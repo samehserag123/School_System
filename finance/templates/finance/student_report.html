@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>تقرير الطالب</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container mt-5">
+
+<h2>تقرير الطالب: {{ student.name }}</h2>
+
+<table class="table table-bordered mt-4">
+    <thead>
+        <tr>
+            <th>رقم القسط</th>
+            <th>المبلغ المدفوع</th>
+            <th>تاريخ الدفع</th>
+            <th>إيصال</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for payment in payments %}
+        <tr>
+            <td>{{ payment.installment.installment_number }}</td>
+            <td>{{ payment.amount_paid }}</td>
+            <td>{{ payment.payment_date }}</td>
+            <td>
+                <a href="{% url 'print_receipt' payment.id %}" 
+                   class="btn btn-sm btn-primary">
+                   🧾 طباعة
+                </a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4">لا توجد دفعات</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+</body>
+</html>

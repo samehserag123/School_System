@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة التحكم{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4 text-center fw-bold">📊 لوحة التحكم المالية</h2>
+
+<!-- Live Counters -->
+<div class="row text-center mb-4">
+
+    <div class="col-md-3">
+        <div class="card shadow border-0 p-3">
+            <h6 class="text-muted">تحصيل اليوم</h6>
+            <h3 class="text-success fw-bold" id="todayAmount">0</h3>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow border-0 p-3">
+            <h6 class="text-muted">إجمالي التحصيل</h6>
+            <h3 class="text-primary fw-bold" id="totalCollected">0</h3>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow border-0 p-3">
+            <h6 class="text-muted">المتأخرات</h6>
+            <h3 class="text-danger fw-bold" id="remainingAmount">0</h3>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow border-0 p-3">
+            <h6 class="text-muted">عدد الطلبة</h6>
+            <h3 class="text-dark fw-bold" id="studentsCount">0</h3>
+        </div>
+    </div>
+
+</div>
+
+<div class="row text-center mb-4">
+    <div class="col-md-12">
+        <div class="card shadow border-0 p-3">
+            <h6 class="text-muted">عدد الأقساط المتأخرة</h6>
+            <h3 class="text-warning fw-bold" id="overdueInstallments">0</h3>
+        </div>
+    </div>
+</div>
+
+
+<!-- Chart -->
+<div class="card border-0 shadow-lg mb-4">
+    <div class="card-body">
+        <h5 class="text-center mb-3">📈 ملخص مالي</h5>
+        <canvas id="financeChart"></canvas>
+    </div>
+</div>
+
+<!-- Activity Feed -->
+<div class="card border-0 shadow-lg mb-4">
+    <div class="card-body">
+        <h5 class="mb-3">🔔 آخر العمليات</h5>
+
+        <ul class="list-group" id="activityFeed">
+        </ul>
+
+    </div>
+</div>
+
+<!-- Students Table -->
+<div class="card border-0 shadow-lg mb-4">
+    <div class="card-body">
+        <h5 class="mb-3">👨‍🎓 قائمة الطلبة</h5>
+
+        <div class="table-responsive">
+            <table id="studentsTable" class="table table-hover text-center">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>الاسم الأول</th>
+                        <th>الاسم الأخير</th>
+                        <th>الرقم القومي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    // =========================
+    // Chart Init
+    // =========================
+    const financeChart = new Chart(document.getElementById('financeChart'), {
+        type: 'bar',
+        data: {
+            labels: ['تحصيل اليوم', 'المتأخرات'],
+            datasets: [{
+                data: [0, 0],
+                backgroundColor: [
+                    'rgba(25, 135, 84, 0.7)',
+                    'rgba(220, 53, 69, 0.7)'
+                ],
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // =========================
+    // Load Dashboard Summary
+    // =========================
+    fetch('/api/v1/finance/dashboard-summary/')
+    .then(res => res.json())
+    .then(data => {
+
+        document.getElementById("todayAmount").innerText = data.total_today ?? 0;
+        document.getElementById("remainingAmount").innerText = data.total_remaining ?? 0;
+        document.getElementById("studentsCount").innerText = data.total_students ?? 0;
+        document.getElementById("totalCollected").innerText = data.total_collected ?? 0;
+        document.getElementById("overdueInstallments").innerText = data.overdue_installments ?? 0;
+
+        financeChart.data.datasets[0].data = [
+            data.total_today ?? 0,
+            data.total_remaining ?? 0
+        ];
+
+        financeChart.update();
+
+        // 🔔 Activity Feed
+        let feed = document.getElementById("activityFeed");
+        feed.innerHTML = "";
+
+        if (data.recent_payments && data.recent_payments.length > 0) {
+            data.recent_payments.forEach(item => {
+                feed.innerHTML += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${item.student_name}</strong><br>
+                            <small class="text-muted">${item.date}</small>
+                        </div>
+                        <span class="badge bg-success">${item.amount} جنيه</span>
+                    </li>
+                `;
+            });
+        } else {
+            feed.innerHTML = `<li class="list-group-item text-muted">لا توجد عمليات حديثة</li>`;
+        }
+
+    })
+    .catch(error => console.error("Dashboard Error:", error));
+
+
+
+
+    // =========================
+    // Load Students
+    // =========================
+    
+    fetch("/api/v1/students/")
+    .then(response => response.json())
+    .then(data => {
+
+        if (!data.results) return;
+
+        let tableBody = document.querySelector("#studentsTable tbody");
+        tableBody.innerHTML = "";
+
+        data.results.forEach((student, index) => {
+            tableBody.innerHTML += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${student.first_name}</td>
+                    <td>${student.last_name}</td>
+                    <td>${student.national_id}</td>
+                </tr>
+            `;
+        });
+
+        // تشغيل DataTable
+        $('#studentsTable').DataTable({
+            pageLength: 5,
+            lengthChange: false,
+            language: {
+                search: "بحث:",
+                paginate: {
+                    next: "التالي",
+                    previous: "السابق"
+                },
+                info: "عرض _START_ إلى _END_ من _TOTAL_ طالب",
+                zeroRecords: "لا توجد نتائج"
+            }
+        });
+
+    })
+    .catch(error => console.error("Students Error:", error));
+
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+
+    <!-- jQuery (مهم جدا) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <!-- DataTables CSS -->
+    <link rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+
+    <meta charset="UTF-8">
+    <title>{% block title %}نظام الحسابات{% endblock %}</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+
+    <style>
+        body {
+            overflow-x: hidden;
+        }
+
+        .sidebar {
+            height: 100vh;
+            background-color: #0d6efd;
+            padding-top: 20px;
+        }
+
+        .sidebar a {
+            color: white;
+            padding: 12px 20px;
+            display: block;
+            text-decoration: none;
+            transition: 0.3s;
+        }
+
+        .sidebar a:hover {
+            background-color: rgba(255,255,255,0.2);
+        }
+
+        .content {
+            padding: 30px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container-fluid">
+    <div class="row">
+
+        <!-- Sidebar -->
+        <div class="col-md-2 sidebar">
+
+            <h5 class="text-white text-center mb-4">
+                <i class="bi bi-building"></i> الإدارة
+            </h5>
+
+            <a href="{% url 'finance_dashboard' %}">
+                <i class="bi bi-speedometer2"></i> لوحة التحكم
+            </a>
+
+            <a href="#">
+                <i class="bi bi-people"></i> الطلاب
+            </a>
+
+            <a href="#">
+                <i class="bi bi-receipt"></i> المدفوعات
+            </a>
+
+            <a href="{% url 'close_month' %}">
+                <i class="bi bi-lock"></i> إقفال الشهر
+            </a>
+
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-10 content bg-light">
+            
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-info text-center shadow-sm">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% block content %}{% endblock %}
+
+        </div>
+
+    </div>
+</div>
+
+<!-- Bootstrap JS (مهم للمستقبل) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Page Specific JS -->
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>
