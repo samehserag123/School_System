@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة أنظمة التقسيط{% endblock %}
+
+{% block content %}
+<div class="container py-5 text-white">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-info"><i class="bi bi-clipboard-data me-2"></i> أنظمة التقسيط المتاحة</h2>
+        <a href="/admin/finance/installmentplan/add/" class="btn btn-success">
+            <i class="bi bi-plus-circle me-1"></i> إضافة نظام جديد
+        </a>
+    </div>
+
+    <div class="row g-4">
+        {% for plan in plans %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 bg-dark border-secondary shadow" style="border-radius: 20px;">
+                <div class="card-header bg-primary bg-opacity-10 border-secondary p-3 text-center">
+                    <h5 class="mb-0 fw-bold">{{ plan.name }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted small">إجمالي المبلغ:</span>
+                        <span class="badge bg-info fs-6">{{ plan.total_amount }} ج.م</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-4">
+                        <span class="text-muted small">عدد الأقساط:</span>
+                        <span class="badge bg-secondary">{{ plan.number_of_installments }}</span>
+                    </div>
+
+                    <h6 class="text-warning small mb-3 border-bottom border-secondary pb-2">جدول الأقساط المبرمج:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-dark table-borderless small mb-0">
+                            <thead>
+                                <tr class="text-muted">
+                                    <th>م</th>
+                                    <th>المبلغ</th>
+                                    <th>التاريخ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in plan.items.all %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ item.amount }} ج</td>
+                                    <td>{{ item.due_date|date:"d/m/Y" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-center text-muted">لم يتم تحديد أقساط بعد</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-secondary text-center">
+                    <a href="/admin/finance/installmentplan/{{ plan.id }}/change/" class="btn btn-outline-info btn-sm w-100">
+                        <i class="bi bi-pencil-square me-1"></i> تعديل النظام
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

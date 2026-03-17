@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>إيصال استلام نقدية - {{ payment.id }}</title>
+    <style>
+        /* إعدادات الصفحة للطباعة الحرارية */
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            width: 75mm;
+            margin: 0 auto;
+            padding: 5mm;
+            font-size: 12px;
+            color: #000;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 1px dashed #000;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+        }
+        .header h3 { margin: 2px 0; font-size: 14px; }
+        .header h4 { margin: 2px 0; font-size: 13px; }
+        
+        .receipt-title {
+            text-align: center;
+            font-weight: bold;
+            text-decoration: underline;
+            margin: 10px 0;
+            font-size: 15px;
+        }
+        
+        .details { margin-bottom: 10px; }
+        .details div { margin-bottom: 5px; line-height: 1.4; }
+        .label { font-weight: bold; }
+        
+        .amount-box {
+            border: 1px solid #000;
+            text-align: center;
+            padding: 5px;
+            margin: 10px 0;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .footer {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 11px;
+            border-top: 1px dashed #000;
+            padding-top: 5px;
+        }
+        
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        /* إخفاء الأزرار عند الطباعة */
+        @media print {
+            .no-print { display: none; }
+        }
+        .btn-print {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="no-print">
+        <button class="btn-print" onclick="window.print()">🖨️ طباعة الإيصال الآن</button>
+        <a href="{% url 'quick_collection' %}" style="display:block; text-align:center; margin-top:10px; color:#666;">العودة للتحصيل</a>
+    </div>
+
+    <div class="header">
+        <h4>محافظة القاهرة</h4>
+        <h4>إدارة عين شمس التعليمية</h4>
+        <h3>مدرسة طلعت حرب الفندقيه</h3>
+    </div>
+
+    <div class="receipt-title">إيصال استلام نقدية</div>
+
+    <div class="details">
+        <div><span class="label">رقم السند:</span> {{ payment.id }}</div>
+        <div><span class="label">التاريخ:</span> {{ payment.created_at|date:"d/m/Y H:i" }}</div>
+        <hr style="border: 0.5px dashed #ccc;">
+        <div><span class="label">استلمنا من الطالب:</span> {{ payment.student.get_full_name }}</div>
+        <div><span class="label">الصف الدراسي:</span> {{ payment.student.grade.name }}</div>
+        <div><span class="label">وذلك عن:</span> {{ payment.revenue_category.name }}</div>
+        {% if payment.notes %}
+        <div><span class="label">ملاحظات:</span> {{ payment.notes }}</div>
+        {% endif %}
+    </div>
+
+    <div class="amount-box">
+        المبلغ: {{ payment.amount_paid }} ج.م
+    </div>
+
+    <div class="signatures">
+        <span>توقيع المستلم:</span>
+        <span>توقيع المدير:</span>
+    </div>
+
+    <div class="footer">
+        نظام إدارة شؤون الطلاب - طلعت حرب الفندقيه
+        <br>
+        شكراً لكم
+    </div>
+
+    <script>
+        // تشغيل أمر الطباعة تلقائياً عند تحميل الصفحة (اختياري)
+        // window.onload = function() { window.print(); }
+    </script>
+</body>
+</html>

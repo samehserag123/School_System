@@ -44,8 +44,12 @@ INSTALLED_APPS = [
     'accounts',
     'reports',
     'audit',
+    'crispy_forms',
+    'crispy_bootstrap5',
 
 ]
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -66,14 +70,15 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'config.context_processors.active_academic_year',
             ],
         },
     },
 ]
-
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
@@ -123,6 +128,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+# أضف هذا السطر ليتمكن Django من العثور على مجلد static الخاص بك
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
+
+# للإنتاج (عندما ترفع الموقع على سيرفر حقيقي)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -133,3 +145,14 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
 }
 
+import os
+
+# إعدادات Celery
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+
+# إيميل المدير لاستقبال التنبيهات
+ADMIN_EMAIL = 'admin@school.com'
+DEFAULT_FROM_EMAIL = 'system@school.com'

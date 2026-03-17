@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}إيصال استلام نقدية - نسختين{% endblock %}
+{% block content %}
+<div class="container d-print-block" style="padding: 0;">
+    <style>
+        @media print {
+    /* 1. إعدادات الورقة والأساسيات */
+        @page { 
+            size: A4 portrait; 
+            margin: 0; 
+        }
+        
+        /* 2. إجبار الموقع على خلفية بيضاء عند الطباعة */
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background: #fff !important;
+            color: #000 !important;
+        }
+        
+        /* 3. عزل الإيصال عن أي تنسيقات غامقة */
+        .receipt-container, .receipt-container * {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            border-color: #000000 !important;
+        }
+
+        /* 4. إخفاء العناصر غير المرغوبة */
+        .d-print-none, nav, footer, .sidebar, .navbar, header, .btn { 
+            display: none !important; 
+        }
+        
+        /* 5. ضبط التحجيم */
+        .print-wrapper {
+            transform: scale(0.94); 
+            transform-origin: top center;
+            margin-top: 2mm;
+        }
+}
+        .cut-here {
+            border-top: 2px dashed #444;
+            margin: 5px 0;
+            text-align: center;
+            position: relative;
+            height: 1px;
+        }
+
+        .cut-here:after {
+            content: "✂ قُص من هنا (نسخة الطالب / نسخة المدرسة) ✂";
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            padding: 0 15px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #444;
+        }
+
+        .copy-tag {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: #000;
+            color: #fff;
+            padding: 2px 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            z-index: 10;
+        }
+        /* تنسيق الإيصال على الشاشة عشان يكون الكلام واضح */
+        .receipt-container {
+            background-color: #f8f9fa !important; /* خلفية فاتحة مريحة للعين داخل الإيصال */
+            color: #000000 !important;             /* نص أسود عشان المراجعة */
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+        }
+
+        /* التأكد إن كل النصوص داخل الإيصال لونها أسود */
+        .receipt-container p, 
+        .receipt-container span, 
+        .receipt-container div, 
+        .receipt-container td {
+            color: #000000 !important;
+        }
+        
+    </style>
+
+    <div class="print-wrapper">
+        <div class="receipt-container">
+            <span class="copy-tag">نسخة الطالب</span>
+            {% include "finance/receipt_content_snippet.html" %}
+        </div>
+
+        <div class="cut-here d-print-block"></div>
+
+        <div class="receipt-container">
+            <span class="copy-tag">نسخة المدرسة</span>
+            {% include "finance/receipt_content_snippet.html" %}
+        </div>
+    </div>
+
+    <div class="text-center d-print-none mt-4 mb-5">
+        <button onclick="window.print()" class="btn btn-dark btn-lg px-5 shadow border-2">
+            <i class="bi bi-printer me-2"></i> طباعة الإيصالين (A4)
+        </button>
+        <a href="{% url 'quick_collection' %}" class="btn btn-outline-primary btn-lg ms-2">تحصيل جديد</a>
+        <a href="{% url 'student_list' %}" class="btn btn-outline-secondary btn-lg ms-2">العودة للرئيسية</a>
+    </div>
+</div>
+{% endblock %}

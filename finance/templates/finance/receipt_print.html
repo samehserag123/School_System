@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block title %}إيصال استلام نقدية - نسختين{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-2">
+    <style>
+        /* إعدادات الطباعة المتقدمة لضبط القياسات */
+        @media print {
+            @page { 
+                size: A4 portrait; 
+                margin: 5mm; /* هامش صغير جداً للسماح للطابعة بالعمل دون ترحيل الصفحات */
+            }
+            body { 
+                background: white !important; 
+                margin: 0; 
+                padding: 0; 
+            }
+            /* إخفاء كافة عناصر الموقع غير الضرورية */
+            .d-print-none, .sidebar, .navbar, nav, footer, .btn { 
+                display: none !important; 
+            }
+            /* إجبار الحاوية على أخذ العرض الكامل */
+            .container, .container-fluid {
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            /* تصغير بسيط جداً لضمان عدم حدوث Page Break مفاجئ */
+            .print-wrapper { 
+                transform: scale(0.98); 
+                transform-origin: top center; 
+            }
+        }
+
+        /* تنسيق الإيصال ليأخذ نصف الصفحة تقريباً */
+        .receipt-card-a4 {
+            border: 2px solid #000;
+            padding: 15px;
+            margin: 0 auto 10px auto;
+            width: 100%;
+            max-width: 800px;
+            background: #fff;
+            position: relative;
+            box-sizing: border-box;
+            page-break-inside: avoid; /* منع قطع الإيصال نفسه */
+        }
+
+        /* خط القص الفاصل */
+        .cut-line {
+            border-top: 2px dashed #444;
+            margin: 10px 0;
+            text-align: center;
+            position: relative;
+            height: 1px;
+        }
+        .cut-line:after {
+            content: "✂ قُص من هنا (نسخة المدرسة / نسخة الطالب) ✂";
+            position: absolute;
+            top: -12px; left: 50%;
+            transform: translateX(-50%);
+            background: #fff; 
+            padding: 0 10px;
+            font-size: 11px;
+            color: #444;
+        }
+
+        .copy-label {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: #000;
+            color: #fff;
+            padding: 2px 8px;
+            font-size: 9px;
+            font-weight: bold;
+        }
+    </style>
+
+    <div class="print-wrapper">
+        <div class="receipt-card-a4">
+            <span class="copy-label">نسخة الطالب</span>
+            {% include "finance/receipt_content_snippet.html" %}
+        </div>
+
+        <div class="cut-line d-print-block"></div>
+
+        <div class="receipt-card-a4">
+            <span class="copy-label">نسخة المدرسة</span>
+            {% include "finance/receipt_content_snippet.html" %}
+        </div>
+    </div>
+
+    <div class="text-center mt-4 mb-5 d-print-none">
+        <button onclick="window.print()" class="btn btn-dark btn-lg px-5 shadow border-2">
+            <i class="bi bi-printer me-2"></i> طباعة النسختين معاً (A4)
+        </button>
+        <a href="{% url 'quick_collection' %}" class="btn btn-outline-primary btn-lg ms-2">تحصيل جديد</a>
+        <a href="{% url 'finance_dashboard' %}" class="btn btn-outline-secondary btn-lg ms-2">العودة للرئيسية</a>
+    </div>
+</div>
+{% endblock %}

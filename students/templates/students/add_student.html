@@ -1,93 +1,122 @@
-{% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-success">
-        {{ message }}
-    </div>
-  {% endfor %}
-{% endif %}
-
-
+{% extends "base.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Add Student</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
 
-<body class="bg-light">
+{% block extra_css %}
+<style>
+    /* 1. تنسيق البطاقة الرئيسية (لتكون داكنة بالكامل) */
+    .student-card {
+        background-color: #1a1d21 !important;
+        border: 1px solid #2d3238 !important;
+        border-radius: 20px !important;
+        padding: 40px !important;
+    }
 
-<div class="container mt-5">
-    <div class="card shadow-lg border-0">
-        <div class="card-header bg-primary text-white">
-            <h4 class="mb-0">إضافة طالب جديد</h4>
+    /* 2. تنسيق موحد لجميع المربعات (للتخلص من اللون الأبيض) */
+    .form-control, .form-select, .input-group .form-control {
+        background-color: #0f1113 !important; /* خلفية سوداء */
+        color: #ffffff !important; /* نص أبيض */
+        border: 1px solid #334155 !important; /* إطار رمادي داكن */
+        padding: 12px !important;
+        border-radius: 8px !important;
+        box-shadow: none !important; /* إزالة الظل الافتراضي */
+    }
+
+    /* 3. تنسيق خاص للأيقونة الملحقة لتناسب الثيم الداكن */
+    .input-group-text {
+        background-color: #1a1d21 !important; /* نفس خلفية الصفحة */
+        border: 1px solid #334155 !important;
+        color: #ffc107 !important; /* لون الأيقونة أصفر */
+    }
+
+    /* 4. تنسيق الزر (للحفاظ على شكله) */
+    .btn-save {
+        background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+        border: none;
+        padding: 12px 50px;
+        border-radius: 50px;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="card student-card shadow-lg">
+        <h3 class="text-center fw-bold text-white mb-5">إضافة بيانات الطالب</h3>
+        
+        {% if form.errors %}
+        <div class="alert alert-danger">
+            <ul>
+                {% for field, errors in form.errors.items %}
+                    <li>{{ field.label }}: {{ errors|striptags }}</li>
+                {% endfor %}
+            </ul>
         </div>
+        {% endif %}
 
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">الاسم الأول</label>
-                        {{ form.first_name }}
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">اسم العائلة</label>
-                        {{ form.last_name }}
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">الرقم القومي</label>
-                        {{ form.national_id }}
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">تاريخ الميلاد</label>
-                        {{ form.date_of_birth }}
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">النوع</label>
-                        {{ form.gender }}
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">الصف</label>
-                        {{ form.grade }}
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">الفصل</label>
-                    {{ form.classroom }}
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">السنة الدراسية</label>
+        <form method="post" id="studentForm">
+            {% csrf_token %}
+            
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <label class="form-label text-info">السنة الدراسية</label>
                     {{ form.academic_year }}
                 </div>
-
-                <div class="mb-3">
-                    <label class="form-label">نظام التقسيط</label>
-                    {{ form.installment_plan }}
+                <div class="col-md-3">
+                    <label class="form-label text-info">الاسم الأول</label>
+                    {{ form.first_name }}
                 </div>
-
-                <div class="text-end">
-                    <button type="submit" class="btn btn-success px-4">
-                        حفظ الطالب
-                    </button>
+                <div class="col-md-3">
+                    <label class="form-label text-info">اسم العائلة</label>
+                    {{ form.last_name }}
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label text-info">الصف الدراسي</label>
+                    {{ form.grade }}
+                </div>
+            </div>
 
-            </form>
-        </div>
+            <div class="row g-4 mb-5 justify-content-center">
+                <div class="col-md-6">
+                    <label class="form-label text-warning fw-bold">الرقم القومي (14 رقم)</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-warning border-0 text-dark"><i class="bi bi-card-text"></i></span>
+                        {{ form.national_id }}
+                    </div>
+                    <small class="text-muted">تأكد من إدخال 14 رقماً صحيحاً بدون حروف.</small>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <button type="submit" class="btn btn-save text-white shadow px-5 py-2">
+                    <i class="bi bi-check-circle me-2"></i> حفظ البيانات
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
-</body>
-</html>
+<script>
+// ... كود الجافا سكريبت الخاص بك ...
+    document.addEventListener("DOMContentLoaded", function() {
+        // نحدد جميع الحقول التي نريد التنقل بينها (المدخلات والقوائم المنسدلة)
+        const form = document.getElementById("studentForm");
+        const inputs = Array.from(form.querySelectorAll("input, select, button")).filter(el => el.type !== "hidden");
+
+        inputs.forEach((input, index) => {
+            input.addEventListener("keydown", function(e) {
+                if (e.key === "Enter") {
+                    e.preventDefault(); // منع إرسال النموذج فوراً عند الضغط على Enter
+                    
+                    const nextInput = inputs[index + 1];
+                    if (nextInput) {
+                        nextInput.focus(); // الانتقال للحقل التالي
+                    } else {
+                        form.submit(); // إذا كان الحقل الأخير (زر الحفظ)، قم بإرسال النموذج
+                    }
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

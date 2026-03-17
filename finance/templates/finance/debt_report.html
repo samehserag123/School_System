@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block title %}تقرير مديونيات الطلاب{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 pb-5">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+            <h4 class="mb-0"><i class="bi bi-file-earmark-ruled me-2"></i> سجل المديونيات المستحقة</h4>
+            <div class="d-print-none">
+                <button onclick="window.print()" class="btn btn-light btn-sm fw-bold">
+                    <i class="bi bi-printer me-1"></i> طباعة (PDF)
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <form method="get" id="filterForm" class="row g-3 mb-4 d-print-none align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-muted small">السنة الدراسية</label>
+                    <select name="academic_year" class="form-select border-primary" onchange="this.form.submit()">
+                        <option value="">--- اختر السنة ---</option>
+                        {% for year in years %}
+                            <option value="{{ year.id }}" {% if selected_year == year.id %}selected{% endif %}>
+                                {{ year.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-muted small">بحث عن طالب (اسم أو كود)</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-primary"><i class="bi bi-search"></i></span>
+                        <input type="text" name="q" class="form-control border-primary" 
+                               placeholder="اكتب الاسم هنا..." value="{{ request.GET.q }}">
+                        <button class="btn btn-primary" type="submit">بحث</button>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <a href="{% url 'debt_report' %}" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-arrow-clockwise"></i> تصفية
+                    </a>
+                </div>
+            </form>
+
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-light border-start border-danger border-4 shadow-sm">
+                        <div class="card-body py-2">
+                            <p class="text-muted small mb-1">إجمالي المديونيات المتبقية</p>
+                            <h3 class="text-danger fw-bold mb-0">{{ total_debts_sum|default:"0" }} <small class="fs-6 text-dark">ج.م</small></h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light border-start border-primary border-4 shadow-sm">
+                        <div class="card-body py-2">
+                            <p class="text-muted small mb-1">عدد الطلاب المديونين</p>
+                            <h3 class="text-primary fw-bold mb-0">{{ report_data|length }} <small class="fs-6 text-dark">طالب</small></h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-sm align-middle">
+                    <thead class="table-light border-bottom border-dark text-center">
+                        <tr>
+                            <th>#</th>
+                            <th class="text-start">اسم الطالب</th>
+                            <th>كود الطالب</th>
+                            <th>الصف</th>
+                            <th>المطلوب</th>
+                            <th>المدفوع</th>
+                            <th class="table-danger">المتبقي</th>
+                            <th class="d-print-none">إجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-center">
+                        {% for item in report_data %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td class="text-start fw-bold text-dark">{{ item.student.get_full_name }}</td>
+                            <td><span class="badge bg-secondary opacity-75">{{ item.student.student_code }}</span></td>
+                            <td>{{ item.student.grade.name }}</td>
+                            <td class="text-muted">{{ item.required }}</td>
+                            <td class="text-success">{{ item.paid }}</td>
+                            <td class="fw-bold text-danger fs-6">{{ item.remaining }}</td>
+                            <td class="d-print-none">
+                                <a href="{% url 'quick_collection' %}?student_id={{ item.student.id }}" 
+                                   class="btn btn-sm btn-outline-primary py-0" title="تحصيل سريع">
+                                    <i class="bi bi-plus-circle"></i> سداد
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="py-5 text-center bg-light">
+                                <div class="text-muted">
+                                    <i class="bi bi-emoji-smile fs-1 d-block mb-2"></i>
+                                    لا توجد مديونيات مستحقة بناءً على البحث الحالي.
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card-footer bg-white d-none d-print-block">
+            <div class="d-flex justify-content-between small text-muted">
+                <span>تم استخراج التقرير بواسطة: {{ request.user.get_full_name|default:request.user.username }}</span>
+                <span>التاريخ: {% now "Y/m/d H:i" %}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media print {
+        @page { size: A4 portrait; margin: 1cm; }
+        .container-fluid { width: 100% !important; padding: 0 !important; }
+        .card { box-shadow: none !important; border: 1px solid #000 !important; }
+        .btn, .form-label, .input-group, select, .d-print-none { display: none !important; }
+        .table { border-collapse: collapse !important; width: 100% !important; }
+        .table th, .table td { border: 1px solid #ccc !important; font-size: 10pt !important; padding: 5px !important; }
+        .text-danger { color: #dc3545 !important; }
+        body { background-color: white !important; font-size: 10pt; }
+    }
+</style>
+{% endblock %}

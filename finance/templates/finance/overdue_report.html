@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}تقرير المتأخرات الحرجة{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 bg-white p-3 rounded-3 shadow-sm border-end border-danger border-5">
+        <div>
+            <h3 class="fw-bold text-danger m-0">رادار المديونيات المتأخرة</h3>
+            <p class="text-muted small mb-0">حصر الطلاب المتجاوزين لمواعيد السداد حتى تاريخ {{ today }}</p>
+        </div>
+        <div class="d-print-none">
+            <button onclick="window.print()" class="btn btn-dark shadow-sm">
+                <i class="bi bi-printer me-2"></i> طباعة التقرير
+            </button>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-danger text-white border-0 shadow">
+                <div class="card-body">
+                    <h6 class="small fw-bold">إجمالي المبالغ المتأخرة</h6>
+                    <h2 class="fw-bold">{{ total_overdue|floatformat:2 }} ج.م</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 text-center">
+                <thead class="bg-light">
+                    <tr>
+                        <th>اسم الطالب</th>
+                        <th>الصف</th>
+                        <th>تاريخ الاستحقاق</th>
+                        <th>المبلغ المطلوب</th>
+                        <th>أيام التأخير</th>
+                        <th class="d-print-none">الإجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in overdue_items %}
+                    <tr>
+                        <td class="fw-bold text-dark text-end px-4">
+                            {{ item.student.get_full_name }}
+                            <div class="small text-muted" style="font-size: 0.7rem;">رقم ولي الأمر: {{ item.student.parent_phone }}</div>
+                        </td>
+                        <td><span class="badge bg-secondary">{{ item.student.grade.name }}</span></td>
+                        <td class="text-danger fw-bold">{{ item.due_date|date:"Y-m-d" }}</td>
+                        <td class="fw-bold">{{ item.amount_due }} ج.م</td>
+                        <td>
+                            <span class="text-danger fw-bold">
+                                {{ today|subtract_dates:item.due_date }} يوم
+                            </span>
+                        </td>
+                        <td class="d-print-none">
+                            <a href="{% url 'quick_collection' %}?student_id={{ item.student.id }}" class="btn btn-sm btn-outline-success">
+                                تحصيل الآن
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="py-5 text-muted">
+                            <i class="bi bi-check-circle-fill text-success display-4"></i>
+                            <p class="mt-2">لا توجد مديونيات متأخرة حالياً، النظام المالي مستقر.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media print {
+        .sidebar, .top-navbar, .d-print-none { display: none !important; }
+        .main-content { margin-right: 0 !important; padding: 0 !important; }
+        .card { border: none !important; box-shadow: none !important; }
+        table { border: 1px solid #dee2e6 !important; }
+        body { background-color: white !important; }
+    }
+</style>
+{% endblock %}

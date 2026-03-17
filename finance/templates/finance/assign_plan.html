@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block title %}تسكين الطلاب - نظام الأقساط الذكي{% endblock %}
+
+{% block content %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-11 col-lg-9">
+            
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm mb-4" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="card shadow-lg border-0 bg-dark text-white" style="border-radius: 20px; overflow: hidden;">
+                <div class="card-header bg-primary bg-gradient p-4 border-0">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
+                                <i class="bi bi-shield-check fs-3 text-white"></i>
+                            </div>
+                            <div>
+                                <h4 class="mb-0 fw-bold">تسكين البرنامج المالي</h4>
+                                <small class="text-white text-opacity-75">سنة دراسية: {{ active_year|default:"2028/2029" }}</small>
+                            </div>
+                        </div>
+                        
+                        {% if account and account.installment_plan %}
+                        <div class="text-end" dir="rtl">
+                            <span class="badge bg-warning text-dark fw-bold p-2 px-3 shadow-sm">
+                                <i class="bi bi-info-circle me-1"></i> الخطة الحالية: {{ account.installment_plan.name }}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+                    <form method="POST" id="assignmentForm" action="{% if selected_student %}{% url 'assign_plan_with_id' selected_student.id %}{% else %}{% url 'assign_plan' %}{% endif %}">
+                        {% csrf_token %}
+                        
+                        {% if selected_student %}
+                            <input type="hidden" name="student" value="{{ selected_student.id }}">
+                            <input type="hidden" name="academic_year" value="{{ selected_student.academic_year.id }}">
+                        {% endif %}
+
+                        <div class="row mb-4" dir="rtl">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-info fw-bold mb-2 small">السنة الدراسية</label>
+                                <select id="academic_year_select" class="form-select bg-secondary bg-opacity-25 text-white border-secondary p-3 shadow-none" {% if selected_student %}disabled style="background-color: #1a1d20 !important;"{% else %}name="academic_year" required{% endif %}>
+                                    {% for y in years %}
+                                        <option value="{{ y.id }}" {% if selected_student and selected_student.academic_year.id == y.id %}selected{% elif y.is_active and not selected_student %}selected{% endif %}>
+                                            {{ y.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label text-info fw-bold mb-2 small">اسم الطالب</label>
+                                <select id="student_select" class="form-control" {% if selected_student %}disabled{% else %}name="student" required{% endif %}>
+                                    {% if selected_student %}
+                                        <option value="{{ selected_student.id }}" selected>{{ selected_student.get_full_name }}</option>
+                                    {% else %}
+                                        <option value="">ابحث عن اسم الطالب...</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <hr class="border-secondary opacity-25 mb-4">
+
+                        <div class="mb-4" dir="rtl">
+                            <label class="form-label text-info fw-bold mb-3 small d-block">اختر البرنامج المالي المتاح:</label>
+                            <select name="plan_id" id="plan_select" class="form-select form-select-lg bg-dark text-white border-info p-3 fw-bold" required>
+                                <option value="" data-amount="0">-- اختر خطة الدفع من القائمة --</option>
+                                {% for p in plans %}
+                                    <option value="{{ p.id }}" 
+                                            data-name="{{ p.name }}"
+                                            data-amount="{{ p.total_amount }}" 
+                                            data-details='[ {% for item in p.items.all %}{"name":"{{ item.installment_name }}", "amount":"{{ item.amount }}", "date":"{{ item.due_date|date:"Y-m-d" }}"}{% if not forloop.last %},{% endif %}{% endfor %} ]'>
+                                        {{ p.name }} (إجمالي: {{ p.total_amount }} ج.م)
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div id="financialPreview" class="d-none mb-4" dir="rtl">
+                            <h6 class="text-info mb-3 fw-bold"><i class="bi bi-list-check me-2"></i> مواعيد ومبالغ الأقساط الحقيقية:</h6>
+                            <div class="table-responsive rounded-3 border border-secondary">
+                                <table class="table table-dark table-hover mb-0 text-center">
+                                    <thead class="table-secondary text-dark">
+                                        <tr>
+                                            <th>اسم القسط</th>
+                                            <th>المبلغ</th>
+                                            <th>تاريخ الاستحقاق</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="preview_body">
+                                        </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div id="financialSummary" class="alert alert-info border-0 shadow-sm d-none mb-4" style="border-radius: 12px; background: rgba(13, 202, 240, 0.15);">
+                            <div class="d-flex justify-content-between align-items-center" dir="rtl">
+                                <div>
+                                    <span class="fw-bold d-block"><i class="bi bi-wallet2 me-2"></i> الخطة المختارة: <span id="selectedPlanName" class="text-white"></span></span>
+                                    <small class="text-info opacity-75">سيتم استبدال الأقساط القديمة فور الاعتماد</small>
+                                </div>
+                                <span class="fs-4 fw-bold text-info" id="netAmountDisplay">0.00 ج.م</span>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" id="submitBtn" class="btn btn-info btn-lg fw-bold py-3 shadow-lg">
+                                <i class="bi bi-shield-check me-2"></i> اعتماد الخطة وتحديث الأقساط
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-select-lg { font-size: 1.1rem; border-radius: 12px; }
+    .select2-container--default .select2-selection--single {
+        background-color: #2b3035 !important; border: 1px solid #495057 !important; height: 58px !important; display: flex; align-items: center; border-radius: 10px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered { color: white !important; padding-right: 15px; text-align: right; }
+</style>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    const planSelect = $('#plan_select');
+    const netDisplay = $('#netAmountDisplay');
+    const planNameDisplay = $('#selectedPlanName');
+    const previewDiv = $('#financialPreview');
+    const previewBody = $('#preview_body');
+
+    // معالجة اختيار الخطة
+    planSelect.on('change', function() {
+        const selected = $(this).find('option:selected');
+        const amount = parseFloat(selected.data('amount')) || 0;
+        const planName = selected.data('name');
+        let details = selected.data('details');
+
+        if (amount > 0) {
+            planNameDisplay.text(planName);
+            netDisplay.text(amount.toLocaleString('ar-EG') + ' ج.م');
+            $('#financialSummary').removeClass('d-none');
+            
+            previewBody.empty();
+            if (Array.isArray(details)) {
+                details.forEach(function(item) {
+                    let installmentName = item.name && item.name !== "None" ? item.name : "قسط دراسي";
+                    previewBody.append(`
+                        <tr>
+                            <td class="text-info fw-bold">${installmentName}</td>
+                            <td class="fw-bold text-white">${parseFloat(item.amount).toLocaleString('ar-EG')} ج.م</td>
+                            <td class="text-warning fw-bold">${item.date}</td>
+                        </tr>
+                    `);
+                });
+                previewDiv.removeClass('d-none');
+            }
+        } else {
+            $('#financialSummary, #financialPreview').addClass('d-none');
+        }
+    });
+
+    // تفعيل البحث عن الطلاب
+    const studentSelect = $('#student_select');
+    if (studentSelect.length && !studentSelect.is(':disabled')) {
+        studentSelect.select2({
+            dir: "rtl",
+            ajax: {
+                url: "{% url 'get_students_by_year' %}",
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return { q: params.term, academic_year: $('#academic_year_select').val() };
+                },
+                processResults: function (data) { return { results: data.results }; }
+            }
+        });
+    }
+
+    $('#assignmentForm').on('submit', function() {
+        $('#submitBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span> جاري الحفظ والتحديث...');
+    });
+});
+</script>
+{% endblock %}

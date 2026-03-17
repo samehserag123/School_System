@@ -1,115 +1,313 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-
-    <!-- jQuery (مهم جدا) -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-    <!-- DataTables CSS -->
-    <link rel="stylesheet"
-      href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-
-    <!-- DataTables JS -->
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-
-
     <meta charset="UTF-8">
-    <title>{% block title %}نظام الحسابات{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}نظام الإدارة المدرسية{% endblock %}</title>
 
-    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
 
     <style>
+        :root {
+            --bg-dark: #0f1113;
+            --sidebar-bg: #1a1d21;
+            --accent-color: #0dcaf0;
+            --text-muted: #cbd5e1;
+            --danger-soft: #ea868f;
+        }
+
         body {
+            font-family: 'Cairo', sans-serif;
+            background-color: var(--bg-dark);
+            color: #ffffff;
+            margin: 0;
             overflow-x: hidden;
         }
 
+        /* --- Sidebar Style --- */
         .sidebar {
             height: 100vh;
-            background-color: #0d6efd;
+            background: var(--sidebar-bg);
             padding-top: 20px;
+            position: fixed;
+            width: 250px;
+            right: 0;
+            z-index: 1000;
+            border-left: 1px solid #333;
+            transition: all 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .sidebar h5 {
+            color: var(--accent-color);
+            font-weight: 700;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #2d3238;
+            margin-bottom: 20px;
         }
 
         .sidebar a {
-            color: white;
+            color: var(--text-muted);
             padding: 12px 20px;
             display: block;
             text-decoration: none;
             transition: 0.3s;
+            font-size: 14px;
         }
 
+        .sidebar a i { margin-left: 10px; }
         .sidebar a:hover {
-            background-color: rgba(255,255,255,0.2);
+            background: #2d3238;
+            color: var(--accent-color);
+            padding-right: 30px;
         }
 
-        .content {
+        .sidebar a.active-link {
+            background: rgba(245, 246, 247, 0.1);
+            color: var(--accent-color);
+            font-weight: bold;
+            border-right: 4px solid var(--accent-color);
+        }
+
+        .section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #6c757d;
+            padding: 15px 20px 5px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .admin-action-btn {
+            background: #1e293b;
+            border: 1px solid #334155;
+            margin: 10px 15px;
+            border-radius: 12px;
+            color: var(--accent-color);
+            padding: 12px;
+            display: block;
+            text-decoration: none;
+            text-align: center;
+            font-size: 14px;
+            transition: 0.3s;
+        }
+
+        .main-content {
+            margin-right: 250px;
             padding: 30px;
+            min-height: 100vh;
         }
-    </style>
-</head>
 
+        .top-navbar {
+            background: var(--sidebar-bg);
+            padding: 15px 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            border: 1px solid #333;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; height: auto; position: relative; }
+            .main-content { margin-right: 0; }
+        }
+        /* هذا الكود يجبر الجداول داخل القائمة لتكون بألوان غامقة */
+        /* 1. الجدول العادي يظل كما هو (بدون تغييرات إجبارية) */
+    /* هذا هو الكود الصحيح لعدم تخريب الجداول الأخرى */
+    .table {
+        color: inherit; /* الجداول تأخذ لونها الطبيعي */
+    }
+
+    /* لا نستخدم .table بل نستخدم كلاس خاص للجداول التي تريدها غامقة */
+    .table-dark-custom {
+        color: #ffffff !important;
+    }
+
+    .table-dark-custom tbody tr td {
+        background-color: #1a1d21 !important;
+        color: #ffffff !important;
+        border-color: #333 !important;
+    }
+    /* هذا هو الكود المسؤول عن إزالة المربع الأبيض وجعل الخلفية سوداء */
+    .table td, .table th {
+        background-color: var(--bg-dark) !important; /* إجبار الخلية على أخذ لون الموقع الغامق */
+        color: #ffffff !important; /* إجبار الخط على اللون الأبيض */
+        border-color: #333 !important; /* لون الحدود ليتماشى مع السواد */
+    }
+
+    /* لضمان أن اسم الطالب يظهر بلون أبيض واضح */
+    .table td a {
+        color: #ffffff !important;
+        text-decoration: none;
+        background-color: transparent !important;
+    }
+    /* تغيير لون نص "إجمالي الطلاب" فقط داخل الـ stat-item */
+    .stat-item .small.text-muted {
+        color: #ffffff !important;
+    }
+    /* استهداف نص إجمالي الطلاب داخل الشريط العلوي فقط */
+
+    /* استهداف نص "إجمالي الطلاب" عشان يبقى لونه أبيض */
+    /* هذا الكود يستهدف نص "إجمالي الطلاب" داخل حاويته المحددة */
+    .d-flex.align-items-center.mb-3.px-2 .text-muted.small {
+        color: #ffffff !important;
+    }
+    
+    @media print {
+    /* 1. إخفاء التنبيهات (تم التحصيل بنجاح) */
+    .alert, .alert-success { 
+        display: none !important; 
+    }
+
+    /* 2. إخفاء مربع "شؤون الطلبة" بشكل قاطع */
+    /* بما أننا لا نريد الاعتماد على كلاسات قد تتداخل، سنستهدف الجدول الذي يحتوي الكلمة مباشرة */
+    table:has(td:contains("شؤون الطلاب")), 
+    .d-print-none { 
+        display: none !important; 
+    }
+    
+    /* إذا استمر في الظهور، استخدم هذا السطر البديل (قم بإلغاء التعليق عنه) */
+    /* .receipt-container table:last-of-type { display: none !important; } */
+}
+    
+            </style>
+    {% block extra_css %}{% endblock %}
+</head>
 <body>
 
-<div class="container-fluid">
-    <div class="row">
-
-        <!-- Sidebar -->
-        <div class="col-md-2 sidebar">
-
-            <h5 class="text-white text-center mb-4">
-                <i class="bi bi-building"></i> الإدارة
-            </h5>
-
-            <a href="{% url 'finance_dashboard' %}">
-                <i class="bi bi-speedometer2"></i> لوحة التحكم
-            </a>
-
-            <a href="#">
-                <i class="bi bi-people"></i> الطلاب
-            </a>
-
-            <a href="#">
-                <i class="bi bi-receipt"></i> المدفوعات
-            </a>
-
-            <a href="{% url 'close_month' %}">
-                <i class="bi bi-lock"></i> إقفال الشهر
-            </a>
-
+<div class="sidebar shadow-lg">
+    {% if student and student.id %}
+        <h5><i class="bi bi-person-badge"></i> ملف الطالب</h5>
+        <div class="text-center mb-4 px-3">
+            <span class="d-block fw-bold text-white fs-5">{{ student.get_full_name }}</span>
+            <small class="badge bg-info text-dark mt-2 px-3">{{ student.academic_year.name }}</small>
         </div>
+        
+        <div class="section-title">العمليات المالية</div>
+        
+        <a href="{% url 'assign_plan_with_id' student.id %}">
+            <i class="bi bi-calendar-check text-info"></i> تسكين برنامج مالي
+        </a>
+        
+        <a href="{% url 'quick_collection' %}?student_id={{ student.id }}">
+            <i class="bi bi-cash-stack text-success"></i> تحصيل المصاريف
+        </a>
 
-        <!-- Main Content -->
-        <div class="col-md-10 content bg-light">
-            
+        <a href="{% url 'student_inventory_view' student.id %}" 
+           class="{% if request.resolver_match.url_name == 'student_inventory_view' %}active-link{% endif %}">
+            <i class="bi bi-box-seam text-warning"></i> تسليم الكتب والزي
+        </a>
 
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-info text-center shadow-sm">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
+        <div class="section-title">تقارير وشهادات</div>
 
-            {% block content %}{% endblock %}
+        <a href="javascript:void(0);" onclick="printEnrollmentCertificate()" class="admin-action-btn mt-2" style="color: #ffc107; border-color: rgba(255,193,7,0.3);">
+            <i class="bi bi-printer"></i> طباعة شهادة قيد
+        </a>
 
-        </div>
+        <a href="{% url 'student_list' %}" class="text-info text-center d-block mt-4 border-top border-secondary pt-3 mx-3">
+            <i class="bi bi-arrow-right-circle"></i> العودة للسجل العام
+        </a>
 
+    {% else %}
+        <h5><i class="bi bi-shield-check"></i> لوحة الإدارة</h5>
+        <div class="section-title">العامة</div>
+        <a href="{% url 'finance_dashboard' %}"><i class="bi bi-speedometer2"></i> الرئيسية المالية</a>
+        <a href="{% url 'student_list' %}"><i class="bi bi-people"></i> سجل الطلاب</a>
+
+        <div class="section-title">المهام السريعة</div>
+        <a href="{% url 'assign_plan' %}"><i class="bi bi-clipboard-check text-info"></i> تسكين الطلاب</a>
+        <a href="{% url 'quick_collection' %}"><i class="bi bi-cash-stack text-success"></i> تحصيل مباشر</a>
+        
+        <div class="section-title">المخازن</div>
+        <a href="{% url 'student_list' %}"><i class="bi bi-box-seam text-warning"></i> مركز استلام الكتب والزي</a>
+        
+        <div class="section-title">الحسابات</div>
+        <a href="{% url 'overdue_report' %}"><i class="bi bi-exclamation-triangle text-danger"></i> تقرير المتأخرات</a>
+        <a href="{% url 'close_month' %}"><i class="bi bi-calendar-check text-primary"></i> الحسابات الشهرية</a>
+        
+        <div class="section-title">النظام</div>
+        <a href="/admin/" target="_blank"><i class="bi bi-gear-fill"></i> الإدارة المتقدمة</a>
+    {% endif %}
     </div>
+<div class="main-content">
+    <div class="top-navbar d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 text-info">{% block page_title %}نظام إدارة شؤون الطلاب{% endblock %}</h5>
+        <div class="d-flex align-items-center">
+            <span class="badge bg-dark border border-secondary p-2 shadow-sm">
+                <i class="bi bi-calendar3 me-1 text-info"></i> 
+                {{ active_year.name|default:"لم يتم تحديد سنة" }}
+            </span>
+        </div>
+    </div>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show text-center shadow-sm">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% block content %}{% endblock %}
 </div>
 
-<!-- Bootstrap JS (مهم للمستقبل) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
-<!-- Page Specific JS -->
+<script>
+    // إعداد الـ AJAX للعمل مع CSRF Token
+    $.ajaxSetup({
+        headers: { "X-CSRFToken": "{{ csrf_token }}" }
+    });
+
+    // دالة طباعة شهادة القيد
+    function printEnrollmentCertificate() {
+        {% if student %}
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html dir="rtl">
+            <head>
+                <title>شهادة قيد - {{ student.get_full_name }}</title>
+                <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Cairo&display=swap');
+                    body { font-family: 'Cairo', sans-serif; padding: 40px; text-align: center; border: 15px double #1a1d21; margin: 20px; color: #333; }
+                    .header { font-size: 32px; font-weight: bold; text-decoration: underline; margin-bottom: 40px; color: #000; }
+                    .content { font-size: 22px; line-height: 2.2; text-align: right; margin-bottom: 60px; padding: 0 20px; }
+                    .footer { display: flex; justify-content: space-between; margin-top: 100px; font-weight: bold; font-size: 18px; }
+                    .highlight { font-weight: bold; border-bottom: 1px solid #000; padding: 0 5px; }
+                </style>
+            </head>
+            <body onload="window.print()">
+                <div class="header">شهادة قيد طالب</div>
+                <div class="content">
+                    تشهد إدارة المدرسة بأن الطالب/ <span class="highlight">{{ student.get_full_name }}</span><br>
+                    المولود بتاريخ: <span class="highlight">{{ student.birth_date|date:"Y-m-d"|default:"---" }}</span><br>
+                    مقيد لدينا بالمدرسة في العام الدراسي: <span class="highlight">{{ student.academic_year.name }}</span><br>
+                    بالصف الدراسي: <span class="highlight">{{ student.grade.name }}</span><br>
+                    وقد أعطيت له هذه الشهادة لتقديمها إلى من يهمه الأمر دون أدنى مسؤولية على المدرسة.
+                </div>
+                <div class="footer">
+                    <div>يعتمد،،<br>شؤون الطلاب</div>
+                    <div>ختم المدرسة<br><br>_______</div>
+                    <div>مدير المدرسة<br><br>_______</div>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        {% else %}
+        alert("يرجى اختيار طالب أولاً!");
+        {% endif %}
+    }
+</script>
+
 {% block extra_js %}{% endblock %}
-
 </body>
 </html>

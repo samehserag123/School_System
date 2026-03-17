@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}التحصيل السريع - نظام الإدارة{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-xl-10">
+            <div class="card shadow-sm border-0 bg-dark text-white mb-4 border-bottom border-info border-3">
+                <div class="card-body py-3">
+                    <form method="GET" id="filterForm" class="row g-3 align-items-center">
+                        <div class="col-md-5">
+                            <select name="academic_year" class="form-select bg-dark text-white border-secondary" onchange="this.form.submit()">
+                                <option value="">السنة الدراسية...</option>
+                                {% for y in years %}
+                                    <option value="{{ y.id }}" {% if selected_year == y.id|stringformat:"i" %}selected{% endif %}>{{ y.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="student" id="id_student" class="form-control" required>
+                            <option value="">اختر الطالب...</option>
+                            
+                            {% for s in students %}
+                                <option value="{{ s.id }}" {% if selected_student_id == s.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ s.get_full_name }} 
+                                    {% if s.student_code %}({{ s.student_code }}){% endif %}
+                                </option>
+                            {% endfor %}
+                            
+                        </select>
+                        </div>
+                        <div class="col-md-5">
+                            <select name="grade" class="form-select bg-dark text-white border-secondary" onchange="this.form.submit()">
+                                <option value="">الصف الدراسي...</option>
+                                {% for grade in grades %}
+                                    <option value="{{ grade.id }}" {% if selected_grade == grade.id|stringformat:"i" %}selected{% endif %}>{{ grade.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <a href="{% url 'quick_collection' %}" class="btn btn-outline-light w-100">إعادة ضبط</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow border-0 bg-dark text-white" style="border-radius: 20px;">
+                <div class="card-header bg-primary p-3">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-shield-fill-check me-2"></i> استلام نقدية من طالب</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" id="mainPaymentForm">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label class="form-label text-info fw-bold">اسم الطالب:</label>
+                            <select name="student" id="id_student" class="form-control" required>
+                            <option value="">اختر الطالب...</option>
+                            {% for s in students %}
+                                <option value="{{ s.id }}" {% if selected_student_id == s.id|stringformat:"s" %}selected{% endif %}>
+                                    {# هنا نستخدم الفلاتر للتخلص من None تماماً #}
+                                    {{ s.first_name|default:"" }} {{ s.last_name|default:"" }} 
+                                    ({{ s.student_code|default:"0000" }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                        </div>
+
+                        <div id="arrears_container" class="mb-4" style="display: none;">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card bg-danger bg-opacity-10 border-danger border-start border-4 text-center p-3">
+                                        <small class="text-white-50">المستحق دفعه الآن</small>
+                                        <h4 id="current_due" class="text-danger fw-bold mb-0">0.00</h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card bg-info bg-opacity-10 border-info border-start border-4 text-center p-3">
+                                        <small class="text-white-50">إجمالي المديونية</small>
+                                        <h4 id="total_debt" class="text-info fw-bold mb-0">0.00</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-info fw-bold">بند التحصيل:</label>
+                                <select name="category" id="id_category" class="form-select bg-dark text-white border-secondary" required>
+                                    <option value="">-- اختر الفئة --</option>
+                                    {% for cat in categories %}
+                                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-info fw-bold">المبلغ:</label>
+                                <input type="number" name="amount" id="id_amount" class="form-control bg-dark text-success fw-bold border-secondary" placeholder="0.00" step="0.01" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-info fw-bold">ملاحظات:</label>
+                            <textarea name="notes" id="id_notes" class="form-control bg-dark text-white border-secondary" rows="2"></textarea>
+                        </div>
+
+                        <button type="button" class="btn btn-info w-100 btn-lg fw-bold text-dark mt-3" onclick="handlePreview()">
+                            <i class="bi bi-printer-fill me-2"></i> مراجعة وحفظ العملية
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-light text-dark">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">تأكيد عملية التحصيل</h5>
+            </div>
+            <div class="modal-body p-4">
+                <p>الطالب: <strong id="p_student"></strong></p>
+                <p>المبلغ: <strong id="p_amount" class="text-success"></strong></p>
+                <p>البند: <strong id="p_category"></strong></p>
+                <p id="p_notes_wrapper">ملاحظات: <span id="p_notes"></span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">تعديل</button>
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('mainPaymentForm').submit();">تأكيد الحفظ</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('#id_student').select2({ dir: "rtl", width: '100%' });
+
+    function fetchStudentBalance(studentId) {
+        if (!studentId) return;
+        $.ajax({
+            url: `/finance/get-student-balance/${studentId}/`,
+            method: 'GET',
+            success: function(data) {
+                const totalDebt = Number(data.total_debt);
+                
+                // تحديث القيم مع التنسيق
+                $('#current_due').text(Number(data.current_due).toLocaleString() + " ج.م");
+                $('#total_debt').text(totalDebt.toLocaleString() + " ج.م");
+                
+                // إضافة لون تنبيهي إذا المديونية تخطت 5000 ج.م
+                if (totalDebt > 5000) {
+                    $('#total_debt').addClass('text-warning fw-bold').removeClass('text-info');
+                } else {
+                    $('#total_debt').removeClass('text-warning fw-bold').addClass('text-info');
+                }
+                
+                $('#arrears_container').slideDown();
+            }
+        });
+    }
+
+    $('#id_student').on('change', function() {
+        fetchStudentBalance($(this).val());
+    });
+});
+
+function handlePreview() {
+    const sSelect = $('#id_student');
+    const amount = $('#id_amount').val();
+    const cat = $('#id_category option:selected').text();
+    const notes = $('#id_notes').val();
+
+    if (!sSelect.val() || !amount) {
+        alert("يرجى إدخال البيانات كاملة");
+        return;
+    }
+
+    $('#p_student').text(sSelect.find(':selected').text());
+    $('#p_amount').text(Number(amount).toLocaleString() + " ج.م");
+    $('#p_category').text(cat);
+    $('#p_notes').text(notes);
+    
+    // إظهار المودال الخاص بالمراجعة
+    var myModal = new bootstrap.Modal(document.getElementById('previewModal'));
+    myModal.show();
+}
+</script>
+{% endblock %}
