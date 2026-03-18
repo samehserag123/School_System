@@ -150,14 +150,14 @@ class Student(models.Model):
         old_paid = Payment.objects.filter(student=self).exclude(academic_year=self.academic_year).aggregate(total=models.Sum('amount_paid'))['total'] or 0
         return Decimal(str(max(old_fees - old_paid, 0)))
 
-    # @property
-    # def total_old_debt(self):
-    #     return Decimal(str(self.previous_debt or 0)) + Decimal(str(self.get_old_debt_amount or 0))
-    
     @property
     def total_old_debt(self):
-        # رجعها لأبسط صورة ممكنة عشان السيستم يفتح
-        return float(self.previous_debt or 0) + float(self.get_old_debt_amount or 0)
+        return Decimal(str(self.previous_debt or 0)) + Decimal(str(self.get_old_debt_amount or 0))
+    
+    # @property
+    # def total_old_debt(self):
+    #     # رجعها لأبسط صورة ممكنة عشان السيستم يفتح
+    #     return float(self.previous_debt or 0) + float(self.get_old_debt_amount or 0)
 
     @property
     def current_year_fees_amount(self):
@@ -168,16 +168,25 @@ class Student(models.Model):
     @property
     def total_paid_amount(self):
         from finance.models import Payment, RevenueCategory
+        from django.db.models import Sum
+        from decimal import Decimal
+
         try:
-            # تأكد من كتابة الاسم "المصروفات الاساسيه" بالـ (ه) كما ظهرت في الـ Shell
-            category = RevenueCategory.objects.get(name="المصروفات الاساسيه")
+            # 1. البحث عن الفئة بشكل مرن (يتجاهل الهمزات أو المسافات الزائدة أحياناً)
+            # أو الأفضل: category = RevenueCategory.objects.get(id=1) لو أنت ضامن الـ ID
+            category = RevenueCategory.objects.get(name__icontains="المصروفات الاساسيه")
+            
+            # 2. الفلترة مع التأكد من السنة الدراسية للطالب
             total = Payment.objects.filter(
                 student=self, 
-                academic_year=self.academic_year,
+                academic_year=self.academic_year, # السنة المسكن عليها الطالب حالياً
                 revenue_category=category
             ).aggregate(total=Sum('amount_paid'))['total'] or 0
+            
             return Decimal(str(total))
-        except RevenueCategory.DoesNotExist:
+            
+        except (RevenueCategory.DoesNotExist, RevenueCategory.MultipleObjectsReturned):
+            # في حالة عدم وجود الفئة أو وجود أكثر من واحدة بنفس الاسم
             return Decimal("0.00")
         
     
@@ -197,3 +206,7 @@ class Student(models.Model):
     @property
     def name(self):
         return self.get_full_name()
+    
+    @property
+    def is_new_student(self):
+        return self.enrollment_status == "New"

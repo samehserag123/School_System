@@ -341,10 +341,6 @@ def get_optimized_dashboard_stats(year):
 
 @staff_member_required
 def bulk_promote_students(request):
-    """
-    نسخة محسنة: تسمح بترحيل الجميع أكاديمياً، 
-    ودالة promote_student_action هي من تمنع التسكين المالي للمديونين.
-    """
     if request.method == 'POST':
         student_ids = request.POST.getlist('student_ids')
         target_year_id = request.POST.get('target_year')
@@ -357,15 +353,23 @@ def bulk_promote_students(request):
         eligible_students = Student.objects.filter(id__in=student_ids, is_active=True)
         
         success_count = 0
+        fail_count = 0 # عداد للطلاب اللي مش هيرحلوا بسبب المديونية
+
         try:
             with transaction.atomic():
                 for student in eligible_students:
-                    # هذه الدالة هي التي تحتوي على شرط (if student.total_old_debt <= 0)
+                    # دالتك الأصلية هي اللي بتقرر (لو مديون بترجع False)
                     if promote_student_action(student.id, target_year_id, target_grade_id):
                         success_count += 1
+                    else:
+                        fail_count += 1
                 
                 if success_count > 0:
                     messages.success(request, f"🚀 تم ترحيل {success_count} طالب بنجاح.")
+                
+                if fail_count > 0:
+                    messages.warning(request, f"⚠️ يوجد {fail_count} طالب لم يتم ترحيلهم بسبب وجود مديونية.")
+                    
         except Exception as e:
             messages.error(request, f"❌ حدث خطأ: {str(e)}")
 
@@ -523,66 +527,6 @@ def promote_student_action(student_id, target_year_id, target_grade_id):
             pass
             
     return True
-
-# def promote_student_action(student_id, target_year_id, target_grade_id):
-#     """
-#     ترحيل الطالب مع التحقق المالي:
-#     1. التأكد من خلو الطالب من مديونيات معلقة غير مبررة.
-#     2. ترحيل المتبقي من السنة الحالية إلى previous_debt.
-#     3. تصفير الحساب المالي للسنة الجديدة.
-#     """
-#     try:
-#         student = Student.objects.select_for_update().get(id=student_id)
-#         target_year = AcademicYear.objects.get(id=target_year_id)
-#         target_grade = Grade.objects.get(id=target_grade_id)
-#     except (Student.DoesNotExist, AcademicYear.DoesNotExist, Grade.DoesNotExist):
-#         return False
-
-#     with transaction.atomic():
-#         # 1. حساب المديونية المتبقية من السنة الحالية
-#         old_installments = StudentInstallment.objects.filter(
-#             student=student,
-#             academic_year=student.academic_year
-#         )
-        
-#         # مجموع المبالغ التي لم تُدفع بعد
-#         total_unpaid = sum(inst.remaining_amount() for inst in old_installments)
-
-#         # 2. تحديث بيانات الطالب
-#         # إضافة المديونية المتبقية للحقل previous_debt (تراكمي)
-#         student.previous_debt += total_unpaid 
-#         student.academic_year = target_year
-#         student.grade = target_grade
-#         student.enrollment_status = "Promoted"
-#         student.classroom = None  # تصفير لتوزيعه لاحقاً
-#         student.last_promotion_date = timezone.now().date()
-        
-#         # تحديث حالة المديونية القديمة في الطالب (إذا كان الموديل يدعم has_old_debt)
-#         if student.previous_debt > 0:
-#             student.has_old_debt = True
-#         else:
-#             student.has_old_debt = False
-            
-#         student.save()
-
-#         # 3. معالجة الحساب المالي (StudentAccount)
-#         # نقوم بجلب أو إنشاء الحساب للسنة الجديدة
-#         account, created = StudentAccount.objects.get_or_create(
-#             student=student,
-#             academic_year=target_year, # نربط الحساب بالسنة الجديدة مباشرة
-#             defaults={'installment_plan': None}
-#         )
-        
-#         # إذا كان الحساب موجوداً مسبقاً (قد يكون خطأ أو ترحيل مكرر)، نقوم بتنظيفه
-#         if not created:
-#             account.academic_year = target_year
-#             account.installment_plan = None  # إجبار الإدارة على إعادة التخطيط
-#             account.save()
-            
-#         # 4. (إضافة اختيارية) تصفير الأقساط القديمة إذا أردت أرشفتها
-#         # old_installments.update(is_archived=True) 
-            
-#     return True
 
 
 def overdue_report(request):

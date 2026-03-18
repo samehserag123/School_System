@@ -189,95 +189,214 @@ opacity:.4;
 </thead>
 
 <tbody id="tableBody">
+
 {% for student in students %}
-    {% with rem=student.current_remaining_amount|default:0 debt=student.previous_debt|default:0 %}
-    {% with total_due=rem|add:debt %}
 
-    <tr class="student-row {% if total_due > 0 %}table-warning{% endif %}"
-        data-search="{{ student.get_full_name }} {{ student.student_code }}">
+<tr class="student-row {% if student.calculated_remaining > 0 %}table-warning{% endif %}"
+data-search="{{ student.get_full_name }} {{ student.student_code }}">
 
-        <td>
-            <input type="checkbox" name="student_ids" value="{{ student.id }}" class="student-checkbox"
-            {% if debt > 0 %}disabled{% endif %}>
-        </td>
+<td>
 
-        <td>{{ forloop.counter }}</td>
+<input type="checkbox" name="student_ids" value="{{ student.id }}" class="student-checkbox">
 
-        <td class="text-end pe-4">
-            <div class="d-flex flex-column">
-                <a href="{% url 'add_student' %}?id={{ student.id }}&mode=view" class="fw-bold text-info text-decoration-none">
-                    {{ student.get_full_name }}
-                </a>
-                <small class="text-muted"><i class="bi bi-hash"></i> {{ student.student_code }}</small>
-            </div>
-        </td>
+</td>
 
-        <td>
-            {% if debt > 0 %}
-                <span class="badge bg-danger fs-6 px-3"><i class="bi bi-exclamation-circle"></i> {{ debt|floatformat:2 }}</span>
-            {% else %}
-                <span class="badge bg-success px-3">0</span>
-            {% endif %}
-        </td>
+<td>
+{{ forloop.counter }}
+</td>
 
-        <td>{{ student.current_year_fees_amount|default:0|floatformat:2 }}</td>
-        <td>{{ student.total_paid_amount|default:0|floatformat:2 }}</td>
 
-        <td class="fw-bold {% if total_due > 0 %}text-danger{% else %}text-success{% endif %}">
-            {{ total_due|floatformat:2 }}
-        </td>
+<td class="text-end pe-4">
 
-        <td>
-            {% if student.enrollment_status == "Promoted" or student.enrollment_status == "Passed" %}
-                <span class="badge bg-info text-dark">ناجح</span>
-            {% else %}
-                <span class="text-muted small">قيد الدراسة</span>
-            {% endif %}
-        </td>
+<div class="d-flex flex-column text-end">
 
-        <td>
-            {% if student.current_year_fees_amount <= 0 and debt <= 0 %}
-                <span class="badge bg-secondary" title="لم يتم تحديد مصاريف السنة الجديدة بعد">في انتظار التسكين ⏳</span>
-            {% elif total_due <= 0 %}
-                <span class="badge bg-success" title="الطالب سدد كل ما عليه">خالص ✅</span>
-            {% else %}
-                <span class="badge bg-danger" title="إجمالي المديونية: {{ total_due }}">مديون ⚠️</span>
-            {% endif %}
-        </td>
-        <td>
-            <div class="d-grid gap-1" style="grid-template-columns:repeat(4,1fr); width:160px; margin:auto">
-                
-                <a href="{% url 'student_statement_print' student.id %}" class="btn btn-sm btn-primary" title="عرض وطباعة كشف الحساب">
-                    <i class="bi bi-receipt"></i>
-                </a>
+<a href="{% url 'add_student' %}?id={{ student.id }}&mode=view"
+class="fw-bold text-info text-decoration-none">
 
-                {% if debt > 0 %}
-                    <a href="{% url 'settle_old_debt' student.id %}" class="btn btn-sm btn-danger" title="سداد مديونية قديمة (مطلوب: {{ debt }})">
-                        <i class="bi bi-cash-stack"></i>
-                    </a>
-                {% else %}
-                    <button class="btn btn-sm btn-outline-success disabled" title="لا توجد مديونيات قديمة"><i class="bi bi-check2-all"></i></button>
-                {% endif %}
+{{ student.get_full_name }}
 
-                {% if debt <= 0 %}
-                    <a href="{% url 'assign_plan_with_id' student.id %}" class="btn btn-sm btn-info" title="تحديد خطة الأقساط والتسكين">
-                        <i class="bi bi-calculator"></i>
-                    </a>
-                {% else %}
-                    <button class="btn btn-sm btn-dark disabled" title="يجب تسوية المديونية القديمة أولاً"><i class="bi bi-lock-fill"></i></button>
-                {% endif %}
+</a>
 
-                {% if debt <= 0 %}
-                    <a href="{% url 'student_inventory_view' student.id %}" class="btn btn-sm btn-warning" title="استلام الكتب والزي المدرسي">
-                        <i class="bi bi-box-seam"></i>
-                    </a>
-                {% else %}
-                    <button class="btn btn-sm btn-dark disabled" title="يجب تسوية المديونية القديمة أولاً"><i class="bi bi-lock-fill"></i></button>
-                {% endif %}
+<small class="text-muted">
 
-            </div>
-        </td>
-    </tr> {% endwith %} {% endwith %} {% endfor %} </tbody>
+<i class="bi bi-hash"></i>
+
+{{ student.student_code }}
+
+</small>
+
+</div>
+
+</td>
+
+
+
+<td class="text-center" style="min-width: 120px;">
+    {# 1. الجزء العلوي: زر السداد أو كلمة خالص #}
+    <div class="mb-2">
+        {% if student.calculated_remaining > 0 %}
+            <a href="{% url 'settle_old_debt' student.id %}" class="btn btn-sm btn-danger w-100 py-1" title="سداد مديونية">
+                <i class="bi bi-cash-stack me-1"></i> سداد
+            </a>
+        {% else %}
+            <span class="badge bg-success w-100 py-2">
+                <i class="bi bi-check2-all"></i> لا يوجد ✅
+            </span>
+        {% endif %}
+    </div>
+
+    {# 2. الجزء السفلي: الرقم (البادج) - التعديل الجوهري هنا #}
+    {% if student.calculated_remaining > 0 %}
+        {# الطالب لسه عليه فلوس: اظهر المديونية باللون الأحمر #}
+        <span class="badge bg-danger fs-6 px-2 d-block shadow-sm">
+            <i class="bi bi-exclamation-circle"></i>
+            {{ student.old_debt_display|floatformat:2 }}
+        </span>
+    {% else %}
+        {# الطالب مسدد: اظهر 0.00 باللون الأخضر الفاتح عشان الشكل ينضبط #}
+        <span class="badge bg-light text-success border border-success px-2 d-block shadow-sm">
+            0.00
+        </span>
+    {% endif %}
+</td>
+
+
+<td>
+
+{{ student.fees_display|floatformat:2 }}
+
+</td>
+
+
+
+<td class="text-success fw-bold">
+
+{{ student.total_paid_display|floatformat:2 }}
+
+</td>
+
+
+
+<td class="fw-bold {% if student.calculated_remaining > 0 %}text-danger{% else %}text-success{% endif %}">
+
+{{ student.calculated_remaining|floatformat:2 }}
+
+</td>
+
+
+
+<td>
+
+{% if student.enrollment_status == "Promoted" or student.enrollment_status == "Passed" %}
+
+<span class="badge bg-info text-dark">
+
+ناجح
+
+</span>
+
+{% else %}
+
+<span class="text-muted small">
+
+قيد الدراسة
+
+</span>
+
+{% endif %}
+
+</td>
+
+
+
+<td>
+
+{% if student.fees_display <= 0 and student.old_debt_display <= 0 %}
+
+<span class="badge bg-secondary">
+
+في انتظار التسكين ⏳
+
+</span>
+
+{% elif student.calculated_remaining <= 0 %}
+
+<span class="badge bg-success">
+
+خالص ✅
+
+</span>
+
+{% else %}
+
+<span class="badge bg-danger">
+
+مديون ⚠️
+
+</span>
+
+{% endif %}
+
+</td>
+
+<td>
+    
+<div class="d-grid gap-1"
+style="grid-template-columns:repeat(5,1fr); width:200px; margin:auto">
+
+<a href="{% url 'student_statement_print' student.id %}"
+class="btn btn-sm btn-primary"
+title="عرض وطباعة كشف الحساب المالي">
+<i class="bi bi-receipt"></i>
+</a>
+<div class="d-grid gap-1" style="grid-template-columns:repeat(3,1fr); width:150px; margin:auto">
+
+    {# 🔴 عليه مديونية #}
+    {% if student.total_old_debt > 0 %}
+
+        <button class="btn btn-sm btn-secondary disabled"><i class="bi bi-lock-fill"></i></button>
+        <button class="btn btn-sm btn-secondary disabled"><i class="bi bi-lock-fill"></i></button>
+        <button class="btn btn-sm btn-secondary disabled"><i class="bi bi-lock-fill"></i></button>
+
+    {# 🟡 طالب جديد (لسه مفيش مصروفات) #}
+    {% elif student.fees_display <= 0 %}
+
+        <button class="btn btn-sm btn-secondary disabled"><i class="bi bi-lock-fill"></i></button>
+
+        <a href="{% url 'assign_plan_with_id' student.id %}" class="btn btn-sm btn-info">
+            <i class="bi bi-calculator"></i>
+        </a>
+
+        <button class="btn btn-sm btn-secondary disabled"><i class="bi bi-lock-fill"></i></button>
+
+    {# 🟢 متسكن خلاص #}
+    {% else %}
+
+        <a href="{% url 'quick_collection' %}?student_id={{ student.id }}" class="btn btn-sm btn-success">
+            <i class="bi bi-lightning-charge-fill"></i>
+        </a>
+
+        <a href="{% url 'assign_plan_with_id' student.id %}" class="btn btn-sm btn-info">
+            <i class="bi bi-calculator"></i>
+        </a>
+
+        <a href="{% url 'student_inventory_view' student.id %}" class="btn btn-sm btn-warning">
+            <i class="bi bi-box-seam"></i>
+        </a>
+
+    {% endif %}
+
+</div>
+
+</div>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
 </table>
 
 </div>
