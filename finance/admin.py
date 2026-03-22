@@ -91,8 +91,7 @@ class StudentAccountAdmin(admin.ModelAdmin):
     list_display = ['student', 'installment_plan', 'total_fees', 'net_fees_display', 'total_paid_display', 'total_remaining_display']
     list_select_related = ('student', 'installment_plan')
     readonly_fields = ['total_fees']
-    search_fields = ['student__first_name']
-
+    search_fields = ['student__first_name', 'student__last_name', 'student__student_code']
     # تحويل الخصائص (Properties) إلى أعمدة قابلة للعرض
     def net_fees_display(self, obj):
         return obj.net_fees
@@ -103,7 +102,11 @@ class StudentAccountAdmin(admin.ModelAdmin):
     total_paid_display.short_description = "إجمالي المدفوع"
 
     def total_remaining_display(self, obj):
-        return obj.total_remaining
+        # يعرض المتبقي مع تلوينه بالأحمر إذا كان هناك مستحقات
+        val = obj.total_remaining
+        if val > 0:
+            return format_html('<span style="color: red; font-weight: bold;">{} ج.م</span>', val)
+        return f"{val} ج.م"
     total_remaining_display.short_description = "المتبقي"
 
 # 6. الأقساط والمدفوعات (Payments)

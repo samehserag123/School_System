@@ -51,6 +51,8 @@ from django.db import models
 from django.contrib import messages
 # دالة للتحقق من صلاحية المدير
 from django.db import IntegrityError
+from itertools import chain
+
 
 # دالة التحقق من المدير
 def is_manager(user):
@@ -94,23 +96,36 @@ def pay_old_debt(request, student_id):
     return render(request, 'finance/pay_debt.html', {'student': student})
 
 
+from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
+
 @login_required
 def student_statement_print(request, student_id):
     """
-    عرض كشف حساب تفصيلي للطالب للطباعة
+    كشف حساب يجمع المدفوعات من جدول Payment 
+    ويعرض الإجماليات المحسوبة في موديل الطالب
     """
+    from finance.models import Payment
+    try:
+        from finance.models import Student
+    except ImportError:
+        from students.models import Student
+
     student = get_object_or_404(Student, id=student_id)
-    payments = Payment.objects.filter(
-        student=student
-    ).order_by('payment_date') # إزالة الفلترة بالسنة الدراسية لرؤية كل العمليات
+    
+    # جلب كافة الحركات المالية للطالب من جدول Payment
+    all_history = Payment.objects.filter(student=student).order_by('-payment_date', '-id')
+
     context = {
         'student': student,
-        'payments': payments,
-        'total_paid_all': student.total_paid_amount, # إجمالي المحصل (تأكد من مطابقة اسم الدالة في موديل الطالب)
-        'total_required': student.current_year_fees_amount, # إجمالي المطلوب
-        'remaining': student.current_remaining_amount, # المتبقي
+        'all_history': all_history,
+        # هذه القيم يتم حسابها تلقائياً من الـ properties اللي في الموديل عندك (الصورة الأخيرة)
+        'total_paid_all': student.current_year_paid, 
+        'total_required': student.total_required_amount, 
+        'remaining': student.final_remaining, 
     }
     return render(request, 'finance/student_statement_print.html', context)
+
 
 @login_required
 def student_inventory_view(request, student_id):
@@ -230,45 +245,64 @@ def mark_item_delivered(request, item_id):
             
     return JsonResponse({'status': 'error', 'message': 'طلب غير مسموح به'}, status=405)
 
-
 @login_required
 def mass_assign_plans(request):
-    """
-    الدالة تقوم الآن بتهيئة الحسابات المالية للطلاب للسنة الدراسية النشطة.
-    بما أن نظام العهد أصبح يعتمد على InventoryMaster مباشرة، 
-    فقد تم تبسيط هذه الدالة لضمان تواجد حساب مالي لكل طالب نشط.
-    """
-    
-    # 1. التأكد من وجود سنة دراسية نشطة
+
     active_year = AcademicYear.objects.filter(is_active=True).first()
     if not active_year:
         return JsonResponse({
             "status": "error", 
-            "message": "عفواً! لا توجد سنة دراسية نشطة حالياً."
+            "message": "لا توجد سنة نشطة"
         }, status=400)
 
-    # 2. جلب كافة الطلاب النشطين
     students = Student.objects.filter(is_active=True)
     initialized_count = 0
-    
-    # 3. التأكد من وجود حساب مالي (StudentAccount) لكل طالب في السنة النشطة
+
     for student in students:
-        _, created = StudentAccount.objects.get_or_create(
+        _, created = StudentAccount.objects.update_or_create(
             student=student,
-            academic_year=active_year,
+            academic_year=active_year,  # ✅ الصح
             defaults={
-                'total_fees': 0, # يتم تحديده لاحقاً عند تعيين الخطة المالية
+                "total_fees": 0
             }
         )
         if created:
             initialized_count += 1
 
     return JsonResponse({
-        "status": "success", 
-        "message": f"✅ تمت التهيئة بنجاح: تم إنشاء {initialized_count} حساب مالي جديد للسنة الدراسية {active_year.name}."
+        "status": "success",
+        "message": f"تم إنشاء {initialized_count} حساب"
     })
 
+# @login_required
+# def mass_assign_plans(request):
 
+#     active_year = AcademicYear.objects.filter(is_active=True).first()
+#     if not active_year:
+#         return JsonResponse({
+#             "status": "error", 
+#             "message": "عفواً! لا توجد سنة دراسية نشطة حالياً."
+#         }, status=400)
+
+#     students = Student.objects.filter(is_active=True)
+#     initialized_count = 0
+    
+#     for student in students:
+#         _, created = StudentAccount.objects.update_or_create(
+#             student=student,
+#             academic_year=active_year,  # ✅ التصحيح هنا
+#             defaults={
+#                 "total_fees": 0
+#             }
+#         )
+#         if created:
+#             initialized_count += 1
+
+#     return JsonResponse({
+#         "status": "success", 
+#         "message": f"✅ تمت التهيئة بنجاح: تم إنشاء {initialized_count} حساب مالي جديد للسنة الدراسية {active_year.name}."
+#     })
+    
 def payments_archive(request):
     # 1. استقبال الفلتر
     category_name = request.GET.get('cat')
@@ -339,39 +373,50 @@ def get_optimized_dashboard_stats(year):
     return list(grade_analysis)
 
 
-@staff_member_required
+from django.contrib.auth.decorators import user_passes_test
+from django.contrib import messages
+from django.shortcuts import redirect
+from django.db import transaction
+
+# 🛡️ استبدلنا staff_member_required بشرط أن يكون superuser (المدير فقط)
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
 def bulk_promote_students(request):
     if request.method == 'POST':
         student_ids = request.POST.getlist('student_ids')
         target_year_id = request.POST.get('target_year')
         target_grade_id = request.POST.get('target_grade')
 
+        # التأكد من وصول البيانات الأساسية
         if not student_ids or not target_year_id or not target_grade_id:
             messages.error(request, "⚠️ يرجى اختيار الطلاب والسنة والصف الدراسي.")
             return redirect(request.META.get('HTTP_REFERER', 'student_list'))
 
+        # جلب الطلاب النشطين فقط من القائمة المحددة
         eligible_students = Student.objects.filter(id__in=student_ids, is_active=True)
         
         success_count = 0
-        fail_count = 0 # عداد للطلاب اللي مش هيرحلوا بسبب المديونية
+        fail_count = 0
 
         try:
-            with transaction.atomic():
-                for student in eligible_students:
-                    # دالتك الأصلية هي اللي بتقرر (لو مديون بترجع False)
-                    if promote_student_action(student.id, target_year_id, target_grade_id):
-                        success_count += 1
-                    else:
-                        fail_count += 1
-                
-                if success_count > 0:
-                    messages.success(request, f"🚀 تم ترحيل {success_count} طالب بنجاح.")
-                
-                if fail_count > 0:
-                    messages.warning(request, f"⚠️ يوجد {fail_count} طالب لم يتم ترحيلهم بسبب وجود مديونية.")
+            # 💡 لاحظ: شلنا transaction.atomic الشاملة عشان لو طالب واحد فشل ميبوظش البقية
+            # الترانزاكشن موجودة بالفعل جوه دالة promote_student_action لكل طالب بشكل منفصل
+            for student in eligible_students:
+                if promote_student_action(student.id, target_year_id, target_grade_id):
+                    success_count += 1
+                else:
+                    fail_count += 1
+            
+            # 📢 رسائل التغذية الراجعة
+            if success_count > 0:
+                messages.success(request, f"🚀 تم ترحيل {success_count} طالب بنجاح للسنة الجديدة.")
+            
+            if fail_count > 0:
+                # الفشل هنا غالباً هيكون بسبب إن الطالب مترحل بالفعل للسنة دي
+                messages.warning(request, f"⚠️ فشل ترحيل {fail_count} طالب (تأكد أنهم ليسوا مسجلين بالفعل في السنة المستهدفة).")
                     
         except Exception as e:
-            messages.error(request, f"❌ حدث خطأ: {str(e)}")
+            messages.error(request, f"❌ حدث خطأ غير متوقع: {str(e)}")
 
     return redirect('student_list')
 
@@ -468,65 +513,68 @@ def close_daily_accounts_view(request):
     
     return redirect('daily_cashier_summary')
 
+
+
 def promote_student_action(student_id, target_year_id, target_grade_id):
-    """
-    ترحيل الطالب مع التحقق المالي:
-    1. ترحيل المديونيات المتبقية لخانة previous_debt.
-    2. الترحيل الأكاديمي (السنة والصف الدراسي).
-    3. منع التسكين المالي (StudentAccount) إذا كان الطالب مديوناً.
-    """
+    from finance.models import StudentAccount, RevenueCategory
+    from decimal import Decimal
+    from django.utils import timezone
+    from django.db import transaction
+
     try:
-        student = Student.objects.select_for_update().get(id=student_id)
-        target_year = AcademicYear.objects.get(id=target_year_id)
-        target_grade = Grade.objects.get(id=target_grade_id)
-    except (Student.DoesNotExist, AcademicYear.DoesNotExist, Grade.DoesNotExist):
-        return False
+        # 🛡️ استخدام select_for_update بيقفل سجل الطالب في قاعدة البيانات 
+        # عشان لو اتنين موظفين ضغطوا ترحيل في نفس الثانية، واحد بس اللي ينفذ
+        with transaction.atomic():
+            try:
+                student = Student.objects.select_for_update().get(id=student_id)
+                target_year = AcademicYear.objects.get(id=target_year_id)
+                target_grade = Grade.objects.get(id=target_grade_id)
+            except (Student.DoesNotExist, AcademicYear.DoesNotExist, Grade.DoesNotExist):
+                return False
 
-    # حماية من التكرار
-    if student.academic_year == target_year:
-        return False 
+            # 🚫 منع الترحيل لنفس السنة الحالية (عشان م يحصلش تكرار مديونية)
+            if str(student.academic_year_id) == str(target_year_id):
+                return False
 
-    with transaction.atomic():
-        # 1. حساب المديونية المتبقية من السنة الحالية لتحويلها لمديونية مرحلة
-        old_installments = StudentInstallment.objects.filter(
-            student=student,
-            academic_year=student.academic_year
-        )
-        total_unpaid = sum(inst.remaining_amount() for inst in old_installments)
+            # 1️⃣ الحساب المالي الدقيق (الخطوة الأهم)
+            # بنحسب المتبقي على الطالب وهو لسه في "السنة القديمة"
+            debt_to_carry = student.final_remaining 
 
-        # 2. تحديث بيانات الطالب (الترحيل الأكاديمي)
-        student.previous_debt += total_unpaid 
-        student.academic_year = target_year
-        student.grade = target_grade
-        student.enrollment_status = "Promoted"
-        student.classroom = None
-        student.last_promotion_date = timezone.now().date()
-        student.save()
+            # 2️⃣ تحديث بيانات الطالب للسنة الجديدة
+            student.academic_year = target_year
+            student.grade = target_grade
+            student.enrollment_status = "Promoted" # تحديث حالته لناجح/منقول
+            student.classroom = None               # تصفير الفصل لحين توزيعه يدوياً
+            student.last_promotion_date = timezone.now().date()
 
-        # 3. المنطق الجديد: التسكين المالي المشروط
-        if student.previous_debt <= 0:
-            # الطالب "خالص": يتم إنشاء حساب مالي (تسكين) فوراً في السنة الجديدة
-            existing_account = StudentAccount.objects.filter(student=student).first()
-
-            if existing_account:
-                # تحديث الحساب للسنة الجديدة بدل إنشاء واحد جديد
-                existing_account.academic_year = target_year
-                existing_account.installment_plan = None
-                existing_account.total_fees = 0
-                existing_account.save()
-            else:
-                StudentAccount.objects.create(
-                    student=student,
-                    academic_year=target_year,
-                    installment_plan=None,
-                    total_fees=0
-                )
-        else:
-            # الطالب مديون: لا يتم إنشاء StudentAccount
-            # سيظهر في السنة الجديدة بمديونية صفر في "المطلوب حالي" حتى يتم تسويته يدوياً
-            pass
+            # 3️⃣ ترحيل المديونية
+            # لو الطالب عليه 500 جنيه متبقية، بتتحول لـ "مديونية سابقة" في السنة الجديدة
+            # max(0) بتضمن إن لو الطالب ليه فلوس (رصيد دائن) م تتحولش لمديونية غلط
+            student.previous_debt = max(Decimal('0.00'), debt_to_carry)
             
-    return True
+            student.save()
+
+            # 4️⃣ تجهيز السجل المالي الجديد
+            # بنبحث عن بند "المصروفات الدراسية" عشان نفتح بيه الحساب الجديد
+            main_category = RevenueCategory.objects.filter(name__icontains="مصروف").first()
+
+            # إنشاء أو تحديث حساب الطالب في السنة الجديدة بقيمة 0 
+            # لحد ما المدير يدخل يعمل "تسكين" ويحدد المصاريف الجديدة
+            StudentAccount.objects.update_or_create(
+                student=student,
+                academic_year=target_year,
+                revenue_category=main_category,
+                defaults={
+                    "total_fees": Decimal("0.00"),
+                    "discount": Decimal("0.00")
+                }
+            )
+
+            return True
+
+    except Exception as e:
+        print(f"❌ حدث خطأ أثناء ترحيل الطالب {student_id}: {str(e)}")
+        return False
 
 
 def overdue_report(request):
@@ -728,7 +776,9 @@ def quick_collection(request):
 
                 # تسجيل الإيصال
                 payment = Payment.objects.create(
-                    academic_year_id=year_id,
+                    # التعديل هنا: نربط الدفع بسنة الطالب الحالية مباشرة لضمان ظهور الأرقام في السجلات
+                    academic_year=student.academic_year, 
+                    
                     student=student,
                     revenue_category=category,
                     amount_paid=amount_to_collect,
@@ -765,65 +815,86 @@ def finance_dashboard(request):
         return render(request, "finance/dashboard.html", {"error": "⚠️ لا توجد سنة نشطة."})
 
     today = timezone.now().date()
-    
-    # 1. سيولة اليوم (إجمالي الكاش فقط)
-    today_total_cash = Payment.objects.filter(payment_date=today).aggregate(
+    this_month = today.month
+    this_year = today.year
+
+    # 1. إيراد اليوم (شامل كل البنود)
+    today_revenue_all = Payment.objects.filter(payment_date=today).aggregate(
         total=Sum('amount_paid'))['total'] or 0
 
-    # 2. القوة الاستيعابية (المعدل الصحيح)
-    # نقوم بحساب الطلاب الذين لديهم حساب مالي (StudentAccount) في السنة النشطة فقط
-    total_students_count = StudentAccount.objects.filter(academic_year=active_year).count()
+    # 2. إيراد الشهر (شامل كل البنود)
+    month_revenue_all = Payment.objects.filter(
+        payment_date__month=this_month, 
+        payment_date__year=this_year
+    ).aggregate(total=Sum('amount_paid'))['total'] or 0
 
-    # 3. رادار المتأخرات الحرجة
-    paid_student_ids = Payment.objects.filter(academic_year=active_year).values_list('student_id', flat=True).distinct()
-    critical_late_count = StudentAccount.objects.filter(
-        academic_year=active_year,
-        total_fees__gt=0
-    ).exclude(student_id__in=paid_student_ids).count()
+    # 3. إيراد العام (شامل كل البنود)
+    year_revenue_all = Payment.objects.filter(academic_year=active_year).aggregate(
+        total=Sum('amount_paid'))['total'] or 0
 
-    grades_efficiency = []
-    total_target_all = 0
-    total_paid_all = 0
+    # 4. المديونيات العامة
+    all_students = Student.objects.filter(academic_year=active_year)
     
+    # مديونية قديمة (تم توحيد المفتاح ليكون 'total')
+    total_old_debts = all_students.aggregate(total=Sum('previous_debt'))['total'] or 0
+    
+    # مديونية العام الحالي
+    total_current_fees = StudentAccount.objects.filter(
+        academic_year=active_year
+    ).aggregate(total=Sum('total_fees'))['total'] or 0
+    
+    paid_current_fees = Payment.objects.filter(
+        academic_year=active_year,
+        revenue_category__name="المصروفات الاساسيه"
+    ).aggregate(total=Sum('amount_paid'))['total'] or 0
+    
+    total_current_year_debt = max(total_current_fees - paid_current_fees, 0)
+
+    # 5. كفاءة الصفوف (تعديل الـ Key لتجنب الخطأ)
+    grades_efficiency = []
     for grade in Grade.objects.all():
-        students_in_grade = Student.objects.filter(grade=grade)
+        students_in_grade = all_students.filter(grade=grade)
         
-        target = StudentAccount.objects.filter(
-            student__in=students_in_grade,
+        # مديونية قديمة للصف
+        g_old = students_in_grade.aggregate(total=Sum('previous_debt'))['total'] or 0
+        
+        # مديونية حالية للصف
+        g_current = StudentAccount.objects.filter(
+            student__in=students_in_grade, 
             academic_year=active_year
         ).aggregate(total=Sum('total_fees'))['total'] or 0
         
-        paid = Payment.objects.filter(
-            student__in=students_in_grade,
-            academic_year=active_year
-        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+        g_target = g_old + g_current
         
-        # --- هذا ما كان ينقصك: تحديث الإجماليات داخل الحلقة ---
-        total_target_all += target
-        total_paid_all += paid
-        # -----------------------------------------------------
+        # المحصل الأساسي للصف
+        g_paid = Payment.objects.filter(
+            student__in=students_in_grade,
+            academic_year=active_year,
+            revenue_category__name="المصروفات الاساسيه"
+        ).aggregate(total=Sum('amount_paid'))['total'] or 0
         
         grades_efficiency.append({
             'grade': grade.name,
-            'target': target,
-            'paid': paid,
-            'remaining': max(target - paid, 0),
-            'percentage': round((paid / target * 100), 1) if target > 0 else 0
+            'target': g_target,
+            'paid': g_paid,
+            'remaining': max(g_target - g_paid, 0),
+            'percentage': round((g_paid / g_target * 100), 1) if g_target > 0 else 0
         })
 
-    # الآن الحسابات النهائية ستستخدم الإجماليات المحدثة
-    total_remaining = max(total_target_all - total_paid_all, 0)
-    total_percentage = round((total_paid_all / total_target_all * 100), 1) if total_target_all > 0 else 0
+    # النسبة الإجمالية
+    total_target_all = total_old_debts + total_current_fees
+    total_percentage = round((paid_current_fees / total_target_all * 100), 1) if total_target_all > 0 else 0
 
     context = {
         "active_year": active_year,
-        "today_total_cash": today_total_cash,
-        "total_students_count": total_students_count,
-        "critical_late_count": critical_late_count,
-        "total_target_all": total_target_all, # أضفتها لك إذا كنت تعرضها في الـ HTML
-        "total_paid_all": total_paid_all,     # أضفتها لك أيضاً
-        "total_remaining": total_remaining,
+        "today_revenue_all": today_revenue_all,
+        "month_revenue_all": month_revenue_all,
+        "year_revenue_all": year_revenue_all,
+        "total_old_debts": total_old_debts,
+        "total_current_year_debt": total_current_year_debt,
+        "total_remaining": total_old_debts + total_current_year_debt,
         "total_percentage": total_percentage,
+        "total_students_count": all_students.count(),
         "grades_efficiency": grades_efficiency,
     }
     return render(request, 'finance/dashboard.html', context)
@@ -867,16 +938,16 @@ def assign_plan(request, student_id=None):
                 return redirect(request.path)
 
             # 2. تحديث الحساب المالي
+            # التعديل: ابحث بالطالب والسنة معاً في المعايير (Criteria) وليس الـ defaults
             account_obj, created = StudentAccount.objects.update_or_create(
                 student=student,
+                academic_year=student.academic_year, # انقلها هنا فوق الـ defaults
                 defaults={
                     'installment_plan': plan, 
                     'total_fees': plan.total_amount,
                     'discount': discount_val,
-                    'academic_year': student.academic_year
                 }
             )
-
             # 3. حذف الأقساط القديمة (للطلبة الذين لم يدفعوا فقط)
             StudentInstallment.objects.filter(
                 student=student, 

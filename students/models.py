@@ -2,10 +2,9 @@ from django.db import models
 import random
 from django.utils import timezone
 from django.core.validators import RegexValidator, MinLengthValidator
-from django.db.models import Sum
 from audit.models import AuditLog
-from decimal import Decimal
-# ملاحظة: إذا كان numbers_only معرفاً في ملف خاص (مثلاً validators.py داخل نفس التطبيق)
+from django.db.models import Sum, Q
+from decimal import Decimal# ملاحظة: إذا كان numbers_only معرفاً في ملف خاص (مثلاً validators.py داخل نفس التطبيق)
 # تأكد من استيراده هنا.
 # من .validators import numbers_only
 numbers_only = RegexValidator(
@@ -143,61 +142,113 @@ class Student(models.Model):
             if not Student.objects.filter(student_code=code).exists():
                 return code
     
+    
     @property
-    def get_old_debt_amount(self):
-        from finance.models import StudentAccount, Payment
-        old_fees = StudentAccount.objects.filter(student=self).exclude(academic_year=self.academic_year).aggregate(total=models.Sum('total_fees'))['total'] or 0
-        old_paid = Payment.objects.filter(student=self).exclude(academic_year=self.academic_year).aggregate(total=models.Sum('amount_paid'))['total'] or 0
-        return Decimal(str(max(old_fees - old_paid, 0)))
-
-    @property
-    def total_old_debt(self):
-        return Decimal(str(self.previous_debt or 0)) + Decimal(str(self.get_old_debt_amount or 0))
+    def total_required_amount(self):
+        # ❌ متضيفش previous_debt هنا
+        return self.current_year_fees_amount
+        # 1. إجمالي المطلوب (السنة دي + المديونية اللي اترحلّت في الحقل)
     
     # @property
-    # def total_old_debt(self):
-    #     # رجعها لأبسط صورة ممكنة عشان السيستم يفتح
-    #     return float(self.previous_debt or 0) + float(self.get_old_debt_amount or 0)
+    # def total_required_amount(self):
+    #     from decimal import Decimal
 
+    #     # ✅ مصاريف السنة الحالية فقط
+    #     return Decimal(str(self.current_year_fees_amount or 0))
+
+    # 2. المحصل (السنة دي بس) - ده اللي هيظهر في خانة المحصل
     @property
-    def current_year_fees_amount(self):
-        from finance.models import StudentAccount
-        account = StudentAccount.objects.filter(student=self, academic_year=self.academic_year).first()
-        return Decimal(str(account.total_fees if account else 0))
+    def current_year_paid(self):
+        from finance.models import Payment
+        from django.db.models import Sum, Q
+        total = Payment.objects.filter(
+            student=self,
+            academic_year=self.academic_year # شرط السنة الحالية
+        ).filter(
+            Q(revenue_category__name__icontains="اساس") | 
+            Q(revenue_category__name__icontains="مصروف")
+        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+        return Decimal(str(total))
 
-    @property
-    def total_paid_amount(self):
-        from finance.models import Payment, RevenueCategory
-        from django.db.models import Sum
-        from decimal import Decimal
+    # @property
+    # def final_remaining(self):
+    #     from decimal import Decimal
 
-        try:
-            # 1. البحث عن الفئة بشكل مرن (يتجاهل الهمزات أو المسافات الزائدة أحياناً)
-            # أو الأفضل: category = RevenueCategory.objects.get(id=1) لو أنت ضامن الـ ID
-            category = RevenueCategory.objects.get(name__icontains="المصروفات الاساسيه")
-            
-            # 2. الفلترة مع التأكد من السنة الدراسية للطالب
-            total = Payment.objects.filter(
-                student=self, 
-                academic_year=self.academic_year, # السنة المسكن عليها الطالب حالياً
-                revenue_category=category
-            ).aggregate(total=Sum('amount_paid'))['total'] or 0
-            
-            return Decimal(str(total))
-            
-        except (RevenueCategory.DoesNotExist, RevenueCategory.MultipleObjectsReturned):
-            # في حالة عدم وجود الفئة أو وجود أكثر من واحدة بنفس الاسم
-            return Decimal("0.00")
-        
+    #     total_required = Decimal(str(self.total_required_amount or 0))
+    #     paid = Decimal(str(self.current_year_paid or 0))
+
+    #     # ✅ احسب السنة الحالية فقط
+    #     remaining = total_required - paid
+
+    #     # 🧪 Debug (اختياري)
+    #     print("total_required:", total_required)
+    #     print("paid:", paid)
+    #     print("remaining (current year only):", remaining)
+
+    #     return max(remaining, Decimal("0.00"))
     
     @property
-    def current_remaining_amount(self):
-        # هذه الخاصية تغنيك عن الحساب في ملف HTML وتمنع الخطأ
-        return self.current_year_fees_amount - self.total_paid_amount
+    def final_remaining(self):
+        from decimal import Decimal
+        from django.db.models import Sum
+
+        # 1. المديونية اللي اتررحلت من السنة اللي فاتت (الصافي فقط)
+        old_debt = Decimal(str(self.previous_debt or 0))
+        
+        # 2. مصاريف السنة دي فقط (صافي بعد الخصم)
+        acc = self.accounts.filter(academic_year=self.academic_year).last()
+        current_fees = Decimal('0.00')
+        if acc:
+            current_fees = Decimal(str(acc.total_fees or 0)) - Decimal(str(acc.discount or 0))
+
+        # 3. 🔥 التعديل هنا: نخصم فقط المدفوعات التابعة لـ "المصروفات الاساسيه"
+        # عشان "خامات المطبخ" أو "الباص" ملمسوش مديونية الطالب الدراسية
+        current_year_payments = self.all_payments.filter(
+            academic_year=self.academic_year,
+            revenue_category__name="المصروفات الاساسيه"  # مطابقة حرفية لاسم البند عندك
+        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+        
+        total_paid = Decimal(str(current_year_payments))
+
+        # المعادلة: (المديونية المرحلة + مصاريف السنة) - مدفوعات المصاريف الدراسية فقط
+        return (old_debt + current_fees) - total_paid
+
 
     @property
-    def has_old_debt(self):
-        return self.total_old_debt > Decimal('0')
+    def calculated_previous_debt(self):
+        from decimal import Decimal
+
+        return max(Decimal('0.00'), Decimal(str(self.previous_debt or 0)))
+    
+    @property
+    def total_balance_due(self):
+        from decimal import Decimal
+        from django.db.models import Sum
+
+        total_required = Decimal(str(self.previous_debt or 0)) + self.current_year_fees_amount
+
+        current_year_paid = self.all_payments.filter(
+            academic_year=self.academic_year
+        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+
+        return total_required - Decimal(str(current_year_paid))
+    
+        
+    @property
+    def current_year_fees_amount(self):
+        """جلب إجمالي المصروفات المطلوبة من حساب الطالب للسنة الحالية"""
+        from finance.models import StudentAccount
+        from decimal import Decimal
+
+        # البحث عن حساب الطالب المرتبط بالسنة الدراسية الحالية
+        account = self.accounts.filter(academic_year=self.academic_year).first()
+        
+        if account:
+            # نستخدم Decimal لضمان دقة الحسابات المالية ومنع أخطاء التقريب
+            return Decimal(str(account.total_fees or 0))
+        
+        # لو الطالب مش متسكن له حساب، نرجع صفر عشان السيستم ما يضربش
+        return Decimal("0.00")
 
     @property
     def full_name(self):
@@ -206,7 +257,9 @@ class Student(models.Model):
     @property
     def name(self):
         return self.get_full_name()
-    
+
     @property
-    def is_new_student(self):
-        return self.enrollment_status == "New"
+    def current_account(self):
+        return self.accounts.filter(academic_year=self.academic_year).first()
+    
+   

@@ -42,6 +42,7 @@ def get_classrooms(request):
 
 
 
+
 def student_list(request):
     all_years = AcademicYear.objects.all().order_by('-name')
     all_grades = Grade.objects.all().order_by('id')
@@ -52,37 +53,69 @@ def student_list(request):
     else:
         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
 
-    students_list = []
+    # تهيئة المتغيرات
+    # ... الكود السابق (تحديد السنة) ...
+
+    # تهيئة المتغيرات
+    total_previous_debt = 0
+    paid_count = 0 
+    debt_count = 0 
+    unassigned_count = 0 
+    processed_students = []
 
     if current_view_year:
+        # استرجاع الطلاب للسنة المحددة مع تحسين الاستعلام
         students_query = Student.objects.filter(
             academic_year=current_view_year
-        ).select_related("grade", "classroom", "account").prefetch_related("all_payments").order_by('first_name')
+        ).select_related(
+            "grade", 
+            "classroom"
+        ).prefetch_related(
+            "accounts",
+            "all_payments"
+        ).order_by('first_name')
+
+        # 🔥 التعديل: حساب إجمالي المديونية القديمة (المبالغ المرحلة فقط)
+        # الطريقة دي بتجمع حقل previous_debt الثابت في قاعدة البيانات مباشرة
+        from django.db.models import Sum
+        total_previous_debt = students_query.aggregate(
+            total=Sum('previous_debt')
+        )['total'] or 0
+        
+        # حساب الطلاب غير المسكنين
+        unassigned_count = students_query.exclude(
+            accounts__academic_year=current_view_year
+        ).distinct().count()
 
         for student in students_query:
-            # كل اللي جوه هنا لازم يكون واخد مسافة زيادة لجوه (Indent)
-            total_paid = student.all_payments.filter(
-                academic_year=current_view_year,
-                revenue_category__name__icontains="المصروفات الاساسيه"
-            ).aggregate(Sum("amount_paid"))["amount_paid__sum"] or 0
-            
-            old_debt = float(student.previous_debt or 0)
-            fees = float(student.current_year_fees_amount or 0)
-            
-            total_required = fees + old_debt
-            remaining = total_required - float(total_paid)
+            # 1. المديونية القديمة (القيمة الثابتة في الحقل)
+            # بنستخدم الحقل مباشرة عشان العداد والجدول يقرأوا من نفس "الخزنة"
+            old_debt = student.previous_debt or 0
+            total_due = student.total_balance_due
 
-            student.total_paid_display = total_paid
-            student.fees_display = fees
-            student.old_debt_display = old_debt
-            student.calculated_remaining = max(remaining, 0)
-            
-            students_list.append(student)
+            # 2. حساب إحصائيات الطلاب (Stats)
+            # هنا بنعتمد على الموقف الكلي للطالب (هل مسدد ولا لسه مديون)
+            if total_due <= 0:
+                paid_count += 1
+            else:
+                debt_count += 1
 
-        # السطور دي لازم تكون محاذية لـ كلمة for بالظبط (مش جواها)
-        paginator = Paginator(students_list, 20) 
+            # 3. تجهيز بيانات العرض للتمبلت
+            student.total_paid_display = student.current_year_paid if hasattr(student, 'current_year_paid') else 0
+            student.fees_display = student.current_year_fees_amount
+            student.old_debt_display = old_debt # عرض المديونية المرحلة
+            student.calculated_remaining = total_due
+            
+            # الإجمالي المطلوب (القديم الثابت + مصاريف السنة دي)
+            student.total_required_display = old_debt + student.current_year_fees_amount
+            
+            processed_students.append(student)
+
+        # 4. نظام الترقيم (Pagination)
+        paginator = Paginator(processed_students, 20) 
         page_number = request.GET.get('page')
         students = paginator.get_page(page_number)
+
     else:
         students = []
 
@@ -90,160 +123,179 @@ def student_list(request):
         "students": students, 
         "all_years": all_years, 
         "all_grades": all_grades, 
-        "current_view_year": current_view_year
+        "current_view_year": current_view_year,
+        "total_previous_debt": total_previous_debt, # العداد الأصفر
+        "paid_count": paid_count,
+        "debt_count": debt_count,
+        "unassigned_count": unassigned_count,
     }
+
     return render(request, "students/student_list.html", context)
+
 # def student_list(request):
 #     all_years = AcademicYear.objects.all().order_by('-name')
-#     all_grades = Grade.objects.all().order_by('id') 
-
+#     all_grades = Grade.objects.all().order_by('id')
 #     selected_year_id = request.GET.get('year_id')
+
 #     if selected_year_id:
 #         current_view_year = AcademicYear.objects.filter(id=selected_year_id).first()
 #     else:
 #         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
-    
+
+#     students_list = []
+#     total_previous_debt = 0
+#     paid_count = 0 
+#     debt_count = 0 
+#     unassigned_count = 0 
+
 #     if current_view_year:
+#         # استرجاع الطلاب للسنة المحددة
 #         students_query = Student.objects.filter(
 #             academic_year=current_view_year
-#         ).select_related("grade", "classroom", "account").order_by('first_name')
+#         ).select_related(
+#             "grade", 
+#             "classroom"
+#         ).prefetch_related(
+#             "accounts",
+#             "all_payments"
+#         ).order_by('first_name')
+        
+#         # 1. حساب الطلاب غير المسكنين (يعتمد على قاعدة البيانات - شغال تمام)
+#         unassigned_count = students_query.exclude(
+#             accounts__academic_year=current_view_year
+#         ).distinct().count()
+
+#         # مصفوفة مؤقتة لمعالجة البيانات وحساب الإحصائيات برمجياً
+#         processed_students = []
         
 #         for student in students_query:
-#             # 1. إجمالي ما دفعه الطالب فعلياً في الخزينة (تاريخياً)
-#             total_history_paid = student.all_payments.aggregate(Sum('amount_paid'))['amount_paid__sum'] or 0
+#             # 1. المديونية القديمة (المحسوبة اللي بتصفر لما يدفع)
+#             prev_debt = student.calculated_previous_debt 
             
-#             # 2. مديونية الأدمن (اليدوية) + أي مديونيات قديمة مسجلة
-#             old_debt_val = float(student.previous_debt or 0) + float(student.get_old_debt_amount or 0)
+#             # 2. المتبقي الكلي (اللي بيطلع -200 أو صفر)
+#             total_due = student.total_balance_due
+
+#             # حساب الإحصائيات (Stats)
+#             total_previous_debt += prev_debt
             
-#             # 3. مطلوبات السنة الحالية (لو الطالب متسكن ماليًا)
-#             current_fees = float(student.current_year_fees_amount or 0)
+#             if total_due <= 0:
+#                 paid_count += 1
+#             else:
+#                 debt_count += 1
+
+#             # تجهيز بيانات العرض (لضمان السرعة في التمبلت)
+#             # ملاحظة: اتأكد إن الدوال دي موجودة في الموديل بنفس الأسماء
+#             student.total_paid_display = student.current_year_paid if hasattr(student, 'current_year_paid') else 0
+#             student.fees_display = student.current_year_fees_amount
+#             student.old_debt_display = prev_debt
+#             student.calculated_remaining = total_due
             
-#             # الحسبة العادلة: (كل اللي عليه) - (كل اللي دفعه)
-#             total_balance = (old_debt_val + current_fees) - float(total_history_paid)
+#             # الإجمالي المطلوب (قديم + جديد)
+#             student.total_required_display = (student.previous_debt or 0) + student.current_year_fees_amount
             
-#             # ده المتغير اللي هيظبط شكل الجدول والأزرار
-#             student.net_old_debt = max(total_balance, 0)
-            
-#             # تحديث المتبقي للعرض (عشان سامح ميبقاش سالب وأحمد ميبقاش صفر)
-#             student.calculated_remaining = max(total_balance, 0)
-            
-#         paginator = Paginator(students_query, 20)
-#         students = paginator.get_page(request.GET.get('page'))
+#             processed_students.append(student)
+
+#         # الـ Pagination يستخدم القائمة المعالجة
+#         paginator = Paginator(processed_students, 20) 
+#         page_number = request.GET.get('page')
+#         students = paginator.get_page(page_number)
+
 #     else:
 #         students = []
 
 #     context = {
-#         "students": students,
-#         "all_years": all_years,
-#         "all_grades": all_grades,
+#         "students": students, 
+#         "all_years": all_years, 
+#         "all_grades": all_grades, 
 #         "current_view_year": current_view_year,
+#         "total_previous_debt": total_previous_debt,
+#         "paid_count": paid_count,
+#         "debt_count": debt_count,
+#         "unassigned_count": unassigned_count,
 #     }
+
 #     return render(request, "students/student_list.html", context)
-
-
-# def student_list_view(request):
-#     # جلب الطلاب مع تحسين الاستعلام (Optimization)
-#     students_list = Student.objects.select_related('account', 'grade', 'classroom').all()
-
-#     # تحديد عدد الطلاب في كل صفحة (مثلاً 50)
-#     paginator = Paginator(students_list, 50) 
-    
-#     page = request.GET.get('page')
-#     try:
-#         students = paginator.page(page)
-#     except PageNotAnInteger:
-#         students = paginator.page(1) # إذا لم تكن الصفحة رقم، اعرض الأولى
-#     except EmptyPage:
-#         students = paginator.page(paginator.num_pages) # إذا تجاوزت الصفحات، اعرض الأخيرة
-
-#     context = {
-#         'students': students, # الآن المتغير هو صفحة واحدة من الطلاب
-#         'all_years': AcademicYear.objects.all(),
-#         # ... باقي المتغيرات الخاصة بك
-#     }
-#     return render(request, 'your_template_name.html', context)
-
-
-# from django.db.models import Sum
 
 # def student_list(request):
 #     all_years = AcademicYear.objects.all().order_by('-name')
-#     all_grades = Grade.objects.all().order_by('id') 
-
+#     all_grades = Grade.objects.all().order_by('id')
 #     selected_year_id = request.GET.get('year_id')
+
 #     if selected_year_id:
 #         current_view_year = AcademicYear.objects.filter(id=selected_year_id).first()
 #     else:
 #         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
-    
+
+#     students_list = []
+#     # تعريف المتغيرات بقيمة مبدئية صفر
+#     total_previous_debt = 0
+#     total_required = 0
+#     paid_count = 0  # مضاف لضمان عدم حدوث خطأ إذا لم يوجد عام
+#     debt_count = 0  # مضاف لضمان عدم حدوث خطأ إذا لم يوجد عام
+#     unassigned_count = 0 # المتغير الجديد للطلاب غير المسكنين
+
 #     if current_view_year:
 #         students_query = Student.objects.filter(
 #             academic_year=current_view_year
-#         ).select_related("grade", "classroom", "account").order_by('first_name')
+#         ).select_related(
+#             "grade", 
+#             "classroom"
+#         ).prefetch_related(
+#             "accounts",
+#             "all_payments"
+#         ).order_by('first_name')
         
+#         total_previous_debt = sum([
+#             s.final_remaining for s in students_query
+#         ])
+        
+#         # total_previous_debt = students_query.aggregate(Sum('previous_debt'))['previous_debt__sum'] or 0
+
+#         # 1. حساب الطلاب غير المسكنين (الجديد) ✅
+#         # هم الطلاب الموجودين في السنة الحالية ولكن ليس لديهم سجل في StudentAccount لهذه السنة
+#         unassigned_count = students_query.exclude(
+#             accounts__academic_year=current_view_year
+#         ).count()
+
+#         # 2. حساب عدد المسددين (الجديد) ✅
+#         paid_count = students_query.filter(previous_debt=0, accounts__total_fees__lte=0).count() 
+
+#         # 3. حساب عدد المديونين (الجديد) ✅
+#         debt_count = students_query.filter(Q(previous_debt__gt=0) | Q(accounts__total_fees__gt=0)).distinct().count()
+
 #         for student in students_query:
-#             # 1. إجمالي مدفوعات الطالب في تاريخه بالكامل (خزينة)
-#             history_paid = student.all_payments.aggregate(Sum('amount_paid'))['amount_paid__sum'] or 0
-            
-#             # 2. مديونية الأدمن اليدوية (previous_debt)
-#             old_debt_val = float(student.previous_debt or 0)
-            
-#             # 3. مديونية السنة الحالية (إن وجدت في الـ Account)
-#             current_fees = float(student.current_year_fees_amount or 0)
-            
-#             # الحسبة الشاملة (حل لغز الـ 28,200):
-#             # نجمع (القديم + الجديد) ونطرح منه (كل اللي اندفع)
-#             total_bal = (old_debt_val + current_fees) - float(history_paid)
-            
-#             # إسناد القيمة لمتغير جديد تماماً للـ HTML
-#             student.final_net_debt = max(total_bal, 0)
-            
-#         paginator = Paginator(students_query, 20)
-#         students = paginator.get_page(request.GET.get('page'))
+#             student.total_paid_display = student.current_year_paid
+#             student.fees_display = student.current_year_fees_amount
+#             student.old_debt_display = student.previous_debt
+#             student.calculated_remaining = (
+#                 (student.previous_debt or 0) + student.final_remaining
+#             )
+#             student.total_required_display = student.total_required_amount
+#             students_list.append(student)
+
+#         paginator = Paginator(students_list, 20) 
+#         page_number = request.GET.get('page')
+#         students = paginator.get_page(page_number)
+
 #     else:
 #         students = []
 
 #     context = {
-#         "students": students,
-#         "all_years": all_years,
-#         "all_grades": all_grades,
+#         "students": students, 
+#         "all_years": all_years, 
+#         "all_grades": all_grades, 
 #         "current_view_year": current_view_year,
+#         # ✅ نرسل الإجماليات للتمبلت هنا
+#         "total_previous_debt": total_previous_debt,
+#         "paid_count": paid_count,                   # العداد الأخضر
+#         "debt_count": debt_count,                   # العداد الأحمر
+#         "unassigned_count": unassigned_count,       # العداد الجديد (الأسود)
 #     }
+
 #     return render(request, "students/student_list.html", context)
 
 
 
-# def student_list(request):
-#     all_years = AcademicYear.objects.all().order_by('-name')
-#     all_grades = Grade.objects.all().order_by('id') 
-
-#     selected_year_id = request.GET.get('year_id')
-#     if selected_year_id:
-#         current_view_year = AcademicYear.objects.filter(id=selected_year_id).first()
-#     else:
-#         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
-    
-#     if current_view_year:
-#         # هنا نقوم بجلب الطلاب فقط مع الربط اللازم
-#         # الـ Properties (مثل current_remaining) ستعمل تلقائياً عند استدعائها في القالب
-#         # نستخدم annotate لجلب إجمالي المدفوعات من قاعدة البيانات مباشرة مع قائمة الطلاب
-#        # هنا الـ view نظيف جداً ولن يعطي أي خطأ
-#         students_query = Student.objects.filter(
-#             academic_year=current_view_year
-#         ).select_related("grade", "classroom", "account").order_by('first_name')
-        
-#         paginator = Paginator(students_query, 20)
-#         students = paginator.get_page(request.GET.get('page'))
-#     else:
-#         students = []
-
-#     context = {
-#         "students": students,
-#         "all_years": all_years,
-#         "all_grades": all_grades,
-#         "current_view_year": current_view_year,
-#     }
-#     return render(request, "students/student_list.html", context)
 
 def add_student(request):
     student_id = request.GET.get('id')
@@ -273,40 +325,87 @@ def add_student(request):
         'student_admin_mode': is_admin_mode, # تفعيل القائمة الجانبية الخاصة بالطالب
         'hide_sidebar': False
     })
+
 def promote_student(request, student_id):
-    from finance.models import AcademicYear 
-    student = get_object_or_404(Student, id=student_id)
-    
     try:
-        current_year = student.academic_year
-        
-        # 1. جلب كل السنوات مرتبة حسب الاسم (مثلاً 2024 ثم 2025 ثم 2026)
-        # الترتيب حسب الاسم 'name' يضمن أن 2025 تأتي بعد 2024
+        student = get_object_or_404(Student, id=student_id)
+
+        # هات السنة الجاية
         all_years = list(AcademicYear.objects.all().order_by('name'))
-        
         next_year = None
-        
-        # 2. البحث عن السنة الحالية في القائمة وتحديد التي تليها مباشرة
+
         for i, year in enumerate(all_years):
-            if year.id == current_year.id:
-                if i + 1 < len(all_years): # التأكد من وجود سنة تالية في القائمة
-                    next_year = all_years[i+1] # هذه هي السنة القادمة (الأحدث)
+            if year.id == student.academic_year.id:
+                if i + 1 < len(all_years):
+                    next_year = all_years[i+1]
                 break
 
-        if next_year:
-            # 3. تحديث بيانات الطالب
-            student.academic_year = next_year
-            student.enrollment_status = "Promoted" # لظهور "ناجح ومنقول"
-            student.save()
-            
-            messages.success(request, f"🚀 تم ترقية الطالب بنجاح من {current_year.name} إلى {next_year.name}")
+        if not next_year:
+            messages.warning(request, "لا توجد سنة تالية")
+            return redirect("students_list")
+
+        # 🔥 استدعاء الدالة الأساسية فقط
+        success = promote_student_action(
+            student_id=student.id,
+            target_year_id=next_year.id,
+            target_grade_id=student.grade.id  # أو غيرها حسب النظام
+        )
+
+        if success:
+            messages.success(request, "تم الترحيل بنجاح")
         else:
-            messages.warning(request, f"تنبيه: لا توجد سنة دراسية مضافة في النظام بعد سنة {current_year.name}. يرجى إضافة السنة القادمة أولاً.")
-            
+            messages.error(request, "فشل الترحيل")
+
     except Exception as e:
-        messages.error(request, f"حدث خطأ فني: {str(e)}")
+        messages.error(request, str(e))
+
+    return redirect("students_list")
+    
+# def promote_student(request, student_id):
+#     from finance.models import AcademicYear 
+#     student = get_object_or_404(Student, id=student_id)
+    
+#     try:
+#         current_year = student.academic_year
         
-    return redirect(f"/students/add/?id={student_id}&mode=view")
+#         # 1. حساب المديونية المتبقية الحالية قبل النقل
+#         # 'final_remaining' هي الدالة اللي عملناها في الموديل
+#         remaining_debt = student.final_remaining
+        
+#         # 2. جلب السنوات مرتبة
+#         all_years = list(AcademicYear.objects.all().order_by('name'))
+#         next_year = None
+        
+#         for i, year in enumerate(all_years):
+#             if year.id == current_year.id:
+#                 if i + 1 < len(all_years):
+#                     next_year = all_years[i+1]
+#                 break
+
+#         if next_year:
+#             # --- الجزء الأهم: الترحيل المالي ---
+#             # نقل المديونية المتبقية لتصبح "مديونية سابقة" في السنة الجديدة
+#             from decimal import Decimal
+
+#             remaining_debt = student.final_remaining
+
+#             student.previous_debt = remaining_debt
+            
+#             # --- الترحيل الأكاديمي ---
+#             student.academic_year = next_year
+#             student.enrollment_status = "Promoted" 
+            
+#             student.save()
+            
+#             messages.success(request, f"🚀 تم ترحيل الطالب بنجاح. المديونية المترحلة: {remaining_debt} ج.م")
+#         else:
+#             messages.warning(request, f"تنبيه: لا توجد سنة دراسية مضافة بعد {current_year.name}.")
+            
+#     except Exception as e:
+#         messages.error(request, f"حدث خطأ فني: {str(e)}")
+        
+#     return redirect(f"/students/add/?id={student_id}&mode=view")
+
 
 def student_detail_view(request, student_id):
     student = get_object_or_404(Student, id=student_id)

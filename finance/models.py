@@ -211,7 +211,7 @@ class StudentInstallment(models.Model):
 # =====================================================
 
 class StudentAccount(models.Model):
-    student = models.OneToOneField("students.Student", on_delete=models.CASCADE, related_name="account")
+    student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name="accounts")
     academic_year = models.ForeignKey('AcademicYear', on_delete=models.CASCADE, null=True)
     installment_plan = models.ForeignKey('InstallmentPlan', on_delete=models.SET_NULL, null=True, blank=True)
     
@@ -227,11 +227,12 @@ class StudentAccount(models.Model):
     total_fees = models.DecimalField("إجمالي المصروفات", max_digits=10, decimal_places=2, default=0)
     discount = models.DecimalField("الخصم", max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    
     class Meta:
+        unique_together = ['student', 'academic_year', 'revenue_category']
         verbose_name = "حساب طالب مالي"
         verbose_name_plural = "حسابات الطلاب المالية"
-
+    
     def __str__(self):
         cat_name = f" - {self.revenue_category.name}" if self.revenue_category else ""
         return f"حساب {self.student.get_full_name()}{cat_name}"
@@ -243,8 +244,9 @@ class StudentAccount(models.Model):
 
     @property
     def current_year_fees_amount(self):
-        return self.total_fees
-
+        account = self.accounts.filter(
+            academic_year=self.academic_year
+        ).first()
     @property
     def paid_amount_current_year(self):
         from finance.models import Payment
@@ -259,7 +261,7 @@ class StudentAccount(models.Model):
         
         # الطباعة هنا لتراها في الـ Terminal وتعرف هل وجد النظام شيئاً أم لا
         total = queryset.aggregate(Sum('amount_paid'))['amount_paid__sum']
-        print(f"DEBUG: Student {self.student.id} found {queryset.count()} payments, total: {total}")
+        # print(f"DEBUG: Student {self.student.id} found {queryset.count()} payments, total: {total}")
         
         return total or Decimal("0.00")
     
@@ -269,7 +271,10 @@ class StudentAccount(models.Model):
         from django.db.models import Sum
         
         # نستخدم id الطالب مباشرة للبحث، ونطبع النتيجة في الـ Console لنرى ماذا يحدث
-        qs = Payment.objects.filter(student=self.student)
+        qs = Payment.objects.filter(
+            student=self.student,
+            academic_year=self.academic_year
+        )
         total = qs.aggregate(Sum('amount_paid'))['amount_paid__sum']
         
         # طباعة للتصحيح (ستظهر في الـ Terminal الذي يعمل عليه السيرفر)
@@ -414,35 +419,44 @@ class Payment(models.Model):
                 raise ValidationError("🚨 خطأ أمني: هذا الإيصال تم إغلاقه في الخزينة، لا يمكن تعديله نهائياً.")
             
     def save(self, *args, **kwargs):
+        # 1. تأمين السنة الدراسية: ربط الدفع بسنة الطالب الحالية تلقائياً
+        if self.student and not self.academic_year:
+            self.academic_year = self.student.academic_year
+
+        # 2. تشغيل التحقق من البيانات (clean)
         self.full_clean()
+
+        # 3. الحفظ في قاعدة البيانات داخل Transaction
         with transaction.atomic():
-            # 1. حفظ إيصال الدفع أولاً
-            super().save(*args, **kwargs)
+            # حفظ إيصال الدفع (استخدام الصيغة الأكثر استقراراً لـ super)
+            super(Payment, self).save(*args, **kwargs)
             
-            # 2. التحديث التلقائي لسجل المخزن (InventoryMaster)
+            # 4. التحديث التلقائي لسجل المخزن (InventoryMaster)
             if self.student and self.revenue_category:
-                # جلب جميع أصناف المخزن المرتبطة بصف الطالب وسنته
+                from django.db.models import Sum
+                
+                # جلب أصناف المخزن المرتبطة بصف الطالب وسنته
                 inventory_items = InventoryMaster.objects.filter(
                     grade=self.student.grade, 
                     academic_year=self.academic_year
                 )
                 
-                # جلب اسم الفئة الحالية والاسم الأب للبحث
                 current_cat_name = self.revenue_category.name
                 parent_cat_name = self.revenue_category.parent.name if self.revenue_category.parent else ""
 
                 for item in inventory_items:
                     item_name = item.item.name
-                    
-                    # التحقق: هل اسم الصنف موجود ضمن اسم الفئة أو فئتها الأم
                     is_relevant = (item_name in current_cat_name or item_name in parent_cat_name)
 
                     if is_relevant:
-                        # حساب إجمالي ما دفعه الطالب فعلياً لهذا الصنف
-                        paid_sum = Payment.objects.filter(
+                        # حساب المجموع الفعلي للمدفوعات لهذا الصنف
+                        paid_data = Payment.objects.filter(
                             student=self.student,
+                            academic_year=self.academic_year,
                             revenue_category__name__icontains=item_name
-                        ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
+                        ).aggregate(total=Sum('amount_paid'))
+                        
+                        paid_sum = paid_data['total'] or 0
                         
                         # إنشاء سجل تسليم إذا غطى المبلغ سعر الصنف
                         if paid_sum >= item.price and item.price > 0:
@@ -453,7 +467,7 @@ class Payment(models.Model):
 
     def __str__(self):
         student_info = self.student.get_full_name() if self.student else "إيراد حر"
-        return f"إيصال {self.pk or 'جديد'} - {student_info} - {self.amount_paid} ج.م"    
+        return f"إيصال {self.pk or 'جديد'} - {student_info} - {self.amount_paid} ج.م"
     
     
 class ItemDefinition(models.Model):

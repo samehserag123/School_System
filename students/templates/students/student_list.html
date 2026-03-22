@@ -73,28 +73,32 @@ opacity:.4;
 
 <div class="stats-bar px-2">
 
-<div class="stat-item">
-<div class="small text-muted">إجمالي الطلاب</div>
-<div class="fw-bold text-info fs-5">{{ students.paginator.count }}</div>
-</div>
+    <div class="stat-item">
+        <div class="small text-muted">إجمالي الطلاب</div>
+        <div class="fw-bold text-info fs-5">{{ students.paginator.count }}</div>
+    </div> <div class="stat-item" style="border-right-color:#6c757d">
+        <div class="small text-muted">غير مسكنين</div>
+        <div id="stat-unassigned" class="fw-bold text-secondary fs-5">
+            {{ unassigned_count }} 
+        </div>
+    </div>
 
-<div class="stat-item" style="border-right-color:#2ecc71">
-<div class="small text-muted">مسددين</div>
-<div id="stat-paid" class="fw-bold text-success fs-5">0</div>
-</div>
+    <div class="stat-item" style="border-right-color:#2ecc71">
+        <div class="small text-muted">مسددين</div>
+        <div id="stat-paid" class="fw-bold text-success fs-5">
+            {{ paid_count }} 
+        </div>
+    </div>
 
-<div class="stat-item" style="border-right-color:#ff4d4d">
-<div class="small text-muted">مديونين</div>
-<div id="stat-debt" class="fw-bold text-danger fs-5">0</div>
-</div>
+    <div class="stat-item" style="border-right-color:#ff4d4d">
+        <div class="small text-muted">مديونين</div>
+        <div id="stat-debt" class="fw-bold text-danger fs-5">
+            {{ debt_count }} 
+        </div>
+    </div>
 
-<div class="stat-item" style="border-right-color:#ffc107">
-<div class="small text-muted">مديونية قديمة</div>
-<div id="stat-old-debt" class="fw-bold text-warning fs-5">0</div>
+    
 </div>
-
-</div>
-
 
 <form method="POST" action="{% url 'bulk_promote' %}" id="promoteForm">
 {% csrf_token %}
@@ -118,44 +122,37 @@ opacity:.4;
 </div>
 
 <div class="col-md-6">
-
-<div class="promote-card mb-0 py-2 border-warning">
-
-<div class="row g-2">
-
-<div class="col-md-4">
-<select name="target_year" class="form-select form-select-sm" required>
-<option value="">إلى سنة...</option>
-{% for year in all_years %}
-<option value="{{ year.id }}">{{ year.name }}</option>
-{% endfor %}
-</select>
-</div>
-
-<div class="col-md-4">
-<select name="target_grade" class="form-select form-select-sm" required>
-<option value="">إلى صف...</option>
-{% for grade in all_grades %}
-<option value="{{ grade.id }}">{{ grade.name }}</option>
-{% endfor %}
-</select>
-</div>
-
-<div class="col-md-4">
-<button type="submit" class="btn btn-warning btn-sm w-100 fw-bold">
-<i class="bi bi-rocket-takeoff-fill"></i>
-تنفيذ الترحيل
-</button>
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
+    {% if user.is_superuser %}
+    <div class="promote-card mb-0 py-2 border-warning">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <select name="target_year" class="form-select form-select-sm" required>
+                    <option value="">إلى سنة...</option>
+                    {% for year in all_years %}
+                    <option value="{{ year.id }}">{{ year.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <select name="target_grade" class="form-select form-select-sm" required>
+                    <option value="">إلى صف...</option>
+                    {% for grade in all_grades %}
+                    <option value="{{ grade.id }}">{{ grade.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-warning btn-sm w-100 fw-bold">
+                    <i class="bi bi-rocket-takeoff-fill"></i> تنفيذ الترحيل
+                </button>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-dark mb-0 py-2 border-0 text-center small shadow-sm">
+        <i class="bi bi-info-circle ms-1"></i> خاصية الترحيل السنوي متاحة للمدير فقط
+    </div>
+    {% endif %}
 </div>
 
 
@@ -188,208 +185,147 @@ opacity:.4;
 
 </thead>
 
+
 <tbody id="tableBody">
 
 {% for student in students %}
 
-<tr class="student-row {% if student.calculated_remaining > 0 %}table-warning{% endif %}"
-data-search="{{ student.get_full_name }} {{ student.student_code }}">
+<tr class="student-row {% if student.calculated_previous_debt > 0 %}table-warning{% endif %}"
+    data-search="{{ student.get_full_name }} {{ student.student_code }}">
 
-<td>
+    <!-- checkbox -->
+    <td>
+        <input type="checkbox" name="student_ids" value="{{ student.id }}" class="student-checkbox">
+    </td>
 
-<input type="checkbox" name="student_ids" value="{{ student.id }}" class="student-checkbox">
+    <!-- counter -->
+    <td>
+        {{ forloop.counter }}
+    </td>
 
-</td>
-
-<td>
-{{ forloop.counter }}
-</td>
-
-
-<td class="text-end pe-4">
-
-<div class="d-flex flex-column text-end">
-
-<a href="{% url 'add_student' %}?id={{ student.id }}&mode=view"
-class="fw-bold text-info text-decoration-none">
-
-{{ student.get_full_name }}
-
-</a>
-
-<small class="text-muted">
-
-<i class="bi bi-hash"></i>
-
-{{ student.student_code }}
-
-</small>
-
-</div>
-
-</td>
-
-
-
-<td class="text-center" style="min-width: 120px;">
-    {# 1. الجزء العلوي: زر السداد أو كلمة خالص #}
-    <div class="mb-2">
-        {% if student.calculated_remaining > 0 %}
-            <a href="{% url 'settle_old_debt' student.id %}" class="btn btn-sm btn-danger w-100 py-1" title="سداد مديونية">
-                <i class="bi bi-cash-stack me-1"></i> سداد
+    <!-- name -->
+    <td class="text-end pe-4">
+        <div class="d-flex flex-column text-end">
+            <a href="{% url 'add_student' %}?id={{ student.id }}&mode=view"
+               class="fw-bold text-info text-decoration-none">
+                {{ student.get_full_name }}
             </a>
+
+            <small class="text-muted">
+                <i class="bi bi-hash"></i>
+                {{ student.student_code }}
+            </small>
+        </div>
+    </td>
+
+    <!-- old debt -->
+    <td class="text-center" style="min-width:120px;">
+        <div class="mb-2">
+            {% if student.calculated_previous_debt > 0 %}
+                <a href="{% url 'settle_old_debt' student.id %}"
+                   class="btn btn-sm btn-danger w-100 py-1">
+                    <i class="bi bi-cash-stack me-1"></i> سداد
+                </a>
+            {% else %}
+                <span class="badge bg-success w-100 py-2">
+                    <i class="bi bi-check2-all"></i> لا يوجد
+                </span>
+            {% endif %}
+        </div>
+
+        {% if student.calculated_previous_debt > 0 %}
+            <span class="badge bg-danger d-block shadow-sm">
+                {{ student.calculated_previous_debt|floatformat:2 }}
+            </span>
         {% else %}
-            <span class="badge bg-success w-100 py-2">
-                <i class="bi bi-check2-all"></i> لا يوجد ✅
+            <span class="badge bg-light text-success border border-success d-block shadow-sm">
+                0.00
             </span>
         {% endif %}
+    </td>
+
+    <!-- required -->
+    <td class="text-center">
+        {{ student.total_required_amount|floatformat:2 }}
+    </td>
+
+    <!-- paid -->
+    <td class="text-success fw-bold text-center">
+        {{ student.current_year_paid|floatformat:2 }}
+    </td>
+
+    <!-- remaining -->
+    <td class="fw-bold text-center {% if student.final_remaining > 0 %}text-danger{% else %}text-success{% endif %}">
+        {{ student.final_remaining|floatformat:2 }}
+    </td>
+
+    <!-- status -->
+    <td class="text-center">
+        {% if student.enrollment_status == "Promoted" %}
+            <span class="badge bg-info text-dark">ناجح</span>
+
+        {% elif student.enrollment_status == "New" %}
+            <span class="badge bg-primary">مستجد</span>
+
+        {% else %}
+            <span class="text-muted small">قيد الدراسة</span>
+        {% endif %}
+    </td>
+
+    <!-- financial status -->
+    <td class="text-center">
+        {% if student.current_year_fees_amount <= 0 and student.calculated_previous_debt <= 0 %}
+            <span class="badge bg-secondary">في انتظار التسكين ⏳</span>
+
+        {% elif student.final_remaining <= 0 %}
+            <span class="badge bg-success">خالص ✅</span>
+
+        {% else %}
+            <span class="badge bg-danger">مديون ⚠️</span>
+        {% endif %}
+    </td>
+
+    <!-- actions -->
+    <td class="text-center">
+    <div class="d-flex justify-content-center gap-1">
+
+        <a href="{% url 'student_statement_print' student.id %}"
+           class="btn btn-sm btn-primary" title="كشف حساب">
+            <i class="bi bi-receipt"></i>
+        </a>
+
+        {% if student.total_required_amount > 0 %}
+            <a href="{% url 'quick_collection' %}?student_id={{ student.id }}"
+               class="btn btn-sm btn-success" title="تحصيل سريع">
+                <i class="bi bi-lightning-charge-fill"></i>
+            </a>
+
+            <a href="{% url 'assign_plan_with_id' student.id %}"
+               class="btn btn-sm btn-info" title="تعديل التسكين">
+                <i class="bi bi-calculator"></i>
+            </a>
+
+            <a href="{% url 'student_inventory_view' student.id %}"
+               class="btn btn-sm btn-warning" title="صرف الكتب/الزي">
+                <i class="bi bi-box-seam"></i>
+            </a>
+
+        {% else %}
+            <button class="btn btn-sm btn-secondary" disabled title="يجب التسكين أولاً">
+                <i class="bi bi-lock-fill"></i>
+            </button>
+
+            <a href="{% url 'assign_plan_with_id' student.id %}"
+               class="btn btn-sm btn-info" title="بدء التسكين">
+                <i class="bi bi-calculator"></i>
+            </a>
+
+            <button class="btn btn-sm btn-secondary" disabled title="يجب التسكين أولاً">
+                <i class="bi bi-lock-fill"></i>
+            </button>
+        {% endif %}
+
     </div>
-
-    {# 2. الجزء السفلي: الرقم (البادج) - التعديل الجوهري هنا #}
-    {% if student.calculated_remaining > 0 %}
-        {# الطالب لسه عليه فلوس: اظهر المديونية باللون الأحمر #}
-        <span class="badge bg-danger fs-6 px-2 d-block shadow-sm">
-            <i class="bi bi-exclamation-circle"></i>
-            {{ student.old_debt_display|floatformat:2 }}
-        </span>
-    {% else %}
-        {# الطالب مسدد: اظهر 0.00 باللون الأخضر الفاتح عشان الشكل ينضبط #}
-        <span class="badge bg-light text-success border border-success px-2 d-block shadow-sm">
-            0.00
-        </span>
-    {% endif %}
-</td>
-
-
-<td>
-
-{{ student.fees_display|floatformat:2 }}
-
-</td>
-
-
-
-<td class="text-success fw-bold">
-
-{{ student.total_paid_display|floatformat:2 }}
-
-</td>
-
-
-
-<td class="fw-bold {% if student.calculated_remaining > 0 %}text-danger{% else %}text-success{% endif %}">
-
-{{ student.calculated_remaining|floatformat:2 }}
-
-</td>
-
-
-
-<td>
-
-{% if student.enrollment_status == "Promoted" or student.enrollment_status == "Passed" %}
-
-<span class="badge bg-info text-dark">
-
-ناجح
-
-</span>
-
-{% else %}
-
-<span class="text-muted small">
-
-قيد الدراسة
-
-</span>
-
-{% endif %}
-
-</td>
-
-
-
-<td>
-
-{% if student.fees_display <= 0 and student.old_debt_display <= 0 %}
-
-<span class="badge bg-secondary">
-
-في انتظار التسكين ⏳
-
-</span>
-
-{% elif student.calculated_remaining <= 0 %}
-
-<span class="badge bg-success">
-
-خالص ✅
-
-</span>
-
-{% else %}
-
-<span class="badge bg-danger">
-
-مديون ⚠️
-
-</span>
-
-{% endif %}
-
-</td>
-
-<td>
-    
-<div class="d-grid gap-1"
-style="grid-template-columns:repeat(5,1fr); width:200px; margin:auto">
-
-<a href="{% url 'student_statement_print' student.id %}"
-class="btn btn-sm btn-primary"
-title="عرض وطباعة كشف الحساب المالي">
-<i class="bi bi-receipt"></i>
-</a>
-<div class="d-grid gap-1" style="grid-template-columns:repeat(3,1fr); width:150px; margin:auto">
-
-    {# 🔴 عليه مديونية #}
-    {% if student.total_old_debt > 0 %}
-
-        <button class="btn btn-sm btn-secondary disabled"><i class="bi bi-lock-fill"></i></button>
-        <button class="btn btn-sm btn-secondary disabled"><i class="bi bi-lock-fill"></i></button>
-        <button class="btn btn-sm btn-secondary disabled"><i class="bi bi-lock-fill"></i></button>
-
-    {# 🟡 طالب جديد (لسه مفيش مصروفات) #}
-    {% elif student.fees_display <= 0 %}
-
-        <button class="btn btn-sm btn-secondary disabled"><i class="bi bi-lock-fill"></i></button>
-
-        <a href="{% url 'assign_plan_with_id' student.id %}" class="btn btn-sm btn-info">
-            <i class="bi bi-calculator"></i>
-        </a>
-
-        <button class="btn btn-sm btn-secondary disabled"><i class="bi bi-lock-fill"></i></button>
-
-    {# 🟢 متسكن خلاص #}
-    {% else %}
-
-        <a href="{% url 'quick_collection' %}?student_id={{ student.id }}" class="btn btn-sm btn-success">
-            <i class="bi bi-lightning-charge-fill"></i>
-        </a>
-
-        <a href="{% url 'assign_plan_with_id' student.id %}" class="btn btn-sm btn-info">
-            <i class="bi bi-calculator"></i>
-        </a>
-
-        <a href="{% url 'student_inventory_view' student.id %}" class="btn btn-sm btn-warning">
-            <i class="bi bi-box-seam"></i>
-        </a>
-
-    {% endif %}
-
-</div>
-
-</div>
-
 </td>
 
 </tr>
@@ -448,101 +384,115 @@ title="عرض وطباعة كشف الحساب المالي">
 <script>
 
 /* رسالة تأكيد الترحيل */
+document.getElementById("promoteForm").addEventListener("submit", function(e){
 
-document.getElementById("promoteForm").addEventListener("submit",function(e){
+    let checked = document.querySelectorAll(".student-checkbox:checked").length;
 
-let checked=document.querySelectorAll(".student-checkbox:checked").length
+    if(checked === 0){
+        alert("يجب اختيار طالب واحد على الأقل");
+        e.preventDefault();
+        return;
+    }
 
-if(checked===0){
+    if(!confirm("هل أنت متأكد من ترحيل الطلاب المحددين إلى السنة الجديدة؟")){
+        e.preventDefault();
+    }
 
-alert("يجب اختيار طالب واحد على الأقل")
+});
 
-e.preventDefault()
-return
 
-}
-
-if(!confirm("هل أنت متأكد من ترحيل الطلاب المحددين إلى السنة الجديدة؟")){
-e.preventDefault()
-}
-
-})
-
-/* البحث */
+/* تحديث الإحصائيات */
 function updateStats(){
 
-let rows=document.querySelectorAll(".student-row")
+    let rows = document.querySelectorAll(".student-row");
 
-let paid=0
-let debt=0
-let oldDebt=0
+    let paid = 0;
+    let debt = 0;
+    let unassigned = 0;
+    let totalVisible = 0;
 
-rows.forEach(row=>{
+    rows.forEach(row => {
 
-// بدلاً من row.querySelector(".badge")
-let badge = row.cells[8].querySelector(".badge"); // العمود التاسع (الموقف المالي)
+        // تجاهل الصفوف المخفية (بعد البحث)
+        if (row.style.display === "none") return;
 
-if(badge){
+        totalVisible++;
 
-if(badge.classList.contains("bg-success")){
-paid++
+        // الموقف المالي (العمود 9)
+        let badge = row.cells[8].querySelector(".badge");
+
+        if(badge){
+
+            if(badge.classList.contains("bg-success")){
+                paid++;
+            }
+
+            else if(badge.classList.contains("bg-danger")){
+                debt++;
+            }
+
+            else if(badge.classList.contains("bg-secondary")){
+                unassigned++;
+            }
+        }
+
+    });
+
+    // تحديث القيم
+    document.getElementById("stat-paid").innerText = paid;
+    document.getElementById("stat-debt").innerText = debt;
+    document.getElementById("stat-unassigned").innerText = unassigned;
+
+    // تحديث الإجمالي (الظاهر فقط)
+    let totalBox = document.querySelector(".text-info.fs-5");
+    if(totalBox){
+        totalBox.innerText = totalVisible;
+    }
 }
 
-if(badge.classList.contains("bg-danger")){
-debt++
-}
 
-}
-
-let old=row.children[3].innerText.trim()
-
-if(parseFloat(old)>0){
-oldDebt++
-}
-
-})
-
-document.getElementById("stat-paid").innerText=paid
-document.getElementById("stat-debt").innerText=debt
-document.getElementById("stat-old-debt").innerText=oldDebt
-
-}
-
+/* البحث */
 function runSearch() {
+
     let input = document.getElementById('searchInput').value.toLowerCase();
     let rows = document.querySelectorAll('.student-row');
 
     rows.forEach(row => {
         let text = row.dataset.search.toLowerCase();
-        // إخفاء أو إظهار الصف بناءً على نص البحث
         row.style.display = text.includes(input) ? '' : 'none';
     });
 
-    // استدعاء دالة التحديث هنا ليتم إعادة حساب الأرقام فوراً
+    // تحديث العدادات بعد البحث
     updateStats(); 
 }
 
-/* تحديد الكل */
 
-let selectAll=document.getElementById("selectAll")
+/* تحديد الكل */
+let selectAll = document.getElementById("selectAll");
 
 if(selectAll){
 
-selectAll.onclick=function(){
+    selectAll.onclick = function(){
 
-document.querySelectorAll(".student-checkbox").forEach(cb=>{
+        document.querySelectorAll(".student-checkbox").forEach(cb => {
 
-let row=cb.closest("tr")
+            let row = cb.closest("tr");
 
-if(row.style.display!=="none"){
-cb.checked=this.checked
+            if(row.style.display !== "none"){
+                cb.checked = this.checked;
+            }
+
+        });
+
+    }
+
 }
 
-})
 
-}
-
-}
+/* تشغيل عند تحميل الصفحة */
+document.addEventListener("DOMContentLoaded", function(){
+    updateStats();
+});
 
 </script>
 
