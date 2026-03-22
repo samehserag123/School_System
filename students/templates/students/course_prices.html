@@ -1,0 +1,258 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إدارة اشتراكات الطلاب - النسخة المتقدمة</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
+    <style>
+        /* تنسيق المكتبة ليتماشى مع تصميمك المظلم */
+        .select2-container--default .select2-selection--single {
+            background-color: rgba(15, 23, 42, 0.8) !important;
+            border: 1px solid rgba(59, 130, 246, 0.5) !important;
+            height: 40px !important;
+            color: white !important;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            color: white !important;
+            line-height: 40px !important;
+        }
+
+        body {
+            background: linear-gradient(-45deg, #0f172a, #1e3a8a, #2563eb, #1e40af);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            font-family: 'Cairo', sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+            color: #ffffff;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container-card {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(15px);
+            border-radius: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        .form-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px dashed rgba(59, 130, 246, 0.5);
+        }
+
+        .table { color: white; vertical-align: middle; border-collapse: separate; border-spacing: 0 8px; }
+        .table thead th {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: none;
+            padding: 15px;
+            font-weight: 700;
+        }
+
+        .table tbody tr {
+            background: rgba(255, 255, 255, 0.03);
+            transition: all 0.3s;
+        }
+
+        .table tbody tr:hover { 
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .btn-collect {
+            background: #f59e0b;
+            color: #000;
+            border: none;
+            font-weight: 800;
+            padding: 6px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+        }
+
+        select, input, textarea {
+            background-color: rgba(15, 23, 42, 0.8) !important;
+            color: #fff !important;
+            border: 1px solid rgba(59, 130, 246, 0.4) !important;
+            border-radius: 10px !important;
+        }
+
+        .filter-highlight {
+            border: 2px solid #fbbf24 !important;
+            animation: pulse 1s;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container mt-2">
+    <div class="container-card">
+        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+            <h2 class="fw-900 text-info m-0"> <i class="bi bi-person-check-fill"></i> نظام تسجيل الاشتراكات</h2>
+            <a href="{% url 'home' %}" class="btn btn-outline-light rounded-pill px-4">
+                <i class="bi bi-house"></i> الرئيسية
+            </a>
+        </div>
+
+        <div class="form-section">
+            <form method="POST" class="row g-3">
+                {% csrf_token %}
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold"><i class="bi bi-person"></i> اختيار الطالب</label>
+                    {{ form.student }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-warning"><i class="bi bi-person-badge"></i> 1. اختر المدرس</label>
+                    {{ form.teacher }} </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold text-info"><i class="bi bi-book"></i> 2. المادة / النوع / السعر</label>
+                    {{ form.course_info }}
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-success w-100 fw-bold shadow">
+                        <i class="bi bi-plus-lg"></i> حفظ الاشتراك
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="row mb-3 align-items-center bg-dark bg-opacity-25 p-3 rounded-4 mx-1">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-primary border-0 text-white"><i class="bi bi-filter-left"></i></span>
+                    <input type="text" id="studentSearch" class="form-control" placeholder="ابحث باسم الطالب هنا للفلترة السريعة...">
+                </div>
+            </div>
+            <div class="col-md-7 text-start">
+                <span class="text-white-50 small">إجمالي المسجلين: <strong>{{ courses.count }}</strong> طالب</span>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table" id="mainTable">
+                <thead>
+                    <tr class="text-center">
+                        <th>التاريخ</th>
+                        <th class="text-start">الطالب</th>
+                        <th>الصف</th>
+                        <th>المدرس</th>
+                        <th>المادة</th>
+                        <th>المتبقي</th>
+                        <th>العمليات</th>
+                    </tr>
+                </thead>
+                <tbody class="text-center">
+                    {% for course in courses %}
+                    <tr>
+                        <td class="small text-white-50">{{ course.registration_date|date:"Y-m-d" }}</td>
+                        <td class="fw-bold text-info text-start">{{ course.student }}</td>
+                        <td><span class="badge bg-primary bg-opacity-25 text-info border border-info">{{ course.course_info.grade.name }}</span></td>
+                        <td>{{ course.course_info.teacher.name }}</td>
+                        <td>{{ course.course_info.subject.name }}</td>
+                        <td class="fw-bold">
+                            {% if course.remaining_amount <= 0 %}
+                                <span class="text-success small"><i class="bi bi-patch-check"></i> خالص</span>
+                            {% else %}
+                                <span class="text-danger fs-5">{{ course.remaining_amount }}</span> <small class="text-danger">ج.م</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if course.remaining_amount > 0 %}
+                                <a href="{% url 'collect_fee' course.id %}" class="btn-collect">
+                                    <i class="bi bi-wallet2"></i> تحصيل
+                                </a>
+                            {% else %}
+                                <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="py-5 text-white-50">لا توجد اشتراكات مسجلة حالياً</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // 1. تحويل اختيار الطالب لمحرك بحث (لحل مشكلة الـ 1000 طالب)
+        $('select[name="student"]').select2({
+            placeholder: "اكتب اسم الطالب للبحث عنه...",
+            allowClear: true,
+            dir: "rtl"
+        });
+
+        // 2. فلتر البحث السريع عن الطالب في الجدول (الأسفل)
+        document.getElementById('studentSearch').addEventListener('keyup', function() {
+            let searchValue = this.value.toLowerCase();
+            let rows = document.querySelectorAll('#mainTable tbody tr');
+            
+            rows.forEach(row => {
+                let studentName = row.cells[1].textContent.toLowerCase();
+                row.style.display = studentName.includes(searchValue) ? '' : 'none';
+            });
+        });
+
+        // 3. فلتر المدرس المعتمد واختيار المادة تلقائياً
+        const teacherSelect = document.querySelector('select[name="teacher"]');
+        const courseSelect = document.querySelector('select[name="course_info"]');
+
+        if(teacherSelect && courseSelect) {
+            const originalOptions = Array.from(courseSelect.options);
+
+            teacherSelect.addEventListener('change', function() {
+                const selectedTeacher = this.options[this.selectedIndex].text;
+                
+                courseSelect.classList.add('filter-highlight');
+                setTimeout(() => courseSelect.classList.remove('filter-highlight'), 1000);
+
+                courseSelect.innerHTML = '';
+
+                // فلترة الخيارات التي تخص المدرس المختار فقط
+                originalOptions.forEach(option => {
+                    if (option.value === "" || option.text.includes(selectedTeacher)) {
+                        courseSelect.appendChild(option.cloneNode(true));
+                    }
+                });
+
+                // --- الإضافة الذكية ---
+                // لو المدرس عنده خيار واحد فقط (مادة واحدة)، اختارها تلقائياً
+                if (courseSelect.options.length === 2) { 
+                    courseSelect.selectedIndex = 1; 
+                } else {
+                    courseSelect.value = ""; 
+                }
+            });
+        }
+    });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

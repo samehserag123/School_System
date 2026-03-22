@@ -31,23 +31,23 @@
 
         .main-card {
             border-radius: 25px;
-            /* تقليل المساحة الداخلية (Padding) لجعل اللوحة أصغر */
             padding: 25px 20px;
             background: rgba(30, 41, 59, 0.85);
             backdrop-filter: blur(15px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 20px 40px rgba(0,0,0,0.5);
             width: 90%;
-            max-width: 420px; /* تقليل العرض الأقصى */
+            max-width: 420px;
             position: relative;
             color: #ffffff;
+            z-index: 1;
         }
 
         .title {
             font-weight: 900;
             color: #ffffff;
-            margin-bottom: 20px; /* تقليل المسافة أسفل العنوان */
-            font-size: 1.5rem;   /* تقليل حجم الخط قليلاً */
+            margin-bottom: 20px;
+            font-size: 1.5rem;
         }
 
         .title::after {
@@ -62,7 +62,7 @@
 
         .btn-custom {
             width: 100%;
-            min-height: 44px; /* تقليل ارتفاع الزرار */
+            min-height: 44px;
             font-size: 15px;
             font-weight: 600;
             border-radius: 12px;
@@ -74,7 +74,7 @@
             transition: all 0.3s ease;
             text-decoration: none;
             color: white !important;
-            margin-bottom: 8px; /* تقليل المسافة بين الأزرار */
+            margin-bottom: 8px;
         }
 
         .btn-custom:hover {
@@ -83,11 +83,11 @@
             filter: brightness(1.1);
         }
 
+        /* تنسيق الألوان للأزرار */
         .btn-students { background: linear-gradient(45deg, #1e3a8a, #3b82f6); }
         .btn-add      { background: linear-gradient(45deg, #059669, #10b981); }
-        .btn-assign   { background: linear-gradient(45deg, #6366f1, #8b5cf6); }
-        .btn-inventory { background: linear-gradient(45deg, #06b6d4, #0891b2); } 
         .btn-plans    { background: linear-gradient(45deg, #b45309, #f59e0b); }
+        .btn-courses  { background: linear-gradient(45deg, #7c3aed, #a78bfa); } /* لون أرجواني جديد للكورسات */
         .btn-debt     { background: linear-gradient(45deg, #e11d48, #fb7185); }
         .btn-finance  { background: linear-gradient(45deg, #d97706, #f59e0b); }
         .btn-treasury { background: linear-gradient(45deg, #92400e, #d97706); }
@@ -121,16 +121,12 @@
             <i class="bi bi-person-plus-fill"></i> إضافة طالب جديد
         </a>
 
-        <a href="{% url 'student_list' %}" class="btn-custom btn-inventory">
-            <i class="bi bi-box-seam-fill"></i> مركز استلام الكتب والزي
+        <a href="{% url 'course_prices' %}" class="btn-custom btn-courses">
+            <i class="bi bi-currency-exchange"></i> قائمة أسعار الكورسات
         </a>
 
         <a href="{% url 'installment_plan_list' %}" class="btn-custom btn-plans">
             <i class="bi bi-clipboard-data-fill"></i> إدارة أنظمة التقسيط
-        </a>
-
-        <a href="{% url 'assign_plan' %}" class="btn-custom btn-assign">
-            <i class="bi bi-person-check-fill"></i> تسكين البرامج الماليّة
         </a>
         
         <a href="{% url 'debt_report' %}" class="btn-custom btn-debt">

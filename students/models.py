@@ -149,14 +149,6 @@ class Student(models.Model):
         return self.current_year_fees_amount
         # 1. إجمالي المطلوب (السنة دي + المديونية اللي اترحلّت في الحقل)
     
-    # @property
-    # def total_required_amount(self):
-    #     from decimal import Decimal
-
-    #     # ✅ مصاريف السنة الحالية فقط
-    #     return Decimal(str(self.current_year_fees_amount or 0))
-
-    # 2. المحصل (السنة دي بس) - ده اللي هيظهر في خانة المحصل
     @property
     def current_year_paid(self):
         from finance.models import Payment
@@ -170,22 +162,6 @@ class Student(models.Model):
         ).aggregate(total=Sum('amount_paid'))['total'] or 0
         return Decimal(str(total))
 
-    # @property
-    # def final_remaining(self):
-    #     from decimal import Decimal
-
-    #     total_required = Decimal(str(self.total_required_amount or 0))
-    #     paid = Decimal(str(self.current_year_paid or 0))
-
-    #     # ✅ احسب السنة الحالية فقط
-    #     remaining = total_required - paid
-
-    #     # 🧪 Debug (اختياري)
-    #     print("total_required:", total_required)
-    #     print("paid:", paid)
-    #     print("remaining (current year only):", remaining)
-
-    #     return max(remaining, Decimal("0.00"))
     
     @property
     def final_remaining(self):
@@ -263,3 +239,106 @@ class Student(models.Model):
         return self.accounts.filter(academic_year=self.academic_year).first()
     
    
+# ----------------------------------------------------------------
+# الجداول الجديدة: المدرسين، المواد، والكورسات
+# ----------------------------------------------------------------
+
+class Teacher(models.Model):
+    name = models.CharField("اسم المدرس", max_length=150)
+    phone = models.CharField("رقم الهاتف", max_length=20, validators=[numbers_only], blank=True, null=True)
+    is_active = models.BooleanField("نشط", default=True)
+
+    class Meta:
+        verbose_name = "مدرس"
+        verbose_name_plural = "المدرسون"
+
+    def __str__(self):
+        return self.name
+
+
+class Subject(models.Model):
+    name = models.CharField("اسم المادة الدراسية", max_length=100, unique=True)
+
+    class Meta:
+        verbose_name = "مادة دراسية"
+        verbose_name_plural = "المواد الدراسية"
+
+    def __str__(self):
+        return self.name
+
+
+
+# 1. الكلاس الجديد (تعريفة أسعار المواد)
+class SubjectPrice(models.Model):
+    SESSION_TYPE_CHOICES = [
+        ('individual', 'كورس (فردي)'),
+        ('group', 'مجموعة (Group)'),
+    ]
+
+    teacher = models.ForeignKey('Teacher', on_delete=models.CASCADE, verbose_name="المدرس")
+    subject = models.ForeignKey('Subject', on_delete=models.CASCADE, verbose_name="المادة")
+    grade = models.ForeignKey('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
+    session_type = models.CharField("نوع التدريس", max_length=20, choices=SESSION_TYPE_CHOICES, default='group')
+    price = models.DecimalField("السعر", max_digits=10, decimal_places=2)
+
+    class Meta:
+        verbose_name = "تعريفة سعر مادة"
+        verbose_name_plural = "1. قائمة أسعار المواد (إعدادات)"
+        unique_together = ('teacher', 'subject', 'grade', 'session_type') # لمنع تكرار نفس التسعيرة
+
+    # داخل كلاس SubjectPrice في models.py
+    def __str__(self):
+        return f"{self.subject.name} - {self.teacher.name} ({self.get_session_type_display()}) - {self.price} ج.م"
+
+
+# 2. تعديل كلاس CourseGroup (تسجيل اشتراك الطالب)
+
+class CourseGroup(models.Model):
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب", related_name="enrolled_courses")
+    course_info = models.ForeignKey('SubjectPrice', on_delete=models.PROTECT, verbose_name="بيانات الكورس والسعر")
+    registration_date = models.DateField("تاريخ الاشتراك", auto_now_add=True)
+    notes = models.TextField("ملاحظات إضافية", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "تسجيل كورس لطالب"
+        verbose_name_plural = "2. سجل اشتراكات الطلاب"
+
+    # --- دوال حسابية ذكية ---
+    
+    @property
+    def total_paid(self):
+        """يجمع كل المبالغ المدفوعة لهذا الكورس من جدول التحصيلات المنفصل"""
+        return self.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
+
+    @property
+    def remaining_amount(self):
+        """يحسب المتبقي (سعر الكورس - إجمالي المدفوع)"""
+        return self.course_info.price - self.total_paid
+
+    @property
+    def payment_status(self):
+        """تحديد حالة الدفع نصياً"""
+        remaining = self.remaining_amount
+        if remaining <= 0:
+            return "خالص ✅"
+        return f"باقي {remaining} ج.م"
+
+    def __str__(self):
+        return f"{self.student} - {self.course_info.subject.name}"
+
+
+# 2. الكلاس الجديد: سجل تحصيلات الكورسات (الخزينة المنفصلة)
+class CoursePayment(models.Model):
+    # نربطه بالاشتراك (CourseGroup) وليس بالطالب مباشرة لتعرف هذا المبلغ دفع لأي مادة
+    course_enrollment = models.ForeignKey(CourseGroup, on_delete=models.CASCADE, verbose_name="الاشتراك", related_name="payments")
+    amount_paid = models.DecimalField("المبلغ المدفوع حالياً", max_digits=10, decimal_places=2)
+    payment_date = models.DateTimeField("تاريخ ووقت التحصيل", auto_now_add=True)
+    collected_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="المحصل")
+    notes = models.TextField("ملاحظات الدفع", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "عملية تحصيل كورس"
+        verbose_name_plural = "3. سجل تحصيلات الكورسات (الخزينة)"
+
+    def __str__(self):
+        return f"تحصيل {self.amount_paid} من {self.course_enrollment.student}"

@@ -16,8 +16,59 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from students.models import Classroom
 from django.db.models import Sum ,Q, F# تأكد من وجود هذا السطر في أعلى الملف
 from finance.models import Payment  # تأكد أن اسم التطبيق عندك هو finance
+from .forms import CourseGroupForm
+from .models import CourseGroup, CoursePayment
+
+def collect_course_fee_view(request, enrollment_id):
+    # جلب بيانات الاشتراك
+    enrollment = get_object_or_404(CourseGroup, id=enrollment_id)
+    
+    if request.method == 'POST':
+        amount = request.POST.get('amount_paid')
+        notes = request.POST.get('notes')
+        
+        if amount and float(amount) > 0:
+            # تسجيل الدفعة في جدول التحصيلات المنفصل
+            CoursePayment.objects.create(
+                course_enrollment=enrollment,
+                amount_paid=amount,
+                collected_by=request.user, # تسجيل الموظف الحالي
+                notes=notes
+            )
+            messages.success(request, f"تم تحصيل {amount} ج.م بنجاح من الطالب {enrollment.student}")
+            return redirect('course_prices') # العودة للجدول الرئيسي
+        else:
+            messages.error(request, "يرجى إدخال مبلغ صحيح")
+
+    context = {
+        'enrollment': enrollment,
+        'title': 'تحصيل رسوم كورس'
+    }
+    return render(request, 'students/collect_fee.html', context)
 
 
+def course_prices_view(request):
+    if request.method == 'POST':
+        form = CourseGroupForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('course_prices')
+    else:
+        form = CourseGroupForm()
+
+    # تأكد أن المتغير اسمه 'courses' (بالجمع) عشان الـ HTML بيقرأ الاسم ده
+    courses = CourseGroup.objects.select_related(
+        'student', 
+        'course_info__subject', 
+        'course_info__teacher'
+    ).all().order_by('-id')
+    
+    context = {
+        'courses': courses, # ده اللي بيروح للـ HTML
+        'form': form,
+        'title': 'سجل اشتراكات الطلاب والكورسات'
+    }
+    return render(request, 'students/course_prices.html', context)
 
 def debt_history(request, student_id):
     # جلب الطالب المطلوب
