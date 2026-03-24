@@ -14,10 +14,53 @@ from finance.models import StudentAccount, AcademicYear, DeliveryRecord
 from finance.utils import get_active_year
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from students.models import Classroom
-from django.db.models import Sum ,Q, F# تأكد من وجود هذا السطر في أعلى الملف
+from django.db.models import Sum ,Q ,F, Value
 from finance.models import Payment  # تأكد أن اسم التطبيق عندك هو finance
 from .forms import CourseGroupForm
 from .models import CourseGroup, CoursePayment
+from django.db.models.functions import Coalesce
+from .models import BookSale,InventoryItem
+from .forms import BookSaleForm
+
+
+def inventory_category_report(request):
+    inventory = InventoryItem.objects.annotate(
+        total_sold_count=Coalesce(Sum('booksale__quantity'), Value(0))
+    ).order_by('grade', 'name')
+
+    # التأكد من المسار الصحيح للمجلدات
+    return render(request, 'books/inventory_report.html', {
+        'inventory': inventory,
+    })
+    
+    
+def book_sales_list(request):
+    # عرض آخر عمليات الصرف أولاً
+    sales = BookSale.objects.all().order_by('-sale_date')
+    return render(request, 'books/sales_list.html', {'sales': sales})
+
+# ابحث عن دالة add_book_sale وقم بتعديلها لتصبح هكذا:
+
+def add_book_sale(request):
+    if request.method == 'POST':
+        form = BookSaleForm(request.POST)
+        if form.is_valid():
+            sale = form.save(commit=False)
+            sale.collected_by = request.user 
+            sale.save()
+            messages.success(request, f"تم تسجيل إذن استلام الكتب للطالب {sale.student} بنجاح.")
+            return redirect('book_sales_list') 
+    else:
+        form = BookSaleForm()
+    
+    # ❌ التعديل هنا: تأكد من اسم المجلد واسم الملف
+    # إذا كان الملف داخل مجلد books واسمه add_sale.html:
+    return render(request, 'books/add_sale.html', {'form': form})
+# هذه الدالة هي المسؤولة عن فتح الإيصال "فقط" عند الضغط على زر الطابعة في الجدول
+def print_receipt_view(request, sale_id):
+    sale = get_object_or_404(BookSale, id=sale_id)
+    return render(request, 'books/print_receipt.html', {'sale': sale})
+
 
 def collect_course_fee_view(request, enrollment_id):
     # جلب بيانات الاشتراك
@@ -44,7 +87,7 @@ def collect_course_fee_view(request, enrollment_id):
         'enrollment': enrollment,
         'title': 'تحصيل رسوم كورس'
     }
-    return render(request, 'students/collect_fee.html', context)
+    return render(request, 'collect_fee.html', context)
 
 
 def course_prices_view(request):
@@ -68,7 +111,7 @@ def course_prices_view(request):
         'form': form,
         'title': 'سجل اشتراكات الطلاب والكورسات'
     }
-    return render(request, 'students/course_prices.html', context)
+    return render(request, 'course_prices.html', context)
 
 def debt_history(request, student_id):
     # جلب الطالب المطلوب
@@ -83,7 +126,7 @@ def debt_history(request, student_id):
         "accounts": accounts,
         "payments": payments,
     }
-    return render(request, "students/debt_history.html", context)
+    return render(request, "debt_history.html", context)
 
 
 def get_classrooms(request):
@@ -412,51 +455,7 @@ def promote_student(request, student_id):
 
     return redirect("students_list")
     
-# def promote_student(request, student_id):
-#     from finance.models import AcademicYear 
-#     student = get_object_or_404(Student, id=student_id)
-    
-#     try:
-#         current_year = student.academic_year
-        
-#         # 1. حساب المديونية المتبقية الحالية قبل النقل
-#         # 'final_remaining' هي الدالة اللي عملناها في الموديل
-#         remaining_debt = student.final_remaining
-        
-#         # 2. جلب السنوات مرتبة
-#         all_years = list(AcademicYear.objects.all().order_by('name'))
-#         next_year = None
-        
-#         for i, year in enumerate(all_years):
-#             if year.id == current_year.id:
-#                 if i + 1 < len(all_years):
-#                     next_year = all_years[i+1]
-#                 break
-
-#         if next_year:
-#             # --- الجزء الأهم: الترحيل المالي ---
-#             # نقل المديونية المتبقية لتصبح "مديونية سابقة" في السنة الجديدة
-#             from decimal import Decimal
-
-#             remaining_debt = student.final_remaining
-
-#             student.previous_debt = remaining_debt
-            
-#             # --- الترحيل الأكاديمي ---
-#             student.academic_year = next_year
-#             student.enrollment_status = "Promoted" 
-            
-#             student.save()
-            
-#             messages.success(request, f"🚀 تم ترحيل الطالب بنجاح. المديونية المترحلة: {remaining_debt} ج.م")
-#         else:
-#             messages.warning(request, f"تنبيه: لا توجد سنة دراسية مضافة بعد {current_year.name}.")
-            
-#     except Exception as e:
-#         messages.error(request, f"حدث خطأ فني: {str(e)}")
-        
-#     return redirect(f"/students/add/?id={student_id}&mode=view")
-
+# 
 
 def student_detail_view(request, student_id):
     student = get_object_or_404(Student, id=student_id)

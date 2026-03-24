@@ -1,13 +1,64 @@
 from django.contrib import admin
 from django.db.models import Sum
 from django.utils.html import format_html
-from .models import Grade, Classroom, Student, Teacher, Subject, CourseGroup, SubjectPrice
+from .models import (
+    Grade, Classroom, Student, Teacher, Subject, Uniform, 
+    InventoryItem, GradePackagePrice, SubjectPrice, BookSale , CourseGroup
+)
 from .models import CoursePayment
 
-from django.contrib import admin
-from django.utils.html import format_html
-from .models import CoursePayment, Teacher  # تأكد من استيراد الموديلات الصح
+# 1. تسجيل المواد الدراسية
+@admin.register(Subject)
+class SubjectAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name']
+    search_fields = ['name']
 
+# 2. تسجيل الزي المدرسي
+@admin.register(Uniform)
+class UniformAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name']
+    search_fields = ['name']
+
+# 3. تسجيل المخزن (الجرد التفصيلي)
+@admin.register(InventoryItem)
+class InventoryItemAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'item_type', 'grade', 'stock_quantity']
+    list_filter = ['item_type', 'grade']
+    search_fields = ['name']
+
+# 4. تسجيل أسعار باقات الصفوف (المالية)
+@admin.register(GradePackagePrice)
+class GradePackagePriceAdmin(admin.ModelAdmin):
+    list_display = ['grade', 'books_price', 'uniform_price']
+
+# 5. تسجيل أسعار المجموعات والكورسات
+@admin.register(SubjectPrice)
+class SubjectPriceAdmin(admin.ModelAdmin):
+    # نستخدم 'subject' و 'teacher' و 'grade' لأنها ForeignKey في الموديل
+    list_display = ['subject', 'teacher', 'grade', 'price', 'session_type']
+    list_filter = ['grade', 'session_type']
+    search_fields = ['subject__name', 'teacher__first_name']
+
+# 6. تسجيل أذونات استلام الكتب والزي
+@admin.register(BookSale)
+class BookSaleAdmin(admin.ModelAdmin):
+    # تم حذف total_price لأنه لم يعد موجوداً في الموديل
+    list_display = [
+        'student', 
+        'book_item', 
+        'quantity', 
+        'payment_status', 
+        'is_delivered', 
+        'sale_date'
+    ]
+    list_filter = ['payment_status', 'is_delivered', 'sale_date']
+    search_fields = ['student__first_name', 'book_item__name']
+    
+    # تحسين: إمكانية الفلترة حسب الطالب في صفحة الإذن
+    raw_id_fields = ['student', 'book_item']
+    
+
+    
 @admin.register(CoursePayment)
 class CoursePaymentAdmin(admin.ModelAdmin):
     # 1. الأعمدة التي تظهر في الجدول الرئيسي
@@ -82,17 +133,6 @@ class TeacherAdmin(admin.ModelAdmin):
     list_display = ['id', 'name', 'phone'] # حذفنا 'subject' لأنه سبب المشكلة
     search_fields = ['name']
 
-# 2. تسجيل المادة (Subject) - ليظهر في القائمة الجانبية
-@admin.register(Subject)
-class SubjectAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name']
-    search_fields = ['name']
-
-@admin.register(SubjectPrice)
-class SubjectPriceAdmin(admin.ModelAdmin):
-    list_display = ('subject', 'teacher', 'grade', 'session_type', 'price')
-    list_filter = ('grade', 'session_type', 'teacher')
-    search_fields = ('subject__name', 'teacher__name')
     
 # 3. تسجيل أسعار الكورسات والمجموعات
 @admin.register(CourseGroup)

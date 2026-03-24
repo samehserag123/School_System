@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.db import models
 import random
 from django.utils import timezone
@@ -50,8 +51,8 @@ class Student(models.Model):
 
     # --- البيانات الأساسية ---
     image = models.ImageField("صورة الطالب", upload_to="students/", null=True, blank=True)
-    registration_number = models.CharField("رقم القيد", max_length=50, unique=True, blank=True, null=True)
-    
+    # جعلنا رقم القيد اختيارياً وغير فريد (أو فريد مع السماح بالقيم الفارغة)
+    registration_number = models.CharField("رقم القيد", max_length=50, blank=True, null=True)
     first_name = models.CharField("الاسم الأول", max_length=100)
     last_name = models.CharField("اسم العائلة", max_length=100)
     
@@ -69,12 +70,13 @@ class Student(models.Model):
     )
 
     # 2. كود الطالب (تلقائي)
-    student_code = models.CharField("كود الطالب", max_length=20, unique=True, editable=False)
+    student_code = models.CharField("كود الطالب", max_length=20, unique=True, editable=False, blank=True, null=True)
 
-    # ... باقي الحقول (grade, academic_year, إلخ) ...
+    # --- البيانات الشخصية ---
     date_of_birth = models.DateField("تاريخ الميلاد", null=True, blank=True)
     birth_place = models.CharField("محل الميلاد", max_length=150, blank=True, null=True)
     
+    # إضافة null و blank للنوع
     gender = models.CharField(
         "النوع", 
         max_length=10, 
@@ -83,24 +85,27 @@ class Student(models.Model):
         blank=True
     )
     
-    religion = models.CharField("الديانة", max_length=20, null=True, blank=True, choices=RELIGION_CHOICES)
-    nationality = models.CharField("الجنسية", max_length=100, default="مصري")
+    religion = models.CharField("الديانة", max_length=20, choices=RELIGION_CHOICES, null=True, blank=True)
+    nationality = models.CharField("الجنسية", max_length=100, default="مصري", null=True, blank=True)
     address = models.TextField("العنوان", blank=True, null=True)
 
     mother_name = models.CharField("اسم الأم", max_length=150, null=True, blank=True)
     phone = models.CharField("رقم التليفون", max_length=20, null=True, blank=True)
 
     # --- الحالة الأكاديمية ---
-    enrollment_status = models.CharField("حالة القيد", max_length=20, choices=STATUS_CHOICES, default="New")
-    integration_status = models.BooleanField("موقف الدمج", default=False)
+    # جعل حالة القيد اختيارية
+    enrollment_status = models.CharField("حالة القيد", max_length=20, choices=STATUS_CHOICES, null=True, blank=True)
+    
+    # الدمج (BooleanField يفضل أن يكون له default لكن وضعنا null=True ليكون اختيارياً تماماً)
+    integration_status = models.BooleanField("موقف الدمج", default=False, null=True, blank=True)
+    
     specialization = models.CharField("التخصص", max_length=30, choices=SPECIALIZATION_CHOICES, blank=True, null=True)
     
     previous_debt = models.DecimalField("مديونية سابقة مرحلة", max_digits=10, decimal_places=2, default=0)
     last_promotion_date = models.DateField(null=True, blank=True)
     
     grade = models.ForeignKey("students.Grade", on_delete=models.PROTECT, null=True, verbose_name="الصف الدراسي")
-    classroom = models.ForeignKey("students.Classroom", on_delete=models.PROTECT, null=True, blank=True, verbose_name="الفصل")
-    
+    classroom = models.ForeignKey("students.Classroom", on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الفصل")    
     academic_year = models.ForeignKey("finance.AcademicYear", on_delete=models.CASCADE, verbose_name="السنة الدراسية", related_name="students")
 
     is_active = models.BooleanField("نشط", default=True)
@@ -250,12 +255,13 @@ class Teacher(models.Model):
 
     class Meta:
         verbose_name = "مدرس"
-        verbose_name_plural = "المدرسون"
+        verbose_name_plural = "اسماء المدرسون"
 
     def __str__(self):
         return self.name
 
 
+# 1. المواد الدراسية
 class Subject(models.Model):
     name = models.CharField("اسم المادة الدراسية", max_length=100, unique=True)
 
@@ -266,9 +272,65 @@ class Subject(models.Model):
     def __str__(self):
         return self.name
 
+# 2. الزي المدرسي
+class Uniform(models.Model):
+    name = models.CharField("نوع الزي", max_length=100, unique=True)
+
+    class Meta:
+        verbose_name = "الزي"
+        verbose_name_plural = "الزي المدرسي"
+
+    def __str__(self):
+        return self.name
+
+# 3. الجرد التفصيلي (الكميات)
+class InventoryItem(models.Model):
+    ITEM_TYPE_CHOICES = [
+        ('book', 'كتاب دراسي'),
+        ('uniform', 'زي مدرسي'),
+    ]
+    
+    name = models.CharField("اسم الصنف التفصيلي", max_length=150, help_text="مثال: كتاب لغة عربية - ترم أول")
+    item_type = models.CharField("نوع الصنف", max_length=10, choices=ITEM_TYPE_CHOICES, default='book')
+    
+    subject = models.ForeignKey('Subject', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="المادة (للكتب)")
+    uniform = models.ForeignKey('Uniform', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الزي (للملابس)")
+    
+    grade = models.ForeignKey('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
+    stock_quantity = models.PositiveIntegerField("الكمية المتاحة في المخزن", default=0)
+
+    class Meta:
+        verbose_name = "صنف مخزني (جرد)"
+        verbose_name_plural = "المخزن (الجرد التفصيلي)"       
+
+    def __str__(self):
+        return f"{self.name} - {self.grade.name}"
+
+    @property
+    def total_sold_count(self):
+        # مجموع الكميات المصروفة من BookSale
+        return sum(sale.quantity for sale in self.booksale_set.all())
+
+    @property
+    def remaining(self):
+        # المتبقي في المخزن
+        return self.stock_quantity - self.total_sold_count
+
+# 4. أسعار الباقات المالية لكل صف
+class GradePackagePrice(models.Model):
+    grade = models.OneToOneField('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
+    books_price = models.DecimalField("سعر باقة الكتب الإجمالي", max_digits=10, decimal_places=2, default=0)
+    uniform_price = models.DecimalField("سعر باقة الزي الإجمالي", max_digits=10, decimal_places=2, default=0)
+    
+    class Meta:
+        verbose_name = "سعر باقة الصف"
+        verbose_name_plural = "أسعار باقات الصفوف"
+
+    def __str__(self):
+        return f"أسعار {self.grade.name}"
 
 
-# 1. الكلاس الجديد (تعريفة أسعار المواد)
+# 5. أسعار المجموعات والكورسات (الدروس)
 class SubjectPrice(models.Model):
     SESSION_TYPE_CHOICES = [
         ('individual', 'كورس (فردي)'),
@@ -283,15 +345,39 @@ class SubjectPrice(models.Model):
 
     class Meta:
         verbose_name = "تعريفة سعر مادة"
-        verbose_name_plural = "1. قائمة أسعار المواد (إعدادات)"
-        unique_together = ('teacher', 'subject', 'grade', 'session_type') # لمنع تكرار نفس التسعيرة
+        verbose_name_plural = "أسعار المجموعات والاشتراكات"
+        unique_together = ('teacher', 'subject', 'grade', 'session_type')
 
-    # داخل كلاس SubjectPrice في models.py
     def __str__(self):
-        return f"{self.subject.name} - {self.teacher.name} ({self.get_session_type_display()}) - {self.price} ج.م"
+        return f"{self.subject.name} - {self.teacher.first_name} ({self.get_session_type_display()})"
+    
 
+# 6. إذن استلام الكتب والزي (الربط بين الطالب والمخزن والمالية)
+class BookSale(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'لم يكتمل السداد'),
+        ('ready', 'تم السداد (جاهز للاستلام)'),
+        ('delivered', 'تم التسليم فعلياً'),
+    ]
 
-# 2. تعديل كلاس CourseGroup (تسجيل اشتراك الطالب)
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب")
+    book_item = models.ForeignKey('InventoryItem', on_delete=models.CASCADE, verbose_name="الصنف المطلوب استلامه")
+    quantity = models.PositiveIntegerField("الكمية", default=1)
+    
+    payment_status = models.CharField("حالة السداد", max_length=20, choices=STATUS_CHOICES, default='pending')
+    is_delivered = models.BooleanField("تم الاستلام من المخزن؟", default=False)
+    
+    collected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الموظف المسؤول")
+    sale_date = models.DateTimeField("تاريخ الحركة", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "إذن استلام"
+        verbose_name_plural = "إذونات الاستلام"
+
+    def __str__(self):
+        return f"{self.student} - {self.book_item.name}"
+    
+    
 
 class CourseGroup(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب", related_name="enrolled_courses")
@@ -301,7 +387,7 @@ class CourseGroup(models.Model):
 
     class Meta:
         verbose_name = "تسجيل كورس لطالب"
-        verbose_name_plural = "2. سجل اشتراكات الطلاب"
+        verbose_name_plural = "سجل اشتراكات الطلاب"
 
     # --- دوال حسابية ذكية ---
     
@@ -342,3 +428,4 @@ class CoursePayment(models.Model):
 
     def __str__(self):
         return f"تحصيل {self.amount_paid} من {self.course_enrollment.student}"
+    

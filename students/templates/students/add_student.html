@@ -3,7 +3,6 @@
 
 {% block extra_css %}
 <style>
-    /* 1. تنسيق البطاقة الرئيسية (لتكون داكنة بالكامل) */
     .student-card {
         background-color: #1a1d21 !important;
         border: 1px solid #2d3238 !important;
@@ -11,30 +10,94 @@
         padding: 40px !important;
     }
 
-    /* 2. تنسيق موحد لجميع المربعات (للتخلص من اللون الأبيض) */
-    .form-control, .form-select, .input-group .form-control {
-        background-color: #0f1113 !important; /* خلفية سوداء */
-        color: #ffffff !important; /* نص أبيض */
-        border: 1px solid #334155 !important; /* إطار رمادي داكن */
-        padding: 12px !important;
-        border-radius: 8px !important;
-        box-shadow: none !important; /* إزالة الظل الافتراضي */
+    /* --- تنسيق الدائرة العلوية --- */
+    .profile-pic-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 30px;
     }
 
-    /* 3. تنسيق خاص للأيقونة الملحقة لتناسب الثيم الداكن */
-    .input-group-text {
-        background-color: #1a1d21 !important; /* نفس خلفية الصفحة */
+    .profile-pic-wrapper {
+        position: relative;
+        width: 140px;
+        height: 140px;
+        border-radius: 50%;
+        border: 4px solid #ffc107;
+        overflow: hidden;
+        cursor: pointer;
+        background-color: #0f1113;
+        transition: all 0.3s ease;
+    }
+
+    .profile-pic-wrapper:hover {
+        border-color: #0dcaf0;
+        transform: scale(1.02);
+    }
+
+    .profile-pic-wrapper img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .upload-overlay {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        color: #fff;
+        text-align: center;
+        padding: 5px 0;
+        font-size: 12px;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .profile-pic-wrapper:hover .upload-overlay {
+        opacity: 1;
+    }
+
+    #hidden-image-input {
+        display: none !important;
+    }
+
+    /* --- تنسيق الحقول --- */
+    .form-control, .form-select {
+        background-color: #0f1113 !important;
+        color: #ffffff !important;
         border: 1px solid #334155 !important;
-        color: #ffc107 !important; /* لون الأيقونة أصفر */
+        padding: 10px !important;
     }
 
-    /* 4. تنسيق الزر (للحفاظ على شكله) */
+    .section-title {
+        border-right: 4px solid #ffc107;
+        padding-right: 15px;
+        margin: 30px 0 20px 0;
+        color: #f8f9fa;
+        font-weight: bold;
+    }
+
+    /* --- تنسيق الزر والدمج في الأسفل --- */
     .btn-save {
         background: linear-gradient(45deg, #0d6efd, #0dcaf0);
         border: none;
-        padding: 12px 50px;
+        padding: 12px 60px;
         border-radius: 50px;
         font-weight: bold;
+    }
+
+    .form-check-input {
+        width: 2.5em !important;
+        height: 1.25em !important;
+        cursor: pointer;
+        background-color: #0f1113 !important;
+        border-color: #334155 !important;
+    }
+
+    .form-check-input:checked {
+        background-color: #ffc107 !important;
+        border-color: #ffc107 !important;
     }
 </style>
 {% endblock %}
@@ -42,77 +105,145 @@
 {% block content %}
 <div class="container py-5">
     <div class="card student-card shadow-lg">
-        <h3 class="text-center fw-bold text-white mb-5">إضافة بيانات الطالب</h3>
-        
-        {% if form.errors %}
-        <div class="alert alert-danger">
-            <ul>
-                {% for field, errors in form.errors.items %}
-                    <li>{{ field.label }}: {{ errors|striptags }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
+        <h3 class="text-center fw-bold text-white mb-4">إضافة طالب جديد</h3>
 
-        <form method="post" id="studentForm">
+        <form method="post" id="studentForm" enctype="multipart/form-data">
             {% csrf_token %}
-            
-            <div class="row g-4 mb-4">
-                <div class="col-md-3">
+
+            <div class="profile-pic-container">
+                <div class="profile-pic-wrapper" onclick="document.getElementById('hidden-image-input').click();">
+                    <img id="image-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="preview">
+                    <div class="upload-overlay">
+                        <i class="bi bi-camera"></i> تغيير
+                    </div>
+                </div>
+                <label class="text-muted mt-2">صورة الطالب</label>
+                <input type="file" name="image" id="hidden-image-input" accept="image/*" onchange="previewImage(this)">
+            </div>
+
+            <h5 class="section-title">البيانات الأساسية</h5>
+            <div class="row g-3">
+                <div class="col-md-4">
                     <label class="form-label text-info">السنة الدراسية</label>
                     {{ form.academic_year }}
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label text-info">الاسم الأول</label>
                     {{ form.first_name }}
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label text-info">اسم العائلة</label>
                     {{ form.last_name }}
                 </div>
+            </div>
+
+            <h5 class="section-title">البيانات الشخصية</h5>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label text-info">الرقم القومي</label>
+                    {{ form.national_id }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label text-info">الجنسية</label>
+                    {{ form.nationality }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label text-info">النوع</label>
+                    {{ form.gender }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label text-info">الديانة</label>
+                    {{ form.religion }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label text-info">تاريخ الميلاد</label>
+                    {{ form.date_of_birth }}
+                </div>
+            </div>
+
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <label class="form-label text-info">العنوان</label>
+                    {{ form.address }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-info">رقم التليفون</label>
+                    {{ form.phone }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-info">اسم الأم</label>
+                    {{ form.mother_name }}
+                </div>
+            </div>
+
+            <h5 class="section-title">الحالة الأكاديمية</h5>
+            <div class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label text-info">الصف الدراسي</label>
                     {{ form.grade }}
                 </div>
-            </div>
-
-            <div class="row g-4 mb-5 justify-content-center">
-                <div class="col-md-6">
-                    <label class="form-label text-warning fw-bold">الرقم القومي (14 رقم)</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-warning border-0 text-dark"><i class="bi bi-card-text"></i></span>
-                        {{ form.national_id }}
-                    </div>
-                    <small class="text-muted">تأكد من إدخال 14 رقماً صحيحاً بدون حروف.</small>
+                <div class="col-md-3">
+                    <label class="form-label text-info">الفصل</label>
+                    {{ form.classroom }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-info">التخصص</label>
+                    {{ form.specialization }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-info">حالة القيد</label>
+                    {{ form.enrollment_status }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-info">رقم القيد</label>
+                    {{ form.registration_number }}
                 </div>
             </div>
 
-            <div class="text-center">
-                <button type="submit" class="btn btn-save text-white shadow px-5 py-2">
-                    <i class="bi bi-check-circle me-2"></i> حفظ البيانات
-                </button>
+            <div class="row mt-5 align-items-center">
+                <div class="col-md-4">
+                    </div>
+                <div class="col-md-4 text-center">
+                    <button type="submit" class="btn btn-save text-white shadow">
+                        <i class="bi bi-check-circle me-2"></i> حفظ البيانات
+                    </button>
+                </div>
+                <div class="col-md-4 d-flex justify-content-end align-items-center">
+                    <div class="form-check form-switch mb-0">
+                        {{ form.integration_status }}
+                        <label class="form-check-label text-warning fw-bold ms-2" style="cursor: pointer;">طالب دمج؟</label>
+                    </div>
+                </div>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-// ... كود الجافا سكريبت الخاص بك ...
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('image-preview').src = e.target.result;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
-        // نحدد جميع الحقول التي نريد التنقل بينها (المدخلات والقوائم المنسدلة)
         const form = document.getElementById("studentForm");
-        const inputs = Array.from(form.querySelectorAll("input, select, button")).filter(el => el.type !== "hidden");
+        const inputs = Array.from(form.querySelectorAll("input:not([type='hidden']):not([type='file']), select, textarea, button"));
 
         inputs.forEach((input, index) => {
             input.addEventListener("keydown", function(e) {
                 if (e.key === "Enter") {
-                    e.preventDefault(); // منع إرسال النموذج فوراً عند الضغط على Enter
-                    
+                    if (e.target.tagName.toLowerCase() === "textarea") return;
+                    e.preventDefault();
                     const nextInput = inputs[index + 1];
                     if (nextInput) {
-                        nextInput.focus(); // الانتقال للحقل التالي
-                    } else {
-                        form.submit(); // إذا كان الحقل الأخير (زر الحفظ)، قم بإرسال النموذج
+                        nextInput.focus();
+                    } else if (input.type === "submit") {
+                        form.submit();
                     }
                 }
             });

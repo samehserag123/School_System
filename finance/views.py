@@ -52,8 +52,27 @@ from django.contrib import messages
 # دالة للتحقق من صلاحية المدير
 from django.db import IntegrityError
 from itertools import chain
+from treasury.models import GeneralLedger # استيراد الموديل الموحد
 
 
+def daily_closure_report(request):
+    today = timezone.now().date()
+    
+    # تجميع المبالغ حسب الموظف لليوم الحالي فقط
+    user_summary = GeneralLedger.objects.filter(date__date=today).values(
+        'collected_by__first_name', 
+        'collected_by__last_name',
+        'collected_by__username'
+    ).annotate(total_collected=Sum('amount')).order_by('-total_collected')
+    
+    # إجمالي الخزينة العام لليوم
+    grand_total = GeneralLedger.objects.filter(date__date=today).aggregate(Sum('amount'))['amount__sum'] or 0
+    
+    return render(request, 'treasury/daily_closure.html', {
+        'user_summary': user_summary,
+        'grand_total': grand_total,
+        'today': today
+    })
 # دالة التحقق من المدير
 def is_manager(user):
     return user.is_superuser or user.is_staff 
@@ -806,8 +825,10 @@ def quick_collection(request):
     })
 
 
+
 # 📊 Dashboard
 # =====================================================
+
 @login_required
 def finance_dashboard(request):
     active_year = get_active_year()
@@ -818,47 +839,43 @@ def finance_dashboard(request):
     this_month = today.month
     this_year = today.year
 
-    # 1. إيراد اليوم (شامل كل البنود)
-    today_revenue_all = Payment.objects.filter(payment_date=today).aggregate(
-        total=Sum('amount_paid'))['total'] or 0
-
-    # 2. إيراد الشهر (شامل كل البنود)
-    month_revenue_all = Payment.objects.filter(
-        payment_date__month=this_month, 
-        payment_date__year=this_year
-    ).aggregate(total=Sum('amount_paid'))['total'] or 0
-
-    # 3. إيراد العام (شامل كل البنود)
-    year_revenue_all = Payment.objects.filter(academic_year=active_year).aggregate(
-        total=Sum('amount_paid'))['total'] or 0
-
-    # 4. المديونيات العامة
-    all_students = Student.objects.filter(academic_year=active_year)
+    # --- التعديل هنا: استخدام الخزينة العامة لجلب الإيرادات الشاملة ---
     
-    # مديونية قديمة (تم توحيد المفتاح ليكون 'total')
+    # 1. إيراد اليوم الموحد (مصاريف + كتب + يدوي)
+    today_revenue_all = GeneralLedger.objects.filter(
+        date__date=today
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    # 2. إيراد الشهر الموحد
+    month_revenue_all = GeneralLedger.objects.filter(
+        date__month=this_month, 
+        date__year=this_year
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    # 3. إيراد العام الموحد
+    year_revenue_all = GeneralLedger.objects.aggregate(
+        total=Sum('amount'))['total'] or 0
+
+    # --- باقي حسابات المديونيات (كما هي من جداول الطلاب والمالية) ---
+    all_students = Student.objects.filter(academic_year=active_year)
     total_old_debts = all_students.aggregate(total=Sum('previous_debt'))['total'] or 0
     
-    # مديونية العام الحالي
     total_current_fees = StudentAccount.objects.filter(
         academic_year=active_year
     ).aggregate(total=Sum('total_fees'))['total'] or 0
     
-    paid_current_fees = Payment.objects.filter(
-        academic_year=active_year,
-        revenue_category__name="المصروفات الاساسيه"
-    ).aggregate(total=Sum('amount_paid'))['total'] or 0
+    # المحصل من المصروفات الدراسية فقط (من جدول الخزينة الموحد بفلتر الفئة)
+    paid_current_fees = GeneralLedger.objects.filter(
+        category='fees'
+    ).aggregate(total=Sum('amount'))['total'] or 0
     
     total_current_year_debt = max(total_current_fees - paid_current_fees, 0)
 
-    # 5. كفاءة الصفوف (تعديل الـ Key لتجنب الخطأ)
+    # كفاءة الصفوف
     grades_efficiency = []
     for grade in Grade.objects.all():
         students_in_grade = all_students.filter(grade=grade)
-        
-        # مديونية قديمة للصف
         g_old = students_in_grade.aggregate(total=Sum('previous_debt'))['total'] or 0
-        
-        # مديونية حالية للصف
         g_current = StudentAccount.objects.filter(
             student__in=students_in_grade, 
             academic_year=active_year
@@ -866,12 +883,11 @@ def finance_dashboard(request):
         
         g_target = g_old + g_current
         
-        # المحصل الأساسي للصف
-        g_paid = Payment.objects.filter(
+        # المحصل للصف من الخزينة الموحدة
+        g_paid = GeneralLedger.objects.filter(
             student__in=students_in_grade,
-            academic_year=active_year,
-            revenue_category__name="المصروفات الاساسيه"
-        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+            category='fees'
+        ).aggregate(total=Sum('amount'))['total'] or 0
         
         grades_efficiency.append({
             'grade': grade.name,
@@ -885,9 +901,12 @@ def finance_dashboard(request):
     total_target_all = total_old_debts + total_current_fees
     total_percentage = round((paid_current_fees / total_target_all * 100), 1) if total_target_all > 0 else 0
 
+    # جلب آخر 10 عمليات من الخزينة العامة لعرضها في الجدول
+    recent_treasury_activities = GeneralLedger.objects.all().order_by('-date')[:10]
+
     context = {
         "active_year": active_year,
-        "today_revenue_all": today_revenue_all,
+        "today_revenue_all": today_revenue_all, # القيمة الموحدة الجديدة
         "month_revenue_all": month_revenue_all,
         "year_revenue_all": year_revenue_all,
         "total_old_debts": total_old_debts,
@@ -896,8 +915,101 @@ def finance_dashboard(request):
         "total_percentage": total_percentage,
         "total_students_count": all_students.count(),
         "grades_efficiency": grades_efficiency,
+        "recent_activities": recent_treasury_activities, # لإظهار السجل الموحد في الجدول
     }
     return render(request, 'finance/dashboard.html', context)
+
+
+# @login_required
+# def finance_dashboard(request):
+#     active_year = get_active_year()
+#     if not active_year:
+#         return render(request, "finance/dashboard.html", {"error": "⚠️ لا توجد سنة نشطة."})
+
+#     today = timezone.now().date()
+#     this_month = today.month
+#     this_year = today.year
+
+#     # 1. إيراد اليوم (شامل كل البنود)
+#     today_revenue_all = Payment.objects.filter(payment_date=today).aggregate(
+#         total=Sum('amount_paid'))['total'] or 0
+
+#     # 2. إيراد الشهر (شامل كل البنود)
+#     month_revenue_all = Payment.objects.filter(
+#         payment_date__month=this_month, 
+#         payment_date__year=this_year
+#     ).aggregate(total=Sum('amount_paid'))['total'] or 0
+
+#     # 3. إيراد العام (شامل كل البنود)
+#     year_revenue_all = Payment.objects.filter(academic_year=active_year).aggregate(
+#         total=Sum('amount_paid'))['total'] or 0
+
+#     # 4. المديونيات العامة
+#     all_students = Student.objects.filter(academic_year=active_year)
+    
+#     # مديونية قديمة (تم توحيد المفتاح ليكون 'total')
+#     total_old_debts = all_students.aggregate(total=Sum('previous_debt'))['total'] or 0
+    
+#     # مديونية العام الحالي
+#     total_current_fees = StudentAccount.objects.filter(
+#         academic_year=active_year
+#     ).aggregate(total=Sum('total_fees'))['total'] or 0
+    
+#     paid_current_fees = Payment.objects.filter(
+#         academic_year=active_year,
+#         revenue_category__name="المصروفات الاساسيه"
+#     ).aggregate(total=Sum('amount_paid'))['total'] or 0
+    
+#     total_current_year_debt = max(total_current_fees - paid_current_fees, 0)
+
+#     # 5. كفاءة الصفوف (تعديل الـ Key لتجنب الخطأ)
+#     grades_efficiency = []
+#     for grade in Grade.objects.all():
+#         students_in_grade = all_students.filter(grade=grade)
+        
+#         # مديونية قديمة للصف
+#         g_old = students_in_grade.aggregate(total=Sum('previous_debt'))['total'] or 0
+        
+#         # مديونية حالية للصف
+#         g_current = StudentAccount.objects.filter(
+#             student__in=students_in_grade, 
+#             academic_year=active_year
+#         ).aggregate(total=Sum('total_fees'))['total'] or 0
+        
+#         g_target = g_old + g_current
+        
+#         # المحصل الأساسي للصف
+#         g_paid = Payment.objects.filter(
+#             student__in=students_in_grade,
+#             academic_year=active_year,
+#             revenue_category__name="المصروفات الاساسيه"
+#         ).aggregate(total=Sum('amount_paid'))['total'] or 0
+        
+#         grades_efficiency.append({
+#             'grade': grade.name,
+#             'target': g_target,
+#             'paid': g_paid,
+#             'remaining': max(g_target - g_paid, 0),
+#             'percentage': round((g_paid / g_target * 100), 1) if g_target > 0 else 0
+#         })
+
+#     # النسبة الإجمالية
+#     total_target_all = total_old_debts + total_current_fees
+#     total_percentage = round((paid_current_fees / total_target_all * 100), 1) if total_target_all > 0 else 0
+
+#     context = {
+#         "active_year": active_year,
+#         "today_revenue_all": today_revenue_all,
+#         "month_revenue_all": month_revenue_all,
+#         "year_revenue_all": year_revenue_all,
+#         "total_old_debts": total_old_debts,
+#         "total_current_year_debt": total_current_year_debt,
+#         "total_remaining": total_old_debts + total_current_year_debt,
+#         "total_percentage": total_percentage,
+#         "total_students_count": all_students.count(),
+#         "grades_efficiency": grades_efficiency,
+#     }
+#     return render(request, 'finance/dashboard.html', context)
 
 
 @staff_member_required

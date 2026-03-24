@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card bg-dark border-secondary shadow-lg">
+                <div class="card-header border-secondary py-3">
+                    <h5 class="mb-0 text-white text-center">
+                        <i class="bi bi-safe2 text-warning me-2"></i> استلام نقدية - الخزينة العامة
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label text-muted small">الطالب (إذا كان الدفع مرتبط بطالب)</label>
+                                {{ form.student }}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">نوع الإيراد</label>
+                                {{ form.category }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">المبلغ المورد</label>
+                                {{ form.amount }}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label text-muted small">رقم الإيصال المرجعي</label>
+                                {{ form.receipt_number }}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label text-muted small">ملاحظات</label>
+                            {{ form.notes }}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-info fw-bold shadow">
+                                <i class="bi bi-check-circle me-1"></i> حفظ وتوريد للخزينة
+                            </button>
+                            <a href="{% url 'treasury_dashboard' %}" class="btn btn-outline-secondary">إلغاء</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

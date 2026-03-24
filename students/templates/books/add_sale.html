@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block page_title %}تسجيل عملية صرف جديدة{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
+<style>
+    /* تنسيق خاص للـ Select2 ليتناسب مع الثيم المظلم (Dark Mode) */
+    .select2-container--bootstrap-5 .select2-selection {
+        background-color: #2b3035 !important; /* لون خلفية الحقول */
+        border-color: #495057 !important;
+        color: #fff !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        color: #fff !important; /* لون نص الاختيار */
+        line-height: 2.2;
+    }
+    .select2-container--bootstrap-5 .select2-dropdown {
+        background-color: #2b3035 !important; /* لون القائمة المنسدلة */
+        border-color: #495057 !important;
+        color: #fff !important;
+    }
+    .select2-container--bootstrap-5 .select2-search__field {
+        background-color: #343a40 !important; /* لون حقل البحث داخل القائمة */
+        color: #fff !important;
+    }
+    .select2-container--bootstrap-5 .select2-results__option--highlighted {
+        background-color: #0dcaf0 !important; /* لون التحديد */
+        color: #000 !important;
+    }
+    /* منع اختفاء الحقل */
+    .select2-container {
+        display: block;
+        width: 100% !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-3">
+    <div class="col-lg-8 col-md-10">
+        <div class="card bg-dark border-secondary shadow-lg">
+            <div class="card-header border-secondary bg-opacity-10 bg-info py-3 text-center text-white">
+                <h5 class="mb-0"><i class="bi bi-cart-plus me-2 text-info"></i> تسجيل صرف كتاب / زي مدرسي</h5>
+            </div>
+            
+            <div class="card-body p-4">
+                <form method="post" id="saleForm">
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label class="form-label text-info fw-bold"><i class="bi bi-person me-1"></i> اختيار الطالب</label>
+                        {{ form.student }}
+                        {% if form.student.errors %}
+                            <div class="text-danger small mt-1">{{ form.student.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <label class="form-label text-info fw-bold"><i class="bi bi-box me-1"></i> الكتاب أو الصنف</label>
+                            {{ form.book_item }}
+                            {% if form.book_item.errors %}
+                                <div class="text-danger small mt-1">{{ form.book_item.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-info fw-bold"><i class="bi bi-hash me-1"></i> الكمية</label>
+                            {{ form.quantity }}
+                            {% if form.quantity.errors %}
+                                <div class="text-danger small mt-1">{{ form.quantity.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="alert bg-black border-secondary text-muted small py-2 d-flex align-items-center shadow-sm">
+                        <i class="bi bi-info-circle me-2 text-warning"></i>
+                        <span>سيتم خصم الكمية من المخزن وتحديث سجلات الطالب فور الحفظ.</span>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-info btn-lg fw-bold shadow">
+                            <i class="bi bi-check2-circle me-1"></i> تأكيد عملية الصرف
+                        </button>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <button type="button" onclick="history.back()" class="btn btn-outline-danger w-100 py-2">
+                                <i class="bi bi-x-lg me-1"></i> إلغاء
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'book_sales_list' %}" class="btn btn-outline-secondary w-100 py-2">
+                                <i class="bi bi-arrow-right me-1"></i> العودة للسجل
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // 1. تفعيل البحث الذكي للطالب
+        $('select[name="student"]').select2({
+            theme: 'bootstrap-5',
+            placeholder: '🔍 ابحث عن الطالب (الاسم أو الكود)...',
+            dir: 'rtl',
+            width: '100%',
+            language: {
+                noResults: function () { return "لا يوجد طالب بهذا الاسم"; }
+            }
+        });
+
+        // 2. تفعيل البحث الذكي للأصناف
+        $('select[name="book_item"]').select2({
+            theme: 'bootstrap-5',
+            placeholder: '📦 اختر الكتاب أو الزي...',
+            dir: 'rtl',
+            width: '100%',
+            language: {
+                noResults: function () { return "هذا الصنف غير موجود بالمخزن"; }
+            }
+        });
+
+        // 3. منع إدخال كمية أقل من 1
+        $('input[name="quantity"]').on('input', function() {
+            if ($(this).val() < 1) { $(this).val(1); }
+        });
+
+        // 4. فحص الحقول قبل الإرسال
+        $('#saleForm').on('submit', function() {
+            const student = $('select[name="student"]').val();
+            const item = $('select[name="book_item"]').val();
+            if (!student || !item) {
+                alert("يرجى اختيار الطالب والصنف قبل التأكيد");
+                return false;
+            }
+            return true;
+        });
+    });
+</script>
+{% endblock %}

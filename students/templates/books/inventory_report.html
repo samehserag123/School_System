@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card bg-dark border-secondary shadow-lg mt-2">
+    <div class="card-header border-secondary d-flex justify-content-between align-items-center py-3">
+        <h5 class="mb-0 text-white"><i class="bi bi-box-seam text-warning me-2"></i> جرد المخزن (الكتب والزي)</h5>
+        <div class="no-print">
+            <input type="text" id="searchInventory" onkeyup="filterInventory()" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="بحث سريع...">
+        </div>
+    </div>
+
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0" id="inventoryTable">
+                <thead>
+                    <tr class="text-muted small">
+                        <th class="px-4">الصنف</th>
+                        <th class="text-center">الرصيد الأصلي</th>
+                        <th class="text-center text-danger">المنصرف</th>
+                        <th class="text-center text-success">المتبقي بالمخزن</th>
+                        <th class="text-center no-print">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in inventory %}
+                    <tr>
+                        <td class="px-4 py-3">
+                            <span class="text-white fw-bold">{{ item.name }}</span>
+                            <br><small class="text-muted">{{ item.grade.name }}</small>
+                        </td>
+                        <td class="text-center">{{ item.stock_quantity|add:item.total_sold_count }}</td>
+                        <td class="text-center text-danger">{{ item.total_sold_count }}</td>
+                        <td class="text-center">
+                            <span class="badge {% if item.remaining <= 5 %}bg-danger animate-pulse{% else %}bg-success{% endif %} fs-6">
+                                {{ item.remaining }} قطعة
+                            </span>
+                        </td>
+                        <td class="text-center no-print">
+                            <div class="btn-group">
+                                <a href="/admin/students/inventoryitem/{{ item.id }}/change/" target="_blank" class="btn btn-sm btn-outline-info">
+                                    <i class="bi bi-pencil"></i> تعديل
+                                </a>
+                                <a href="{% url 'book_sales_list' %}?item={{ item.id }}" class="btn btn-sm btn-outline-light">
+                                    <i class="bi bi-clock-history"></i> السجل
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-center py-4">لا توجد أصناف حالياً</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="bg-black fw-bold">
+                        <td colspan="3" class="text-end py-3 px-4 text-white">إجمالي القطع المتاحة للفلتر الحالي:</td>
+                        <td class="text-center text-warning fs-5" id="grandTotal">0</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function filterInventory() {
+        let searchValue = document.getElementById('searchInventory').value.toLowerCase();
+        let rows = document.querySelectorAll('#inventoryTable tbody tr');
+        let total = 0;
+
+        rows.forEach(row => {
+            let text = row.innerText.toLowerCase();
+            if (text.includes(searchValue)) {
+                row.style.display = '';
+                let qtyText = row.cells[3].innerText.replace(' قطعة', '');
+                let qty = parseInt(qtyText) || 0;
+                total += qty;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        document.getElementById('grandTotal').innerText = total + " قطعة";
+    }
+    document.addEventListener("DOMContentLoaded", filterInventory);
+</script>
+{% endblock %}

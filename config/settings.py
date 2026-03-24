@@ -41,8 +41,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'students',
     'finance.apps.FinanceConfig',
+    'treasury.apps.TreasuryConfig',
     'accounts',
-    'reports',
     'audit',
     'crispy_forms',
     'crispy_bootstrap5',
@@ -66,7 +66,11 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / "templates"],
+        'DIRS': [
+            BASE_DIR / "templates",  # المسار العام
+            BASE_DIR / "students/templates/students/books",  # لو عايز Django يشوف القوالب مباشرة هنا
+        ],
+        
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

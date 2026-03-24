@@ -13,6 +13,7 @@ urlpatterns = [
     # الروابط العادية للمستخدمين (HTML)
     path('students/', include('students.urls')),
     path('finance/', include('finance.urls')),
+    path('treasury/', include('treasury.urls')),
 
     # روابط الـ API (المفصولة الآن في ملفات api_urls)
     path('api/v1/finance/', include('finance.api_urls')), 
