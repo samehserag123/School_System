@@ -16,6 +16,7 @@ from .models import (
 )
 
 from .models import GradePriceList # لا تنسَ الاستيراد في الأعلى
+from django.utils.html import format_html
 
 @admin.register(GradePriceList)
 class GradePriceListAdmin(admin.ModelAdmin):

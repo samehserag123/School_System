@@ -19,18 +19,133 @@ from finance.models import Payment  # تأكد أن اسم التطبيق عند
 from .forms import CourseGroupForm
 from .models import CourseGroup, CoursePayment
 from django.db.models.functions import Coalesce
-from .models import BookSale,InventoryItem
+# الاستيراد من الموديلات (الجداول)
+from .models import BookSale, InventoryItem, InventoryRestock
+# الاستيراد من الفورمات (النماذج) - هذا هو السطر الذي ينقصك
+from .forms import RestockForm
 from .forms import BookSaleForm
 
 
-def inventory_category_report(request):
-    inventory = InventoryItem.objects.annotate(
-        total_sold_count=Coalesce(Sum('booksale__quantity'), Value(0))
-    ).order_by('grade', 'name')
+def admin_add_restock(request):
+    if request.method == 'POST':
+        form = RestockForm(request.POST)
+        item_id = request.POST.get('item_id')
+        
+        if form.is_valid() and item_id:
+            item = get_object_or_404(InventoryItem, id=item_id)
+            restock = form.save(commit=False)
+            restock.item = item
+            restock.save()
+            
+            # 🛑 تنبيه: لا تضف سطر (item.stock_quantity += ...) هنا 
+            # لأننا نعتمد الآن على الحساب التلقائي في الموديل لمنع التكرار
+            
+            messages.success(request, f"✅ تم تسجيل توريد {restock.quantity} قطعة لصنف ({item.display_name})")
+            return redirect('admin_add_restock') 
+        
+        # في حال كان الفورم غير صحيح
+        items = InventoryItem.objects.all().select_related('subject', 'grade', 'uniform')
+        return render(request, 'students/admin_restock.html', {'form': form, 'items': items})
 
-    # التأكد من المسار الصحيح للمجلدات
-    return render(request, 'books/inventory_report.html', {
-        'inventory': inventory,
+    else:
+        # حالة الـ GET (عند فتح الصفحة أول مرة)
+        form = RestockForm()
+    
+    # جلب البيانات لعرضها في القائمة المنسدلة (Select) في كل الحالات
+    items = InventoryItem.objects.all().select_related('subject', 'grade', 'uniform')
+    
+    # 🟢 هذا الـ return هو الذي كان ينقصك ويسبب الخطأ
+    return render(request, 'students/admin_restock.html', {'form': form, 'items': items})
+
+    
+def get_item_history(request, item_id):
+    
+    
+    try:
+        item = InventoryItem.objects.get(id=item_id)
+        history_list = []
+
+        # --- 🟢 أولاً: جلب تفاصيل الوارد (التوريدات) ---
+        # نجلب العمليات من الجدول الجديد الذي أضفته
+        restocks = InventoryRestock.objects.filter(item_id=item_id).order_by('-restock_date')
+        
+        for stock in restocks:
+            history_list.append({
+                'date': stock.restock_date.strftime('%Y-%m-%d') if stock.restock_date else "---",
+                'type': 'وارد (توريد)',
+                'color': 'success', # أخضر
+                'qty': stock.quantity,
+                'note': stock.note or "إضافة كمية للمخزن"
+            })
+
+        # إذا لم يكن هناك توريدات مسجلة، نظهر الكمية الأصلية كـ "وارد افتتاحي"
+        if not restocks.exists():
+            history_list.append({
+                'date': "---",
+                'type': 'وارد (رصيد أول)',
+                'color': 'success',
+                'qty': item.stock_quantity,
+                'note': "الكمية الأساسية عند تعريف الصنف"
+            })
+
+        # --- 🔴 ثانياً: جلب تفاصيل المنصرف (عمليات الصرف) ---
+        sales = BookSale.objects.filter(book_item_id=item_id).order_by('-sale_date')
+        
+        for sale in sales:
+            # دمج الاسم الأول والأخير للطالب
+            student_name = f"{sale.student.first_name} {sale.student.last_name}" if sale.student else "---"
+            
+            history_list.append({
+                'date': sale.sale_date.strftime('%Y-%m-%d') if sale.sale_date else "---",
+                'type': 'منصرف',
+                'color': 'danger', # أحمر
+                'qty': sale.quantity,
+                'note': f"طالب: {student_name}"
+            })
+
+        # ترتيب كل العمليات من الأحدث للأقدم بناءً على التاريخ
+        # (اختياري: إذا أردت دمجهم بترتيب زمني واحد)
+        # history_list.sort(key=lambda x: x['date'], reverse=True)
+
+        return JsonResponse({'history': history_list})
+
+    except InventoryItem.DoesNotExist:
+        return JsonResponse({'history': [], 'error': 'Item not found'})
+    
+    
+
+def inventory_category_report(request):
+    # جلب الأصناف
+    inventory_items = InventoryItem.objects.select_related(
+        'grade', 'subject', 'uniform'
+    ).order_by('item_type')
+
+    summary_dict = {}
+
+    for item in inventory_items:
+        # 1. نستخدم display_name كمفتاح للتجميع (مثلاً: "كتاب اكتشف")
+        name_key = item.display_name
+        
+        if name_key not in summary_dict:
+            summary_dict[name_key] = {
+                'name': name_key,
+                'item_type': item.item_type,
+                'total_stock': 0,
+                'total_sold': 0,
+            }
+        
+        # 2. الجمع التراكمي: نجمع كل الكميات التي لها نفس الاسم
+        # item.total_incoming يحسب (الافتتاحي + التوريدات) لهذا السجل
+        summary_dict[name_key]['total_stock'] += item.total_incoming
+        summary_dict[name_key]['total_sold'] += item.total_sold_count
+
+    # 3. حساب الرصيد المتبقي النهائي بعد التجميع
+    for val in summary_dict.values():
+        val['total_remaining'] = val['total_stock'] - val['total_sold']
+
+    return render(request, 'students/books/inventory_report.html', {
+        'inventory': inventory_items, # للجدول التفصيلي (السفلي)
+        'inventory_summary': summary_dict.values() # لجدول الملخص (العلوي)
     })
     
     
@@ -46,16 +161,34 @@ def add_book_sale(request):
         form = BookSaleForm(request.POST)
         if form.is_valid():
             sale = form.save(commit=False)
+            inventory_item = sale.book_item 
+            requested_qty = sale.quantity
+            
+            # التأكد من توفر الكمية باستخدام الرصيد الفعلي (المتبقي)
+            if requested_qty > inventory_item.remaining_qty:
+                messages.error(request, f"⚠️ مخزن غير كافٍ! المتوفر حالياً: {inventory_item.remaining_qty}")
+                # يجب إرجاع render هنا في حالة الخطأ
+                return render(request, 'books/add_sale.html', {'form': form})
+            
             sale.collected_by = request.user 
             sale.save()
-            messages.success(request, f"تم تسجيل إذن استلام الكتب للطالب {sale.student} بنجاح.")
-            return redirect('book_sales_list') 
+            
+            # ملاحظة: لا نعدل stock_quantity يدوياً هنا لأننا نعتمد على الحساب التلقائي في الموديل
+            
+            messages.success(request, f"تم تسجيل إذن الاستلام بنجاح.")
+            return redirect('book_sales_list')
+        
+        # في حال كان الفورم غير صحيح (Errors)
+        return render(request, 'books/add_sale.html', {'form': form})
+
     else:
+        # حالة الـ GET (عند فتح الصفحة أول مرة)
         form = BookSaleForm()
     
-    # ❌ التعديل هنا: تأكد من اسم المجلد واسم الملف
-    # إذا كان الملف داخل مجلد books واسمه add_sale.html:
+    # هذا الـ return هو الأهم، يجب أن يكون في نهاية الدالة تماماً 
+    # لضمان إرجاع الصفحة في حال فشل الـ POST أو عند دخول GET
     return render(request, 'books/add_sale.html', {'form': form})
+# ...
 # هذه الدالة هي المسؤولة عن فتح الإيصال "فقط" عند الضغط على زر الطابعة في الجدول
 def print_receipt_view(request, sale_id):
     sale = get_object_or_404(BookSale, id=sale_id)

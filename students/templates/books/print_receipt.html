@@ -1,120 +1,146 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block extra_css %}
 <style>
-    /* تنسيق الحاوية الرئيسية للإيصال */
+    /* تنسيق الشاشة العادية */
+    body { background-color: #f8f9fa !important; }
+    
     .receipt-container {
-        background-color: #fff;
-        color: #000;
-        padding: 40px;
-        border-radius: 8px;
+        background-color: #ffffff !important;
+        color: #000 !important;
+        padding: 30px;
         max-width: 800px;
         margin: 20px auto;
-        box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        border: 1px solid #000;
         font-family: 'Cairo', sans-serif;
     }
 
-    .receipt-header {
-        border-bottom: 2px solid #333;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
+    .item-name-bold {
+        color: #000 !important;
+        font-weight: 900 !important;
+        font-size: 1.3rem !important;
+        display: block;
     }
 
-    /* التنسيق الخاص بالطباعة */
+    /* --- تنسيق الطباعة الاحترافي --- */
     @media print {
-        body * {
-            visibility: hidden;
-        }
-        .receipt-container, .receipt-container * {
-            visibility: visible;
-        }
-        .receipt-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            box-shadow: none;
-            margin: 0;
-            padding: 10px;
-        }
-        .no-print {
+        /* 1. إخفاء القائمة الجانبية والهيدر وأي أزرار */
+        nav, .sidebar, .navbar, .no-print, footer, .sidebar-wrapper, aside {
             display: none !important;
         }
+
+        /* 2. إلغاء أي هوامش أو إزاحات تسببها لوحة الإدارة */
+        body, html, .main-panel, .content-wrapper, .main-content {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            background-color: #fff !important;
+        }
+
+        /* 3. جعل حاوية الإيصال هي المركز الوحيد */
+        .receipt-container {
+            border: 1px solid #000 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            position: relative !important;
+            box-shadow: none !important;
+        }
+
+        @page {
+            size: A4;
+            margin: 1cm;
+        }
+    }
+
+    .table-receipt {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    .table-receipt th, .table-receipt td {
+        border: 1px solid #000 !important;
+        padding: 10px;
+        text-align: center;
+        color: #000 !important;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container text-center mb-4 no-print">
-    <div class="d-flex justify-content-center gap-3">
-        <button onclick="window.print()" class="btn btn-success btn-lg shadow">
-            <i class="bi bi-printer me-2"></i> طباعة الإيصال
-        </button>
-
-        <a href="{% url 'book_sales_list' %}" class="btn btn-info btn-lg text-white shadow">
-            <i class="bi bi-arrow-right-circle me-2"></i> العودة للسجل
-        </a>
-    </div>
+<div class="no-print text-center mb-3">
+    <button onclick="window.print()" class="btn btn-success btn-lg">طباعة الإيصال</button>
+    <a href="{% url 'book_sales_list' %}" class="btn btn-dark btn-lg">العودة</a>
 </div>
 
-<div class="receipt-container text-dark">
-    <div class="receipt-header d-flex justify-content-between align-items-center">
+<div class="receipt-container">
+    <div class="d-flex justify-content-between align-items-center border-bottom border-2 border-dark pb-2 mb-3">
         <div>
-            <h3 class="fw-bold mb-1">نظام الإدارة المدرسية</h3>
-            <p class="mb-0">قسم شؤون الطلاب والمخازن</p>
+            <h4 class="fw-bold mb-0">نظام الإدارة المدرسية</h4>
+            <p class="small mb-0">قسم المخازن وشؤون الطلاب</p>
         </div>
         <div class="text-end">
-            <h4 class="fw-bold">إيصال استلام كتب/زي</h4>
-            <p class="mb-0 text-muted">رقم العملية: #{{ sale.id }}</p>
+            <h5 class="fw-bold mb-0">إيصال استلام عهدة</h5>
+            <p class="small mb-0 fw-bold">رقم العملية: #{{ sale.id }}</p>
         </div>
     </div>
 
-    <div class="row mb-4 mt-4 text-dark">
-        <div class="col-6 text-start">
-            <h6 class="text-muted small">بيانات الطالب:</h6>
-            <p class="fs-5 mb-1"><strong>{{ sale.student.get_full_name }}</strong></p>
-            <p class="mb-0">الصف: {{ sale.student.grade.name }}</p>
+    <div class="row mb-3">
+        <div class="col-7">
+            <p class="mb-1"><strong>المستلم:</strong> {{ sale.student.get_full_name }}</p>
+            <p class="mb-0"><strong></strong> {{ sale.student.grade.name }}</p>
         </div>
-        <div class="col-6 text-end">
-            <h6 class="text-muted small">تاريخ الصرف:</h6>
-            <p class="mb-0">{{ sale.sale_date|date:"Y-m-d" }}</p>
-            <p class="mb-0">{{ sale.sale_date|date:"H:i A" }}</p>
+        <div class="col-5 text-end small">
+            <p class="mb-0">التاريخ: {{ sale.sale_date|date:"Y-m-d" }}</p>
+            <p class="mb-0">الوقت: {{ sale.sale_date|date:"H:i A" }}</p>
         </div>
     </div>
 
-    <table class="table table-bordered border-dark mt-4 text-dark">
-        <thead class="table-light border-dark">
+    <table class="table-receipt">
+        <thead style="background-color: #eee;">
             <tr>
-                <th>الصنف المصروف</th>
-                <th class="text-center">الكمية</th>
-                <th class="text-center">ملاحظات</th>
+                <th>الصنف وتفاصيله</th>
+                <th style="width: 15%;">الكمية</th>
+                <th>الموقف المالي</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td class="py-3">{{ sale.book_item.name }}</td>
-                <td class="text-center py-3">
-                    <span class="fw-bold">{{ sale.quantity }}</span>
+                <td class="text-start px-3">
+                    <span class="small fw-bold text-muted">
+                        {% if sale.book_item.item_type == 'book' %} كتاب دراسي {% else %} زي مدرسي {% endif %}
+                    </span>
+                    <span class="item-name-bold my-1">
+                        {% if sale.book_item.item_type == 'book' and sale.book_item.subject %}
+                            مادة: {{ sale.book_item.subject.name }}
+                        {% elif sale.book_item.item_type == 'uniform' and sale.book_item.uniform %}
+                            {{ sale.book_item.uniform.name }}
+                        {% else %}
+                            {{ sale.book_item.display_name }}
+                        {% endif %}
+                    </span>
+                    <span class="small fw-bold"> {{ sale.book_item.grade.name|default:"عام" }}</span>
                 </td>
-                <td class="text-center py-3">استلام عهدة من المخزن</td>
+                <td><span class="fs-3 fw-bold">{{ sale.quantity }}</span></td>
+                <td class="small fw-bold">{{ sale.get_payment_status_display }}</td>
             </tr>
         </tbody>
     </table>
 
-    <div class="mt-3 text-dark">
-        <p><strong>حالة السداد (المالية):</strong> {{ sale.get_payment_status_display }}</p>
-        <p class="small text-muted">* تم صرف هذا الصنف بناءً على سداد باقة المصروفات الدراسية المقررة.</p>
+    <div class="row mt-5">
+        <div class="col-6 text-center">
+            <p class="mb-4 fw-bold">توقيع المستلم</p>
+            <p>________________</p>
+        </div>
+        <div class="col-6 text-center">
+            <p class="mb-4 fw-bold">أمين المخزن</p>
+            <p>________________</p>
+        </div>
     </div>
 
-    <div class="row mt-5 text-dark">
-        <div class="col-6 text-center">
-            <p class="mb-5 small text-muted">توقيع ولي الأمر / المستلم</p>
-            <p>__________________</p>
-        </div>
-        <div class="col-6 text-center">
-            <p class="mb-5 small text-muted">توقيع أمين المخزن</p>
-            <p>__________________</p>
-        </div>
+    <div class="mt-4 pt-2 border-top text-center small">
+        <p class="mb-0 italic">مستند رسمي لصرف العهدة المدرسية - {{ now|date:"Y" }}</p>
     </div>
 </div>
 {% endblock %}

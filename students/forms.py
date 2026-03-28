@@ -2,25 +2,51 @@ from django import forms
 from .models import Student
 from finance.models import AcademicYear
 from .models import CourseGroup, Teacher, SubjectPrice
-from .models import BookSale
+from .models import BookSale, InventoryItem, Student
 
-# forms.py
+from .models import InventoryRestock  # 👈 هذا هو السطر الناقص
+
+class RestockForm(forms.ModelForm):
+    class Meta:
+        model = InventoryRestock
+        fields = ['quantity', 'note']
+        widgets = {
+            'quantity': forms.NumberInput(attrs={'class': 'form-control bg-dark text-white border-info', 'min': '1'}),
+            'note': forms.TextInput(attrs={'class': 'form-control bg-dark text-white border-info', 'placeholder': 'ملاحظات التوريد'}),
+        }
+
 class BookSaleForm(forms.ModelForm):
     class Meta:
         model = BookSale
         fields = ['student', 'book_item', 'quantity']
         widgets = {
-            'student': forms.Select(attrs={'class': 'form-select select2'}), # select2 سيقوم بالباقي
+            'student': forms.Select(attrs={'class': 'form-select select2'}),
             'book_item': forms.Select(attrs={'class': 'form-select select2'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control bg-dark text-white border-secondary', 'min': 1}),
         }
 
-    def clean_quantity(self):
-        quantity = self.cleaned_data.get('quantity')
-        book_item = self.cleaned_data.get('book_item')
-        if book_item and quantity > book_item.stock_quantity:
-            raise forms.ValidationError(f"الكمية المطلوبة غير متوفرة. المتاح: {book_item.stock_quantity}")
-        return quantity
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # 1. تصحيح ترتيب الطلاب (استخدام first_name بدلاً من name)
+        self.fields['student'].queryset = Student.objects.all().order_by('first_name', 'last_name')
+        
+        # تخصيص ظهور اسم الطالب (الاسم الأول + الأخير) في القائمة
+        self.fields['student'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name} - {obj.student_code}"
+
+        # 2. تحسين عرض الأصناف (كتب/زي)
+        self.fields['book_item'].queryset = InventoryItem.objects.all().select_related('subject', 'grade', 'uniform')
+        self.fields['book_item'].label_from_instance = self.label_from_item_instance
+
+    def label_from_item_instance(self, obj):
+        """تنسيق اسم الكتاب أو الزي"""
+        grade_name = obj.grade.name if obj.grade else "عام"
+        if obj.item_type == 'book':
+            subject_name = obj.subject.name if obj.subject else "---"
+            return f"📚 كتاب {subject_name} - {grade_name}"
+        else:
+            uniform_name = obj.uniform.name if obj.uniform else "زي مدرسي"
+            return f"👕 {uniform_name} - {grade_name}"
 
 
 class CourseGroupForm(forms.ModelForm):

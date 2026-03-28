@@ -6,8 +6,9 @@ from django.core.validators import RegexValidator, MinLengthValidator
 from audit.models import AuditLog
 from django.db.models import Sum, Q
 from decimal import Decimal# ملاحظة: إذا كان numbers_only معرفاً في ملف خاص (مثلاً validators.py داخل نفس التطبيق)
-# تأكد من استيراده هنا.
-# من .validators import numbers_only
+from django.core.exceptions import ValidationError
+
+
 numbers_only = RegexValidator(
     regex=r'^\d+$',
     message='يجب إدخال أرقام فقط.'
@@ -283,39 +284,70 @@ class Uniform(models.Model):
     def __str__(self):
         return self.name
 
-# 3. الجرد التفصيلي (الكميات)
+
 class InventoryItem(models.Model):
     ITEM_TYPE_CHOICES = [
         ('book', 'كتاب دراسي'),
         ('uniform', 'زي مدرسي'),
     ]
     
-    name = models.CharField("اسم الصنف التفصيلي", max_length=150, help_text="مثال: كتاب لغة عربية - ترم أول")
     item_type = models.CharField("نوع الصنف", max_length=10, choices=ITEM_TYPE_CHOICES, default='book')
-    
     subject = models.ForeignKey('Subject', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="المادة (للكتب)")
     uniform = models.ForeignKey('Uniform', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الزي (للملابس)")
+    grade = models.ForeignKey('Grade', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الصف الدراسي")    
     
-    grade = models.ForeignKey('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
-    stock_quantity = models.PositiveIntegerField("الكمية المتاحة في المخزن", default=0)
+    # ⚠️ هذا الحقل يمثل الرصيد الذي بدأت به (الافتتاحي) ولن ينقص أبداً
+    stock_quantity = models.PositiveIntegerField("الرصيد الافتتاحي", default=0)
 
     class Meta:
+        unique_together = ('item_type', 'subject', 'uniform', 'grade')
         verbose_name = "صنف مخزني (جرد)"
-        verbose_name_plural = "المخزن (الجرد التفصيلي)"       
+        verbose_name_plural = "المخزن (الجرد التفصيلي)"
+        ordering = ['id']
 
-    def __str__(self):
-        return f"{self.name} - {self.grade.name}"
+    @property
+    def display_name(self):
+        """الاسم الذي سيظهر في التقارير والـ View"""
+        if self.item_type == 'book' and self.subject:
+            return f"كتاب {self.subject.name}"
+        elif self.item_type == 'uniform' and self.uniform:
+            return f"{self.uniform.name}"
+        return "صنف غير محدد"
+
+    @property
+    def total_incoming(self):
+        # استخدام aggregate هنا آمن لأنه يعمل على QuerySet منفصل لهذا الصنف فقط
+        from django.db.models import Sum
+        restocks_qty = self.restocks.aggregate(total=Sum('quantity'))['total'] or 0
+        return self.stock_quantity + restocks_qty
 
     @property
     def total_sold_count(self):
-        # مجموع الكميات المصروفة من BookSale
-        return sum(sale.quantity for sale in self.booksale_set.all())
+        """إجمالي المنصرف (المبيعات)"""
+        from django.db.models import Sum
+        return self.booksale_set.aggregate(total=Sum('quantity'))['total'] or 0
 
     @property
-    def remaining(self):
-        # المتبقي في المخزن
-        return self.stock_quantity - self.total_sold_count
+    def remaining_qty(self):
+        """الرصيد الحالي الفعلي المتبقي في الرفوف"""
+        return self.total_incoming - self.total_sold_count
 
+    def __str__(self):
+        # استخدام display_name الجديد لتعريف الكائن
+        return f"{self.display_name} - {self.grade.name if self.grade else 'عام'}"
+            
+
+# سجل عمليات التوريد (الوارد)
+class InventoryRestock(models.Model):
+    item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='restocks')
+    quantity = models.PositiveIntegerField(verbose_name="الكمية الموردة")
+    restock_date = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ التوريد")
+    note = models.CharField(max_length=255, blank=True, verbose_name="ملاحظات (مثل اسم المورد)")
+
+    def __str__(self):
+        return f"وارد: {self.quantity} لـ {self.item}"
+    
+    
 # 4. أسعار الباقات المالية لكل صف
 class GradePackagePrice(models.Model):
     grade = models.OneToOneField('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
@@ -375,8 +407,8 @@ class BookSale(models.Model):
         verbose_name_plural = "إذونات الاستلام"
 
     def __str__(self):
-        return f"{self.student} - {self.book_item.name}"
-    
+        # ✅ نستخدم display_name التي أنشأناها أو id لتجنب الخطأ
+        return f"{self.student} - {self.book_item.display_name if self.book_item else self.id}"
     
 
 class CourseGroup(models.Model):

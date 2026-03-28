@@ -20,12 +20,27 @@ class UniformAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 # 3. تسجيل المخزن (الجرد التفصيلي)
+
 @admin.register(InventoryItem)
 class InventoryItemAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name', 'item_type', 'grade', 'stock_quantity']
-    list_filter = ['item_type', 'grade']
-    search_fields = ['name']
+    # ✅ غيرنا الاسم هنا ليتطابق مع الدالة بالأسفل
+    list_display = ('id', 'get_item_label', 'grade', 'stock_quantity')
+    list_filter = ('item_type', 'grade')
+    search_fields = ('subject__name', 'uniform__name')
 
+    # الدالة المسؤولة عن عرض "عربي" أو "بنطلون"
+    def get_item_label(self, obj):
+        # تأكد أن display_name موجودة في الموديل كما اتفقنا
+        return obj.display_name
+    
+    # هذا السطر يعطي اسماً للعمود في لوحة التحكم
+    get_item_label.short_description = "اسم الصنف"
+
+    fieldsets = (
+        ('المعلومات الأساسية', {'fields': ('item_type', 'grade')}),
+        ('تفاصيل الصنف', {'fields': ('subject', 'uniform')}),
+        ('المخزون', {'fields': ('stock_quantity',)}),
+    )
 # 4. تسجيل أسعار باقات الصفوف (المالية)
 @admin.register(GradePackagePrice)
 class GradePackagePriceAdmin(admin.ModelAdmin):

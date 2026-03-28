@@ -27,4 +27,9 @@ urlpatterns = [
         
     # 5. تقرير جرد المخزن التفصيلي
     path('inventory/report/', views.inventory_category_report, name='inventory_report'),
+    
+    # ✅ التعديل الصحيح في ملف students/urls.py
+    path('inventory/history/<int:item_id>/', views.get_item_history, name='get_item_history'),
+    # امسح الرابط القديم وضعه مكانه هذا:
+    path('admin/inventory/add-stock/', views.admin_add_restock, name='admin_add_restock'),
 ]

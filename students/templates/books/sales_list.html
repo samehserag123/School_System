@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block page_title %}سجل حركة صرف الكتب{% endblock %}
+{% block page_title %}سجل حركة صرف الكتب والزي{% endblock %}
 
 {% block content %}
 <div class="card bg-dark border-secondary shadow-lg mt-2">
@@ -13,7 +13,6 @@
             <a href="{% url 'inventory_report' %}" class="btn btn-outline-warning btn-sm shadow-sm">
                 <i class="bi bi-box-seam me-1"></i> عرض جرد المخزن
             </a>
-
             <a href="{% url 'add_book_sale' %}" class="btn btn-outline-info btn-sm shadow-sm">
                 <i class="bi bi-plus-circle me-1"></i> تسجيل عملية جديدة
             </a>
@@ -22,44 +21,78 @@
 
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0 table-dark">
+            <table class="table table-hover mb-0 table-dark align-middle">
                 <thead>
                     <tr class="text-muted small text-uppercase" style="border-bottom: 2px solid #333;">
                         <th class="px-4 py-3">التاريخ</th>
                         <th>اسم الطالب</th>
                         <th>الصنف المصروف</th>
                         <th class="text-center">الكمية</th>
-                        <th class="text-center">إجمالي السعر</th>
                         <th class="text-center px-4">إجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for sale in sales %}
                     <tr style="border-bottom: 1px solid #2d3238;">
-                        <td class="px-4 py-3 text-muted small">{{ sale.sale_date|date:"Y-m-d H:i" }}</td>
+                        <td class="px-4 text-muted small">
+                            {{ sale.sale_date|date:"Y-m-d" }}<br>
+                            <span class="opacity-50">{{ sale.sale_date|date:"H:i" }}</span>
+                        </td>
+
                         <td>
                             <span class="text-white fw-bold">{{ sale.student.get_full_name }}</span>
-                            <br><small class="text-muted">{{ sale.student.grade.name }}</small>
+                            <br>
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary-emphasis" style="font-size: 0.7rem;">
+                                {{ sale.student.grade.name }}
+                            </span>
                         </td>
+
                         <td>
-                            <span class="badge bg-secondary px-2 py-1">{{ sale.book_item.name }}</span>
+                            {% if sale.book_item.item_type == 'book' %}
+                                <div class="d-flex align-items-center">
+                                    <div class="item-icon-box bg-primary bg-opacity-10 text-primary me-2">
+                                        <i class="bi bi-book"></i>
+                                    </div>
+                                    <div>
+                                        <span class="d-block text-white fw-semibold mb-0" style="font-size: 0.9rem;">
+                                            {{ sale.book_item.subject.name|default:"None" }}
+                                        </span>
+                                        <span class="text-info opacity-75 small" style="font-size: 0.75rem;">: {{ sale.book_item.grade.name|default:"None" }}</span>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="d-flex align-items-center">
+                                    <div class="item-icon-box bg-warning bg-opacity-10 text-warning me-2">
+                                        <i class="bi bi-universal-access"></i>
+                                    </div>
+                                    <div>
+                                        <span class="d-block text-white fw-semibold mb-0" style="font-size: 0.9rem;">
+                                            {{ sale.book_item.uniform.name|default:"None" }}
+                                        </span>
+                                        <span class="text-warning opacity-75 small" style="font-size: 0.75rem;">: {{ sale.book_item.grade.name|default:"None" }}</span>
+                                    </div>
+                                </div>
+                            {% endif %}
                         </td>
+
                         <td class="text-center">
-                            <span class="badge border border-info text-info">{{ sale.quantity }}</span>
+                            <span class="badge rounded-pill border border-info text-info px-3">
+                                {{ sale.quantity }}
+                            </span>
                         </td>
-                        <td class="text-center">
-                            <span class="text-white">{{ sale.total_price|default:"-" }}</span>
-                        </td>
+
                         <td class="text-center px-4">
-                            <div class="btn-group">
-                                <a href="{% url 'print_book_receipt' sale.id %}" class="btn btn-sm btn-dark border-secondary text-light" target="_blank">
-                                    <i class="bi bi-printer"></i> طباعة
-                            </div>
+                            <a href="{% url 'print_book_receipt' sale.id %}" class="btn btn-sm btn-outline-light border-secondary shadow-sm" target="_blank">
+                                <i class="bi bi-printer me-1"></i> طباعة
+                            </a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center py-5 text-muted fst-italic">لا توجد عمليات صرف مسجلة حالياً.</td>
+                        <td colspan="5" class="text-center py-5 text-muted fst-italic">
+                             <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
+                            لا توجد عمليات صرف مسجلة حالياً.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -67,4 +100,35 @@
         </div>
     </div>
 </div>
+
+<style>
+    /* صندوق الأيقونات الصغير */
+    .item-icon-box {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        font-size: 1.1rem;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* تأثير تمرير الماوس على الصفوف */
+    .table-hover tbody tr:hover {
+        background-color: rgba(255, 255, 255, 0.03) !important;
+        transition: all 0.3s ease;
+    }
+
+    /* تحسين شكل البادج */
+    .badge.bg-opacity-10 {
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* تنسيق النصوص الفارغة */
+    .text-muted.small {
+        font-size: 0.8rem;
+    }
+</style>
 {% endblock %}
