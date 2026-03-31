@@ -169,39 +169,32 @@ class Student(models.Model):
         return Decimal(str(total))
 
     
+    # students/models.py
+
     @property
     def final_remaining(self):
         from decimal import Decimal
-        from django.db.models import Sum
-
-        # 1. المديونية اللي اتررحلت من السنة اللي فاتت (الصافي فقط)
+        # 1. المديونية المرحلة
         old_debt = Decimal(str(self.previous_debt or 0))
         
-        # 2. مصاريف السنة دي فقط (صافي بعد الخصم)
+        # 2. صافي مصاريف السنة الحالية
         acc = self.accounts.filter(academic_year=self.academic_year).last()
         current_fees = Decimal('0.00')
         if acc:
             current_fees = Decimal(str(acc.total_fees or 0)) - Decimal(str(acc.discount or 0))
 
-        # 3. 🔥 التعديل هنا: نخصم فقط المدفوعات التابعة لـ "المصروفات الاساسيه"
-        # عشان "خامات المطبخ" أو "الباص" ملمسوش مديونية الطالب الدراسية
-        current_year_payments = self.all_payments.filter(
-            academic_year=self.academic_year,
-            revenue_category__name="المصروفات الاساسيه"  # مطابقة حرفية لاسم البند عندك
-        ).aggregate(total=Sum('amount_paid'))['total'] or 0
-        
-        total_paid = Decimal(str(current_year_payments))
+        # 3. استخدام الدالة الموحدة للمدفوعات (التي تجمع كل بنود المصاريف)
+        total_paid = self.current_year_paid 
 
-        # المعادلة: (المديونية المرحلة + مصاريف السنة) - مدفوعات المصاريف الدراسية فقط
+        # المعادلة الموحدة
         return (old_debt + current_fees) - total_paid
 
+        @property
+        def calculated_previous_debt(self):
+            from decimal import Decimal
 
-    @property
-    def calculated_previous_debt(self):
-        from decimal import Decimal
-
-        return max(Decimal('0.00'), Decimal(str(self.previous_debt or 0)))
-    
+            return max(Decimal('0.00'), Decimal(str(self.previous_debt or 0)))
+        
     @property
     def total_balance_due(self):
         from decimal import Decimal
@@ -350,16 +343,19 @@ class InventoryRestock(models.Model):
     
 # 4. أسعار الباقات المالية لكل صف
 class GradePackagePrice(models.Model):
-    grade = models.OneToOneField('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
+    academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="السنة الدراسية")
+    grade = models.ForeignKey('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
     books_price = models.DecimalField("سعر باقة الكتب الإجمالي", max_digits=10, decimal_places=2, default=0)
     uniform_price = models.DecimalField("سعر باقة الزي الإجمالي", max_digits=10, decimal_places=2, default=0)
     
     class Meta:
+        # منع تكرار السعر لنفس الصف في نفس السنة
+        unique_together = ('academic_year', 'grade')
         verbose_name = "سعر باقة الصف"
         verbose_name_plural = "أسعار باقات الصفوف"
 
     def __str__(self):
-        return f"أسعار {self.grade.name}"
+        return f"أسعار {self.grade.name} - {self.academic_year.name}"
 
 
 # 5. أسعار المجموعات والكورسات (الدروس)
@@ -381,35 +377,101 @@ class SubjectPrice(models.Model):
         unique_together = ('teacher', 'subject', 'grade', 'session_type')
 
     def __str__(self):
-        return f"{self.subject.name} - {self.teacher.first_name} ({self.get_session_type_display()})"
-    
+        # ✅ التعديل هنا: استخدام self.teacher.name بدلاً من first_name
+        return f"{self.subject.name} - {self.teacher.name} ({self.get_session_type_display()})"
 
 # 6. إذن استلام الكتب والزي (الربط بين الطالب والمخزن والمالية)
 class BookSale(models.Model):
     STATUS_CHOICES = [
         ('pending', 'لم يكتمل السداد'),
-        ('ready', 'تم السداد (جاهز للاستلام)'),
+        ('paid', 'تم السداد بالكامل'),
         ('delivered', 'تم التسليم فعلياً'),
     ]
 
     student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب")
-    book_item = models.ForeignKey('InventoryItem', on_delete=models.CASCADE, verbose_name="الصنف المطلوب استلامه")
+    item = models.ForeignKey('InventoryItem', on_delete=models.CASCADE, verbose_name="الصنف")
     quantity = models.PositiveIntegerField("الكمية", default=1)
     
-    payment_status = models.CharField("حالة السداد", max_length=20, choices=STATUS_CHOICES, default='pending')
-    is_delivered = models.BooleanField("تم الاستلام من المخزن؟", default=False)
+    total_amount = models.DecimalField("الإجمالي المطلوب", max_digits=10, decimal_places=2, default=0)
+    paid_amount = models.DecimalField("المبلغ المدفوع", max_digits=10, decimal_places=2, default=0)
     
-    collected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الموظف المسؤول")
+    status = models.CharField("حالة الحركة", max_length=20, choices=STATUS_CHOICES, default='pending')
+    is_delivered = models.BooleanField("تم الاستلام من المخزن؟", default=False)
     sale_date = models.DateTimeField("تاريخ الحركة", auto_now_add=True)
 
     class Meta:
-        verbose_name = "إذن استلام"
-        verbose_name_plural = "إذونات الاستلام"
+        verbose_name = "إذن استلام ومبيعات"
+        verbose_name_plural = "إذونات الاستلام والمبيعات"
+
+    # students/models.py
+
+   # students/models.py
+
+    # داخل كلاس BookSale في models.py
+
+    @property
+    def calculated_paid_amount(self):
+        """يقرأ إجمالي المدفوعات من الخزينة مباشرة"""
+        from finance.models import Payment
+        # تأكد من استيراد Sum في أعلى الملف: from django.db.models import Sum
+        total = Payment.objects.filter(
+            notes__icontains=f"#{self.id}"
+        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+        return total
+
+    @property
+    def remaining_amount(self):
+        """المتبقي الحقيقي بناءً على مدفوعات الخزينة"""
+        return self.total_amount - self.calculated_paid_amount
+
+    # models.py داخل كلاس BookSale
+
+    def save(self, *args, **kwargs):
+        # 1. حساب الإجمالي تلقائياً من باقة السنة
+        if not self.total_amount:
+            try:
+                from .models import GradePackagePrice
+                package = GradePackagePrice.objects.get(
+                    grade=self.student.grade, 
+                    academic_year=self.student.academic_year
+                )
+                self.total_amount = (package.books_price if self.item.item_type == 'book' else package.uniform_price) * self.quantity
+            except GradePackagePrice.DoesNotExist:
+                self.total_amount = 0
+
+        # 2. حفظ العملية أولاً لتوليد ID (ضروري لربط الخزينة)
+        super().save(*args, **kwargs)
+
+        # 3. تحديث الحالة بناءً على الدفع الحقيقي من الخزينة
+        # ملاحظة: استدعي الحفظ مرة أخرى فقط إذا تغيرت الحالة لتجنب التكرار اللانهائي
+        actual_paid = self.calculated_paid_amount
+        new_status = self.status
+        if actual_paid >= self.total_amount and self.total_amount > 0:
+            new_status = 'delivered' if self.is_delivered else 'paid'
+        else:
+            new_status = 'pending'
+        
+        if new_status != self.status:
+            BookSale.objects.filter(id=self.id).update(status=new_status)
+
+    @property
+    def status_label(self):
+        """تحديد الحالة بناءً على الدفع الفعلي"""
+        remaining = self.remaining_amount
+        if remaining <= 0 and self.total_amount > 0:
+            return "تم السداد بالكامل"
+        elif remaining < self.total_amount:
+            return "سداد جزئي"
+        return "لم يتم السداد"
+
+    @property
+    def is_fully_paid(self):
+        """اختبار سريع هل تم السداد بالكامل أم لا"""
+        return self.remaining_amount <= 0
+
 
     def __str__(self):
-        # ✅ نستخدم display_name التي أنشأناها أو id لتجنب الخطأ
-        return f"{self.student} - {self.book_item.display_name if self.book_item else self.id}"
-    
+        return f"{self.student.get_full_name()} - {self.item.display_name}"        
 
 class CourseGroup(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب", related_name="enrolled_courses")
@@ -461,3 +523,18 @@ class CoursePayment(models.Model):
     def __str__(self):
         return f"تحصيل {self.amount_paid} من {self.course_enrollment.student}"
     
+    
+    
+# أضف هذه الدوال داخل كلاس Student في ملف models.py
+    @property
+    def book_sales_summary(self):
+        """تعطي ملخصاً للطالب: هل عليه مبالغ متأخرة في الكتب/الزي؟"""
+        sales = self.booksale_set.all()
+        total_required = sum(s.total_amount for s in sales)
+        total_paid = sum(s.paid_amount for s in sales)
+        pending_delivery = sales.filter(is_delivered=False, status='paid').count()
+        
+        return {
+            'total_due': total_required - total_paid,
+            'pending_items_count': pending_delivery, # أشياء دفع ثمنها ولم يستلمها
+        }

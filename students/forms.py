@@ -18,10 +18,10 @@ class RestockForm(forms.ModelForm):
 class BookSaleForm(forms.ModelForm):
     class Meta:
         model = BookSale
-        fields = ['student', 'book_item', 'quantity']
+        fields = ['student', 'item', 'quantity']
         widgets = {
             'student': forms.Select(attrs={'class': 'form-select select2'}),
-            'book_item': forms.Select(attrs={'class': 'form-select select2'}),
+            'item': forms.Select(attrs={'class': 'form-select select2'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control bg-dark text-white border-secondary', 'min': 1}),
         }
 
@@ -35,8 +35,8 @@ class BookSaleForm(forms.ModelForm):
         self.fields['student'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name} - {obj.student_code}"
 
         # 2. تحسين عرض الأصناف (كتب/زي)
-        self.fields['book_item'].queryset = InventoryItem.objects.all().select_related('subject', 'grade', 'uniform')
-        self.fields['book_item'].label_from_instance = self.label_from_item_instance
+        self.fields['item'].queryset = InventoryItem.objects.all().select_related('subject', 'grade', 'uniform')
+        self.fields['item'].label_from_instance = self.label_from_item_instance
 
     def label_from_item_instance(self, obj):
         """تنسيق اسم الكتاب أو الزي"""

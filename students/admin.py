@@ -44,7 +44,21 @@ class InventoryItemAdmin(admin.ModelAdmin):
 # 4. تسجيل أسعار باقات الصفوف (المالية)
 @admin.register(GradePackagePrice)
 class GradePackagePriceAdmin(admin.ModelAdmin):
-    list_display = ['grade', 'books_price', 'uniform_price']
+    # عرض السنة الدراسية والصف والسعر في القائمة الرئيسية
+    list_display = ['academic_year', 'grade', 'books_price', 'uniform_price']
+    
+    # إضافة فلتر جانبي لتسهيل البحث بالسنة أو الصف
+    list_filter = ['academic_year', 'grade']
+    
+    # ترتيب العرض لجعل السنة الأحدث تظهر أولاً
+    ordering = ['-academic_year', 'grade']
+
+    # تحسين واجهة الإضافة (Dropdowns)
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "academic_year":
+            # عرض السنوات الدراسية مرتبة تنازلياً
+            kwargs["queryset"] = db_field.related_model.objects.order_by('-name')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 # 5. تسجيل أسعار المجموعات والكورسات
 @admin.register(SubjectPrice)
@@ -55,24 +69,40 @@ class SubjectPriceAdmin(admin.ModelAdmin):
     search_fields = ['subject__name', 'teacher__first_name']
 
 # 6. تسجيل أذونات استلام الكتب والزي
+# students/admin.py
+
 @admin.register(BookSale)
 class BookSaleAdmin(admin.ModelAdmin):
-    # تم حذف total_price لأنه لم يعد موجوداً في الموديل
-    list_display = [
-        'student', 
-        'book_item', 
-        'quantity', 
-        'payment_status', 
-        'is_delivered', 
-        'sale_date'
-    ]
-    list_filter = ['payment_status', 'is_delivered', 'sale_date']
-    search_fields = ['student__first_name', 'book_item__name']
+    # الحقول التي ستظهر في الجدول الرئيسي
+    list_display = ['student_link', 'item', 'quantity', 'total_amount', 'paid_amount', 'financial_status', 'is_delivered']
     
-    # تحسين: إمكانية الفلترة حسب الطالب في صفحة الإذن
-    raw_id_fields = ['student', 'book_item']
+    # الفلاتر الجانبية
+    list_filter = ['status', 'is_delivered', 'sale_date', 'student__academic_year']
     
+    # جعل اختيار الطالب والصنف يتم بالبحث (للسرعة)
+    raw_id_fields = ['student', 'item']
+    
+    # حقول للقراءة فقط (لا يمكن تعديلها يدوياً لضمان دقة الحسابات)
+    readonly_fields = ['total_amount', 'sale_date']
 
+    def financial_status(self, obj):
+        """عرض أيقونة ملونة توضح حالة السداد"""
+        from django.utils.html import format_html
+        remaining = obj.remaining_amount
+        if remaining <= 0:
+            return format_html('<span style="color: green; font-weight: bold;">خالص ✅</span>')
+        return format_html('<span style="color: red; font-weight: bold;">باقي {} ج.م</span>', remaining)
+    
+    financial_status.short_description = "الموقف المالي"
+
+    def student_link(self, obj):
+        """رابط سريع لملف الطالب"""
+        from django.urls import reverse
+        from django.utils.html import format_html
+        url = reverse("admin:students_student_change", args=[obj.student.id])
+        return format_html('<a href="{}">{}</a>', url, obj.student.get_full_name())
+    
+    student_link.short_description = "الطالب"
     
 @admin.register(CoursePayment)
 class CoursePaymentAdmin(admin.ModelAdmin):

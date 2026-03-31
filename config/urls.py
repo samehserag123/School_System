@@ -18,6 +18,8 @@ urlpatterns = [
     # روابط الـ API (المفصولة الآن في ملفات api_urls)
     path('api/v1/finance/', include('finance.api_urls')), 
     path('api/v1/students/', include('students.api_urls')),
+    
+    path('hr/', include('hr.urls')),
 ]
 
 if settings.DEBUG:

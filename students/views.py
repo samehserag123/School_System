@@ -89,7 +89,7 @@ def get_item_history(request, item_id):
             })
 
         # --- 🔴 ثانياً: جلب تفاصيل المنصرف (عمليات الصرف) ---
-        sales = BookSale.objects.filter(book_item_id=item_id).order_by('-sale_date')
+        sales = BookSale.objects.filter(item_id=item_id).order_by('-sale_date')
         
         for sale in sales:
             # دمج الاسم الأول والأخير للطالب
@@ -156,37 +156,53 @@ def book_sales_list(request):
 
 # ابحث عن دالة add_book_sale وقم بتعديلها لتصبح هكذا:
 
+# students/views.py
+
 def add_book_sale(request):
     if request.method == 'POST':
         form = BookSaleForm(request.POST)
         if form.is_valid():
             sale = form.save(commit=False)
-            inventory_item = sale.book_item 
+            inventory_item = sale.item 
+            student = sale.student
             requested_qty = sale.quantity
             
-            # التأكد من توفر الكمية باستخدام الرصيد الفعلي (المتبقي)
+            # 1. جلب السعر بناءً على (الصف + السنة الدراسية للطالب)
+            from .models import GradePackagePrice
+            try:
+                package = GradePackagePrice.objects.get(
+                    grade=student.grade, 
+                    academic_year=student.academic_year # الربط بالسنة الدراسية
+                )
+                if inventory_item.item_type == 'book':
+                    sale.total_amount = package.books_price * requested_qty
+                else:
+                    sale.total_amount = package.uniform_price * requested_qty
+            except GradePackagePrice.DoesNotExist:
+                messages.error(request, f"⚠️ لم يتم تحديد سعر الباقة لصف {student.grade.name} في سنة {student.academic_year.name}")
+                return render(request, 'books/add_sale.html', {'form': form})
+
+            # 2. التأكد من توفر الكمية في المخزن
             if requested_qty > inventory_item.remaining_qty:
                 messages.error(request, f"⚠️ مخزن غير كافٍ! المتوفر حالياً: {inventory_item.remaining_qty}")
-                # يجب إرجاع render هنا في حالة الخطأ
                 return render(request, 'books/add_sale.html', {'form': form})
             
+            # 3. التحقق من السداد (اختياري: هل تسمح بتسجيل الطلب بدون سداد؟)
+            # إذا كنت تريد منع الحفظ تماماً إلا بعد السداد الكامل:
+            # if sale.paid_amount < sale.total_amount:
+            #     messages.warning(request, "تم تسجيل الطلب ولكن لا يمكن التسليم لعدم اكتمال السداد.")
+
             sale.collected_by = request.user 
             sale.save()
             
-            # ملاحظة: لا نعدل stock_quantity يدوياً هنا لأننا نعتمد على الحساب التلقائي في الموديل
-            
-            messages.success(request, f"تم تسجيل إذن الاستلام بنجاح.")
+            messages.success(request, f"تم تسجيل إذن الاستلام للطالب {student.get_full_name()} بنجاح.")
             return redirect('book_sales_list')
         
-        # في حال كان الفورم غير صحيح (Errors)
         return render(request, 'books/add_sale.html', {'form': form})
 
     else:
-        # حالة الـ GET (عند فتح الصفحة أول مرة)
         form = BookSaleForm()
     
-    # هذا الـ return هو الأهم، يجب أن يكون في نهاية الدالة تماماً 
-    # لضمان إرجاع الصفحة في حال فشل الـ POST أو عند دخول GET
     return render(request, 'books/add_sale.html', {'form': form})
 # ...
 # هذه الدالة هي المسؤولة عن فتح الإيصال "فقط" عند الضغط على زر الطابعة في الجدول
@@ -220,7 +236,7 @@ def collect_course_fee_view(request, enrollment_id):
         'enrollment': enrollment,
         'title': 'تحصيل رسوم كورس'
     }
-    return render(request, 'collect_fee.html', context)
+    return render(request, 'students/collect_fee.html', context)
 
 
 def course_prices_view(request):
@@ -244,7 +260,8 @@ def course_prices_view(request):
         'form': form,
         'title': 'سجل اشتراكات الطلاب والكورسات'
     }
-    return render(request, 'course_prices.html', context)
+    # في ملف students/views.py
+    return render(request, 'students/course_prices.html', context)
 
 def debt_history(request, student_id):
     # جلب الطالب المطلوب

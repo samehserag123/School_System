@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'students',
     'finance.apps.FinanceConfig',
     'treasury.apps.TreasuryConfig',
+    'hr',
     'accounts',
     'audit',
     'crispy_forms',

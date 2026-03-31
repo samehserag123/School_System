@@ -14,6 +14,7 @@
         margin: 20px auto;
         border: 1px solid #000;
         font-family: 'Cairo', sans-serif;
+        position: relative;
     }
 
     .item-name-bold {
@@ -23,14 +24,27 @@
         display: block;
     }
 
+    /* علامة مائية للحالة المالية */
+    .status-watermark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-45deg);
+        font-size: 5rem;
+        opacity: 0.1;
+        font-weight: bold;
+        z-index: 0;
+        pointer-events: none;
+        width: 100%;
+        text-align: center;
+    }
+
     /* --- تنسيق الطباعة الاحترافي --- */
     @media print {
-        /* 1. إخفاء القائمة الجانبية والهيدر وأي أزرار */
-        nav, .sidebar, .navbar, .no-print, footer, .sidebar-wrapper, aside {
+        nav, .sidebar, .navbar, .no-print, footer, .sidebar-wrapper, aside, .btn {
             display: none !important;
         }
 
-        /* 2. إلغاء أي هوامش أو إزاحات تسببها لوحة الإدارة */
         body, html, .main-panel, .content-wrapper, .main-content {
             margin: 0 !important;
             padding: 0 !important;
@@ -38,13 +52,11 @@
             background-color: #fff !important;
         }
 
-        /* 3. جعل حاوية الإيصال هي المركز الوحيد */
         .receipt-container {
             border: 1px solid #000 !important;
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
-            position: relative !important;
             box-shadow: none !important;
         }
 
@@ -70,15 +82,26 @@
 
 {% block content %}
 <div class="no-print text-center mb-3">
-    <button onclick="window.print()" class="btn btn-success btn-lg">طباعة الإيصال</button>
-    <a href="{% url 'book_sales_list' %}" class="btn btn-dark btn-lg">العودة</a>
+    {% if sale.remaining_amount <= 0 %}
+        <button onclick="window.print()" class="btn btn-success btn-lg">🖨️ طباعة الإيصال</button>
+    {% else %}
+        <div class="alert alert-danger d-inline-block p-3 fw-bold">
+            ⚠️ لا يمكن الطباعة: الطالب لم يسدد كامل المبلغ (المتبقي: {{ sale.remaining_amount }} ج.م)
+        </div>
+    {% endif %}
+    <a href="{% url 'book_sales_list' %}" class="btn btn-dark btn-lg">العودة للسجل</a>
 </div>
 
 <div class="receipt-container">
+    <div class="status-watermark">
+        {% if sale.remaining_amount <= 0 %} تم السداد {% else %} قيد الانتظار {% endif %}
+    </div>
+
     <div class="d-flex justify-content-between align-items-center border-bottom border-2 border-dark pb-2 mb-3">
         <div>
             <h4 class="fw-bold mb-0">نظام الإدارة المدرسية</h4>
             <p class="small mb-0">قسم المخازن وشؤون الطلاب</p>
+            <p class="small mb-0">العام الدراسي: {{ sale.student.academic_year.name }}</p>
         </div>
         <div class="text-end">
             <h5 class="fw-bold mb-0">إيصال استلام عهدة</h5>
@@ -89,11 +112,12 @@
     <div class="row mb-3">
         <div class="col-7">
             <p class="mb-1"><strong>المستلم:</strong> {{ sale.student.get_full_name }}</p>
-            <p class="mb-0"><strong></strong> {{ sale.student.grade.name }}</p>
+            <p class="mb-0"><strong>الصف:</strong> {{ sale.student.grade.name }}</p>
+            <p class="mb-0"><strong>كود الطالب:</strong> {{ sale.student.student_code }}</p>
         </div>
         <div class="col-5 text-end small">
-            <p class="mb-0">التاريخ: {{ sale.sale_date|date:"Y-m-d" }}</p>
-            <p class="mb-0">الوقت: {{ sale.sale_date|date:"H:i A" }}</p>
+            <p class="mb-0">تاريخ الطلب: {{ sale.sale_date|date:"Y-m-d" }}</p>
+            <p class="mb-0">وقت الطباعة: {% now "Y-m-d H:i A" %}</p>
         </div>
     </div>
 
@@ -102,45 +126,51 @@
             <tr>
                 <th>الصنف وتفاصيله</th>
                 <th style="width: 15%;">الكمية</th>
-                <th>الموقف المالي</th>
+                <th>الحالة المالية</th>
             </tr>
         </thead>
         <tbody>
             <tr>
                 <td class="text-start px-3">
                     <span class="small fw-bold text-muted">
-                        {% if sale.book_item.item_type == 'book' %} كتاب دراسي {% else %} زي مدرسي {% endif %}
+                        {% if sale.item.item_type == 'book' %} كتاب دراسي {% else %} زي مدرسي {% endif %}
                     </span>
                     <span class="item-name-bold my-1">
-                        {% if sale.book_item.item_type == 'book' and sale.book_item.subject %}
-                            مادة: {{ sale.book_item.subject.name }}
-                        {% elif sale.book_item.item_type == 'uniform' and sale.book_item.uniform %}
-                            {{ sale.book_item.uniform.name }}
+                        {% if sale.item.item_type == 'book' and sale.item.subject %}
+                            مادة: {{ sale.item.subject.name }}
+                        {% elif sale.item.item_type == 'uniform' and sale.item.uniform %}
+                            {{ sale.item.uniform.name }}
                         {% else %}
-                            {{ sale.book_item.display_name }}
+                            {{ sale.item.display_name }}
                         {% endif %}
                     </span>
-                    <span class="small fw-bold"> {{ sale.book_item.grade.name|default:"عام" }}</span>
+                    <span class="small fw-bold"> الإصدار: {{ sale.student.academic_year.name }}</span>
                 </td>
                 <td><span class="fs-3 fw-bold">{{ sale.quantity }}</span></td>
-                <td class="small fw-bold">{{ sale.get_payment_status_display }}</td>
+                <td>
+                    <div class="small fw-bold">
+                        <div>المطلوب: {{ sale.total_amount }}</div>
+                        <div>المدفوع: {{ sale.calculated_paid_amount }}</div> <div class="border-top mt-1">المتبقي: {{ sale.remaining_amount }}</div>
+                    </div>
+                </td>
             </tr>
         </tbody>
     </table>
 
     <div class="row mt-5">
         <div class="col-6 text-center">
-            <p class="mb-4 fw-bold">توقيع المستلم</p>
-            <p>________________</p>
+            <p class="mb-4 fw-bold">توقيع المستلم (ولي الأمر/الطالب)</p>
+            <p class="mt-4">________________</p>
         </div>
         <div class="col-6 text-center">
-            <p class="mb-4 fw-bold">أمين المخزن</p>
-            <p>________________</p>
+            <p class="mb-4 fw-bold">اعتماد أمين المخزن</p>
+            <p class="mt-4">________________</p>
         </div>
     </div>
 
-    <div class="mt-4 pt-2 border-top text-center small">
-        <p class="mb-0 italic">مستند رسمي لصرف العهدة المدرسية - {{ now|date:"Y" }}</p>
+    <div class="mt-5 pt-2 border-top text-center small">
+        <p class="mb-0 italic">يعتبر هذا الإيصال مستند صرف رسمي ولا يعتد به في حال وجود كشط أو تعديل يدوياً</p>
+        <p class="mb-0">تم الاستخراج بواسطة الموظف: {{ user.get_full_name|default:user.username }}</p>
     </div>
 </div>
 {% endblock %}

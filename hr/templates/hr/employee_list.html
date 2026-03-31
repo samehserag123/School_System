@@ -1,0 +1,95 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إدارة الموارد البشرية</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-light">
+    <!-- شريط التنقل العلوي -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'hr:employee_list' %}"><i class="fas fa-users"></i> نظام الـ HR</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{% url 'hr:employee_list' %}">قائمة الموظفين</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'hr:department_list' %}">إدارة الأقسام</a>
+                    </li>
+                    <!-- الزر الجديد الخاص بالإجازات -->
+                    <li class="nav-item">
+                        <a class="nav-link text-warning fw-bold" href="{% url 'hr:leave_list' %}">سجل الإجازات</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'hr:calculate_payroll' %}">معالجة البصمة والمرتبات</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'hr:payroll_archive' %}">أرشيف المرتبات</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>سجل الموظفين</h2>
+            <a href="{% url 'hr:employee_create' %}" class="btn btn-primary"><i class="fas fa-user-plus"></i> إضافة موظف جديد</a>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <table class="table table-hover table-bordered align-middle text-center">
+                    <thead class="table-light">
+                        <tr>
+                            <th>رقم البصمة</th>
+                            <th>الاسم</th>
+                            <th>المسمى الوظيفي</th>
+                            <th>الراتب الأساسي</th>
+                            <th>الإجازات السنوية</th>
+                            <th>الإجازات العارضة</th>
+                            <th>الراحة الأسبوعية</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emp in employees %}
+                        <tr>
+                            <td><strong>{{ emp.emp_id }}</strong></td>
+                            <td>{{ emp.name }}</td>
+                            <td>{{ emp.job_title|default:"-" }}</td>
+                            <td>{{ emp.base_salary }} ج.م</td>
+                            <td><span class="badge bg-success">{{ emp.annual_leave_balance }}</span></td>
+                            <td><span class="badge bg-warning text-dark">{{ emp.casual_leave_balance }}</span></td>
+                            <td>{{ emp.get_weekly_day_off_display }}</td>
+                            <td>
+                                <a href="{% url 'hr:employee_update' emp.pk %}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-edit"></i> تعديل</a>
+                                <a href="{% url 'hr:payroll_archive' %}" class="btn btn-info text-white"><i class="fas fa-archive"></i> أرشيف المرتبات</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-muted py-4">لا يوجد موظفين مسجلين حالياً. اضغط على إضافة موظف جديد.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
