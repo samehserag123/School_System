@@ -34,4 +34,5 @@ urlpatterns = [
     path('daily-summary/', views.daily_cashier_summary, name='daily_cashier_summary'),
     path('trigger-closure/', views.trigger_daily_closure, name='trigger_daily_closure'),
     path('payments-archive/', views.payments_archive, name='payments_archive'),
+    path('student/<int:student_id>/finance/', views.student_finance_detail, name='student_finance_detail'),
 ]

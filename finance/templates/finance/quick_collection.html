@@ -84,14 +84,17 @@
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label text-info fw-bold">بند التحصيل:</label>
-                                <select name="category" id="id_category" class="form-select bg-dark text-white border-secondary" required>
-                                    <option value="">-- اختر الفئة --</option>
-                                    {% for cat in categories %}
-                                        <option value="{{ cat.id }}">{{ cat.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
+                                    <label class="form-label text-info fw-bold">بند التحصيل:</label>
+                                    <select name="category" id="id_category" class="form-select shadow-sm border-secondary bg-dark text-info fw-bold" required>
+                                        <option value="" class="text-white">-- اختر الفئة --</option>
+                                        {% for cat in categories %}
+                                            <option value="{{ cat.id }}" 
+                                                {% if default_category and cat.id == default_category.id %}selected{% endif %}>
+                                                {{ cat.name }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label text-info fw-bold">المبلغ:</label>
                                 <input type="number" name="amount" id="id_amount" class="form-control bg-dark text-success fw-bold border-secondary" placeholder="0.00" step="0.01" required>

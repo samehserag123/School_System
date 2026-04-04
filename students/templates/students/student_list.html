@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block content %}
-
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 {% if messages %}
 <div class="container-fluid px-2">
 {% for message in messages %}
@@ -67,16 +67,32 @@ background:rgba(255,193,7,.1)
 pointer-events:none;
 opacity:.4;
 }
+.stat-item {
+    /* ... خصائصك القديمة ... */
+    transition: all 0.3s ease; /* لتنعيم حركة الماوس وتغيير الألوان */
+}
 
+/* حركة النبض التي تظهر عند تغير الأرقام */
+.pulse-update {
+    animation: pulse 0.5s;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); border-color: #0dcaf0; }
+    100% { transform: scale(1); }
+}
 </style>
 
 
-<div class="stats-bar px-2">
+<div class="stats-bar px-2 animate__animated animate__fadeIn">
 
     <div class="stat-item">
         <div class="small text-muted">إجمالي الطلاب</div>
-        <div class="fw-bold text-info fs-5">{{ students.paginator.count }}</div>
-    </div> <div class="stat-item" style="border-right-color:#6c757d">
+        <div id="stat-total" class="fw-bold text-info fs-5">{{ students.paginator.count }}</div>
+    </div> 
+
+    <div class="stat-item" style="border-right-color:#6c757d">
         <div class="small text-muted">غير مسكنين</div>
         <div id="stat-unassigned" class="fw-bold text-secondary fs-5">
             {{ unassigned_count }} 
@@ -96,14 +112,13 @@ opacity:.4;
             {{ debt_count }} 
         </div>
     </div>
-
     
 </div>
 
 <form method="POST" action="{% url 'bulk_promote' %}" id="promoteForm">
 {% csrf_token %}
 
-<div class="filter-card">
+<div class="filter-card animate__animated animate__fadeInDown">
 
 <div class="row g-3">
 
@@ -156,7 +171,7 @@ opacity:.4;
 </div>
 
 
-<div class="table-responsive shadow-lg">
+<div class="table-responsive shadow-lg animate__animated animate__fadeInUp">
 
 <table class="table text-center align-middle mb-0" id="studentTable">
 
@@ -221,9 +236,9 @@ opacity:.4;
     <!-- old debt -->
     <td class="text-center" style="min-width:120px;">
         <div class="mb-2">
-            {% if student.calculated_previous_debt > 0 %}
+            {% if student.old_debt_display > 0 %}
                 <a href="{% url 'settle_old_debt' student.id %}"
-                   class="btn btn-sm btn-danger w-100 py-1">
+                class="btn btn-sm btn-danger w-100 py-1">
                     <i class="bi bi-cash-stack me-1"></i> سداد
                 </a>
             {% else %}
@@ -233,13 +248,13 @@ opacity:.4;
             {% endif %}
         </div>
 
-        {% if student.calculated_previous_debt > 0 %}
+        {% if student.old_debt_display > 0 %}
             <span class="badge bg-danger d-block shadow-sm">
-                {{ student.calculated_previous_debt|floatformat:2 }}
+                {{ student.old_debt_display|floatformat:0 }} 
             </span>
         {% else %}
             <span class="badge bg-light text-success border border-success d-block shadow-sm">
-                0.00
+                0
             </span>
         {% endif %}
     </td>
@@ -274,14 +289,20 @@ opacity:.4;
 
     <!-- financial status -->
     <td class="text-center">
-        {% if student.current_year_fees_amount <= 0 and student.calculated_previous_debt <= 0 %}
-            <span class="badge bg-secondary">في انتظار التسكين ⏳</span>
+        {% if student.current_year_fees_amount <= 0 %}
+            <span class="badge rounded-pill bg-secondary shadow-sm px-3">
+                <i class="bi bi-pause-circle me-1"></i> غير مسكن ⏳
+            </span>
 
-        {% elif student.final_remaining <= 0 %}
-            <span class="badge bg-success">خالص ✅</span>
+        {% elif student.final_remaining > 0 or student.calculated_previous_debt > 0 %}
+            <span class="badge rounded-pill bg-danger shadow-sm px-3">
+                <i class="bi bi-exclamation-triangle me-1"></i> مديون ⚠️
+            </span>
 
         {% else %}
-            <span class="badge bg-danger">مديون ⚠️</span>
+            <span class="badge rounded-pill bg-success shadow-sm px-3">
+                <i class="bi bi-check-circle me-1"></i> خالص ✅
+            </span>
         {% endif %}
     </td>
 
@@ -340,21 +361,53 @@ opacity:.4;
 
 <!-- pagination -->
 
-<nav class="mt-4">
+<nav aria-label="Page navigation" class="mt-5 animate__animated animate__fadeInUp">
+    <ul class="pagination pagination-custom justify-content-center">
 
-<ul class="pagination justify-content-center">
+        {% if students.has_previous %}
+        <li class="page-item">
+            <a class="page-link shadow-sm" href="?page=1" title="الصفحة الأولى">
+                <i class="bi bi-chevron-double-right"></i>
+            </a>
+        </li>
+        <li class="page-item">
+            <a class="page-link shadow-sm" href="?page={{ students.previous_page_number }}">السابق</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link opacity-50"><i class="bi bi-chevron-double-right"></i></span>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link opacity-50">السابق</span>
+        </li>
+        {% endif %}
 
-{% if students.has_previous %}
+        <li class="page-item active">
+            <span class="page-link shadow-sm">
+                {{ students.number }} من {{ students.paginator.num_pages }}
+            </span>
+        </li>
 
-<li class="page-item">
-<a class="page-link" href="?page=1">&laquo;</a>
-</li>
+        {% if students.has_next %}
+        <li class="page-item">
+            <a class="page-link shadow-sm" href="?page={{ students.next_page_number }}">التالي</a>
+        </li>
+        <li class="page-item">
+            <a class="page-link shadow-sm" href="?page={{ students.paginator.num_pages }}" title="الصفحة الأخيرة">
+                <i class="bi bi-chevron-double-left"></i>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link opacity-50">التالي</span>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link opacity-50"><i class="bi bi-chevron-double-left"></i></span>
+        </li>
+        {% endif %}
 
-<li class="page-item">
-<a class="page-link" href="?page={{ students.previous_page_number }}">السابق</a>
-</li>
-
-{% endif %}
+    </ul>
+</nav>
 
 <li class="page-item disabled">
 <span class="page-link">
@@ -400,10 +453,29 @@ document.getElementById("promoteForm").addEventListener("submit", function(e){
 
 });
 
+function applyPulse(id, newValue) {
+    const el = document.getElementById(id);
+    if (!el) return;
 
-/* تحديث الإحصائيات */
-function updateStats(){
+    const oldValue = el.innerText;
+    // لا تشغل الحركة إلا إذا تغير الرقم فعلياً أثناء البحث أو التصفية
+    if (oldValue != newValue) {
+        el.innerText = newValue;
+        
+        // البحث عن الكارت المحيط (stat-item) لتطبيق النبض عليه بالكامل
+        const parentCard = el.closest('.stat-item');
+        if (parentCard) {
+            parentCard.classList.add('pulse-update');
+            // إزالة الكلاس بعد انتهاء الأنيميشن (0.5 ثانية) ليتمكن من العمل مرة أخرى
+            setTimeout(() => {
+                parentCard.classList.remove('pulse-update');
+            }, 500);
+        }
+    }
+}
 
+/* 2. تحديث الإحصائيات (تحديث العدادات بناءً على ما يظهر في الجدول) */
+function updateStats() {
     let rows = document.querySelectorAll(".student-row");
 
     let paid = 0;
@@ -412,7 +484,6 @@ function updateStats(){
     let totalVisible = 0;
 
     rows.forEach(row => {
-
         // تجاهل الصفوف المخفية (بعد البحث)
         if (row.style.display === "none") return;
 
@@ -421,48 +492,59 @@ function updateStats(){
         // الموقف المالي (العمود 9)
         let badge = row.cells[8].querySelector(".badge");
 
-        if(badge){
-
-            if(badge.classList.contains("bg-success")){
+        if (badge) {
+            if (badge.classList.contains("bg-success")) {
                 paid++;
-            }
-
-            else if(badge.classList.contains("bg-danger")){
+            } else if (badge.classList.contains("bg-danger")) {
                 debt++;
-            }
-
-            else if(badge.classList.contains("bg-secondary")){
+            } else if (badge.classList.contains("bg-secondary")) {
                 unassigned++;
             }
         }
-
     });
 
-    // تحديث القيم
-    document.getElementById("stat-paid").innerText = paid;
-    document.getElementById("stat-debt").innerText = debt;
-    document.getElementById("stat-unassigned").innerText = unassigned;
+    // تحديث القيم مع الحركة (تأكد أن الـ IDs مطابقة للـ HTML لديك)
+    applyPulse("stat-paid", paid);
+    applyPulse("stat-debt", debt);
+    applyPulse("stat-unassigned", unassigned);
 
     // تحديث الإجمالي (الظاهر فقط)
-    let totalBox = document.querySelector(".text-info.fs-5");
-    if(totalBox){
-        totalBox.innerText = totalVisible;
+    let totalBox = document.getElementById("stat-total");
+    if (totalBox) {
+        applyPulse("stat-total", totalVisible);
+    } else {
+        // دعم للكلاس القديم في حال لم تضف الـ ID بعد
+        let oldTotalBox = document.querySelector(".text-info.fs-5");
+        if (oldTotalBox) oldTotalBox.innerText = totalVisible;
     }
 }
-
-
-/* البحث */
+/* دالة البحث المتقدمة مع حركات الظهور للجدول */
 function runSearch() {
-
     let input = document.getElementById('searchInput').value.toLowerCase();
     let rows = document.querySelectorAll('.student-row');
 
     rows.forEach(row => {
         let text = row.dataset.search.toLowerCase();
-        row.style.display = text.includes(input) ? '' : 'none';
+        
+        if (text.includes(input)) {
+            // إذا كان الصف مخفياً وظهر الآن، نطبق عليه حركة دخول
+            if (row.style.display === 'none') {
+                row.style.display = '';
+                // نستخدم animate__fadeInUp ليعطي تأثير الصعود من أسفل لأعلى
+                row.classList.add('animate__animated', 'animate__fadeInUp', 'animate__faster');
+                
+                // تنظيف الكلاسات بعد انتهاء الحركة لضمان عملها في المرة القادمة
+                setTimeout(() => {
+                    row.classList.remove('animate__animated', 'animate__fadeInUp', 'animate__faster');
+                }, 500);
+            }
+        } else {
+            // إخفاء الصفوف التي لا تطابق البحث
+            row.style.display = 'none';
+        }
     });
 
-    // تحديث العدادات بعد البحث
+    // تحديث العدادات (التي تحتوي بدورها على حركة النبض Pulse)
     updateStats(); 
 }
 

@@ -1,13 +1,12 @@
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import models, transaction
 import random
 from django.utils import timezone
 from django.core.validators import RegexValidator, MinLengthValidator
 from audit.models import AuditLog
 from django.db.models import Sum, Q
-from decimal import Decimal# ملاحظة: إذا كان numbers_only معرفاً في ملف خاص (مثلاً validators.py داخل نفس التطبيق)
-from django.core.exceptions import ValidationError
-
+from decimal import Decimal
+from django.db import models, transaction
 
 numbers_only = RegexValidator(
     regex=r'^\d+$',
@@ -91,8 +90,8 @@ class Student(models.Model):
     address = models.TextField("العنوان", blank=True, null=True)
 
     mother_name = models.CharField("اسم الأم", max_length=150, null=True, blank=True)
-    phone = models.CharField("رقم التليفون", max_length=20, null=True, blank=True)
-
+    phone = models.CharField("رقم التليفون", max_length=40, null=True, blank=True)
+    father_job = models.CharField(max_length=100, verbose_name="وظيفة الأب", blank=True, null=True)
     # --- الحالة الأكاديمية ---
     # جعل حالة القيد اختيارية
     enrollment_status = models.CharField("حالة القيد", max_length=20, choices=STATUS_CHOICES, null=True, blank=True)
@@ -155,6 +154,8 @@ class Student(models.Model):
         return self.current_year_fees_amount
         # 1. إجمالي المطلوب (السنة دي + المديونية اللي اترحلّت في الحقل)
     
+    
+    
     @property
     def current_year_paid(self):
         from finance.models import Payment
@@ -194,6 +195,8 @@ class Student(models.Model):
             from decimal import Decimal
 
             return max(Decimal('0.00'), Decimal(str(self.previous_debt or 0)))
+    
+         
         
     @property
     def total_balance_due(self):
@@ -381,6 +384,8 @@ class SubjectPrice(models.Model):
         return f"{self.subject.name} - {self.teacher.name} ({self.get_session_type_display()})"
 
 # 6. إذن استلام الكتب والزي (الربط بين الطالب والمخزن والمالية)
+
+
 class BookSale(models.Model):
     STATUS_CHOICES = [
         ('pending', 'لم يكتمل السداد'),
@@ -393,7 +398,9 @@ class BookSale(models.Model):
     quantity = models.PositiveIntegerField("الكمية", default=1)
     
     total_amount = models.DecimalField("الإجمالي المطلوب", max_digits=10, decimal_places=2, default=0)
-    paid_amount = models.DecimalField("المبلغ المدفوع", max_digits=10, decimal_places=2, default=0)
+    
+    # حقل "المبلغ المدفوع الآن" - يستخدم لاستلام المبلغ من شاشة الصرف مباشرة
+    pay_now = models.DecimalField("المبلغ المدفوع الآن", max_digits=10, decimal_places=2, default=0)
     
     status = models.CharField("حالة الحركة", max_length=20, choices=STATUS_CHOICES, default='pending')
     is_delivered = models.BooleanField("تم الاستلام من المخزن؟", default=False)
@@ -403,60 +410,77 @@ class BookSale(models.Model):
         verbose_name = "إذن استلام ومبيعات"
         verbose_name_plural = "إذونات الاستلام والمبيعات"
 
-    # students/models.py
-
-   # students/models.py
-
-    # داخل كلاس BookSale في models.py
-
     @property
     def calculated_paid_amount(self):
-        """يقرأ إجمالي المدفوعات من الخزينة مباشرة"""
-        from finance.models import Payment
-        # تأكد من استيراد Sum في أعلى الملف: from django.db.models import Sum
-        total = Payment.objects.filter(
+        """يبحث في الخزينة العامة عن أي مبالغ مسجلة برقم هذا الإذن #ID"""
+        from treasury.models import GeneralLedger
+        total = GeneralLedger.objects.filter(
             notes__icontains=f"#{self.id}"
-        ).aggregate(total=Sum('amount_paid'))['total'] or 0
-        return total
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        return Decimal(str(total))
 
     @property
     def remaining_amount(self):
-        """المتبقي الحقيقي بناءً على مدفوعات الخزينة"""
+        """حساب المتبقي الحقيقي"""
         return self.total_amount - self.calculated_paid_amount
 
-    # models.py داخل كلاس BookSale
-
     def save(self, *args, **kwargs):
-        # 1. حساب الإجمالي تلقائياً من باقة السنة
+        # 1. جلب الموظف الحالي (يتم تمريره من الـ View عبر _current_user)
+        current_user = getattr(self, '_current_user', None)
+        
+        # 2. حساب الإجمالي تلقائياً من باقة الصف إذا لم يتم إدخاله يدوياً
         if not self.total_amount:
             try:
-                from .models import GradePackagePrice
+                # استيراد محلي لتجنب مشاكل الاعتماد الدائري
+                from .models import GradePackagePrice 
                 package = GradePackagePrice.objects.get(
                     grade=self.student.grade, 
                     academic_year=self.student.academic_year
                 )
-                self.total_amount = (package.books_price if self.item.item_type == 'book' else package.uniform_price) * self.quantity
-            except GradePackagePrice.DoesNotExist:
+                # تحديد السعر بناءً على نوع الصنف (كتاب أم زي)
+                price = package.books_price if self.item.item_type == 'book' else package.uniform_price
+                self.total_amount = price * self.quantity
+            except:
                 self.total_amount = 0
 
-        # 2. حفظ العملية أولاً لتوليد ID (ضروري لربط الخزينة)
+        # 3. الحفظ الأساسي للعملية (ضروري للحصول على ID لاستخدامه في الخزينة)
+        is_new = self.pk is None
         super().save(*args, **kwargs)
 
-        # 3. تحديث الحالة بناءً على الدفع الحقيقي من الخزينة
-        # ملاحظة: استدعي الحفظ مرة أخرى فقط إذا تغيرت الحالة لتجنب التكرار اللانهائي
+        # 4. الربط الآلي مع الخزينة العامة عند وجود مبلغ مدفوع (السداد الفوري)
+        if is_new and self.pay_now > 0:
+            # استيراد الموديل المتاح فقط لتجنب ImportError الخاص بـ Category
+            from treasury.models import GeneralLedger
+            
+            # إنشاء قيد في الخزينة العامة
+            GeneralLedger.objects.create(
+                student=self.student,
+                # تم إلغاء حقل category هنا لتجنب خطأ الاستيراد الذي واجهته
+                amount=self.pay_now,
+                # الربط السحري: نضع رقم الإذن في الملاحظات مسبوقاً بـ # ليقرأه الإيصال تلقائياً
+                notes=f"سداد آلي لإذن استلام رقم #{self.id}", 
+                receipt_number=f"BS-{self.id}",
+                collected_by=current_user
+            )
+
+        # 5. تحديث الحالة النهائية للإذن بناءً على ما تم دفعه فعلياً في الخزينة
+        # نستخدم calculated_paid_amount التي تبحث في الخزينة برقم الإذن #
         actual_paid = self.calculated_paid_amount
-        new_status = self.status
+        
         if actual_paid >= self.total_amount and self.total_amount > 0:
             new_status = 'delivered' if self.is_delivered else 'paid'
+        elif actual_paid > 0:
+            new_status = 'pending' # دفع جزئي
         else:
-            new_status = 'pending'
+            new_status = 'pending' # لم يتم الدفع
         
+        # تحديث الحالة في قاعدة البيانات مباشرة لتجنب تكرار دالة save
         if new_status != self.status:
-            BookSale.objects.filter(id=self.id).update(status=new_status)
+            type(self).objects.filter(id=self.id).update(status=new_status)
 
     @property
     def status_label(self):
-        """تحديد الحالة بناءً على الدفع الفعلي"""
+        """عرض حالة السداد نصياً بناءً على المتبقي الحقيقي"""
         remaining = self.remaining_amount
         if remaining <= 0 and self.total_amount > 0:
             return "تم السداد بالكامل"
@@ -464,14 +488,10 @@ class BookSale(models.Model):
             return "سداد جزئي"
         return "لم يتم السداد"
 
-    @property
-    def is_fully_paid(self):
-        """اختبار سريع هل تم السداد بالكامل أم لا"""
-        return self.remaining_amount <= 0
-
-
     def __str__(self):
-        return f"{self.student.get_full_name()} - {self.item.display_name}"        
+        """تعريف الاسم الذي يظهر في لوحة التحكم"""
+        return f"{self.student.get_full_name()} - {self.item.display_name}"
+    
 
 class CourseGroup(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب", related_name="enrolled_courses")

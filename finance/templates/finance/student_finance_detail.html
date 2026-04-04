@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}كشف حساب الطالب{% endblock %}
+
+{% block content %}
+<div class="container py-4" dir="rtl">
+    <div class="card shadow-sm p-4 mb-4 bg-dark text-white rounded-4 border-0 position-relative">
+        
+        <a href="{{ request.META.HTTP_REFERER }}" 
+           class="btn-close btn-close-white position-absolute top-0 left-0 m-3 shadow-none" 
+           aria-label="Close" 
+           style="right: auto; left: 1.5rem;"
+           onclick="if(document.referrer.includes('registry')){ window.location.href='{% url 'student_registry' %}'; return false; }">
+        </a>
+        
+        <div class="d-flex align-items-center mb-4">
+            <h3 class="fw-bold m-0">
+                <i class="bi bi-person-badge ms-2"></i>كشف حساب الطالب: 
+                <a href="{% url 'add_student' %}?id={{ student.id }}&mode=view" class="text-white text-decoration-none border-bottom border-secondary">
+                    {{ student.get_full_name }} <i class="bi bi-pencil-square fs-6 ms-1 text-info"></i>
+                </a>
+            </h3>
+        </div>
+        
+        <hr class="opacity-25">
+        
+        <div class="row text-center">
+            <div class="col-md-4 border-start border-secondary border-opacity-50">
+                <p class="mb-1 opacity-75 small">إجمالي المصروفات الدراسية</p>
+                <h4 class="fw-bold text-white">{{ total_required|floatformat:0 }} <small class="fs-6">ج.م</small></h4>
+            </div>
+
+            <div class="col-md-4 border-start border-secondary border-opacity-50">
+                <p class="mb-1 opacity-75 small">إجمالي المبلغ المسدد</p>
+                <h4 class="fw-bold text-success">{{ total_paid|floatformat:0 }} <small class="fs-6">ج.م</small></h4>
+            </div>
+
+            <div class="col-md-4">
+                <p class="mb-1 opacity-75 small">المتبقي النهائي</p>
+                <h4 class="fw-bold {% if total_remaining > 0 %}text-danger{% else %}text-info{% endif %}">
+                    {{ total_remaining|floatformat:0 }} <small class="fs-6">ج.م</small>
+                </h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+        <div class="card-header bg-secondary bg-opacity-10 py-3">
+            <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-list-check ms-2"></i>تفاصيل الأقساط ومواعيد الاستحقاق</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 text-center">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="py-3">موعد الاستحقاق</th>
+                        <th class="py-3">قيمة القسط</th>
+                        <th class="py-3 text-success">المسدد</th>
+                        <th class="py-3 text-danger">المتبقي</th>
+                        <th class="py-3">الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inst in installments %}
+                    <tr>
+                        <td class="fw-bold">{{ inst.due_date|date:"Y-m-d" }}</td>
+                        <td class="text-secondary">{{ inst.amount_due|floatformat:0 }} ج.م</td>
+                        <td class="text-success fw-bold">{{ inst.display_paid|floatformat:0 }} ج.م</td>
+                        <td class="text-danger fw-bold">{{ inst.display_remaining|floatformat:0 }} ج.م</td>
+                        <td>
+                            {% if inst.display_remaining == 0 %}
+                                <span class="badge rounded-pill bg-success px-3">خالص</span>
+                            {% elif inst.display_remaining < inst.amount_due %}
+                                <span class="badge rounded-pill bg-warning text-dark px-3">مسدد جزئياً</span>
+                            {% else %}
+                                <span class="badge rounded-pill bg-danger px-3">غير مسدد</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="py-5 text-muted">لا توجد أقساط مسجلة لهذا الطالب.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="mt-4 text-start">
+        {% if "registry" in request.META.HTTP_REFERER %}
+            <a href="{{ request.META.HTTP_REFERER }}" class="btn btn-outline-info rounded-pill px-4 shadow-sm">
+                <i class="bi bi-arrow-right ms-2"></i>العودة لسجل الطلاب
+            </a>
+        {% else %}
+            <a href="{% url 'overdue_report' %}" class="btn btn-outline-dark rounded-pill px-4 shadow-sm">
+                <i class="bi bi-arrow-right ms-2"></i>العودة لرادار المديونيات
+            </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

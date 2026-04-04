@@ -20,10 +20,115 @@ from .forms import CourseGroupForm
 from .models import CourseGroup, CoursePayment
 from django.db.models.functions import Coalesce
 # الاستيراد من الموديلات (الجداول)
-from .models import BookSale, InventoryItem, InventoryRestock
+from .models import BookSale, InventoryItem, InventoryRestock, GradePackagePrice
 # الاستيراد من الفورمات (النماذج) - هذا هو السطر الذي ينقصك
 from .forms import RestockForm
 from .forms import BookSaleForm
+
+# تأكد من استيراد الموديلات الصحيحة من تطبيقاتك
+from students.models import Student, Grade, Classroom 
+
+def student_registry_view(request):
+    # 1. جلب كل الطلاب النشطين مرتبين (الترتيب مهم جداً للترقيم)
+    student_list = Student.objects.filter(is_active=True).order_by('first_name')
+    
+    # 2. إعداد نظام الترقيم (مثلاً: 20 طالب في كل صفحة)
+    paginator = Paginator(student_list, 20)
+    page_number = request.GET.get('page')
+    students_page = paginator.get_page(page_number)
+    
+    # 3. جلب بيانات الفلاتر من الجداول الخاصة بها
+    all_grades = Grade.objects.all()
+    all_classrooms = Classroom.objects.all()
+    all_specs = Student.SPECIALIZATION_CHOICES
+    
+    context = {
+        'students': students_page,  # نرسل كائن الصفحة بدلاً من القائمة الكاملة
+        'all_grades': all_grades,
+        'all_classrooms': all_classrooms,
+        'all_specs': all_specs,
+    }
+    return render(request, 'student_registry.html', context)
+
+# def student_basic_data(request):
+
+#     students = Student.objects.select_related(
+#         'grade', 'classroom', 'specialization'
+#     ).all()
+
+#     # الفلاتر
+#     grade = request.GET.get('grade')
+#     classroom = request.GET.get('classroom')
+#     specialization = request.GET.get('specialization')
+#     gender = request.GET.get('gender')
+#     integration = request.GET.get('integration')
+#     religion = request.GET.get('religion')
+#     nationality = request.GET.get('nationality')
+
+#     if grade:
+#         students = students.filter(grade_id=grade)
+
+#     if classroom:
+#         students = students.filter(classroom_id=classroom)
+
+#     if specialization:
+#         students = students.filter(specialization_id=specialization)
+
+#     if gender:
+#         students = students.filter(gender=gender)
+
+#     if integration:
+#         students = students.filter(integration_status=integration)
+
+#     if religion:
+#         students = students.filter(religion=religion)
+
+#     if nationality:
+#         students = students.filter(nationality=nationality)
+
+#     # الإحصائيات
+#     stats = {
+#         "total": students.count(),
+#         "male": students.filter(gender="Male").count(),
+#         "female": students.filter(gender="Female").count(),
+#         "islam": students.filter(religion="Islam").count(),
+#         "christian": students.filter(religion="Christian").count(),
+#     }
+
+#     # حسب الصف
+#     grade_counts = students.values("grade__name").annotate(count=Count("id"))
+
+#     # حسب الفصل
+#     class_counts = students.values("classroom__name").annotate(count=Count("id"))
+
+#     # حسب التخصص
+#     spec_counts = students.values("specialization__name").annotate(count=Count("id"))
+
+#     context = {
+#         "students": students,
+#         "stats": stats,
+#         "grade_counts": grade_counts,
+#         "class_counts": class_counts,
+#         "spec_counts": spec_counts,
+#     }
+
+#     return render(request, "students/student_basic_data.html", context)
+
+
+def get_pending_sales_api(request, student_id):
+    # جلب الأذونات التي لم تدفع بالكامل لهذا الطالب
+    sales = BookSale.objects.filter(student_id=student_id).exclude(status='paid')
+    
+    sales_data = []
+    for s in sales:
+        if s.remaining_amount > 0: # التأكد باستخدام الـ property التي أنشأتها
+            sales_data.append({
+                'id': s.id,
+                'item_name': s.item.display_name,
+                'remaining': float(s.remaining_amount)
+            })
+            
+    return JsonResponse({'sales': sales_data})
 
 
 def admin_add_restock(request):
@@ -157,6 +262,9 @@ def book_sales_list(request):
 # ابحث عن دالة add_book_sale وقم بتعديلها لتصبح هكذا:
 
 # students/views.py
+# students/views.py
+
+
 
 def add_book_sale(request):
     if request.method == 'POST':
@@ -168,35 +276,41 @@ def add_book_sale(request):
             requested_qty = sale.quantity
             
             # 1. جلب السعر بناءً على (الصف + السنة الدراسية للطالب)
-            from .models import GradePackagePrice
             try:
                 package = GradePackagePrice.objects.get(
                     grade=student.grade, 
-                    academic_year=student.academic_year # الربط بالسنة الدراسية
+                    academic_year=student.academic_year
                 )
                 if inventory_item.item_type == 'book':
-                    sale.total_amount = package.books_price * requested_qty
+                    unit_price = package.books_price
                 else:
-                    sale.total_amount = package.uniform_price * requested_qty
+                    unit_price = package.uniform_price
+                
+                sale.total_amount = unit_price * requested_qty
+                
             except GradePackagePrice.DoesNotExist:
                 messages.error(request, f"⚠️ لم يتم تحديد سعر الباقة لصف {student.grade.name} في سنة {student.academic_year.name}")
                 return render(request, 'books/add_sale.html', {'form': form})
 
             # 2. التأكد من توفر الكمية في المخزن
             if requested_qty > inventory_item.remaining_qty:
-                messages.error(request, f"⚠️ مخزن غير كافٍ! المتوفر حالياً: {inventory_item.remaining_qty}")
+                messages.error(request, f"⚠️ المخزن غير كافٍ! المتوفر حالياً: {inventory_item.remaining_qty}")
                 return render(request, 'books/add_sale.html', {'form': form})
             
-            # 3. التحقق من السداد (اختياري: هل تسمح بتسجيل الطلب بدون سداد؟)
-            # إذا كنت تريد منع الحفظ تماماً إلا بعد السداد الكامل:
-            # if sale.paid_amount < sale.total_amount:
-            #     messages.warning(request, "تم تسجيل الطلب ولكن لا يمكن التسليم لعدم اكتمال السداد.")
-
-            sale.collected_by = request.user 
+            # 3. الربط مع الموظف الحالي (مهم جداً لعملية السداد الآلي في الموديل)
+            sale._current_user = request.user 
+            
+            # 4. الحفظ النهائي (سيقوم الموديل تلقائياً بإنشاء قيد الخزينة بناءً على قيمة pay_now)
             sale.save()
             
-            messages.success(request, f"تم تسجيل إذن الاستلام للطالب {student.get_full_name()} بنجاح.")
-            return redirect('book_sales_list')
+            # 5. رسالة نجاح مخصصة حسب حالة الدفع
+            if sale.pay_now > 0:
+                messages.success(request, f"✅ تم تسجيل الصرف وتوريد مبلغ {sale.pay_now} ج.م للخزينة للطالب {student.get_full_name()}.")
+            else:
+                messages.warning(request, f"تم تسجيل إذن الصرف للطالب {student.get_full_name()} بدون سداد مالي.")
+            
+            # توجيه المستخدم لصفحة الطباعة فوراً أو لقائمة المبيعات
+            return redirect('print_book_receipt', sale_id=sale.id)
         
         return render(request, 'books/add_sale.html', {'form': form})
 
@@ -204,7 +318,6 @@ def add_book_sale(request):
         form = BookSaleForm()
     
     return render(request, 'books/add_sale.html', {'form': form})
-# ...
 # هذه الدالة هي المسؤولة عن فتح الإيصال "فقط" عند الضغط على زر الطابعة في الجدول
 def print_receipt_view(request, sale_id):
     sale = get_object_or_404(BookSale, id=sale_id)
@@ -539,11 +652,9 @@ def student_list(request):
 #     return render(request, "students/student_list.html", context)
 
 
-
-
 def add_student(request):
     student_id = request.GET.get('id')
-    mode = request.GET.get('mode') # التأكد إذا كان عرض فقط أو تعديل
+    mode = request.GET.get('mode') 
     student = None
 
     if student_id:
@@ -554,21 +665,53 @@ def add_student(request):
         if form.is_valid():
             form.save()
             messages.success(request, "تم حفظ بيانات الطالب بنجاح")
-            # التعديل هنا: نجعله يعود لصفحة الإضافة بدلاً من السجل
             return redirect('add_student') 
     else:
         form = StudentForm(instance=student)
+        
+        # --- الجزء المسؤول عن منع التعديل ---
+        if mode == 'view':
+            for field in form.fields.values():
+                field.widget.attrs['disabled'] = True # تعطيل الحقل برمجياً
+                field.required = False # إلغاء الإلزامية لتجنب أخطاء التحقق
 
-    # هنا الحل لظهور السايدبار المطور:
-    # نرسل student_admin_mode فقط إذا كنا في وضع العرض (view) أو كان الطالب موجوداً
     is_admin_mode = True if (student and mode == 'view') else False
 
     return render(request, 'students/add_student.html', {
         'form': form, 
         'student': student,
-        'student_admin_mode': is_admin_mode, # تفعيل القائمة الجانبية الخاصة بالطالب
+        'student_admin_mode': is_admin_mode,
         'hide_sidebar': False
     })
+
+# def add_student(request):
+#     student_id = request.GET.get('id')
+#     mode = request.GET.get('mode') # التأكد إذا كان عرض فقط أو تعديل
+#     student = None
+
+#     if student_id:
+#         student = get_object_or_404(Student, id=student_id)
+
+#     if request.method == 'POST':
+#         form = StudentForm(request.POST, request.FILES, instance=student)
+#         if form.is_valid():
+#             form.save()
+#             messages.success(request, "تم حفظ بيانات الطالب بنجاح")
+#             # التعديل هنا: نجعله يعود لصفحة الإضافة بدلاً من السجل
+#             return redirect('add_student') 
+#     else:
+#         form = StudentForm(instance=student)
+
+#     # هنا الحل لظهور السايدبار المطور:
+#     # نرسل student_admin_mode فقط إذا كنا في وضع العرض (view) أو كان الطالب موجوداً
+#     is_admin_mode = True if (student and mode == 'view') else False
+
+#     return render(request, 'students/add_student.html', {
+#         'form': form, 
+#         'student': student,
+#         'student_admin_mode': is_admin_mode, # تفعيل القائمة الجانبية الخاصة بالطالب
+#         'hide_sidebar': False
+#     })
 
 def promote_student(request, student_id):
     try:
@@ -620,10 +763,34 @@ def student_detail_view(request, student_id):
         'student_admin_mode': True,
     }
     return render(request, 'students/add_student.html', context)
+
+
+# students/views.py
+from treasury.models import GeneralLedger
+from .forms import GeneralLedgerForm # تأكد من إنشاء هذا الفورم أولاً
+
+def add_ledger_entry(request):
+    if request.method == 'POST':
+        # افترضنا أن اسم الفورم هو GeneralLedgerForm
+        form = GeneralLedgerForm(request.POST)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.collected_by = request.user
+            entry.save()
+            messages.success(request, "تم تسجيل القيد في الخزينة العامة بنجاح")
+            return redirect('student_list') # أو أي صفحة أخرى
+    else:
+        form = GeneralLedgerForm()
+    
+    return render(request, 'treasury/treasury_form.html', {'form': form})
+
+
+
 class StudentListAPI(generics.ListAPIView):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['first_name', 'last_name', 'national_id']
+
 
 

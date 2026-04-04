@@ -223,15 +223,17 @@
         <a href="{% url 'assign_plan' %}"><i class="bi bi-clipboard-check text-info"></i> تسكين الطلاب</a>
         <a href="{% url 'quick_collection' %}"><i class="bi bi-cash-stack text-success"></i> تحصيل مباشر</a>
         
-        <div class="section-title">المخازن</div>
-        <a href="{% url 'student_list' %}"><i class="bi bi-box-seam text-warning"></i> مركز استلام الكتب والزي</a>
+        <div class="section-title">إدارة الطلاب</div>
+        <a href="{% url 'add_student' %}"><i class="bi bi-person-plus-fill text-warning"></i> إضافة طالب جديد</a>
         
         <div class="section-title">الحسابات</div>
         <a href="{% url 'overdue_report' %}"><i class="bi bi-exclamation-triangle text-danger"></i> تقرير المتأخرات</a>
-        <a href="{% url 'close_month' %}"><i class="bi bi-calendar-check text-primary"></i> الحسابات الشهرية</a>
+        <a href="/"><i class="bi bi-house-door text-primary"></i> الصفحة الرئيسية</a>
         
         <div class="section-title">النظام</div>
-        <a href="/admin/" target="_blank"><i class="bi bi-gear-fill"></i> الإدارة المتقدمة</a>
+        <a href="{% url 'student_registry' %}">
+            <i class="bi bi-card-list text-info"></i> السجل المدني للطلاب
+        </a>
     {% endif %}
     </div>
 <div class="main-content">

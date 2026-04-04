@@ -6,6 +6,22 @@ from .models import BookSale, InventoryItem, Student
 
 from .models import InventoryRestock  # 👈 هذا هو السطر الناقص
 
+from treasury.models import GeneralLedger
+
+
+
+class GeneralLedgerForm(forms.ModelForm):
+    class Meta:
+        model = GeneralLedger
+        fields = ['student', 'category', 'amount', 'receipt_number', 'notes']
+        widgets = {
+            'student': forms.Select(attrs={'class': 'form-select bg-dark text-white border-secondary'}),
+            'category': forms.Select(attrs={'class': 'form-select bg-dark text-white border-secondary'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control bg-dark text-white border-secondary', 'placeholder': '0.00'}),
+            'receipt_number': forms.TextInput(attrs={'class': 'form-control bg-dark text-white border-secondary', 'placeholder': 'رقم الإيصال الدفتري'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control bg-dark text-white border-secondary', 'rows': 3, 'placeholder': 'أضف #رقم_الإذن لربط سداد الكتب'}),
+        }
+
 class RestockForm(forms.ModelForm):
     class Meta:
         model = InventoryRestock
@@ -15,28 +31,38 @@ class RestockForm(forms.ModelForm):
             'note': forms.TextInput(attrs={'class': 'form-control bg-dark text-white border-info', 'placeholder': 'ملاحظات التوريد'}),
         }
 
+
+
 class BookSaleForm(forms.ModelForm):
     class Meta:
         model = BookSale
-        fields = ['student', 'item', 'quantity']
+        # إضافة حقل pay_now لتمكين السداد الفوري من نفس الشاشة
+        fields = ['student', 'item', 'quantity', 'pay_now'] 
         widgets = {
             'student': forms.Select(attrs={'class': 'form-select select2'}),
             'item': forms.Select(attrs={'class': 'form-select select2'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control bg-dark text-white border-secondary', 'min': 1}),
+            # تنسيق حقل الدفع بلون مميز لتمييزه كعملية مالية
+            'pay_now': forms.NumberInput(attrs={
+                'class': 'form-control bg-warning text-dark fw-bold border-warning',
+                'placeholder': 'أدخل المبلغ المحصل الآن...',
+                'min': 0
+            }),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # 1. تصحيح ترتيب الطلاب (استخدام first_name بدلاً من name)
+        # 1. تصحيح ترتيب الطلاب وتخصيص الاسم
         self.fields['student'].queryset = Student.objects.all().order_by('first_name', 'last_name')
-        
-        # تخصيص ظهور اسم الطالب (الاسم الأول + الأخير) في القائمة
         self.fields['student'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name} - {obj.student_code}"
 
         # 2. تحسين عرض الأصناف (كتب/زي)
         self.fields['item'].queryset = InventoryItem.objects.all().select_related('subject', 'grade', 'uniform')
         self.fields['item'].label_from_instance = self.label_from_item_instance
+        
+        # إضافة تسمية توضيحية لحقل الدفع
+        self.fields['pay_now'].label = "المبلغ المدفوع نقداً الآن"
 
     def label_from_item_instance(self, obj):
         """تنسيق اسم الكتاب أو الزي"""
@@ -94,7 +120,7 @@ class StudentForm(forms.ModelForm):
         fields = [
             'academic_year', 'first_name', 'last_name', 'image',
             'national_id', 'nationality', 'gender', 'religion', 
-            'date_of_birth', 'address', 'phone', 'mother_name',
+            'date_of_birth', 'address', 'phone', 'mother_name','father_job',
             'grade', 'classroom', 'specialization', 'enrollment_status',
             'registration_number', 'integration_status'
         ]
@@ -119,6 +145,7 @@ class StudentForm(forms.ModelForm):
             'date_of_birth': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'العنوان بالتفصيل', 'rows': 1}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'رقم التليفون'}),
+            'father_job': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'أدخل وظيفة الأب (اختياري)'}),
             'mother_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'اسم الأم بالكامل'}),
             'classroom': forms.Select(attrs={'class': 'form-control'}),
             'specialization': forms.Select(attrs={'class': 'form-select'}),

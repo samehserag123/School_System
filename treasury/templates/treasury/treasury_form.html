@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card bg-dark border-secondary shadow-lg text-white" style="border-radius: 15px;">
+                <div class="card-header border-secondary py-3 bg-gradient bg-primary text-center">
+                    <h5 class="mb-0 text-white">
+                        <i class="bi bi-safe2 me-2"></i> استلام نقدية - الخزينة العامة
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" id="paymentForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-info small fw-bold">الطالب المستحق</label>
+                            {{ form.student }}
+                            <div class="form-text text-muted">اختر الطالب لعرض أذونات الكتب غير المسددة.</div>
+                        </div>
+
+                        <div id="book_sale_section" class="alert alert-info bg-opacity-10 border-info d-none mb-4">
+                            <label class="form-label text-info small fw-bold"><i class="bi bi-box-seam me-1"></i> ربط الدفع بإذن استلام:</label>
+                            <select id="book_sale_selector" class="form-select bg-dark text-white border-info mb-2">
+                                <option value="">-- دفع عام (غير مرتبط بإذن) --</option>
+                            </select>
+                            <small class="text-warning d-block mt-1" id="sale_hint"></small>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label text-info small fw-bold">نوع الإيراد</label>
+                                {{ form.category }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-info small fw-bold">المبلغ المورد</label>
+                                {{ form.amount }}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-info small fw-bold">رقم الإيصال المرجعي (الدفتري)</label>
+                            {{ form.receipt_number }}
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label text-info small fw-bold">ملاحظات التحصيل</label>
+                            {{ form.notes }}
+                            <div class="form-text text-warning small">سيتم إضافة #رقم_الإذن هنا تلقائياً لربط عهدة الكتب.</div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-info btn-lg fw-bold shadow">
+                                <i class="bi bi-check-circle me-1"></i> حفظ وتوريد للخزينة
+                            </button>
+                            <a href="{% url 'treasury_dashboard' %}" class="btn btn-outline-secondary">إلغاء والعودة</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const studentSelect = document.querySelector('select[name="student"]');
+    const categorySelect = document.querySelector('select[name="category"]');
+    const bookSaleSection = document.getElementById('book_sale_section');
+    const bookSaleSelector = document.getElementById('book_sale_selector');
+    const notesInput = document.querySelector('textarea[name="notes"]');
+    const amountInput = document.querySelector('input[name="amount"]');
+
+    // 1. مراقبة اختيار الطالب
+    studentSelect.addEventListener('change', function() {
+        const studentId = this.value;
+        if (!studentId) {
+            bookSaleSection.classList.add('d-none');
+            return;
+        }
+
+        // جلب الأذونات عبر API
+        fetch(`/students/api/get-pending-sales/${studentId}/`)
+            .then(response => response.json())
+            .then(data => {
+                bookSaleSelector.innerHTML = '<option value="">-- دفع عام (غير مرتبط بإذن) --</option>';
+                if (data.sales && data.sales.length > 0) {
+                    bookSaleSection.classList.remove('d-none');
+                    data.sales.forEach(sale => {
+                        bookSaleSelector.innerHTML += `<option value="${sale.id}" data-amount="${sale.remaining}">إذن #${sale.id} - ${sale.item_name} (باقي: ${sale.remaining} ج.م)</option>`;
+                    });
+                } else {
+                    bookSaleSection.classList.add('d-none');
+                }
+            });
+    });
+
+    // 2. تحديث الحقول عند اختيار إذن
+    bookSaleSelector.addEventListener('change', function() {
+        const selected = this.options[this.selectedIndex];
+        if (this.value) {
+            amountInput.value = selected.getAttribute('data-amount');
+            notesInput.value = `سداد إذن استلام عهدة رقم #${this.value}`; // 👈 هذا السطر هو مفتاح الربط
+            
+            // اختيار فئة "الكتب" تلقائياً
+            for (let opt of categorySelect.options) {
+                if (opt.text.includes('كتب') || opt.value.includes('book')) {
+                    categorySelect.value = opt.value;
+                    break;
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}سجل بيانات الطلاب المطور{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+<style>
+    /* تصميم كروت الإحصائيات المطور */
+    .stats-grid {
+    display: flex; /* تحويل الشبكة إلى نظام مرن */
+    justify-content: space-between; /* توزيع المسافات بين الكروت بالتساوي */
+    gap: 10px; /* المسافة بين كل كارت والثاني */
+    margin-bottom: 25px;
+    flex-wrap: nowrap; /* منع الكروت من النزول لسطر جديد */
+    overflow-x: auto; /* إضافة شريط تمرير أفقي فقط في الشاشات الصغيرة جداً */
+    padding-bottom: 10px;
+    }
+
+    .stat-card {
+        flex: 1; /* جعل كل كارت يأخذ مساحة متساوية تماماً */
+        min-width: 120px; /* الحد الأدنى لعرض الكارت حتى لا يختفي الكلام */
+        background: linear-gradient(145deg, #1e2227, #16191d);
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 12px 5px; /* تقليل الحشو الداخلي ليناسب السطر الواحد */
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        border-color: #0dcaf0;
+        box-shadow: 0 5px 15px rgba(13, 202, 240, 0.2);
+    }
+    .stat-card .label { font-size: 0.8rem; color: #aaa; margin-bottom: 8px; font-weight: 500; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 800; color: #fff; }
+    
+    /* أنيميشن بسيط عند تغير الرقم */
+    .number-animate { animation: pulse 0.5s; }
+
+    /* تنسيق الفلتر الجمالي */
+    .filter-section {
+        background: rgba(26, 29, 33, 0.8);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 25px;
+        border: 1px solid #334155;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    }
+    .filter-section input, .filter-section select {
+        background-color: #0f1113 !important;
+        border: 1px solid #334155 !important;
+        color: #fff !important;
+        border-radius: 8px !important;
+        transition: all 0.3s;
+    }
+    .filter-section input:focus, .filter-section select:focus {
+        border-color: #0dcaf0 !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.1) !important;
+    }
+
+    /* تنسيق الجدول */
+    .table-container {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid #334155;
+    }
+    #studentTable thead th {
+        background-color: #000;
+        color: #0dcaf0;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 1px;
+        border: none;
+    }
+    .student-row { transition: background 0.2s; border-bottom: 1px solid #2d3238 !important; }
+    .student-row:hover { background: rgba(13, 202, 240, 0.05) !important; }
+    
+    .student-link {
+        color: #0dcaf0;
+        text-decoration: none;
+        font-weight: 600;
+        transition: 0.3s;
+    }
+    .student-link:hover { color: #fff; }
+
+    .badge-status { font-size: 0.7rem; padding: 5px 10px; border-radius: 6px; }
+
+    /* تحسين شكل الترقيم */
+.pagination .page-link {
+    color: #0dcaf0;
+    background-color: #1e2227;
+    border-color: #334155;
+    transition: all 0.3s;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #0dcaf0;
+    border-color: #0dcaf0;
+    color: #000;
+}
+
+.pagination .page-link:hover {
+    background-color: #0dcaf0;
+    color: #000;
+}
+
+</style>
+
+<div class="container-fluid px-3 animate__animated animate__fadeIn">
+    
+    <div class="stats-grid" id="statsContainer">
+        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #0dcaf0;">
+            <div class="label">إجمالي الطلاب</div>
+            <div class="value counter" id="count-all">0</div>
+        </div>
+
+        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #2ecc71; animation-delay: 0.1s;">
+            <div class="label">بنين (ذكر)</div>
+            <div class="value counter" id="count-male">0</div>
+        </div>
+
+        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #f39c12; animation-delay: 0.2s;">
+            <div class="label">بنات (أنثى)</div>
+            <div class="value counter" id="count-female">0</div>
+        </div>
+
+        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #3498db; animation-delay: 0.3s;">
+            <div class="label">مسلم</div>
+            <div class="value counter" id="count-muslim">0</div>
+        </div>
+
+        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #e74c3c; animation-delay: 0.4s;">
+            <div class="label">مسيحي</div>
+            <div class="value counter" id="count-christian">0</div>
+        </div>
+
+        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #f1c40f; animation-delay: 0.5s;">
+            <div class="label">طلاب الدمج</div>
+            <div class="value counter" id="count-integ">0</div>
+        </div>
+    </div>
+</div>
+
+    <div class="filter-section animate__animated animate__fadeInUp">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-secondary text-muted"><i class="bi bi-search"></i></span>
+                    <input type="text" id="tableSearch" onkeyup="runFilters()" class="form-control" placeholder="ابحث باسم الطالب أو الرقم القومي...">
+                </div>
+            </div>
+            <div class="col-md-9">
+                <div class="row g-2">
+                    <div class="col-md-2">
+                        <select id="f-grade" onchange="runFilters()" class="form-select form-select-sm">
+                            <option value="">الصف الدراسي</option>
+                            {% for grade in all_grades %}<option value="{{ grade.name }}">{{ grade.name }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select id="f-class" onchange="runFilters()" class="form-select form-select-sm">
+                            <option value="">الفصل</option>
+                            {% for classroom in all_classrooms %}<option value="{{ classroom.name }}">{{ classroom.name }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select id="f-spec" onchange="runFilters()" class="form-select form-select-sm">
+                            <option value="">التخصص</option>
+                            {% for spec_code, spec_name in all_specs %}
+                                <option value="{{ spec_name }}">{{ spec_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select id="f-gender" onchange="runFilters()" class="form-select form-select-sm">
+                            <option value="">النوع</option>
+                            <option value="ذكر">ذكر</option>
+                            <option value="أنثى">أنثى</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select id="f-religion" onchange="runFilters()" class="form-select form-select-sm">
+                            <option value="">الديانة</option>
+                            <option value="مسلم">مسلم</option>
+                            <option value="مسيحي">مسيحي</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select id="f-integ" onchange="runFilters()" class="form-select form-select-sm">
+                            <option value="">الدمج</option>
+                            <option value="نعم">دمج</option>
+                            <option value="لا">عادي</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-container shadow-lg animate__animated animate__fadeInUp" style="animation-delay: 0.2s;">
+        <table class="table table-dark table-hover text-center align-middle mb-0" id="studentTable">
+            <thead>
+                <tr>
+                    <th class="py-3">البيانات الأساسية للطلاب</th>
+                    <th>النوع</th>
+                    <th>الديانة</th>
+                    <th>الجنسية</th>
+                    <th>حالة القيد</th>
+                    <th>رقم القيد</th>
+                    <th>موقف الدمج</th>
+                    <th>الرادار المالي</th> </tr>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                {% for student in students %}
+                <tr class="student-row" 
+                    data-grade="{{ student.grade.name }}" 
+                    data-class="{{ student.classroom.name }}"
+                    data-spec="{{ student.specialization.name }}">
+                    
+                    <td class="text-end pe-3">
+                        <div style="display: block;">
+                            <a href="{% url 'add_student' %}?id={{ student.id }}&mode=view" 
+                            class="student-link fs-6 fw-bold text-info text-decoration-none d-block mb-1">
+                                {{ student.first_name }}
+                            </a>
+                            
+                            <span class="text-white-50 small fw-bold d-block mb-1">
+                                {{ student.last_name }}
+                            </span>
+                            
+                            <span class="badge bg-info text-dark shadow-sm d-inline-block mt-1" 
+                                style="font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; padding: 5px 10px;">
+                                <i class="bi bi-person-vcard me-1 text-dark opacity-75"></i>{{ student.national_id }}
+                            </span>
+                        </div>
+                    </td>
+
+                    <td class="gender-val">
+                        {% if student.get_gender_display == "ذكر" %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary px-3 shadow-sm" style="font-size: 0.75rem; font-weight: 700;">
+                                <i class="bi bi-gender-male me-1"></i>ذكر
+                            </span>
+                        {% elif student.get_gender_display == "أنثى" %}
+                            <span class="badge bg-warning-subtle text-warning border border-warning px-3 shadow-sm" style="font-size: 0.75rem; font-weight: 700;">
+                                <i class="bi bi-gender-female me-1"></i>أنثى
+                            {% else %}
+                                <span class="badge bg-secondary text-white">{{ student.get_gender_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="religion-val">{{ student.get_religion_display }}</td>
+                    <td><img src="https://flagcdn.com/16x12/eg.png" class="me-1"> {{ student.nationality }}</td>
+                    <td><span class="badge bg-primary-subtle text-primary border border-primary badge-status">{{ student.get_enrollment_status_display }}</span></td>
+                    <td class="text-info mono">{{ student.registration_number|default:"---" }}</td>
+                    <td class="integ-val">
+                        {% if student.integration_status %}
+                            <span class="badge bg-warning text-dark">دمج ✅</span>
+                        {% else %}
+                            <span class="text-muted">لا</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <a href="{% url 'student_finance_detail' student.id %}" 
+                        class="btn btn-sm btn-outline-info border-0 animate__animated animate__pulse animate__infinite animate__slow" 
+                        title="عرض الرادار المالي">
+                            <i class="bi bi-radar fs-5"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="d-flex justify-content-between align-items-center mt-3 animate__animated animate__fadeInUp">
+    <div class="text-white-50 small">
+        عرض {{ students.start_index }} إلى {{ students.end_index }} من إجمالي {{ students.paginator.count }} طالب
+    </div>
+    
+    <nav aria-label="Page navigation">
+        <ul class="pagination pagination-sm mb-0">
+            {% if students.has_previous %}
+                <li class="page-item">
+                    <a class="page-link bg-dark border-secondary text-info" href="?page=1" aria-label="First">
+                        <span aria-hidden="true">&laquo;&laquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link bg-dark border-secondary text-info" href="?page={{ students.previous_page_number }}" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+            {% endif %}
+
+            {% for num in students.paginator.page_range %}
+                {% if students.number == num %}
+                    <li class="page-item active"><span class="page-link bg-info border-info text-dark fw-bold">{{ num }}</span></li>
+                {% elif num > students.number|add:'-3' and num < students.number|add:'3' %}
+                    <li class="page-item"><a class="page-link bg-dark border-secondary text-info" href="?page={{ num }}">{{ num }}</a></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if students.has_next %}
+                <li class="page-item">
+                    <a class="page-link bg-dark border-secondary text-info" href="?page={{ students.next_page_number }}" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link bg-dark border-secondary text-info" href="?page={{ students.paginator.num_pages }}" aria-label="Last">
+                        <span aria-hidden="true">&raquo;&raquo;</span>
+                    </a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+
+<script>
+// دالة لتحديث الأرقام بحركة (Counter effect)
+function animateValue(obj, start, end, duration) {
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        obj.innerHTML = Math.floor(progress * (end - start) + start);
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        }
+    };
+    window.requestAnimationFrame(step);
+}
+
+function runFilters() {
+    let search = document.getElementById("tableSearch").value.toLowerCase();
+    let fGrade = document.getElementById("f-grade").value;
+    let fClass = document.getElementById("f-class").value;
+    let fSpec = document.getElementById("f-spec").value;
+    let fGender = document.getElementById("f-gender").value;
+    let fRelig = document.getElementById("f-religion").value;
+    let fInteg = document.getElementById("f-integ").value;
+
+    let rows = document.querySelectorAll(".student-row");
+    
+    // 1. إضافة integ: 0 لتبدأ الحساب من الصفر
+    let stats = { all:0, male:0, female:0, muslim:0, christian:0, integ:0 };
+
+    rows.forEach(row => {
+        let text = row.innerText.toLowerCase();
+        let grade = row.getAttribute("data-grade");
+        let classroom = row.getAttribute("data-class");
+        let spec = row.getAttribute("data-spec");
+        let gender = row.querySelector(".gender-val").innerText.trim();
+        let religion = row.querySelector(".religion-val").innerText.trim();
+        let integText = row.querySelector(".integ-val").innerText.trim();
+
+        let isMatch = text.includes(search) &&
+                      (!fGrade || grade === fGrade) &&
+                      (!fClass || classroom === fClass) &&
+                      (!fSpec || spec === fSpec) &&
+                      (!fGender || gender === fGender) &&
+                      (!fRelig || religion === fRelig) &&
+                      (!fInteg || integText.includes(fInteg));
+
+        if (isMatch) {
+            row.style.display = "";
+            stats.all++;
+            if(gender === "ذكر") stats.male++;
+            if(gender === "أنثى") stats.female++;
+            if(religion === "مسلم") stats.muslim++;
+            if(religion === "مسيحي") stats.christian++;
+            
+            // 2. فحص ما إذا كان الطالب "دمج" لزيادة العداد
+            // نبحث عن كلمة "دمج" أو "نعم" حسب المكتوب في جدولك
+            if(integText.includes("دمج") || integText.includes("نعم")) {
+                stats.integ++;
+            }
+        } else {
+            row.style.display = "none";
+        }
+    });
+
+    // 3. تحديث جميع العدادات بما فيها عداد الدمج الجديد
+    updateCounter("count-all", stats.all);
+    updateCounter("count-male", stats.male);
+    updateCounter("count-female", stats.female);
+    updateCounter("count-muslim", stats.muslim);
+    updateCounter("count-christian", stats.christian);
+    updateCounter("count-integ", stats.integ); // تحديث عداد الدمج
+}
+
+function updateCounter(id, newValue) {
+    const el = document.getElementById(id);
+    const oldValue = parseInt(el.innerText);
+    if (oldValue !== newValue) {
+        animateValue(el, oldValue, newValue, 300);
+        el.parentElement.classList.add('animate__animated', 'animate__pulse');
+        setTimeout(() => el.parentElement.classList.remove('animate__animated', 'animate__pulse'), 500);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", runFilters);
+</script>
+{% endblock %}

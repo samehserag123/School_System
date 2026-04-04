@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<style>
+.stats-bar{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+margin-bottom:20px
+}
+
+.stat{
+background:#1f2933;
+padding:10px 15px;
+border-radius:10px;
+min-width:140px
+}
+
+#studentTable th{
+background:#000;
+color:#0dcaf0;
+text-align:center
+}
+</style>
+
+<!-- ✅ الإحصائيات -->
+<div class="stats-bar">
+
+<div class="stat">إجمالي: {{ stats.total }}</div>
+<div class="stat text-info">ذكور: {{ stats.male }}</div>
+<div class="stat text-warning">إناث: {{ stats.female }}</div>
+<div class="stat text-success">مسلمين: {{ stats.islam }}</div>
+<div class="stat text-danger">مسيحيين: {{ stats.christian }}</div>
+
+</div>
+
+<!-- ✅ الفلاتر -->
+<div class="row mb-3">
+
+<div class="col-md-3">
+<input type="text" id="searchInput" class="form-control" placeholder="بحث سريع...">
+</div>
+
+<div class="col-md-2">
+<select class="form-select" onchange="filterData()">
+<option value="">النوع</option>
+<option value="Male">ذكر</option>
+<option value="Female">أنثى</option>
+</select>
+</div>
+
+<div class="col-md-2">
+<select class="form-select" onchange="filterData()">
+<option value="">الديانة</option>
+<option value="Islam">مسلم</option>
+<option value="Christian">مسيحي</option>
+</select>
+</div>
+
+</div>
+
+<!-- ✅ الجدول -->
+<div class="table-responsive">
+
+<table class="table table-bordered text-center" id="studentTable">
+
+<thead>
+<tr>
+<th>الرقم القومي</th>
+<th>الاسم الأول</th>
+<th>اسم العائلة</th>
+<th>النوع</th>
+<th>الديانة</th>
+<th>الجنسية</th>
+<th>حالة القيد</th>
+<th>رقم القيد</th>
+<th>دمج</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for s in students %}
+<tr class="student-row"
+data-search="{{ s.first_name }} {{ s.last_name }} {{ s.national_id }} {{ s.nationality }} {{ s.religion }}">
+
+<td>{{ s.national_id }}</td>
+
+<td>
+<a href="{% url 'add_student' %}?id={{ s.id }}&mode=view" class="text-info fw-bold">
+{{ s.first_name }}
+</a>
+</td>
+
+<td>{{ s.last_name }}</td>
+<td>{{ s.gender }}</td>
+<td>{{ s.religion }}</td>
+<td>{{ s.nationality }}</td>
+<td>{{ s.enrollment_status }}</td>
+<td>{{ s.registration_number }}</td>
+
+<td>
+{% if s.integration_status %}
+<span class="badge bg-warning">نعم</span>
+{% else %}
+<span class="badge bg-secondary">لا</span>
+{% endif %}
+</td>
+
+</tr>
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+<!-- ✅ احصائيات إضافية -->
+<hr>
+
+<h5>حسب الصف:</h5>
+<ul>
+{% for g in grade_counts %}
+<li>{{ g.grade__name }} : {{ g.count }}</li>
+{% endfor %}
+</ul>
+
+<h5>حسب الفصل:</h5>
+<ul>
+{% for c in class_counts %}
+<li>{{ c.classroom__name }} : {{ c.count }}</li>
+{% endfor %}
+</ul>
+
+<h5>حسب التخصص:</h5>
+<ul>
+{% for s in spec_counts %}
+<li>{{ s.specialization__name }} : {{ s.count }}</li>
+{% endfor %}
+</ul>
+
+<!-- ✅ البحث -->
+<script>
+document.getElementById("searchInput").addEventListener("keyup", function(){
+
+let val = this.value.toLowerCase();
+
+document.querySelectorAll(".student-row").forEach(row => {
+
+let text = row.dataset.search.toLowerCase();
+
+row.style.display = text.includes(val) ? "" : "none";
+
+});
+
+});
+</script>
+
+{% endblock %}

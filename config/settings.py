@@ -152,12 +152,32 @@ REST_FRAMEWORK = {
 
 import os
 
-# إعدادات Celery
+# --- إعدادات Celery ---
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
-# إيميل المدير لاستقبال التنبيهات
+# --- إعدادات البريد الإلكتروني وتنبيهات النظام ---
 ADMIN_EMAIL = 'admin@school.com'
 DEFAULT_FROM_EMAIL = 'system@school.com'
+
+# --- إعدادات نظام تسجيل الدخول (Login Settings) ---
+# هذا الجزء حيوي لضمان عمل شاشة الدخول والروابط التي أنشأناها
+LOGIN_URL = 'login'               # توجيه المستخدم لصفحة الدخول عند الحاجة
+LOGIN_REDIRECT_URL = 'home'        # الصفحة التي تفتح فور نجاح الدخول (صفحة الأزرار)
+LOGOUT_REDIRECT_URL = 'login'      # الصفحة التي يذهب إليها المستخدم بعد تسجيل الخروج
+
+# --- إعدادات الجلسة (لضمان استقرار النظام ومنع الـ Loop) ---
+SESSION_COOKIE_AGE = 3600          # تنتهي الجلسة تلقائياً بعد ساعة واحدة
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # تسجيل خروج تلقائي بمجرد إغلاق المتصفح
+# إعدادات لضمان تحديث الجلسة ومنع اللوب
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+# إعدادات إضافية لكسر اللوب
+APPEND_SLASH = True  # يضمن أن الروابط تنتهي بـ / دائماً
+REMOVE_SLASH = False
+
+# تأكد أن ALLOWED_HOSTS في ملفك الأصلي تسمح بالدخول المحلي
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']

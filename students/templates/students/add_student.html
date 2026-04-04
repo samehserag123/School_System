@@ -70,6 +70,14 @@
         padding: 10px !important;
     }
 
+    /* تحسين شكل الحقول عند التعطيل Disabled */
+    .form-control:disabled, .form-select:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        background-color: #161b22 !important;
+        border-color: #21262d !important;
+    }
+
     .section-title {
         border-right: 4px solid #ffc107;
         padding-right: 15px;
@@ -105,17 +113,26 @@
 {% block content %}
 <div class="container py-5">
     <div class="card student-card shadow-lg">
-        <h3 class="text-center fw-bold text-white mb-4">إضافة طالب جديد</h3>
+        <h3 class="text-center fw-bold text-white mb-4">
+            {% if student %} بيانات الطالب: {{ student.get_full_name }} {% else %} إضافة طالب جديد {% endif %}
+        </h3>
 
         <form method="post" id="studentForm" enctype="multipart/form-data">
             {% csrf_token %}
 
             <div class="profile-pic-container">
-                <div class="profile-pic-wrapper" onclick="document.getElementById('hidden-image-input').click();">
-                    <img id="image-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="preview">
+                <div class="profile-pic-wrapper" {% if not student_admin_mode %}onclick="document.getElementById('hidden-image-input').click();"{% endif %}>
+                    {% if student and student.image %}
+                        <img id="image-preview" src="{{ student.image.url }}" alt="preview">
+                    {% else %}
+                        <img id="image-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="preview">
+                    {% endif %}
+                    
+                    {% if not student_admin_mode %}
                     <div class="upload-overlay">
                         <i class="bi bi-camera"></i> تغيير
                     </div>
+                    {% endif %}
                 </div>
                 <label class="text-muted mt-2">صورة الطالب</label>
                 <input type="file" name="image" id="hidden-image-input" accept="image/*" onchange="previewImage(this)">
@@ -162,17 +179,24 @@
             </div>
 
             <div class="row g-3 mt-2">
-                <div class="col-md-6">
+                <div class="col-md-3">
                     <label class="form-label text-info">العنوان</label>
                     {{ form.address }}
                 </div>
-                <div class="col-md-3">
+
+                <div class="col-md-4">
                     <label class="form-label text-info">رقم التليفون</label>
                     {{ form.phone }}
                 </div>
+
                 <div class="col-md-3">
                     <label class="form-label text-info">اسم الأم</label>
                     {{ form.mother_name }}
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label text-info">وظيفة الأب</label>
+                    {{ form.father_job }}
                 </div>
             </div>
 
@@ -186,15 +210,15 @@
                     <label class="form-label text-info">الفصل</label>
                     {{ form.classroom }}
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label text-info">التخصص</label>
                     {{ form.specialization }}
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label text-info">حالة القيد</label>
                     {{ form.enrollment_status }}
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label text-info">رقم القيد</label>
                     {{ form.registration_number }}
                 </div>
@@ -202,12 +226,20 @@
 
             <div class="row mt-5 align-items-center">
                 <div class="col-md-4">
-                    </div>
-                <div class="col-md-4 text-center">
-                    <button type="submit" class="btn btn-save text-white shadow">
-                        <i class="bi bi-check-circle me-2"></i> حفظ البيانات
-                    </button>
                 </div>
+                
+                <div class="col-md-4 text-center">
+                    {% if not student_admin_mode %}
+                        <button type="submit" class="btn btn-save text-white shadow">
+                            <i class="bi bi-check-circle me-2"></i> حفظ البيانات
+                        </button>
+                    {% else %}
+                        <div class="alert alert-warning border-0 shadow-sm mb-0 py-2">
+                            <i class="bi bi-eye-fill ms-1"></i> وضع العرض فقط
+                        </div>
+                    {% endif %}
+                </div>
+
                 <div class="col-md-4 d-flex justify-content-end align-items-center">
                     <div class="form-check form-switch mb-0">
                         {{ form.integration_status }}
@@ -232,6 +264,11 @@
 
     document.addEventListener("DOMContentLoaded", function() {
         const form = document.getElementById("studentForm");
+        const isViewMode = "{{ student_admin_mode }}" === "True";
+
+        // إذا كنا في وضع العرض، لا نحتاج لتفعيل التنقل بـ Enter للـ Inputs المعطلة
+        if (isViewMode) return;
+
         const inputs = Array.from(form.querySelectorAll("input:not([type='hidden']):not([type='file']), select, textarea, button"));
 
         inputs.forEach((input, index) => {

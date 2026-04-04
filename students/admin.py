@@ -7,6 +7,9 @@ from .models import (
 )
 from .models import CoursePayment
 
+from django.urls import reverse
+from .models import BookSale
+
 # 1. تسجيل المواد الدراسية
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
@@ -69,41 +72,66 @@ class SubjectPriceAdmin(admin.ModelAdmin):
     search_fields = ['subject__name', 'teacher__first_name']
 
 # 6. تسجيل أذونات استلام الكتب والزي
-# students/admin.py
+# students/admin.p
 
 @admin.register(BookSale)
 class BookSaleAdmin(admin.ModelAdmin):
-    # الحقول التي ستظهر في الجدول الرئيسي
-    list_display = ['student_link', 'item', 'quantity', 'total_amount', 'paid_amount', 'financial_status', 'is_delivered']
+    # 1. الحقول التي ستظهر في الجدول الرئيسي (تم استبدال الحقل المسبب للخطأ بالدالة الجديدة)
+    list_display = [
+        'id', 
+        'student_link', 
+        'item', 
+        'quantity', 
+        'total_amount', 
+        'display_paid_amount',  # الدالة الجديدة لعرض المسدد من الخزينة
+        'financial_status', 
+        'is_delivered',
+        'sale_date'
+    ]
     
-    # الفلاتر الجانبية
+    # 2. الفلاتر الجانبية
     list_filter = ['status', 'is_delivered', 'sale_date', 'student__academic_year']
     
-    # جعل اختيار الطالب والصنف يتم بالبحث (للسرعة)
+    # 3. جعل اختيار الطالب والصنف يتم بالبحث (للسرعة في حالة كثرة البيانات)
     raw_id_fields = ['student', 'item']
     
-    # حقول للقراءة فقط (لا يمكن تعديلها يدوياً لضمان دقة الحسابات)
-    readonly_fields = ['total_amount', 'sale_date']
+    # 4. حقول للقراءة فقط لضمان دقة الحسابات المالية
+    readonly_fields = ['total_amount', 'sale_date', 'display_paid_amount']
+
+    def display_paid_amount(self, obj):
+        """عرض المبلغ المسدد فعلياً في الخزينة بلون مميز"""
+        paid = obj.calculated_paid_amount
+        return format_html('<span style="color: #28a745; font-weight: bold;">{} ج.م</span>', paid)
+    
+    display_paid_amount.short_description = "المسدد بالخزينة"
 
     def financial_status(self, obj):
-        """عرض أيقونة ملونة توضح حالة السداد"""
-        from django.utils.html import format_html
+        """عرض أيقونة ملونة توضح حالة السداد بناءً على المتبقي الحقيقي"""
         remaining = obj.remaining_amount
-        if remaining <= 0:
-            return format_html('<span style="color: green; font-weight: bold;">خالص ✅</span>')
-        return format_html('<span style="color: red; font-weight: bold;">باقي {} ج.م</span>', remaining)
+        if remaining <= 0 and obj.total_amount > 0:
+            return format_html('<span style="color: #28a745; font-weight: bold;">خالص ✅</span>')
+        elif 0 < remaining < obj.total_amount:
+            return format_html('<span style="color: #fd7e14; font-weight: bold;">جزئي (باقي {})</span>', remaining)
+        return format_html('<span style="color: #dc3545; font-weight: bold;">باقي {} ج.م</span>', remaining)
     
     financial_status.short_description = "الموقف المالي"
 
     def student_link(self, obj):
-        """رابط سريع لملف الطالب"""
-        from django.urls import reverse
-        from django.utils.html import format_html
-        url = reverse("admin:students_student_change", args=[obj.student.id])
-        return format_html('<a href="{}">{}</a>', url, obj.student.get_full_name())
+        """رابط سريع لفتح ملف الطالب في لوحة التحكم"""
+        try:
+            # تأكد من أن اسم التطبيق هو students والموديل student
+            url = reverse("admin:students_student_change", args=[obj.student.id])
+            return format_html('<a href="{}" style="font-weight:bold; color:#007bff;">{}</a>', url, obj.student.get_full_name())
+        except:
+            return obj.student.get_full_name()
     
     student_link.short_description = "الطالب"
+
+    # إضافة إمكانية البحث بالاسم أو الكود أو رقم العملية
+    search_fields = ('student__first_name', 'student__last_name', 'student__student_code', 'id')
     
+    
+        
 @admin.register(CoursePayment)
 class CoursePaymentAdmin(admin.ModelAdmin):
     # 1. الأعمدة التي تظهر في الجدول الرئيسي

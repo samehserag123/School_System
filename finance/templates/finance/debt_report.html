@@ -79,30 +79,32 @@
                         </tr>
                     </thead>
                     <tbody class="text-center">
-                        {% for item in report_data %}
+                        {% for item in overdue_items %}
                         <tr>
                             <td>{{ forloop.counter }}</td>
-                            <td class="text-start fw-bold text-dark">{{ item.student.get_full_name }}</td>
-                            <td><span class="badge bg-secondary opacity-75">{{ item.student.student_code }}</span></td>
+                            <td class="text-start">
+                                <div class="fw-bold">{{ item.student.get_full_name }}</div>
+                                <small class="text-muted"><i class="bi bi-telephone"></i> {{ item.student.parent_phone }}</small>
+                            </td>
                             <td>{{ item.student.grade.name }}</td>
-                            <td class="text-muted">{{ item.required }}</td>
-                            <td class="text-success">{{ item.paid }}</td>
-                            <td class="fw-bold text-danger fs-6">{{ item.remaining }}</td>
-                            <td class="d-print-none">
-                                <a href="{% url 'quick_collection' %}?student_id={{ item.student.id }}" 
-                                   class="btn btn-sm btn-outline-primary py-0" title="تحصيل سريع">
-                                    <i class="bi bi-plus-circle"></i> سداد
+                            <td><span class="badge bg-dark opacity-75">{{ item.due_date|date:"Y-m-d" }}</span></td>
+                            <td class="fw-bold">{{ item.amount_due }}</td>
+                            <td class="text-success">{{ item.display_paid }} ج.م</td>
+                            <td class="text-danger fw-bold fs-6">{{ item.display_remaining }} ج.م</td>
+                            <td>
+                                <span class="badge {% if item.days_overdue > 30 %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                                    <i class="bi bi-clock-history"></i> {{ item.days_overdue }} يوم
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{% url 'quick_collection' %}?student_id={{ item.student.id }}" class="btn btn-sm btn-success">
+                                    <i class="bi bi-cash-stack"></i> تحصيل
                                 </a>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="py-5 text-center bg-light">
-                                <div class="text-muted">
-                                    <i class="bi bi-emoji-smile fs-1 d-block mb-2"></i>
-                                    لا توجد مديونيات مستحقة بناءً على البحث الحالي.
-                                </div>
-                            </td>
+                            <td colspan="9" class="py-5 text-muted">لا يوجد متأخرات حالياً.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
