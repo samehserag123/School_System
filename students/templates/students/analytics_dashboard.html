@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    /* تنسيق كروت الإحصائيات الفاخرة [cite: 2026-04-09] */
+    .stat-card {
+        background: #000;
+        border: 1px solid #1e293b;
+        border-radius: 20px;
+        padding: 25px;
+        transition: transform 0.3s ease;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .stat-card:hover { 
+        transform: translateY(-5px); 
+        border-color: #38bdf8; 
+    }
+    /* النصوص المشعة (Neon) [cite: 2026-04-09] */
+    .neon-text-info { 
+        color: #00d4ff; 
+        text-shadow: 0 0 10px rgba(0, 212, 255, 0.3); 
+    }
+    /* أشرطة التقدم المخصصة [cite: 2026-04-09] */
+    .progress-custom { 
+        background: #0f172a; 
+        height: 12px; 
+        border-radius: 10px; 
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    /* تنسيق التبويبات (Tabs) [cite: 2026-04-09] */
+    .nav-pills .nav-link {
+        color: #94a3b8;
+        border-radius: 10px;
+        padding: 10px 25px;
+        transition: all 0.3s;
+    }
+    .nav-pills .nav-link.active {
+        background-color: rgba(56, 189, 248, 0.1) !important;
+        color: #38bdf8 !important;
+        border: 1px solid #38bdf8;
+    }
+    
+    /* تأثيرات روابط الطلاب الذكية [cite: 2026-04-09] */
+    .student-link {
+        transition: all 0.2s ease;
+        display: inline-block;
+        color: #fff !important;
+        text-decoration: none !important;
+    }
+    .student-link:hover {
+        color: #38bdf8 !important;
+        transform: translateX(-5px);
+        text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+    }
+
+    /* زر العودة المطور الظاهر في صورتك [cite: 2026-04-09] */
+    .back-btn-top {
+        background: rgba(255, 255, 255, 0.05);
+        color: #94a3b8;
+        border: 1px solid #1e293b;
+        padding: 8px 24px;
+        border-radius: 50px;
+        text-decoration: none !important;
+        transition: all 0.3s ease;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .back-btn-top:hover {
+        background: #38bdf8;
+        color: #000 !important;
+        border-color: #38bdf8;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+        transform: scale(1.05);
+    }
+</style>
+
+<div class="container-fluid py-4 text-end" dir="rtl">
+    
+    <div class="d-flex justify-content-between align-items-center mb-5 flex-row-reverse">
+        <h2 class="fw-900 text-white m-0">
+            <i class="bi bi-pie-chart-fill neon-text-info me-2"></i> لوحة تحليل بيانات الطلاب المجمعة
+        </h2>
+        <a href="{% url 'course_prices' %}" class="back-btn-top">
+            <i class="bi bi-arrow-right-circle fs-5"></i> 
+            العودة لقائمة المجموعات
+        </a>
+    </div>
+
+    <div class="row g-4 mb-5">
+        <div class="col-md-4">
+            <div class="stat-card text-center">
+                <div class="small text-secondary fw-bold mb-2">إجمالي طلاب المدرسة</div>
+                <div class="display-5 fw-900 text-white">{{ total_students }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card text-center" style="border-right: 5px solid #39ff14 !important;">
+                <div class="small text-secondary fw-bold mb-2 text-success">طلاب مشتركين (فعالين)</div>
+                <div class="display-5 fw-900 text-success">{{ enrolled_count }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card text-center" style="border-right: 5px solid #ff3131 !important;">
+                <div class="small text-secondary fw-bold mb-2 text-danger">طلاب بدون اشتراكات</div>
+                <div class="display-5 fw-900 text-danger">{{ non_enrolled_count }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card mb-5">
+        <h5 class="text-info fw-bold mb-4">
+            <i class="bi bi-book me-2"></i> تحليل كثافة الاشتراكات والانتشار حسب المادة
+        </h5>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover border-secondary border-opacity-10 align-middle">
+                <thead>
+                    <tr class="text-secondary small">
+                        <th>المادة الدراسية / الكورس</th>
+                        <th>عدد الطلاب المشتركين</th>
+                        <th style="width: 40%;">نسبة الإقبال الإحصائية</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in subject_analysis %}
+                    <tr>
+                        <td class="fw-bold text-white">{{ item.course_info__subject__name }}</td>
+                        <td>
+                            <span class="badge bg-info text-dark px-3 rounded-pill fw-bold">
+                                {{ item.total }} طالب
+                            </span>
+                        </td>
+                        <td>
+                            <div class="progress progress-custom">
+                                <div class="progress-bar bg-info" 
+                                     style="width: {% widthratio item.total enrolled_count 100 %}%">
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-row-reverse">
+            <h5 class="text-white fw-bold m-0"><i class="bi bi-people me-2"></i> قوائم الطلاب التفصيلية</h5>
+            
+            <ul class="nav nav-pills" id="studentTabs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#enrolledList">
+                        المشتركين
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#nonEnrolledList">
+                        غير المشتركين
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="enrolledList">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle">
+                        <thead class="text-secondary small">
+                            <tr>
+                                <th>كود الطالب</th>
+                                <th>الاسم بالكامل (اضغط للتفاصيل)</th>
+                                <th>المرحلة الدراسية</th>
+                                <th>السنة الدراسية</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in enrolled_students %}
+                            <tr>
+                                <td class="text-info fw-bold">{{ student.student_code }}</td>
+                                <td>
+                                    <a href="{% url 'student_analytics_detail' student.id %}" class="student-link fw-bold">
+                                        <i class="bi bi-eye text-info me-1 small"></i>
+                                        {{ student.get_full_name }}
+                                    </a>
+                                </td>
+                                <td>{{ student.grade.name }}</td>
+                                <td><span class="badge bg-dark border border-secondary">{{ student.academic_year.name }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="nonEnrolledList">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle">
+                        <thead class="text-secondary small">
+                            <tr>
+                                <th>الاسم بالكامل</th>
+                                <th>المرحلة الدراسية</th>
+                                <th>رقم الهاتف</th>
+                                <th>الإجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in non_enrolled_students %}
+                            <tr>
+                                <td class="text-warning fw-bold">{{ student.get_full_name }}</td>
+                                <td>{{ student.grade.name }}</td>
+                                <td>{{ student.phone }}</td>
+                                <td>
+                                    <a href="{% url 'course_prices' %}" class="btn btn-sm btn-outline-info rounded-pill px-3 fw-bold">
+                                        <i class="bi bi-plus-circle me-1"></i> تسكين بمجموعة
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

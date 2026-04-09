@@ -261,17 +261,15 @@ opacity:.4;
 
     <!-- required -->
     <td class="text-center">
-        {{ student.total_required_amount|floatformat:2 }}
+        {{ student.fees_display|floatformat:2 }}
     </td>
 
-    <!-- paid -->
     <td class="text-success fw-bold text-center">
-        {{ student.current_year_paid|floatformat:2 }}
+        {{ student.total_paid_display|floatformat:2 }}
     </td>
 
-    <!-- remaining -->
-    <td class="fw-bold text-center {% if student.final_remaining > 0 %}text-danger{% else %}text-success{% endif %}">
-        {{ student.final_remaining|floatformat:2 }}
+    <td class="fw-bold text-center {% if student.calculated_remaining > 0 %}text-danger{% else %}text-success{% endif %}">
+        {{ student.calculated_remaining|floatformat:2 }}
     </td>
 
     <!-- status -->

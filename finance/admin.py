@@ -17,7 +17,17 @@ from .models import (
 
 from .models import GradePriceList # لا تنسَ الاستيراد في الأعلى
 from django.utils.html import format_html
+from .models import ReceiptBook
 
+
+@admin.register(ReceiptBook)
+class ReceiptBookAdmin(admin.ModelAdmin):
+    list_display = ('book_number', 'user', 'start_serial', 'end_serial', 'is_active', 'created_at')
+    list_filter = ('is_active', 'user')
+    search_fields = ('book_number', 'user__username')
+    # يمكن لرئيس الحسابات فقط إضافة الدفاتر من هنا
+    
+    
 @admin.register(GradePriceList)
 class GradePriceListAdmin(admin.ModelAdmin):
     list_display = ('revenue_category', 'grade', 'academic_year', 'price')
@@ -110,12 +120,26 @@ class StudentAccountAdmin(admin.ModelAdmin):
         return f"{val} ج.م"
     total_remaining_display.short_description = "المتبقي"
 
-# 6. الأقساط والمدفوعات (Payments)
 @admin.register(StudentInstallment)
 class StudentInstallmentAdmin(admin.ModelAdmin):
-    list_display = ['student', 'installment_number', 'amount_due', 'status', 'due_date']
-    list_filter = ['academic_year', 'status']
+    # إظهار الحقول الأساسية + حقل "المتبقي" الذي سنحسبه حياً
+    list_display = ('student', 'academic_year', 'amount_due', 'paid_amount', 'get_remaining_balance', 'status')
+    
+    # منع التعديل اليدوي على المدفوع لضمان دقة الربط مع الإيصالات
+    readonly_fields = ('paid_amount',)
 
+    def get_remaining_balance(self, obj):
+        # هذه الدالة تجبر الصفحة على سحب القيمة الحقيقية من قاعدة البيانات في كل مرة تفتح فيها الصفحة
+        return obj.amount_due - obj.paid_amount
+    
+    get_remaining_balance.short_description = "المبلغ المتبقي الحقيقي"
+
+    # إضافة هذه الدالة لضمان تحديث البيانات عند العرض
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('student')
+    
+    
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
     list_display = ['get_student_name', 'revenue_category', 'amount_paid', 'payment_date']

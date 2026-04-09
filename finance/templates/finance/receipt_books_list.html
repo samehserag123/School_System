@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}سجل دفاتر الإيصالات{% endblock %}
+
+{% block content %}
+<div class="container mt-4" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <!-- العنوان أصبح مرئياً بوضوح -->
+        <h3 class="fw-bold text-white">
+            <i class="bi bi-journals me-2"></i> سجل دفاتر الإيصالات المرجعية
+            {% if filter_today %}
+                <span class="badge bg-warning text-dark ms-2 fs-6 shadow-sm"><i class="bi bi-calendar-check"></i> إيصالات اليوم</span>
+            {% endif %}
+        </h3>
+        
+        <!-- أزرار الفلترة الديناميكية -->
+        <div>
+            {% if filter_today %}
+                <a href="{% url 'receipt_books_list' %}" class="btn btn-outline-info fw-bold shadow-sm">
+                    <i class="bi bi-list-check me-1"></i> عرض كل الدفاتر
+                </a>
+            {% else %}
+                <a href="?filter=today" class="btn btn-warning fw-bold shadow-sm text-dark">
+                    <i class="bi bi-calendar-event me-1"></i> إيصالات اليوم فقط
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 bg-dark text-white">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0 text-center">
+                    <thead class="table-active text-white">
+                        <tr>
+                            <th>رقم/اسم الدفتر</th>
+                            <th>الموظف (المحصل)</th>
+                            <th>حالة الدفتر</th>
+                            <th>النطاق (من - إلى)</th>
+                            <th>{% if filter_today %}معدل استخدام اليوم{% else %}معدل الاستخدام الكلي{% endif %}</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in books_data %}
+                        <tr>
+                            <td class="fw-bold text-info">{{ item.book.book_number }}</td>
+                            <td>{{ item.book.user.get_full_name|default:item.book.user.username }}</td>
+                            <td>
+                                {% if item.book.is_active %}
+                                    <span class="badge bg-success rounded-pill px-3 py-2">نشط</span>
+                                {% else %}
+                                    <span class="badge bg-secondary rounded-pill px-3 py-2 text-white-50">مغلق</span>
+                                {% endif %}
+                            </td>
+                            <td dir="ltr" class="fw-bold text-light">
+                                {{ item.book.start_serial }} <i class="bi bi-arrow-right mx-1 text-secondary"></i> {{ item.book.end_serial }}
+                            </td>
+                            <td style="width: 20%;">
+                                <div class="d-flex justify-content-between small mb-1 text-white-50">
+                                    <span>{{ item.used_count }} مستخدم</span>
+                                    <span>من أصل {{ item.total_count }}</span>
+                                </div>
+                                <div class="progress" style="height: 8px; background-color: #333;">
+                                    <div class="progress-bar {% if item.progress == 100 %}bg-danger{% else %}bg-primary{% endif %}" 
+                                         role="progressbar" 
+                                         style="width: {{ item.progress }}%;"></div>
+                                </div>
+                            </td>
+                            <td>
+                                <a href="{% url 'receipt_book_detail' item.book.id %}" class="btn btn-sm btn-outline-info">
+                                    <i class="bi bi-eye"></i> عرض الإيصالات
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-white-50">
+                                {% if filter_today %}
+                                    <i class="bi bi-info-circle fs-3 d-block mb-2"></i>
+                                    لا توجد أي دفاتر تم قطع إيصالات منها اليوم.
+                                {% else %}
+                                    لا توجد دفاتر مسجلة حالياً.
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

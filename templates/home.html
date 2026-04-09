@@ -21,7 +21,7 @@
             align-items: center;
             justify-content: center;
             margin: 0;
-            padding: 20px 0;
+            padding: 20px;
         }
 
         @keyframes gradientBG {
@@ -32,45 +32,54 @@
 
         .main-card {
             border-radius: 25px;
-            padding: 25px 20px;
+            padding: 30px 25px;
             background: rgba(30, 41, 59, 0.85);
             backdrop-filter: blur(15px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-            width: 90%;
+            width: 100%;
             max-width: 440px;
             position: relative;
             color: #ffffff;
             z-index: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         .top-user-bar {
             background: rgba(15, 23, 42, 0.4);
             border-radius: 15px;
             padding: 10px 15px;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
 
         .title {
             font-weight: 900;
-            color: #ffffff;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             font-size: 1.5rem;
+            position: relative;
         }
 
         .title::after {
             content: '';
             display: block;
-            width: 40px;
+            width: 45px;
             height: 4px;
             background: #3b82f6;
-            margin: 8px auto;
+            margin: 10px auto;
             border-radius: 10px;
+        }
+
+        .buttons-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
         }
 
         .btn-custom {
             width: 100%;
-            min-height: 46px;
+            min-height: 50px;
             font-size: 15px;
             font-weight: 600;
             border-radius: 12px;
@@ -82,7 +91,6 @@
             transition: all 0.3s ease;
             text-decoration: none;
             color: white !important;
-            margin-bottom: 10px;
         }
 
         .btn-custom:hover {
@@ -91,19 +99,30 @@
             filter: brightness(1.1);
         }
 
-        /* تنسيق الألوان للأزرار */
-        .btn-hr       { background: linear-gradient(45deg, #0891b2, #06b6d4); }
+        /* ألوان الأزرار */
         .btn-students { background: linear-gradient(45deg, #1e3a8a, #3b82f6); }
         .btn-add      { background: linear-gradient(45deg, #059669, #10b981); }
-        .btn-registry { background: linear-gradient(45deg, #0dcaf0, #3b82f6); box-shadow: 0 4px 15px rgba(13, 202, 240, 0.3); }
+        .btn-registry { background: linear-gradient(45deg, #0dcaf0, #3b82f6); }
         .btn-books    { background: linear-gradient(135deg, #6366f1, #4f46e5); }
-        .btn-restock  { background: linear-gradient(135deg, #198754, #146c43); }
         .btn-courses  { background: linear-gradient(45deg, #7c3aed, #a78bfa); }
         .btn-plans    { background: linear-gradient(45deg, #b45309, #f59e0b); }
-        .btn-debt     { background: linear-gradient(45deg, #e11d48, #fb7185); }
-        .btn-finance  { background: linear-gradient(45deg, #d97706, #f59e0b); }
+        .btn-collection { background: linear-gradient(45deg, #10b981, #047857); }
         .btn-treasury { background: linear-gradient(45deg, #92400e, #d97706); }
+        .btn-finance  { background: linear-gradient(45deg, #d97706, #f59e0b); }
+        .btn-receipt-books { background: linear-gradient(45deg, #64748b, #334155); }
         .btn-admin    { background: linear-gradient(45deg, #334155, #64748b); }
+
+        .school-footer {
+            width: 100%;
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
 
         .bg-icon {
             position: absolute;
@@ -118,76 +137,106 @@
 </head>
 <body>
 
-<div class="main-card text-center animate__animated animate__fadeIn">
+<div class="main-card animate__animated animate__fadeIn">
     
     <div class="top-user-bar d-flex justify-content-between align-items-center">
-        <div class="text-end">
+        <div class="text-right">
             <small class="opacity-50 d-block">مرحباً بك،</small>
-            <strong class="text-info small">
+            <strong class="text-info">
                 <i class="bi bi-person-circle"></i> {{ user.username }}
             </strong>
         </div>
         <form action="{% url 'logout' %}" method="post" class="m-0">
             {% csrf_token %}
-            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1" style="font-size: 0.75rem;">
+            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1">
                 <i class="bi bi-box-arrow-right"></i> خروج
             </button>
         </form>
     </div>
 
     <i class="bi bi-mortarboard bg-icon"></i>
-    <h2 class="title">نظام إدارة المدرسة</h2>
+    <h2 class="title text-center">نظام إدارة المدرسة</h2>
     
     <div class="buttons-container">
-        
-        {% if user.is_superuser %}   
-            <a href="{% url 'admin_add_restock' %}" class="btn-custom btn-restock animate__animated animate__pulse animate__infinite animate__slow">
-                <i class="bi bi-plus-square-fill"></i> إضافة وارد للمخزن (مدير)
-            </a>
+        {% if user.is_authenticated %}
+            
+            {# 1. إضافة طالب جديد #}
+            {% if admission_open %}
+                {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                    <a href="{% url 'add_student' %}" class="btn-custom btn-add">
+                        <i class="bi bi-person-plus-fill"></i> إضافة طالب جديد
+                    </a>
+                {% endif %}
+            {% endif %}
 
-            <a href="{% url 'finance_dashboard' %}" class="btn-custom btn-finance animate__animated animate__pulse animate__infinite animate__slow">
-                <i class="bi bi-pie-chart-fill"></i> الداشبورد المالي
-            </a>
+            {# 2. السجل المدني #}
+            {% if user.is_superuser or user.groups.all %}
+                <a href="{% url 'student_registry' %}" class="btn-custom btn-registry">
+                    <i class="bi bi-card-list"></i> السجل المدني للطلاب
+                </a>
+            {% endif %}
 
-            <a href="/admin/" class="btn-custom btn-admin animate__animated animate__pulse animate__infinite animate__slow">
-                <i class="bi bi-shield-lock-fill"></i> لوحة التحكم (Admin)
-            </a>
+            {# 3. إدارة الطلاب المالية وأنظمة التقسيط #}
+            {% if "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or user.is_superuser %}
+                <a href="{% url 'student_list' %}" class="btn-custom btn-students">
+                    <i class="bi bi-people-fill"></i> إدارة الطلاب المالية
+                </a>
+                <a href="{% url 'installment_plan_list' %}" class="btn-custom btn-plans">
+                    <i class="bi bi-clipboard-data-fill"></i> إدارة أنظمة التقسيط
+                </a>
+            {% endif %}
+
+            {# 4. الكتب والزي #}
+            {% if "Finance_Books" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or user.is_superuser %}
+                <a href="{% url 'book_sales_list' %}" class="btn-custom btn-books">
+                    <i class="bi bi-book-half"></i> نظام صرف الكتب والزي
+                </a>
+            {% endif %}
+
+            {# 5. الكورسات #}
+            {% if "Finance_Courses" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or user.is_superuser %}
+                <a href="{% url 'course_prices' %}" class="btn-custom btn-courses">
+                    <i class="bi bi-currency-exchange"></i> قائمة أسعار الكورسات
+                </a>
+            {% endif %}
+            
+            {# 6. الخزينة والتحصيل #}
+            {% if "Finance_Treasury" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or user.is_superuser %}
+                <a href="{% url 'quick_collection' %}" class="btn-custom btn-collection">
+                    <i class="bi bi-cash-coin"></i> شاشة التحصيل والمقبوضات
+                </a>
+                <a href="{% url 'daily_cashier_summary' %}" class="btn-custom btn-treasury">
+                    <i class="bi bi-safe2-fill"></i> جرد وإغلاق الخزينة اليومي
+                </a>
+                <a href="{% url 'finance_dashboard' %}" class="btn-custom btn-finance">
+                    <i class="bi bi-pie-chart-fill"></i> الداشبورد المالي
+                </a>
+                
+                {% if user.is_superuser or user.is_staff %}
+                <a href="{% url 'receipt_books_list' %}" class="btn-custom btn-receipt-books">
+                    <i class="bi bi-journals"></i> سجل دفاتر الإيصالات المرجعية
+                </a>
+                {% endif %}
+            {% endif %}
+
+            {# 7. لوحة التحكم #}
+            {% if user.is_superuser %}
+                <a href="/admin/" class="btn-custom btn-admin mt-2">
+                    <i class="bi bi-shield-lock-fill"></i> لوحة التحكم (Admin)
+                </a>
+            {% endif %}
+
         {% endif %}
-
-        {% if user.is_staff or user.is_superuser %}
-            <a href="{% url 'student_list' %}" class="btn-custom btn-students animate__animated animate__pulse animate__infinite animate__slow">
-                <i class="bi bi-people-fill"></i> إدارة الطلاب الماليه
-            </a>
-
-            <a href="{% url 'book_sales_list' %}" class="btn-custom btn-books animate__animated animate__pulse animate__infinite animate__slow">
-                <i class="bi bi-book-half"></i> نظام صرف الكتب والزي
-            </a>
-
-            <a href="{% url 'daily_cashier_summary' %}" class="btn-custom btn-treasury animate__animated animate__pulse animate__infinite animate__slow">
-                <i class="bi bi-safe2-fill"></i> جرد وإغلاق الخزينة اليومي
-            </a>
-
-            <a href="{% url 'installment_plan_list' %}" class="btn-custom btn-plans animate__animated animate__pulse animate__infinite animate__slow">
-                <i class="bi bi-clipboard-data-fill"></i> إدارة أنظمة التقسيط
-            </a>
-        {% endif %}
-
-        <a href="{% url 'add_student' %}" class="btn-custom btn-add animate__animated animate__pulse animate__infinite animate__slow">
-            <i class="bi bi-person-plus-fill"></i> إضافة طالب جديد
+    </div>
+    <div class="sidebar">
+        <a href="{% url 'students_analytics' %}" class="nav-link text-white py-3 border-bottom border-secondary border-opacity-25">
+            <i class="bi bi-graph-up-arrow me-2 text-info"></i>
+            <span>التحليل الإحصائي العام</span>
         </a>
-
-        <a href="{% url 'student_registry' %}" class="btn-custom btn-registry animate__animated animate__pulse animate__infinite animate__slow">
-            <i class="bi bi-card-list"></i> السجل المدني للطلاب
-        </a>
-
-        <a href="{% url 'course_prices' %}" class="btn-custom btn-courses animate__animated animate__pulse animate__infinite animate__slow">
-            <i class="bi bi-currency-exchange"></i> قائمة أسعار الكورسات
-        </a>
-
     </div>
 
-    <div class="mt-4 pt-2 border-top border-light border-opacity-10">
-        <p class="text-white text-opacity-50 mb-0 small fw-bold">نظام الإدارة المتكامل | 2026</p>
+    <div class="school-footer">
+        TALAAT HARB HOTELIER HIGH SCHOOL | 2026
     </div>
 </div>
 

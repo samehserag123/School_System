@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4" dir="rtl">
+    <!-- هيدر الصفحة (معلومات الجرد) -->
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3 text-right">
+        <div>
+            <h3 class="fw-bold text-white mb-0">🔍 تفاصيل الجرد رقم: {{ closure.closure_id }}</h3>
+            <p class="text-muted mb-0">تم بواسطة الموظف: <span class="text-info fw-bold">{{ closure.closed_by.username }}</span> في {{ closure.closure_date|date:"Y-m-d H:i" }}</p>
+        </div>
+        <a href="{% url 'closures_archive' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-right me-1"></i> العودة للأرشيف
+        </a>
+    </div>
+
+    <div class="row text-right">
+        <!-- الجانب الأيمن: الملخص المالي -->
+        <div class="col-md-4">
+            <div class="card bg-dark border-secondary shadow-sm mb-4">
+                <div class="card-header bg-secondary text-white fw-bold">الملخص المالي للجرد</div>
+                <div class="card-body text-white">
+                    <div class="d-flex justify-content-between mb-3 border-bottom border-secondary pb-2">
+                        <span>المبلغ المفترض (النظام):</span>
+                        <span class="fw-bold">{{ closure.total_cash }} ج.م</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3 border-bottom border-secondary pb-2">
+                        <span>المبلغ الفعلي (العد):</span>
+                        <span class="fw-bold text-info fs-5">{{ closure.actual_cash }} ج.م</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 p-2 rounded {% if closure.variance < 0 %}bg-danger bg-opacity-10{% else %}bg-success bg-opacity-10{% endif %}">
+                        <span class="fw-bold">الفارق (عجز/زيادة):</span>
+                        <span class="fw-bold fs-5 {% if closure.variance < 0 %}text-danger{% else %}text-success{% endif %}">
+                            {{ closure.variance }} ج.م
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-dark border-secondary shadow-sm mb-4">
+                <div class="card-header bg-dark text-info border-secondary fw-bold">ملاحظات الجرد</div>
+                <div class="card-body text-muted small">
+                    {{ closure.notes|default:"لا توجد ملاحظات مسجلة لهذا الجرد."|linebreaks }}
+                </div>
+            </div>
+        </div>
+
+        <!-- الجانب الأيسر: جداول التفاصيل -->
+        <div class="col-md-8">
+            
+            <!-- 1. جدول إيصالات الطلاب (المصروفات الأساسية) -->
+            <div class="card bg-dark border-secondary shadow-sm mb-4">
+                <div class="card-header bg-primary bg-opacity-25 text-white border-secondary d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold"><i class="bi bi-person-badge me-2"></i> 1. إيصالات الطلاب (المصروفات والأنشطة)</h6>
+                    <span class="badge bg-primary">{{ payments.count }} حركة</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0 text-center align-middle">
+                            <thead class="table-secondary text-dark">
+                                <tr>
+                                    <th>رقم الإيصال</th>
+                                    <th>اسم الطالب</th>
+                                    <th>البند</th>
+                                    <th>المبلغ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in payments %}
+                                <tr class="border-bottom border-secondary">
+                                    <td class="text-muted fw-bold">#{{ p.receipt_number|default:p.id }}</td>
+                                    <td class="text-white fw-bold">{{ p.student.get_full_name }}</td>
+                                    <td><span class="badge bg-secondary border">{{ p.revenue_category.name }}</span></td>
+                                    <td class="text-info fw-bold">{{ p.amount_paid }} ج.م</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" class="py-3 text-muted">لا توجد إيصالات طلاب في هذا الجرد.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 🔥 جدول إيرادات الكتب والزي والكورسات (كان مفقوداً) 🔥 -->
+            <div class="card bg-dark border-info shadow-sm mb-4">
+                <div class="card-header bg-info bg-opacity-10 text-info border-info d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold"><i class="bi bi-book-half me-2"></i> 2. مبيعات الكتب، الزي، ومجموعات التقوية</h6>
+                    <span class="badge bg-info text-dark">{{ ledger_entries.count }} حركة</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0 text-center align-middle">
+                            <thead class="table-active text-white">
+                                <tr>
+                                    <th>الطالب</th>
+                                    <th>بند التحصيل</th>
+                                    <th>رقم الإيصال</th>
+                                    <th>المبلغ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in ledger_entries %}
+                                <tr class="border-bottom border-secondary border-opacity-25">
+                                    <td class="text-white">{{ item.student.get_full_name }}</td>
+                                    <td>
+                                        <span class="badge bg-warning text-dark">
+                                            {% if item.category == 'books' %}كتب وباقات
+                                            {% elif item.category == 'كورس' %}مجموعات تقوية
+                                            {% else %}{{ item.category }}{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="text-info font-monospace">{{ item.receipt_number|default:"---" }}</td>
+                                    <td class="fw-bold text-success">{{ item.amount }} ج.م</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" class="py-3 text-muted">لا توجد مبيعات كتب أو كورسات في هذا الجرد.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. جدول المصروفات (كان مفقوداً) -->
+            <div class="card bg-dark border-danger shadow-sm mb-5">
+                <div class="card-header bg-danger bg-opacity-10 text-danger border-danger d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold"><i class="bi bi-cash-stack me-2"></i> 3. المصروفات النقدية الصادرة</h6>
+                    <span class="badge bg-danger">{{ expenses.count }} مصروف</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0 text-center">
+                            <thead class="table-active text-white">
+                                <tr>
+                                    <th>بيان الصرف</th>
+                                    <th>بواسطة</th>
+                                    <th>المبلغ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for exp in expenses %}
+                                <tr>
+                                    <td>{{ exp.title }}</td>
+                                    <td>{{ exp.spent_by.username }}</td>
+                                    <td class="text-danger fw-bold">{{ exp.amount }} ج.م</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="py-3 text-muted">لا توجد مصروفات مسجلة في هذا الجرد.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .card { border-radius: 15px !important; overflow: hidden; }
+    .table-hover tbody tr:hover { background-color: rgba(255,255,255,0.05) !important; transition: 0.3s; }
+    .badge { font-weight: 600; padding: 6px 12px; }
+    @media print {
+        .btn, .navbar, .sidebar { display: none !important; }
+        body { background-color: white !important; color: black !important; }
+        .card { border: 1px solid #ccc !important; background-color: white !important; color: black !important; }
+        .table { color: black !important; }
+        .text-white, .text-info, .text-muted { color: black !important; }
+    }
+</style>
+{% endblock %}

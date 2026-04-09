@@ -24,7 +24,7 @@
                 {% for user in user_summary %}
                 <tr>
                     <td class="py-3">
-                        <span class="fw-bold d-block">{{ user.collected_by__first_name }} {{ user.collected_by__last_name }}</span>
+                        <span class="fw-bold d-block">{{ user.user_display }} {{ user.collected_by__last_name }}</span>
                         <small class="text-muted">@{{ user.collected_by__username }}</small>
                     </td>
                     <td class="py-3 fs-5 fw-bold text-dark">{{ user.total_collected }} ج.م</td>

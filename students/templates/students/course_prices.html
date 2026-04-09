@@ -3,7 +3,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إدارة اشتراكات الطلاب - النسخة المتقدمة</title>
+    <title>نظام المجموعات الاحترافي | النسخة المطورة</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
@@ -11,141 +11,405 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     
     <style>
-        /* تنسيق المكتبة ليتماشى مع تصميمك المظلم */
-        .select2-container--default .select2-selection--single {
-            background-color: rgba(15, 23, 42, 0.8) !important;
-            border: 1px solid rgba(59, 130, 246, 0.5) !important;
-            height: 40px !important;
-            color: white !important;
-        }
-        .select2-container--default .select2-selection--single .select2-selection__rendered {
-            color: white !important;
-            line-height: 40px !important;
+        :root {
+            /* لوحة ألوان ساطعة وعالية التباين - نسخة سامح النهائية */
+            --bg-deep: #000000;          /* جعل الخلفية سوداء صريحة لراحة العين */
+            --card-inner: #020617;       /* لون البطاقة داكن جداً */
+            --form-bg: #000000;          /* لون خلفية الفورم أسود فاحم */
+            --text-main: #e2e8f0;
+            --accent-student: #ffffff;   /* أبيض ناصع للطالب */
+            --accent-teacher: #22c55e;   /* أخضر نيون ساطع للمدرس */
+            --accent-subject: #00d4ff;   /* سماوي كهربائي للمادة */
+            --danger-bright: #ff3131;    /* أحمر صارخ جداً للديون */
+            --success-bright: #39ff14;   /* أخضر فسفوري للمسدد */
         }
 
         body {
-            background: linear-gradient(-45deg, #0f172a, #1e3a8a, #2563eb, #1e40af);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
+            background-color: var(--bg-deep);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(30, 58, 138, 0.2) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(30, 27, 75, 0.2) 0%, transparent 40%);
             font-family: 'Cairo', sans-serif;
             min-height: 100vh;
+            color: var(--text-main);
             padding: 20px;
-            color: #ffffff;
+            line-height: 1.6;
         }
 
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
+        /* تعديل البطاقة الكبيرة ومنطقة الفورم لإزالة الرمادي */
         .container-card {
-            background: rgba(30, 41, 59, 0.85);
-            backdrop-filter: blur(15px);
-            border-radius: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--card-inner);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
             padding: 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.9);
         }
 
-        .form-section {
-            background: rgba(255, 255, 255, 0.05);
+        /* إزالة الخلفية الرمادية من منطقة إضافة الاشتراك */
+        #addEnrollment .card-body {
+            background-color: var(--form-bg) !important;
+            border: 1px solid #1e293b !important;
             border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 30px;
-            border: 1px dashed rgba(59, 130, 246, 0.5);
+            box-shadow: inset 0 0 20px rgba(0,0,0,1);
         }
 
-        .table { color: white; vertical-align: middle; border-collapse: separate; border-spacing: 0 8px; }
-        .table thead th {
-            background: rgba(59, 130, 246, 0.15);
-            color: #60a5fa;
-            border: none;
-            padding: 15px;
+                /* تنسيق الطالب والمادة - محاذاة لليمين وتصغير الخط */
+        /* --- تنسيق عمود الطالب والمادة --- */
+        .student-box {
+            text-align: right !important; /* ضمان المحاذاة لليمين */
+            padding-right: 10px;
+        }
+
+        .student-box .name {
+            color: var(--accent-student) !important;
+            font-weight: 900;
+            font-size: 1.1rem !important; /* تصغير اسم الطالب */
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+            margin-bottom: 2px;
+            display: block;
+        }
+
+        .student-box .subject {
+            color: var(--accent-subject) !important;
+            font-weight: 700;
+            font-size: 0.85rem !important; /* تصغير اسم المادة */
+            background: rgba(0, 212, 255, 0.1) !important;
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+        }
+
+        /* --- تنسيق المدرس (الأخضر النيون) --- */
+        .teacher-pill {
+            background: rgba(34, 197, 94, 0.05) !important;
+            color: var(--accent-teacher) !important;
+            border: 2px solid var(--accent-teacher) !important;
+            font-weight: 800;
+            font-size: 0.9rem;
+            padding: 4px 15px !important;
+            border-radius: 50px;
+        }
+        /* الموقف المالي - الأحمر الصارخ */
+        .debt-alert {
+            color: var(--danger-bright) !important;
+            font-weight: 900;
+            font-size: 1.4rem;
+            display: block;
+            text-shadow: 0 0 10px rgba(255, 49, 49, 0.3);
+        }
+        .paid-ok {
+            color: var(--success-bright);
+            font-weight: 800;
+            background: rgba(57, 255, 20, 0.1);
+            padding: 6px 15px;
+            border-radius: 50px;
+            border: 2px solid var(--success-bright);
+        }
+
+        /* الحصص والتقدم */
+        .session-stats { font-weight: 800; color: #94a3b8; }
+        .session-stats b { color: #fff; font-size: 1.1rem; }
+        .progress { 
+            background-color: #000000; 
+            height: 10px; 
+            border-radius: 20px; 
+            border: 1px solid #1e293b;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+        }
+
+        /* الجدول الإحترافي */
+        .table { --bs-table-bg: transparent; color: var(--text-main); margin-top: 25px; }
+        .table thead th { 
+            color: #64748b; 
+            font-size: 0.9rem; 
+            border-bottom: 2px solid #1e293b; 
             font-weight: 700;
         }
+        .table tbody tr { 
+            border-bottom: 1px solid #0f172a; 
+            vertical-align: middle; 
+            transition: all 0.3s ease;
+        }
+        .table tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
 
-        .table tbody tr {
-            background: rgba(255, 255, 255, 0.03);
-            transition: all 0.3s;
+        /* تحسين أزرار الإجراءات */
+        .btn-success { background-color: #10b981; border: none; font-weight: 800; }
+        .btn-outline-info { border-width: 2px; font-weight: 700; }
+
+        /* --- نظام Select2 المطور (أسود فاحم + أبيض ناصع) --- */
+        
+        /* 1. القائمة المفتوحة */
+        /* --- نظام القوائم السوداء الموحد (المدرس، الباقة، الطالب) --- */
+
+/* 1. القائمة المفتوحة */
+        .select2-dropdown {
+            background-color: #000000 !important;
+            border: 1px solid #38bdf8 !important;
         }
 
-        .table tbody tr:hover { 
-            background: rgba(255, 255, 255, 0.08);
+        /* 2. صندوق البحث داخل القائمة */
+        .select2-container--default .select2-search--dropdown .select2-search__field {
+            background-color: #050505 !important;
+            border: 1px solid #1e293b !important;
+            color: #ffffff !important;
+        }
+
+        /* 3. الخيارات العادية */
+        .select2-container--default .select2-results__option {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            border-bottom: 1px solid #0f172a;
+            padding: 10px 15px !important;
+            padding: 4px 12px !important; /* تقليل التباعد الرأسي من 10 إلى 4 */
+            line-height: 1.1 !important;  /* ضغط الأسطر لتقليل الارتفاع الكلي */
+        }
+
+        /* 4. خيار الماوس (التظليل السماوي المضيء) */
+        .select2-container--default .select2-results__option--highlighted[aria-selected] {
+            background-color: #38bdf8 !important;
+            color: #000000 !important;
+            font-weight: 900 !important;
+        }
+
+        /* 5. الصناديق وهي مغلقة */
+        .select2-container--default .select2-selection--single {
+            background-color: #000000 !important;
+            border: 2px solid #334155 !important;
+            height: 40px !important; /* توحيد الارتفاع مع حقل الحصص */
+            border-radius: 10px !important;
+            display: flex !important;
+            align-items: center !important; /* توسيط المحتوى رأسياً */
+            overflow: hidden !important; 
+        }
+        
+        .select2-selection__rendered .student-info-small {
+            font-size: 7px !important; 
+           margin-top: 0px !important;
+            opacity: 0.6;
+        }
+        /* 6. النص المختار داخل الصندوق */
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            color: #ffffff !important;
+            font-weight: 800 !important;
+            padding-right: 15px !important;
+            font-size: 0.85rem !important; /* تصغير الخط قليلاً ليتناسب مع المساحة */
+            line-height: 1.2 !important;   /* تقليل المسافة بين السطور داخل الصندوق */
+            display: block !important;
+        }
+
+        /* 7. سهم القائمة */
+        .select2-container--default .select2-selection--single .select2-selection__arrow b {
+            border-color: #ffffff transparent transparent transparent !important;
+        }
+        
+        /* 8. حقل إجمالي الحصص (تنسيق مخصص وواضح جداً) */
+        input[name="total_sessions"], 
+        input#id_total_sessions {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            border: 2px solid #38bdf8 !important;
+            height: 45px !important;
+            border-radius: 10px !important;
+            font-weight: 900 !important;
+            text-align: center !important;
+            display: block !important;
+            visibility: visible !important;
+        }
+
+        /* حالة الوقوف على الحقل للكتابة */
+        input[name="total_sessions"]:focus {
+            border-color: #39ff14 !important; /* يتحول للأخضر عند الكتابة */
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.5) !important;
+        }
+
+        /* تحسين شكل التسمية (Label) فوق الخانة */
+        label[for="id_total_sessions"], 
+        .form-label {
+            color: #94a3b8 !important;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: block;
+        }
+                /* --- تطوير نظام الترقيم (Pagination) الاحترافي --- */
+        .pagination-container {
+            margin-top: 30px;
+            padding: 20px 0;
+            border-top: 1px solid #1e293b;
+            display: flex;
+            justify-content: center;
+        }
+
+        .pagination {
+            gap: 8px; /* مسافة بين الأزرار */
+        }
+
+        .pagination .page-link {
+            background-color: #000000 !important; /* أسود فاحم */
+            color: #ffffff !important;           /* نص أبيض */
+            border: 1px solid #334155 !important;
+            border-radius: 8px !important;
+            padding: 8px 16px;
+            font-weight: 700;
+            transition: all 0.3s ease;
+        }
+
+        /* حالة الصفحة النشطة (الحالية) */
+        .pagination .page-item.active .page-link {
+            background-color: #38bdf8 !important; /* سماوي ساطع */
+            color: #000000 !important;           /* نص أسود لتباين فائق */
+            border-color: #38bdf8 !important;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+        }
+
+        /* عند مرور الماوس على الأرقام */
+        .pagination .page-link:hover {
+            background-color: #1e293b !important;
+            border-color: #38bdf8 !important;
             transform: translateY(-2px);
         }
 
-        .btn-collect {
-            background: #f59e0b;
-            color: #000;
-            border: none;
-            font-weight: 800;
-            padding: 6px 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+        /* أزرار السابق والتالي */
+        .pagination .page-item:first-child .page-link,
+        .pagination .page-item:last-child .page-link {
+            background-color: #0f172a !important;
+            color: #38bdf8 !important;
+            font-size: 1.1rem;
         }
 
-        select, input, textarea {
-            background-color: rgba(15, 23, 42, 0.8) !important;
-            color: #fff !important;
-            border: 1px solid rgba(59, 130, 246, 0.4) !important;
-            border-radius: 10px !important;
+        /* حالة التعطيل (Disabled) */
+        .pagination .page-item.disabled .page-link {
+            background-color: #020617 !important;
+            color: #334155 !important;
+            border-color: #1e293b !important;
+            opacity: 0.5;
+        }
+        #tableSearch::placeholder {
+        color: rgba(255, 255, 255, 0.3);
+        font-size: 0.9rem;
         }
 
-        .filter-highlight {
-            border: 2px solid #fbbf24 !important;
-            animation: pulse 1s;
-        }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+        #tableSearch:focus {
+            border-color: var(--accent-subject) !important;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.2) !important;
+            outline: none;
         }
     </style>
 </head>
 <body>
 
-<div class="container mt-2">
+<div class="container-fluid">
     <div class="container-card">
-        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
-            <h2 class="fw-900 text-info m-0"> <i class="bi bi-person-check-fill"></i> نظام تسجيل الاشتراكات</h2>
-            <a href="{% url 'home' %}" class="btn btn-outline-light rounded-pill px-4">
-                <i class="bi bi-house"></i> الرئيسية
-            </a>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-900 m-0" style="color: #60a5fa;"><i class="bi bi-shield-check me-2"></i> لوحة تحكم المجموعات</h2>
+            <button class="btn btn-primary fw-bold rounded-pill px-4 shadow-sm" data-bs-toggle="collapse" data-bs-target="#addEnrollment">
+                <i class="bi bi-plus-lg me-1"></i> اشتراك جديد
+            </button>
         </div>
 
-        <div class="form-section">
-            <form method="POST" class="row g-3">
-                {% csrf_token %}
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold"><i class="bi bi-person"></i> اختيار الطالب</label>
-                    {{ form.student }}
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold text-warning"><i class="bi bi-person-badge"></i> 1. اختر المدرس</label>
-                    {{ form.teacher }} </div>
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold text-info"><i class="bi bi-book"></i> 2. المادة / النوع / السعر</label>
-                    {{ form.course_info }}
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button type="submit" class="btn btn-success w-100 fw-bold shadow">
-                        <i class="bi bi-plus-lg"></i> حفظ الاشتراك
-                    </button>
-                </div>
-            </form>
+        <div class="collapse mb-4" id="addEnrollment">
+            <div class="card card-body bg-black border-secondary rounded-4 shadow-lg">
+                <form method="POST" class="row g-3">
+                    {% csrf_token %}
+                    
+                    <div class="col-md-12 mb-2">
+                        <div class="form-check form-switch p-2 rounded-3 border border-secondary border-opacity-25" style="background: rgba(255, 193, 7, 0.05);">
+                            <input class="form-check-input ms-0" type="checkbox" id="flexSwitchExternal" name="is_external" style="cursor: pointer; transform: scale(1.2);">
+                            <label class="form-check-label text-warning fw-bold me-4" for="flexSwitchExternal" style="cursor: pointer;">
+                                <i class="bi bi-person-plus-fill me-1"></i> تسجيل طالب جديد من خارج المدرسة
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="external_fields" style="display: none;" class="row g-3 mb-3 border-bottom border-secondary border-opacity-10 pb-3 mx-0">
+                        <div class="col-md-8"> 
+                            <label class="form-label small fw-bold text-info">اسم الطالب الخارجي</label>
+                            <input type="text" name="ext_name" class="form-control bg-black text-white border-secondary" placeholder="الاسم الرباعي بالكامل">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-info">رقم التليفون</label>
+                            <input type="text" name="ext_phone" class="form-control bg-black text-white border-secondary" placeholder="01xxxxxxxxx">
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-secondary">اختيار الطالب</label>
+                        {{ form.student }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-secondary">المدرس</label>
+                        {{ form.teacher }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-secondary">المادة / الباقة</label>
+                        {{ form.course_info }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-info">
+                            <i class="bi bi-hash"></i> إجمالي الحصص
+                        </label>
+                        {{ form.total_sessions }}
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success w-100 fw-bold">تأكيد الاشتراك</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
-        <div class="row mb-3 align-items-center bg-dark bg-opacity-25 p-3 rounded-4 mx-1">
-            <div class="col-md-5">
-                <div class="input-group">
-                    <span class="input-group-text bg-primary border-0 text-white"><i class="bi bi-filter-left"></i></span>
-                    <input type="text" id="studentSearch" class="form-control" placeholder="ابحث باسم الطالب هنا للفلترة السريعة...">
+        <div class="row g-3 mb-4 text-center">
+            <div class="col-md-4">
+                <div class="p-3 rounded-4 border border-info border-opacity-25 shadow-lg h-100" style="background: #000; border-right: 5px solid #00d4ff !important;">
+                    <div class="small text-secondary fw-bold mb-1">
+                        {% if current_filter == 'today' %}إيراد اليوم (المطلوب){% else %}إجمالي الإيراد للفترة{% endif %}
+                    </div>
+                    <div class="fs-2 fw-900 text-info">{{ total_revenue }} <small class="fs-6">ج.م</small></div>
                 </div>
             </div>
-            <div class="col-md-7 text-start">
-                <span class="text-white-50 small">إجمالي المسجلين: <strong>{{ courses.count }}</strong> طالب</span>
+            <div class="col-md-4">
+                <div class="p-3 rounded-4 border border-success border-opacity-25 shadow-lg h-100" style="background: #000; border-right: 5px solid #39ff14 !important;">
+                    <div class="small text-secondary fw-bold mb-1">التحصيل الفعلي (كاش)</div>
+                    <div class="fs-2 fw-900" style="color: #39ff14;">{{ total_collected }} <small class="fs-6">ج.م</small></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-3 rounded-4 border border-danger border-opacity-25 shadow-lg h-100" style="background: #000; border-right: 5px solid #ff3131 !important;">
+                    <div class="small text-secondary fw-bold mb-1">باقي لم يُحصل</div>
+                    <div class="fs-2 fw-900" style="color: #ff3131;">{{ total_remaining }} <small class="fs-6">ج.م</small></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <div class="input-group shadow-sm">
+                <span class="input-group-text bg-black border-secondary text-info">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="text" id="tableSearch" class="form-control bg-black text-white border-secondary py-2" 
+                       placeholder="بحث سريع باسم الطالب أو المادة أو المدرس داخل الجدول..." 
+                       style="font-weight: 700;">
+            </div>
+        </div>
+
+        <div class="mb-4 bg-black p-3 rounded-4 border border-secondary border-opacity-25 shadow-lg">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="text-secondary align-self-center me-2 small fw-bold"><i class="bi bi-funnel-fill text-info"></i> تصفية:</span>
+                    <a href="?time_filter=all" class="btn btn-sm {% if not current_filter or current_filter == 'all' %}btn-info text-dark{% else %}btn-outline-secondary text-white{% endif %} rounded-pill px-3 fw-bold">الكل</a>
+                    <a href="?time_filter=today" class="btn btn-sm {% if current_filter == 'today' %}btn-info text-dark{% else %}btn-outline-secondary text-white{% endif %} rounded-pill px-3 fw-bold">اليوم</a>
+                    <a href="?time_filter=month" class="btn btn-sm {% if current_filter == 'month' %}btn-info text-dark{% else %}btn-outline-secondary text-white{% endif %} rounded-pill px-3 fw-bold">آخر شهر</a>
+                    <a href="?time_filter=year" class="btn btn-sm {% if current_filter == 'year' %}btn-info text-dark{% else %}btn-outline-secondary text-white{% endif %} rounded-pill px-3 fw-bold">آخر عام</a>
+                </div>
+                <form method="GET" class="d-flex align-items-center gap-2 border-start border-secondary ps-3 border-opacity-25">
+                    <span class="small fw-bold text-white-50">فترة:</span>
+                    <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm bg-dark text-white border-secondary" style="width: 135px;">
+                    <span class="text-white">-</span>
+                    <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm bg-dark text-white border-secondary" style="width: 135px;">
+                    <button type="submit" class="btn btn-sm btn-info text-dark fw-bold rounded-pill px-3">تطبيق</button>
+                </form>
             </div>
         </div>
 
@@ -153,106 +417,189 @@
             <table class="table" id="mainTable">
                 <thead>
                     <tr class="text-center">
-                        <th>التاريخ</th>
-                        <th class="text-start">الطالب</th>
-                        <th>الصف</th>
-                        <th>المدرس</th>
-                        <th>المادة</th>
-                        <th>المتبقي</th>
-                        <th>العمليات</th>
+                        <th class="text-start">الطالب والمادة الدراسية</th>
+                        <th>المدرس المسؤول</th>
+                        <th>رصيد الحصص</th>
+                        <th>الموقف المالي</th>
+                        <th>الإجراءات</th>
                     </tr>
                 </thead>
-                <tbody class="text-center">
+                <tbody>
                     {% for course in courses %}
-                    <tr>
-                        <td class="small text-white-50">{{ course.registration_date|date:"Y-m-d" }}</td>
-                        <td class="fw-bold text-info text-start">{{ course.student }}</td>
-                        <td><span class="badge bg-primary bg-opacity-25 text-info border border-info">{{ course.course_info.grade.name }}</span></td>
-                        <td>{{ course.course_info.teacher.name }}</td>
-                        <td>{{ course.course_info.subject.name }}</td>
-                        <td class="fw-bold">
+                        <tr class="text-center">
+                            <td class="text-end py-3" style="width: 25%;"> 
+                                <div class="student-box px-2">
+                                    <div class="name" style="font-size: 1.1rem; margin-bottom: 2px;">
+                                        {% if course.student %}
+                                            <a href="{% url 'student_analytics_detail' course.student.id %}" class="text-decoration-none text-white fw-bold">
+                                                {{ course.student.get_full_name }}
+                                            </a>
+                                            <div class="student-info-small" style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">
+                                                <span class="me-2"><i class="bi bi-hash text-info"></i> كود: {{ course.student.student_code }}</span>
+                                                <span><i class="bi bi-card-text text-warning"></i> قومي: {{ course.student.national_id }}</span>
+                                            </div>
+                                        {% elif course.external_student %}
+                                            <span class="text-info fw-bold">{{ course.external_student.full_name }}</span>
+                                            <span class="badge bg-warning text-dark ms-1" style="font-size: 0.65rem;">خارجي</span>
+                                            <div class="small text-secondary">{{ course.external_student.phone_number }}</div>
+                                        {% else %}
+                                            <span class="text-secondary small">غير محدد</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="subject" style="font-size: 0.85rem; opacity: 0.9;">
+                                        مادة: {{ course.course_info.subject.name }}
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="badge teacher-pill">{{ course.course_info.teacher.name }}</span></td>
+                            <td style="min-width: 160px;">
+                                <div class="session-stats mb-1 small text-end">
+                                    <span>حضر <b>{{ course.attended_sessions_count }}</b> من {{ course.total_sessions }}</span>
+                                </div>
+                                <div class="progress"><div class="progress-bar bg-info" style="width: {% widthratio course.attended_sessions_count course.total_sessions 100 %}%"></div></div>
+                                <small class="text-secondary mt-1 d-block text-start">باقي {{ course.remaining_sessions }} حصة</small>
+                            </td>
+                        <td>
                             {% if course.remaining_amount <= 0 %}
-                                <span class="text-success small"><i class="bi bi-patch-check"></i> خالص</span>
+                                <span class="paid-ok"><i class="bi bi-check2-circle"></i> مسدد</span>
                             {% else %}
-                                <span class="text-danger fs-5">{{ course.remaining_amount }}</span> <small class="text-danger">ج.م</small>
+                                <span class="debt-alert">{{ course.remaining_amount }}</span>
+                                <a href="{% url 'collect_fee' course.id %}" class="btn btn-link btn-sm text-warning p-0 text-decoration-none">تحصيل سريع</a>
                             {% endif %}
                         </td>
                         <td>
-                            {% if course.remaining_amount > 0 %}
-                                <a href="{% url 'collect_fee' course.id %}" class="btn-collect">
-                                    <i class="bi bi-wallet2"></i> تحصيل
-                                </a>
-                            {% else %}
-                                <i class="bi bi-check-circle-fill text-success fs-5"></i>
-                            {% endif %}
+                            <div class="d-flex justify-content-center gap-1">
+                                <button class="btn btn-success btn-sm px-3 fw-bold" onclick="markAttendance(this, {{ course.id }})" {% if course.remaining_sessions <= 0 %}disabled{% endif %}>تحضير</button>
+                                <button class="btn btn-outline-info btn-sm" onclick="showHistory({{ course.id }}, '{{ course.student.get_full_name }}')"><i class="bi bi-clock-history"></i></button>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="7" class="py-5 text-white-50">لا توجد اشتراكات مسجلة حالياً</td></tr>
+                    <tr><td colspan="5" class="py-5 text-center text-secondary">لا توجد سجلات حالياً</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        {% if courses.has_other_pages %}
+        <div class="pagination-container">
+            <nav>
+                <ul class="pagination">
+                    {% if courses.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?page={{ courses.previous_page_number }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">السابق</a></li>
+                    {% endif %}
+                    {% for i in courses.paginator.page_range %}
+                        <li class="page-item {% if courses.number == i %}active{% endif %}">
+                            <a class="page-link" href="?page={{ i }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ i }}</a>
+                        </li>
+                    {% endfor %}
+                    {% if courses.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ courses.next_page_number }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">التالي</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary shadow-lg">
+            <div class="modal-header border-secondary p-3">
+                <h6 class="modal-title text-info" id="historyTitle">تاريخ الحصص</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="historyBody"></div>
         </div>
     </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     $(document).ready(function() {
-        // 1. تحويل اختيار الطالب لمحرك بحث (لحل مشكلة الـ 1000 طالب)
-        $('select[name="student"]').select2({
-            placeholder: "اكتب اسم الطالب للبحث عنه...",
-            allowClear: true,
-            dir: "rtl"
+        // 1. تفعيل التصميم الموحد لجميع القوائم داخل حاوية الاشتراك (المدرس، الباقة، الطالب)
+        $('#addEnrollment select').select2({ 
+            width: '100%', 
+            dir: 'rtl', 
+            dropdownParent: $('#addEnrollment'),
+            escapeMarkup: function(m) { return m; }
         });
 
-        // 2. فلتر البحث السريع عن الطالب في الجدول (الأسفل)
-        document.getElementById('studentSearch').addEventListener('keyup', function() {
-            let searchValue = this.value.toLowerCase();
-            let rows = document.querySelectorAll('#mainTable tbody tr');
-            
-            rows.forEach(row => {
-                let studentName = row.cells[1].textContent.toLowerCase();
-                row.style.display = studentName.includes(searchValue) ? '' : 'none';
-            });
+        // 2. تخصيص حقل الطالب تحديدا لدعم البحث المطور (اسم | كود | قومي) وتنسيق العرض
+        $('select[name="student"]').select2({ 
+            width: '100%', 
+            dir: 'rtl', 
+            placeholder: "ابحث بالاسم، الكود، أو الرقم القومي...",
+            dropdownParent: $('#addEnrollment'),
+            escapeMarkup: function(m) { return m; }, 
+            templateResult: formatStudentOption,    
+            templateSelection: formatStudentOption, 
+            matcher: modelMatcher // استخدام دالة البحث المتطورة المحددة أدناه
         });
 
-        // 3. فلتر المدرس المعتمد واختيار المادة تلقائياً
-        const teacherSelect = document.querySelector('select[name="teacher"]');
-        const courseSelect = document.querySelector('select[name="course_info"]');
+        // دالة البحث من أول حرف (للطالب)
+        function modelMatcher(params, data) {
+            if ($.trim(params.term) === '') { return data; }
+            if (typeof data.text === 'undefined') { return null; }
+            var searchTerm = params.term.toLowerCase().trim();
+            var dataParts = data.text.toLowerCase().split('|');
 
-        if(teacherSelect && courseSelect) {
-            const originalOptions = Array.from(courseSelect.options);
-
-            teacherSelect.addEventListener('change', function() {
-                const selectedTeacher = this.options[this.selectedIndex].text;
-                
-                courseSelect.classList.add('filter-highlight');
-                setTimeout(() => courseSelect.classList.remove('filter-highlight'), 1000);
-
-                courseSelect.innerHTML = '';
-
-                // فلترة الخيارات التي تخص المدرس المختار فقط
-                originalOptions.forEach(option => {
-                    if (option.value === "" || option.text.includes(selectedTeacher)) {
-                        courseSelect.appendChild(option.cloneNode(true));
-                    }
-                });
-
-                // --- الإضافة الذكية ---
-                // لو المدرس عنده خيار واحد فقط (مادة واحدة)، اختارها تلقائياً
-                if (courseSelect.options.length === 2) { 
-                    courseSelect.selectedIndex = 1; 
-                } else {
-                    courseSelect.value = ""; 
-                }
+            var matchFound = dataParts.some(function(part) {
+                return part.trim().indexOf(searchTerm) === 0;
             });
+
+            if (matchFound) { return data; }
+            return null;
         }
+
+        // دالة التنسيق لعرض الكود والقومي بخط صغير أسفل الاسم
+        function formatStudentOption(state) {
+            if (!state.id) return state.text;
+
+            var parts = state.text.split('|');
+            var name = parts[0] ? parts[0].trim() : state.text;
+            var code = parts[1] ? parts[1].trim() : "---";
+            var nationalId = parts[2] ? parts[2].trim() : "---";
+
+            return `
+                <div class="d-flex flex-column py-1 text-end">
+                    <div class="fw-bold text-white mb-1" style="font-size: 0.95rem;">${name}</div>
+                    <div class="d-flex gap-3" style="font-size: 11px; opacity: 0.8;">
+                        <span class="text-info"><i class="bi bi-hash"></i> كود: ${code}</span>
+                        <span class="text-warning"><i class="bi bi-card-text"></i> قومي: ${nationalId}</span>
+                    </div>
+                </div>`;
+        }
+
+        // 3. البحث السريع داخل الجدول السفلي
+        $("#tableSearch").on("keyup", function() {
+            var value = $(this).val().toLowerCase();
+            $("#mainTable tbody tr").filter(function() {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+            });
+        });
+
+        // 4. التبديل بين الطالب المسجل والخارجي
+        $('#flexSwitchExternal').on('change', function() {
+            const fields = $('#external_fields');
+            const studentSelect = $('select[name="student"]');
+            const studentContainer = studentSelect.closest('.col-md-3');
+
+            if(this.checked) {
+                fields.slideDown(300);
+                studentSelect.prop('disabled', true).val(null).trigger('change');
+                studentContainer.css({'opacity': '0.3', 'pointer-events': 'none'});
+            } else {
+                fields.slideUp(300);
+                studentSelect.prop('disabled', false).trigger('change');
+                studentContainer.css({'opacity': '1', 'pointer-events': 'auto'});
+            }
+        });
     });
 </script>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

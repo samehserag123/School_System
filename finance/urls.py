@@ -25,6 +25,8 @@ urlpatterns = [
     path('receipt/<int:payment_id>/', views.print_receipt, name='print_receipt'),
     path('student/<int:student_id>/print-statement/', views.student_statement_print, name='student_statement_print'),
     path('student/<int:student_id>/settle-debt/', views.pay_old_debt, name='settle_old_debt'),
+    path('receipt-books/', views.receipt_books_list, name='receipt_books_list'),
+    path('receipt-books/<int:book_id>/', views.receipt_book_detail, name='receipt_book_detail'),
 
     # 🎓 شؤون الطلاب والترقية
     path('students/bulk-promote/', views.bulk_promote_students, name='bulk_promote'),
@@ -35,4 +37,11 @@ urlpatterns = [
     path('trigger-closure/', views.trigger_daily_closure, name='trigger_daily_closure'),
     path('payments-archive/', views.payments_archive, name='payments_archive'),
     path('student/<int:student_id>/finance/', views.student_finance_detail, name='student_finance_detail'),
+    # ... الروابط السابقة ...
+    
+    # 🔒 إغلاق الحسابات والخزينة (تأكد من إضافة هذه الأسطر)
+    path('close-accounts/', views.close_daily_accounts_view, name='close_daily_accounts_view'),
+    path('expenses/add/', views.add_expense_view, name='add_expense_view'), # <--- السطر المطلوب لحل الخطأ الحالي
+    path('closures-archive/', views.daily_closures_archive, name='closures_archive'),
+    path('closure/<str:closure_id>/', views.closure_detail, name='closure_detail'),
 ]

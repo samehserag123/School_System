@@ -10,6 +10,20 @@ from .models import CoursePayment
 from django.urls import reverse
 from .models import BookSale
 
+from .models import SystemSettings
+
+@admin.register(SystemSettings)
+class SystemSettingsAdmin(admin.ModelAdmin):
+    list_display = ('is_admission_open',)
+    
+    # يمنع إضافة سجل جديد لأننا نملك السجل رقم 1 بالفعل
+    def has_add_permission(self, request):
+        return False
+
+    # يمنع حذف السجل الوحيد لضمان استقرار النظام
+    def has_delete_permission(self, request, obj=None):
+        return False
+    
 # 1. تسجيل المواد الدراسية
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):

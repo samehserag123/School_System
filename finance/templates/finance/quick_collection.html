@@ -1,44 +1,38 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}التحصيل السريع - نظام الإدارة{% endblock %}
+{% block title %}إدارة المقبوضات النقدية - نظام الإدارة{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid" dir="rtl">
     <div class="row justify-content-center">
         <div class="col-xl-10">
             <div class="card shadow-sm border-0 bg-dark text-white mb-4 border-bottom border-info border-3">
                 <div class="card-body py-3">
-                    <form method="GET" id="filterForm" class="row g-3 align-items-center">
-                        <div class="col-md-5">
-                            <select name="academic_year" class="form-select bg-dark text-white border-secondary" onchange="this.form.submit()">
-                                <option value="">السنة الدراسية...</option>
+                    <form method="GET" id="filterForm" class="row g-3 align-items-center text-right">
+                        <div class="col-md-3">
+                            <label class="small text-white-50 d-block mb-1">السنة الدراسية:</label>
+                            <select name="academic_year" class="form-select bg-dark text-white border-secondary shadow-none" onchange="this.form.submit()">
+                                <option value="">كل السنوات...</option>
                                 {% for y in years %}
                                     <option value="{{ y.id }}" {% if selected_year == y.id|stringformat:"i" %}selected{% endif %}>{{ y.name }}</option>
                                 {% endfor %}
                             </select>
-                            <select name="student" id="id_student" class="form-control" required>
-                            <option value="">اختر الطالب...</option>
-                            
-                            {% for s in students %}
-                                <option value="{{ s.id }}" {% if selected_student_id == s.id|stringformat:"s" %}selected{% endif %}>
-                                    {{ s.get_full_name }} 
-                                    {% if s.student_code %}({{ s.student_code }}){% endif %}
-                                </option>
-                            {% endfor %}
-                            
-                        </select>
                         </div>
-                        <div class="col-md-5">
-                            <select name="grade" class="form-select bg-dark text-white border-secondary" onchange="this.form.submit()">
-                                <option value="">الصف الدراسي...</option>
-                                {% for grade in grades %}
-                                    <option value="{{ grade.id }}" {% if selected_grade == grade.id|stringformat:"i" %}selected{% endif %}>{{ grade.name }}</option>
+                        <div class="col-md-6">
+                            <label class="small text-white-50 d-block mb-1">بحث سريع بالطلاب:</label>
+                            <select name="student" id="id_student_filter" class="form-control">
+                                <option value="">اختر الطالب للتحصيل المباشر...</option>
+                                {% for s in students %}
+                                    <option value="{{ s.id }}" {% if selected_student_id == s.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ s.get_full_name }} 
+                                        {% if s.student_code %}({{ s.student_code }}){% endif %}
+                                    </option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <a href="{% url 'quick_collection' %}" class="btn btn-outline-light w-100">إعادة ضبط</a>
+                        <div class="col-md-3 text-end pt-3">
+                            <a href="{% url 'quick_collection' %}" class="btn btn-outline-light w-100 btn-sm">إعادة ضبط الفلاتر</a>
                         </div>
                     </form>
                 </div>
@@ -46,67 +40,83 @@
 
             <div class="card shadow border-0 bg-dark text-white" style="border-radius: 20px;">
                 <div class="card-header bg-primary p-3">
-                    <h5 class="mb-0 fw-bold"><i class="bi bi-shield-fill-check me-2"></i> استلام نقدية من طالب</h5>
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-receipt me-2"></i> إدارة المقبوضات النقدية وإصدار السندات</h5>
                 </div>
                 <div class="card-body p-4">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
                     <form method="POST" id="mainPaymentForm">
                         {% csrf_token %}
-                        <div class="mb-4">
-                            <label class="form-label text-info fw-bold">اسم الطالب:</label>
+                        <div class="mb-4 text-right">
+                            <label class="form-label text-info fw-bold">اسم الطالب (المستلم منه):</label>
                             <select name="student" id="id_student" class="form-control" required>
-                            <option value="">اختر الطالب...</option>
-                            {% for s in students %}
-                                <option value="{{ s.id }}" {% if selected_student_id == s.id|stringformat:"s" %}selected{% endif %}>
-                                    {# هنا نستخدم الفلاتر للتخلص من None تماماً #}
-                                    {{ s.first_name|default:"" }} {{ s.last_name|default:"" }} 
-                                    ({{ s.student_code|default:"0000" }})
-                                </option>
-                            {% endfor %}
-                        </select>
+                                <option value="">-- اختر الطالب لبدء التحصيل --</option>
+                                {% for s in students %}
+                                    <option value="{{ s.id }}" {% if selected_student_id == s.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ s.get_full_name }} 
+                                        ({{ s.student_code|default:"0000" }})
+                                    </option>
+                                {% endfor %}
+                            </select>
                         </div>
 
                         <div id="arrears_container" class="mb-4" style="display: none;">
                             <div class="row g-3">
-                                <div class="col-md-6">
-                                    <div class="card bg-danger bg-opacity-10 border-danger border-start border-4 text-center p-3">
-                                        <small class="text-white-50">المستحق دفعه الآن</small>
+                                <div class="col-md-6 text-right">
+                                    <div class="card bg-danger bg-opacity-10 border-danger border-start border-4 p-3 h-100 shadow-sm">
+                                        <small class="text-white-50 d-block mb-1">المستحق دفعه (متأخرات):</small>
                                         <h4 id="current_due" class="text-danger fw-bold mb-0">0.00</h4>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="card bg-info bg-opacity-10 border-info border-start border-4 text-center p-3">
-                                        <small class="text-white-50">إجمالي المديونية</small>
+                                <div class="col-md-6 text-right">
+                                    <div class="card bg-info bg-opacity-10 border-info border-start border-4 p-3 h-100 shadow-sm">
+                                        <small class="text-white-50 d-block mb-1">إجمالي مديونية الطالب المتبقية:</small>
                                         <h4 id="total_debt" class="text-info fw-bold mb-0">0.00</h4>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                    <label class="form-label text-info fw-bold">بند التحصيل:</label>
-                                    <select name="category" id="id_category" class="form-select shadow-sm border-secondary bg-dark text-info fw-bold" required>
-                                        <option value="" class="text-white">-- اختر الفئة --</option>
-                                        {% for cat in categories %}
-                                            <option value="{{ cat.id }}" 
-                                                {% if default_category and cat.id == default_category.id %}selected{% endif %}>
-                                                {{ cat.name }}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-info fw-bold">المبلغ:</label>
-                                <input type="number" name="amount" id="id_amount" class="form-control bg-dark text-success fw-bold border-secondary" placeholder="0.00" step="0.01" required>
+                        <div class="row text-right">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-warning fw-bold">رقم الإيصال (مرجعي):</label>
+                                {% if active_book %}
+                                    <input type="number" name="receipt_number" id="id_receipt_number" class="form-control bg-dark text-warning fw-bold border-warning fs-5 text-center" value="{{ next_serial }}" readonly required>
+                                    <small class="text-success small"><i class="bi bi-check-circle-fill"></i> السيريال المرجعي متاح</small>
+                                {% else %}
+                                    <input type="text" id="id_receipt_number" class="form-control bg-dark text-danger fw-bold border-danger text-center fs-5" placeholder="لا يوجد دفتر" disabled>
+                                    <small class="text-danger fw-bold small"><i class="bi bi-exclamation-triangle"></i> ليس لديك عهدة نشطة حالياً!</small>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-info fw-bold">بند التحصيل:</label>
+                                <select name="category" id="id_category" class="form-select bg-dark text-info fw-bold border-secondary shadow-none" required>
+                                    <option value="">-- اختر الفئة --</option>
+                                    {% for cat in categories %}
+                                        <option value="{{ cat.id }}" {% if default_category.id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div id="category_hint" class="small mt-1 fw-bold" style="display: none;"></div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-success fw-bold">المبلغ المحصل:</label>
+                                <input type="number" name="amount" id="id_amount" class="form-control bg-dark text-success fw-bold border-secondary fs-5" placeholder="0.00" step="0.01" required>
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label text-info fw-bold">ملاحظات:</label>
-                            <textarea name="notes" id="id_notes" class="form-control bg-dark text-white border-secondary" rows="2"></textarea>
+                        <div class="mb-3 text-right">
+                            <label class="form-label text-info fw-bold">ملاحظات (اختياري):</label>
+                            <textarea name="notes" id="id_notes" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="اكتب ملاحظاتك هنا..."></textarea>
                         </div>
 
-                        <button type="button" class="btn btn-info w-100 btn-lg fw-bold text-dark mt-3" onclick="handlePreview()">
+                        <button type="button" id="btnPreview" class="btn btn-info w-100 btn-lg fw-bold text-dark mt-3 shadow" onclick="handlePreview()">
                             <i class="bi bi-printer-fill me-2"></i> مراجعة وحفظ العملية
                         </button>
                     </form>
@@ -117,20 +127,22 @@
 </div>
 
 <div class="modal fade" id="previewModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-light text-dark">
+    <div class="modal-dialog modal-dialog-centered text-right text-dark">
+        <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title">تأكيد عملية التحصيل</h5>
+                <h5 class="modal-title fw-bold">تأكيد بيانات السند المالي</h5>
             </div>
-            <div class="modal-body p-4">
-                <p>الطالب: <strong id="p_student"></strong></p>
-                <p>المبلغ: <strong id="p_amount" class="text-success"></strong></p>
-                <p>البند: <strong id="p_category"></strong></p>
-                <p id="p_notes_wrapper">ملاحظات: <span id="p_notes"></span></p>
+            <div class="modal-body p-4" dir="rtl">
+                <p class="mb-2 border-bottom pb-2">الطالب: <strong id="p_student" class="text-primary fs-5"></strong></p>
+                <p class="mb-2 border-bottom pb-2">المبلغ الصافي: <strong id="p_amount" class="text-success fs-4"></strong></p>
+                <p class="mb-2 border-bottom pb-2">بند الإيراد: <strong id="p_category" class="text-info"></strong></p>
+                <div class="bg-warning bg-opacity-10 p-2 rounded mt-3 border border-warning border-opacity-25 text-dark">
+                    <p id="p_notes_wrapper" class="mb-0 small text-dark">ملاحظات ورقم السيريال: <span id="p_notes" class="fw-bold"></span></p>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">تعديل</button>
-                <button type="button" class="btn btn-primary" onclick="document.getElementById('mainPaymentForm').submit();">تأكيد الحفظ</button>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">تعديل</button>
+                <button type="button" id="btnSubmitFinal" class="btn btn-primary px-5 fw-bold" onclick="submitMainForm()">تأكيد السداد والترحيل</button>
             </div>
         </div>
     </div>
@@ -138,37 +150,94 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 $(document).ready(function() {
-    $('#id_student').select2({ dir: "rtl", width: '100%' });
+    // تفعيل Select2
+    $('#id_student, #id_student_filter').select2({ dir: "rtl", width: '100%' });
+
+    $('#id_student_filter').on('change', function() {
+        if (this.value) window.location.href = '?student_id=' + this.value;
+    });
+
+    // دالة تطبيع للنصوص العربية لضمان تطابق الكلمات
+    function normalizeArabic(text) {
+        if (!text) return "";
+        let result = text.trim();
+        result = result.replace(/^ال/g, ""); 
+        return result
+            .replace(/[أإآ]/g, "ا")
+            .replace(/ة/g, "ه")
+            .replace(/ى/g, "ي")
+            .replace(/\s+/g, ""); 
+    }
 
     function fetchStudentBalance(studentId) {
         if (!studentId) return;
+        
+        // إظهار الحاوية وعلامة التحميل
+        $('#arrears_container').show();
+        $('#current_due, #total_debt').html('<span class="spinner-border spinner-border-sm"></span>');
+
         $.ajax({
-            url: `/finance/get-student-balance/${studentId}/`,
+            // استخدام الرابط الديناميكي لضمان الوصول للسيرفر
+            url: "{% url 'get_student_balance' 0 %}".replace('0', studentId),
             method: 'GET',
+            dataType: 'json',
             success: function(data) {
-                const totalDebt = Number(data.total_debt);
+                console.log("البيانات المستلمة:", data);
                 
-                // تحديث القيم مع التنسيق
-                $('#current_due').text(Number(data.current_due).toLocaleString() + " ج.م");
-                $('#total_debt').text(totalDebt.toLocaleString() + " ج.م");
-                
-                // إضافة لون تنبيهي إذا المديونية تخطت 5000 ج.م
-                if (totalDebt > 5000) {
-                    $('#total_debt').addClass('text-warning fw-bold').removeClass('text-info');
+                if (data.success || !data.error) {
+                    // قراءة المديونية من المتغيرات اللي بيبعتها الـ View الجديد
+                    let remaining = data.total_remaining || data.total_debt || 0;
+                    let due = data.current_due || 0;
+
+                    // تحديث المربعين بالأرقام الحقيقية (3174.00)
+                    $('#current_due').text(Number(due).toLocaleString() + " ج.م");
+                    $('#total_debt').text(Number(remaining).toLocaleString() + " ج.م");
                 } else {
-                    $('#total_debt').removeClass('text-warning fw-bold').addClass('text-info');
+                    $('#current_due, #total_debt').text("0.00");
                 }
-                
-                $('#arrears_container').slideDown();
+            },
+            error: function(xhr, status, error) {
+                console.error("خطأ في الاتصال:", error);
+                $('#current_due, #total_debt').text("0.00");
             }
         });
     }
 
+    const preselectedStudent = $('#id_student').val();
+    if (preselectedStudent) fetchStudentBalance(preselectedStudent);
+
     $('#id_student').on('change', function() {
         fetchStudentBalance($(this).val());
+        $('#id_category').trigger('change');
     });
+
+    // مراقبة الفئة المختارة مع توسيع القائمة لتشمل الفئات الجديدة
+    $('#id_category').on('change', function() {
+        const rawText = $(this).find('option:selected').text();
+        const normText = normalizeArabic(rawText);
+        const hint = $('#category_hint');
+        
+        // كلمات مفتاحية ذكية لتغطية أي بنود جديدة مثل "صصصص" طالما تحتوي على حروف دالة
+        const keywords = [
+            "انشطه", "نشاط", "كتب", "رسوم", "منازل", "دبلوم", "استماره", 
+            "مصروفات", "اساسيه", "تعليم", "قسط", "سداد", "صصص"
+        ];
+        
+        const isMatch = keywords.some(word => normText.includes(word));
+        
+        if (isMatch) {
+            hint.html('<i class="bi bi-check-circle-fill text-success"></i> سيتم خصم هذا البند من مديونية الطالب ✅')
+                .css({'color': '#10b981', 'display': 'block'});
+        } else {
+            hint.html('<i class="bi bi-info-circle text-warning"></i> إيراد حر (لا يؤثر على مديونية الأقساط).')
+                .css({'color': '#fbbf24', 'display': 'block'});
+        }
+    });
+    
+    $('#id_category').trigger('change');
 });
 
 function handlePreview() {
@@ -176,20 +245,24 @@ function handlePreview() {
     const amount = $('#id_amount').val();
     const cat = $('#id_category option:selected').text();
     const notes = $('#id_notes').val();
+    const receiptNum = $('#id_receipt_number').val();
 
-    if (!sSelect.val() || !amount) {
-        alert("يرجى إدخال البيانات كاملة");
+    if (!sSelect.val() || !amount || amount <= 0) {
+        Swal.fire({ icon: 'warning', title: 'بيانات ناقصة', text: 'يرجى اختيار الطالب وتحديد مبلغ.' });
         return;
     }
 
     $('#p_student').text(sSelect.find(':selected').text());
     $('#p_amount').text(Number(amount).toLocaleString() + " ج.م");
     $('#p_category').text(cat);
-    $('#p_notes').text(notes);
+    $('#p_notes').text("إيصال #" + (receiptNum || '---') + " | " + (notes || "بدون ملاحظات"));
     
-    // إظهار المودال الخاص بالمراجعة
-    var myModal = new bootstrap.Modal(document.getElementById('previewModal'));
-    myModal.show();
+    new bootstrap.Modal(document.getElementById('previewModal')).show();
+}
+
+function submitMainForm() {
+    $('#btnSubmitFinal').prop('disabled', true).text('جاري الترحيل...');
+    document.getElementById('mainPaymentForm').submit();
 }
 </script>
 {% endblock %}

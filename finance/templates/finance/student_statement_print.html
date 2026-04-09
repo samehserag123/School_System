@@ -2,233 +2,150 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>كشف حساب {{ student.get_full_name }}</title>
+    <title>كشف حساب مالي - {{ student.get_full_name }}</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; }
-        .header-print { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #999; padding: 12px; text-align: center; }
-        th { background-color: #f2f2f2; font-weight: bold; }
-        tr:nth-child(even) { background-color: #fafafa; }
-        
-        .no-print { margin-bottom: 20px; display: flex; gap: 10px; }
-        .btn { padding: 8px 15px; text-decoration: none; border-radius: 4px; cursor: pointer; border: none; font-size: 14px; }
-        .btn-print { background-color: #28a745; color: white; }
-        .btn-back { background-color: #6c757d; color: white; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; background-color: #fff; line-height: 1.6; }
+        .header-print { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 15px; }
         
         .summary-container {
-        display: flex;
-        justify-content: space-between;
-        gap: 20px; /* مسافة أكبر قليلاً بين الصناديق */
-        margin-bottom: 25px;
-        flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
         }
 
         .summary-box-item {
-            flex: 1; /* كل صندوق يأخذ ثلث المساحة */
-            min-width: 250px; /* عرض أدنى مناسب للطباعة */
             border: 1px solid #ddd;
-            padding: 15px 10px;
+            padding: 15px;
             border-radius: 8px;
             background-color: #f9f9f9;
             text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
         }
 
-        .summary-label {
-            display: block;
-            font-size: 0.9em;
-            color: #555;
-            margin-bottom: 2px;
-        }
+        .summary-label { display: block; font-size: 0.9em; color: #555; margin-bottom: 5px; font-weight: bold; }
+        .summary-value { display: block; font-size: 1.4em; font-weight: bold; }
+        
+        .text-danger { color: #dc3545 !important; }
+        .text-primary { color: #007bff !important; }
+        .text-success { color: #28a745 !important; }
 
-        .summary-value {
-            display: block;
-            font-size: 1.3em;
-            font-weight: bold;
-            line-height: 1.1;
-        }
-
-        .plan-badge {
-            font-size: 0.8em;
-            color: #007bff;
-            margin-top: 5px;
-            font-weight: bold;
-            border-top: 1px dashed #abc;
-            padding-top: 4px;
-        }
-
-            /* تمييز الصندوق النهائي */
-            .total-final-box {
-                background-color: #333;
-                color: #fff;
-                margin-top: 15px;
-                padding: 15px;
-                border-radius: 8px;
-                text-align: center;
-        }
-
-            @media print { 
-                .no-print { display: none; } 
-                body { padding: 0; }
-                .summary-box { border: 1px solid #000; background-color: #fff !important; }
-            }
-        .finance-table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        margin-top: 20px;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        overflow: hidden; /* عشان الحواف المستديرة */
-        }
-
-        .finance-table thead {
-            background-color: #2c3e50; /* لون كحلي وقور */
-            color: white;
-        }
-
-        .finance-table th {
-            padding: 15px 10px;
+        .total-final-box {
+            grid-column: span 3;
+            background-color: #2c3e50;
+            color: #fff;
+            padding: 25px;
+            border-radius: 10px;
             text-align: center;
-            font-weight: 600;
-            font-size: 0.95em;
-            border-bottom: 2px solid #1a252f;
+            margin-top: 15px;
+            border: 2px solid #1a252f;
         }
 
-        .finance-table td {
-            padding: 12px 10px;
-            text-align: center;
-            border-bottom: 1px solid #eee;
-            vertical-align: middle;
-            font-size: 1em;
-        }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: center; }
+        th { background-color: #2c3e50; color: white; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
 
-        /* تمييز صفوف المبالغ */
-        .amount-cell {
-            font-family: 'Courier New', Courier, monospace; /* خط أرقام أوضح */
-            font-weight: bold;
-            color: #2c3e50;
-        }
+        .no-print { margin-bottom: 20px; display: flex; gap: 10px; }
+        .btn { padding: 10px 20px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold; text-decoration: none; }
+        .btn-print { background-color: #28a745; color: white; }
+        .btn-back { background-color: #6c757d; color: white; }
 
-        /* تأثير عند الوقوف على الصف */
-        .finance-table tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        /* تنسيق خاص للديون القديمة */
-        .old-debt-row {
-            background-color: #fff5f5; /* لون أحمر خفيف جداً للتمييز */
-        }
-
-        .text-old-debt {
-            color: #e74c3c;
-            font-weight: bold;
+        @media print { 
+            .no-print { display: none; } 
+            .total-final-box { background-color: #f8f9fa !important; color: #000 !important; border: 2px solid #000; }
         }
     </style>
 </head>
 <body>
     <div class="no-print">
-        <button onclick="window.print()" class="btn btn-print">🖨️ طباعة كشف الحساب</button>
-        <a href="javascript:history.back()" class="btn btn-back">🔙 عودة للخلف</a>
+        <button onclick="window.print()" class="btn btn-print">🖨️ طباعة الآن</button>
+        <a href="javascript:history.back()" class="btn btn-back">🔙 العودة</a>
     </div>
     
     <div class="header-print">
-        <h1>كشف حساب مالي تفصيلي</h1>
-        <p style="font-size: 1.4em; margin-bottom: 5px;"><strong>اسم الطالب:</strong> {{ student.get_full_name }}</p>
-        <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
-            <span><strong>كود الطالب:</strong> {{ student.id }}</span>
-            <span><strong>الصف الدراسي:</strong> {{ student.grade.name }}</span>
-            <span><strong>النظام:</strong> {{ student.study_type|default:"عام" }}</span>
+        <h1 style="margin: 0 0 10px 0;">كشف حساب مالي تفصيلي</h1>
+        <p style="font-size: 1.5em; margin: 0 0 10px 0;"><strong>اسم الطالب:</strong> {{ student.get_full_name }}</p>
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #eee;">
+            <span><strong>كود الطالب:</strong> {{ student.student_code|default:student.id }}</span>
+            <span><strong>الصف:</strong> {{ student.grade.name }}</span>
             <span><strong>العام الدراسي:</strong> {{ student.academic_year.name }}</span>
         </div>
-        <p style="text-align: left; font-size: 0.9em; color: #666;">تاريخ الاستخراج: {% now "Y-m-d H:i" %}</p>
+        <p style="text-align: left; font-size: 0.8em; color: #666; margin-top: 5px;">تاريخ الاستخراج: {% now "Y-m-d H:i" %}</p>
     </div>
 
-    <div class="summary-box" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px;">
-        <div class="summary-item">
-            <span>مديونية سنوات سابقة:</span>
-            <span style="font-weight: bold; color: #dc3545;">{{ student.previous_debt|floatformat:2 }} ج.م</span>
-        <div class="summary-item">
-            <span>مطلوب العام الحالي:</span>
-            <span style="font-weight: bold; color: #007bff;">{{ student.current_year_fees_amount|floatformat:2 }} ج.م</span>
-            {% with account=student.current_account %}
-            {% if account and account.installment_plan %}
-                <span class="plan-badge">نوع التسكين: {{ account.installment_plan.name }}</span>
-            {% else %}
-                <span class="plan-badge" style="color: #999;">(غير مسكن)</span>
-            {% endif %}
-        {% endwith %}
-    </div>
-        </div>
-        <div class="summary-item" style="border-top: 1px solid #ddd; padding-top: 10px;">
-            <span>إجمالي ما تم سداده:</span>
-            <span style="font-weight: bold; color: #28a745;">{{ student.current_year_paid|floatformat:2 }} ج.م</span>
-        </div>
-        <div class="summary-item total-row" style="grid-column: span 2; background: #f8f9fa; padding: 15px; border: 2px solid #333; text-align: center; margin-top: 10px;">
-            <span style="font-size: 1.2em; font-weight: bold;">المتبقي النهائي المستحق:</span>
-            <span style="font-size: 1.5em; font-weight: bold; color: {% if student.final_remaining > 0 %}#dc3545{% else %}#28a745{% endif %};">
-                {{ student.final_remaining|floatformat:2 }} ج.م
+    <div class="summary-container">
+        <div class="summary-box-item">
+            <span class="summary-label">مديونية سنوات سابقة</span>
+            <span class="summary-value text-danger">
+                {{ student.previous_debt|default:"0.00"|floatformat:2 }} ج.م
             </span>
         </div>
+
+        <div class="summary-box-item">
+            <span class="summary-label">مطلوب العام الحالي</span>
+            <span class="summary-value text-primary">
+                {{ total_required|default:"0.00"|floatformat:2 }} ج.م
+            </span>
+            {% with account=student.current_account %}
+                {% if account and account.installment_plan %}
+                    <div style="font-size: 0.7em; color: #007bff; margin-top: 5px;">نظام التسكين: {{ account.installment_plan.name }}</div>
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <div class="summary-box-item">
+            <span class="summary-label">إجمالي ما تم سداده</span>
+            <span class="summary-value text-success">
+                {{ total_paid_all|default:"0.00"|floatformat:2 }} ج.م
+            </span>
+        </div>
+
+        <div class="total-final-box">
+            <div style="font-size: 1.2em; margin-bottom: 10px;">صافي المتبقي المستحق دفعه</div>
+            <div style="font-size: 2.5em; font-weight: bold;">
+                {{ remaining|default:"0.00"|floatformat:2 }} ج.م
+            </div>
+            <div style="font-size: 0.9em; opacity: 0.8; margin-top: 8px;">
+                (إجمالي المطلوب + مديونية قديمة - جميع المدفوعات المسجلة بالجدول)
+            </div>
+        </div>
     </div>
 
-    <h3 style="border-right: 5px solid #007bff; padding-right: 10px; margin-bottom: 15px;">سجل عمليات التحصيل</h3>
+    <h3 style="border-right: 5px solid #007bff; padding-right: 10px; margin-top: 30px;">سجل المقبوضات النقدية التفصيلي</h3>
     <table>
         <thead>
             <tr>
-                <th>تاريخ العملية</th>
-                <th>بيان الدفع (البند)</th>
+                <th>التاريخ</th>
+                <th style="text-align: right;">بيان الدفع</th>
                 <th>العام الدراسي</th>
-                <th>المبلغ المسدد</th>
+                <th>المبلغ</th>
             </tr>
         </thead>
         <tbody>
             {% for entry in all_history %}
-                {# عرض عمليات العام الدراسي الحالي للطالب فقط #}
+                {# عرض عمليات العام الدراسي الحالي للطالب #}
                 {% if entry.academic_year == student.academic_year %}
                 <tr>
-                    <td style="text-align: center; border: 1px solid #ddd; padding: 10px;">
-                        {{ entry.payment_date|date:"d / m / Y" }}
+                    <td>{{ entry.payment_date|date:"d/m/Y" }}</td>
+                    <td style="text-align: right;">
+                        {{ entry.revenue_category.name|default:"مصروفات دراسية" }}
+                        {% if entry.notes %}<br><small style="color:#666">({{ entry.notes }})</small>{% endif %}
                     </td>
-
-                    <td style="border: 1px solid #ddd; padding: 10px;">
-                        {% if entry.revenue_category %}
-                            {{ entry.revenue_category.name }}
-                        {% else %}
-                            <span style="color: #666; font-style: italic;">سداد مصروفات دراسية</span>
-                        {% endif %}
-                    </td>
-
-                    <td style="text-align: center; border: 1px solid #ddd; padding: 10px; font-weight: 500;">
-                        {{ entry.academic_year.name }} </td>
-
-                    <td style="font-weight: bold; text-align: center; border: 1px solid #ddd; padding: 10px; background-color: #fcfcfc;">
+                    <td>{{ entry.academic_year.name }}</td>
+                    <td style="font-weight: bold;" class="text-success">
                         {{ entry.amount_paid|floatformat:2 }} ج.م
                     </td>
                 </tr>
                 {% endif %}
             {% empty %}
-            <tr>
-                <td colspan="4" style="padding: 40px; text-align: center; color: #888; border: 1px solid #ddd;">
-                    لا توجد عمليات تحصيل مسجلة للعام الدراسي الحالي.
-                </td>
-            </tr>
+                <tr><td colspan="4" style="padding: 30px; color:#888;">لا توجد دفعات مسجلة لهذا العام.</td></tr>
             {% endfor %}
         </tbody>
     </table>
 
-    <div class="footer-print" style="margin-top: 50px; display: flex; justify-content: space-between;">
-        <div style="text-align: center;">
-            <p>توقيع المحاسب</p>
-            <p>..........................</p>
-        </div>
-        <div style="text-align: center;">
-            <p>ختم المدرسة</p>
-            <p>..........................</p>
-        </div>
+    <div style="margin-top: 70px; display: flex; justify-content: space-between; padding: 0 50px;">
+        <div style="text-align: center;"><p style="font-weight:bold;">توقيع المحاسب</p><p>....................</p></div>
+        <div style="text-align: center;"><p style="font-weight:bold;">ختم المدرسة الرسمي</p><p>....................</p></div>
     </div>
 </body>
 </html>

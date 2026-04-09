@@ -240,13 +240,13 @@
                     </td>
 
                     <td class="gender-val">
-                        {% if student.get_gender_display == "ذكر" %}
+                        {% if student.get_gender_display == "بنين" %}
                             <span class="badge bg-primary-subtle text-primary border border-primary px-3 shadow-sm" style="font-size: 0.75rem; font-weight: 700;">
-                                <i class="bi bi-gender-male me-1"></i>ذكر
+                                <i class="bi bi-gender-male me-1"></i>بنين
                             </span>
-                        {% elif student.get_gender_display == "أنثى" %}
+                        {% elif student.get_gender_display == "بنات" %}
                             <span class="badge bg-warning-subtle text-warning border border-warning px-3 shadow-sm" style="font-size: 0.75rem; font-weight: 700;">
-                                <i class="bi bi-gender-female me-1"></i>أنثى
+                                <i class="bi bi-gender-female me-1"></i>بنات
                             {% else %}
                                 <span class="badge bg-secondary text-white">{{ student.get_gender_display }}</span>
                         {% endif %}
@@ -368,8 +368,8 @@ function runFilters() {
         if (isMatch) {
             row.style.display = "";
             stats.all++;
-            if(gender === "ذكر") stats.male++;
-            if(gender === "أنثى") stats.female++;
+            if(gender === "بنين") stats.male++;
+            if(gender === "بنات") stats.female++;
             if(religion === "مسلم") stats.muslim++;
             if(religion === "مسيحي") stats.christian++;
             

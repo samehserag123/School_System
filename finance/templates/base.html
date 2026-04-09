@@ -116,66 +116,50 @@
             .sidebar { width: 100%; height: auto; position: relative; }
             .main-content { margin-right: 0; }
         }
-        /* هذا الكود يجبر الجداول داخل القائمة لتكون بألوان غامقة */
-        /* 1. الجدول العادي يظل كما هو (بدون تغييرات إجبارية) */
-    /* هذا هو الكود الصحيح لعدم تخريب الجداول الأخرى */
-    .table {
-        color: inherit; /* الجداول تأخذ لونها الطبيعي */
-    }
 
-    /* لا نستخدم .table بل نستخدم كلاس خاص للجداول التي تريدها غامقة */
-    .table-dark-custom {
-        color: #ffffff !important;
-    }
+        .table {
+            color: inherit; 
+        }
 
-    .table-dark-custom tbody tr td {
-        background-color: #1a1d21 !important;
-        color: #ffffff !important;
-        border-color: #333 !important;
-    }
-    /* هذا هو الكود المسؤول عن إزالة المربع الأبيض وجعل الخلفية سوداء */
-    .table td, .table th {
-        background-color: var(--bg-dark) !important; /* إجبار الخلية على أخذ لون الموقع الغامق */
-        color: #ffffff !important; /* إجبار الخط على اللون الأبيض */
-        border-color: #333 !important; /* لون الحدود ليتماشى مع السواد */
-    }
+        .table-dark-custom {
+            color: #ffffff !important;
+        }
 
-    /* لضمان أن اسم الطالب يظهر بلون أبيض واضح */
-    .table td a {
-        color: #ffffff !important;
-        text-decoration: none;
-        background-color: transparent !important;
-    }
-    /* تغيير لون نص "إجمالي الطلاب" فقط داخل الـ stat-item */
-    .stat-item .small.text-muted {
-        color: #ffffff !important;
-    }
-    /* استهداف نص إجمالي الطلاب داخل الشريط العلوي فقط */
+        .table-dark-custom tbody tr td {
+            background-color: #1a1d21 !important;
+            color: #ffffff !important;
+            border-color: #333 !important;
+        }
 
-    /* استهداف نص "إجمالي الطلاب" عشان يبقى لونه أبيض */
-    /* هذا الكود يستهدف نص "إجمالي الطلاب" داخل حاويته المحددة */
-    .d-flex.align-items-center.mb-3.px-2 .text-muted.small {
-        color: #ffffff !important;
-    }
-    
-    @media print {
-    /* 1. إخفاء التنبيهات (تم التحصيل بنجاح) */
-    .alert, .alert-success { 
-        display: none !important; 
-    }
+        .table td, .table th {
+            background-color: var(--bg-dark) !important;
+            color: #ffffff !important;
+            border-color: #333 !important;
+        }
 
-    /* 2. إخفاء مربع "شؤون الطلبة" بشكل قاطع */
-    /* بما أننا لا نريد الاعتماد على كلاسات قد تتداخل، سنستهدف الجدول الذي يحتوي الكلمة مباشرة */
-    table:has(td:contains("شؤون الطلاب")), 
-    .d-print-none { 
-        display: none !important; 
-    }
-    
-    /* إذا استمر في الظهور، استخدم هذا السطر البديل (قم بإلغاء التعليق عنه) */
-    /* .receipt-container table:last-of-type { display: none !important; } */
-}
-    
-            </style>
+        .table td a {
+            color: #ffffff !important;
+            text-decoration: none;
+            background-color: transparent !important;
+        }
+
+        .stat-item .small.text-muted {
+            color: #ffffff !important;
+        }
+
+        .d-flex.align-items-center.mb-3.px-2 .text-muted.small {
+            color: #ffffff !important;
+        }
+        
+        @media print {
+            .alert, .alert-success { 
+                display: none !important; 
+            }
+            .d-print-none { 
+                display: none !important; 
+            }
+        }
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -188,26 +172,28 @@
             <small class="badge bg-info text-dark mt-2 px-3">{{ student.academic_year.name }}</small>
         </div>
         
-        <div class="section-title">العمليات المالية</div>
-        
-        <a href="{% url 'assign_plan_with_id' student.id %}">
-            <i class="bi bi-calendar-check text-info"></i> تسكين برنامج مالي
-        </a>
-        
-        <a href="{% url 'quick_collection' %}?student_id={{ student.id }}">
-            <i class="bi bi-cash-stack text-success"></i> تحصيل المصاريف
-        </a>
+        {% if user.is_superuser or "Finance_General" in user.groups.all.0.name %}
+            <div class="section-title">العمليات المالية</div>
+            <a href="{% url 'assign_plan_with_id' student.id %}">
+                <i class="bi bi-calendar-check text-info"></i> تسكين برنامج مالي
+            </a>
+            <a href="{% url 'quick_collection' %}?student_id={{ student.id }}">
+                <i class="bi bi-cash-stack text-success"></i> تحصيل المصاريف
+            </a>
+        {% endif %}
 
-        <a href="{% url 'student_inventory_view' student.id %}" 
-           class="{% if request.resolver_match.url_name == 'student_inventory_view' %}active-link{% endif %}">
-            <i class="bi bi-box-seam text-warning"></i> تسليم الكتب والزي
-        </a>
+        {% if user.is_superuser or "Finance_Books" in user.groups.all.0.name %}
+            <a href="{% url 'student_inventory_view' student.id %}">
+                <i class="bi bi-box-seam text-warning"></i> تسليم الكتب والزي
+            </a>
+        {% endif %}
 
-        <div class="section-title">تقارير وشهادات</div>
-
-        <a href="javascript:void(0);" onclick="printEnrollmentCertificate()" class="admin-action-btn mt-2" style="color: #ffc107; border-color: rgba(255,193,7,0.3);">
-            <i class="bi bi-printer"></i> طباعة شهادة قيد
-        </a>
+        {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name %}
+            <div class="section-title">تقارير وشهادات</div>
+            <a href="javascript:void(0);" onclick="printEnrollmentCertificate()" class="admin-action-btn mt-2" style="color: #ffc107; border-color: rgba(255,193,7,0.3);">
+                <i class="bi bi-printer"></i> طباعة شهادة قيد
+            </a>
+        {% endif %}
 
         <a href="{% url 'student_list' %}" class="text-info text-center d-block mt-4 border-top border-secondary pt-3 mx-3">
             <i class="bi bi-arrow-right-circle"></i> العودة للسجل العام
@@ -215,27 +201,40 @@
 
     {% else %}
         <h5><i class="bi bi-shield-check"></i> لوحة الإدارة</h5>
-        <div class="section-title">العامة</div>
-        <a href="{% url 'finance_dashboard' %}"><i class="bi bi-speedometer2"></i> الرئيسية المالية</a>
-        <a href="{% url 'student_list' %}"><i class="bi bi-people"></i> سجل الطلاب</a>
+        
+        {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name %}
+            <div class="section-title">إدارة الطلاب</div>
+            <a href="{% url 'add_student' %}"><i class="bi bi-person-plus-fill text-warning"></i> إضافة طالب جديد</a>
+            <a href="{% url 'student_registry' %}"><i class="bi bi-card-list text-info"></i> السجل المدني للطلاب</a>
+            
+            <a href="{% url 'students_analytics' %}" style="border: 1px dashed rgba(56, 189, 248, 0.4); margin-top: 5px; background: rgba(56, 189, 248, 0.05);">
+                <i class="bi bi-graph-up-arrow text-info"></i> 
+                <span class="fw-bold" style="color: #38bdf8;">التحليل الإحصائي العام</span>
+            </a>
+        {% endif %}
 
-        <div class="section-title">المهام السريعة</div>
-        <a href="{% url 'assign_plan' %}"><i class="bi bi-clipboard-check text-info"></i> تسكين الطلاب</a>
-        <a href="{% url 'quick_collection' %}"><i class="bi bi-cash-stack text-success"></i> تحصيل مباشر</a>
-        
-        <div class="section-title">إدارة الطلاب</div>
-        <a href="{% url 'add_student' %}"><i class="bi bi-person-plus-fill text-warning"></i> إضافة طالب جديد</a>
-        
-        <div class="section-title">الحسابات</div>
-        <a href="{% url 'overdue_report' %}"><i class="bi bi-exclamation-triangle text-danger"></i> تقرير المتأخرات</a>
-        <a href="/"><i class="bi bi-house-door text-primary"></i> الصفحة الرئيسية</a>
-        
+        {% if user.is_superuser or "Finance_General" in user.groups.all.0.name %}
+            <div class="section-title">المهام السريعة</div>
+            <a href="{% url 'assign_plan' %}"><i class="bi bi-clipboard-check text-info"></i> تسكين الطلاب</a>
+            <a href="{% url 'student_list' %}"><i class="bi bi-people"></i> سجل الطلاب المالي</a>
+        {% endif %}
+
+        {% if user.is_superuser or "Finance_Treasury" in user.groups.all.0.name %}
+            <div class="section-title">الحسابات والتقارير</div>
+            <a href="{% url 'finance_dashboard' %}"><i class="bi bi-speedometer2"></i> الرئيسية المالية</a>
+            <a href="{% url 'quick_collection' %}"><i class="bi bi-cash-stack text-success"></i> تحصيل مباشر</a>
+            <a href="{% url 'overdue_report' %}"><i class="bi bi-exclamation-triangle text-danger"></i> تقرير المتأخرات</a>
+        {% endif %}
+
+        {% if user.is_superuser or "Finance_Courses" in user.groups.all.0.name %}
+            <div class="section-title">الكورسات</div>
+            <a href="{% url 'course_prices' %}"><i class="bi bi-currency-exchange text-info"></i> قائمة أسعار الكورسات</a>
+        {% endif %}
+
         <div class="section-title">النظام</div>
-        <a href="{% url 'student_registry' %}">
-            <i class="bi bi-card-list text-info"></i> السجل المدني للطلاب
-        </a>
+        <a href="/"><i class="bi bi-house-door text-primary"></i> الصفحة الرئيسية</a>
     {% endif %}
-    </div>
+</div>
 <div class="main-content">
     <div class="top-navbar d-flex justify-content-between align-items-center">
         <h5 class="mb-0 text-info">{% block page_title %}نظام إدارة شؤون الطلاب{% endblock %}</h5>
@@ -264,12 +263,10 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
-    // إعداد الـ AJAX للعمل مع CSRF Token
     $.ajaxSetup({
         headers: { "X-CSRFToken": "{{ csrf_token }}" }
     });
 
-    // دالة طباعة شهادة القيد
     function printEnrollmentCertificate() {
         {% if student %}
         const printWindow = window.open('', '_blank');

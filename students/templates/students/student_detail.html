@@ -1,0 +1,45 @@
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4">
+    <div class="container-card" style="background: #000; border: 1px solid #1e293b; padding: 30px; border-radius: 20px;">
+        <h2 class="text-info fw-900 mb-4 border-bottom border-secondary pb-2">
+            <i class="bi bi-person-badge"></i> ملف الطالب: {{ student.get_full_name }}
+        </h2>
+
+        <div class="row g-4">
+            <div class="col-md-6">
+                <h5 class="text-success fw-bold mb-3"><i class="bi bi-check-circle-fill"></i> المواد المسجلة</h5>
+                <div class="list-group">
+                    {% for item in enrollments %}
+                    <div class="list-group-item bg-dark text-white border-secondary mb-2 rounded shadow-sm">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong class="text-info">{{ item.course_info.subject.name }}</strong><br>
+                                <small class="text-secondary">المدرس: {{ item.course_info.teacher.name }}</small>
+                            </div>
+                            <span class="badge bg-primary">باقي {{ item.remaining_sessions }} حِصص</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-secondary">لا يوجد اشتراكات نشطة</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <h5 class="text-warning fw-bold mb-3"><i class="bi bi-exclamation-triangle"></i> مواد غير مشترك بها</h5>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for sub in other_subjects %}
+                        <span class="badge border border-secondary text-secondary p-2">{{ sub.name }}</span>
+                    {% empty %}
+                    <p class="text-success">مشترك في جميع المواد المتاحة</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-5">
+            <a href="{% url 'course_prices' %}" class="btn btn-outline-secondary rounded-pill px-4">عودة للوحة التحكم</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

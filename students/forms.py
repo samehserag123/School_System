@@ -74,9 +74,28 @@ class BookSaleForm(forms.ModelForm):
             uniform_name = obj.uniform.name if obj.uniform else "زي مدرسي"
             return f"👕 {uniform_name} - {grade_name}"
 
-
 class CourseGroupForm(forms.ModelForm):
-    # 1. حقل المدرس (فلتر وهمي): ده اللي هيخلينا نختار المدرس عشان المادة تظهر
+    # --- حقول التحكم والطلاب الخارجين ---
+    is_external = forms.BooleanField(
+        label="تسجيل طالب من خارج المدرسة؟", 
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'flexSwitchExternal'})
+    )
+    
+    ext_name = forms.CharField(
+        label="اسم الطالب الخارجي", 
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control bg-dark text-white border-info border-opacity-25', 'placeholder': 'الاسم بالكامل'})
+    )
+    
+    
+    ext_phone = forms.CharField(
+        label="رقم التليفون", 
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control bg-dark text-white border-info border-opacity-25', 'placeholder': '01xxxxxxxxx'})
+    )
+
+    # --- حقل المدرس (فلتر وهمي) ---
     teacher = forms.ModelChoiceField(
         queryset=Teacher.objects.all(),
         label="1. اختر المدرس",
@@ -87,30 +106,100 @@ class CourseGroupForm(forms.ModelForm):
 
     class Meta:
         model = CourseGroup
-        # نرتتب الحقول بحيث المدرس يظهر قبل المادة
-        fields = ['student', 'teacher', 'course_info', 'notes'] 
+        # ترتيب الحقول بما يتناسب مع الإدخال الجديد
+        fields = ['student', 'teacher', 'course_info', 'total_sessions', 'notes'] 
         
         widgets = {
-            # حقل الطالب: هنركب عليه Select2 في الـ HTML عشان الـ 1000 طالب
+            # حقل الطالب المدرسي
             'student': forms.Select(attrs={'class': 'form-select select2-student'}),
             
-            # حقل المادة: هيتفلتر بناءً على المدرس بواسطة JavaScript
+            # حقل المادة
             'course_info': forms.Select(attrs={'class': 'form-select', 'id': 'id_course_info'}),
+            
+            # حقل عدد الحصص المطور لراحة عينك
+            'total_sessions': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '4',
+                'min': '1',
+                'style': 'font-weight: 900; text-align: center;' 
+            }),
             
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 1, 'placeholder': 'أي ملاحظات إضافية...'}),
         }
         
         labels = {
-            'student': 'اسم الطالب (بحث بالاسم)',
+            'student': 'اسم الطالب المدرسي',
             'course_info': '2. المادة / النوع / السعر',
+            'total_sessions': 'إجمالي الحصص',
             'notes': 'ملاحظات',
         }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # تخصيص رسائل القوائم الفارغة
-        self.fields['course_info'].empty_label = "--- اختر المدرس أولاً لرؤية مواده ---"
-        self.fields['student'].empty_label = "اكتب اسم الطالب للبحث..."
+    # students/forms.py
+
+def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    
+    # 1. تخصيص رسائل القوائم الفارغة [cite: 2026-04-06]
+    self.fields['course_info'].empty_label = "--- اختر المدرس أولاً لرؤية مواده ---"
+    self.fields['student'].empty_label = "اكتب اسم الطالب للبحث..."
+    
+    # هذا التعديل يتيح لك البحث بأي من هذه البيانات داخل القائمة المنسدلة
+    self.fields['student'].queryset = Student.objects.all()
+    self.fields['student'].label_from_instance = lambda obj: f"{obj.get_full_name()} | كود: {obj.id} | قومي: {obj.national_id}" 
+    
+    # 3. التأكد من أن حقل الحصص مطلوب ونشط [cite: 2026-04-06]
+    self.fields['total_sessions'].required = True
+    
+    self.fields['student'].required = False
+
+# class CourseGroupForm(forms.ModelForm):
+#     # 1. حقل المدرس (فلتر وهمي): لاختيار المدرس وتصفية المواد بناءً عليه
+#     teacher = forms.ModelChoiceField(
+#         queryset=Teacher.objects.all(),
+#         label="1. اختر المدرس",
+#         required=False,
+#         empty_label="--- ابحث واختار اسم المدرس ---",
+#         widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_teacher_filter'})
+#     )
+
+#     class Meta:
+#         model = CourseGroup
+#         # ترتيب الحقول: الطالب -> المدرس -> المادة -> عدد الحصص -> ملاحظات
+#         fields = ['student', 'teacher', 'course_info', 'total_sessions', 'notes'] 
+        
+#         widgets = {
+#             # حقل الطالب: لتركيب Select2 عليه في الـ HTML
+#             'student': forms.Select(attrs={'class': 'form-select select2-student'}),
+            
+#             # حقل المادة: يتم فلترته بواسطة JavaScript بناءً على المدرس
+#             'course_info': forms.Select(attrs={'class': 'form-select', 'id': 'id_course_info'}),
+            
+#             # 🟢 التعديل الجوهري: حقل عدد الحصص كـ NumberInput لضمان التفعيل والظهور
+#             'total_sessions': forms.NumberInput(attrs={
+#                 'class': 'form-control',
+#                 'placeholder': '4',
+#                 'min': '1',
+#                 'style': 'font-weight: 900; text-align: center;' # لضمان الوضوح الفائق
+#             }),
+            
+#             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 1, 'placeholder': 'أي ملاحظات إضافية...'}),
+#         }
+        
+#         labels = {
+#             'student': 'اسم الطالب (بحث بالاسم)',
+#             'course_info': '2. المادة / النوع / السعر',
+#             'total_sessions': 'إجمالي الحصص',
+#             'notes': 'ملاحظات',
+#         }
+
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         # تخصيص رسائل القوائم الفارغة والتحقق من التفعيل
+#         self.fields['course_info'].empty_label = "--- اختر المدرس أولاً لرؤية مواده ---"
+#         self.fields['student'].empty_label = "اكتب اسم الطالب للبحث..."
+        
+#         # التأكد من أن حقل الحصص مطلوب ونشط [cite: 2026-04-06]
+#         self.fields['total_sessions'].required = True
              
         
 class StudentForm(forms.ModelForm):

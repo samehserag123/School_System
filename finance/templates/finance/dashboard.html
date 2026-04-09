@@ -50,11 +50,7 @@
             <h2 class="fw-bold m-0 text-primary"><i class="bi bi-cpu-fill ms-2"></i>المركز المالي الذكي</h2>
             <p class="text-muted mb-0 mt-1">إحصائيات العام الدراسي: <span class="badge rounded-pill bg-soft-primary text-primary fw-bold">{{ active_year }}</span></p>
         </div>
-        <div class="btn-group mt-3 mt-md-0 shadow-sm">
-            <a href="{% url 'add_ledger_entry' %}" class="btn btn-primary px-4 rounded-start-pill"><i class="bi bi-plus-circle-fill ms-1"></i> تحصيل نقدية</a>
-            <a href="{% url 'treasury_dashboard' %}" class="btn btn-dark px-4"><i class="bi bi-collection-fill ms-1"></i> سجل الخزينة</a>
-            <button class="btn btn-light px-3 rounded-end-pill" onclick="window.print()"><i class="bi bi-printer-fill"></i></button>
-        </div>
+        
     </div>
 
     <div class="row g-4 mb-4">
@@ -185,11 +181,8 @@
                     <h6 class="text-muted small mb-1">إجمالي الطلاب</h6>
                     <h3 class="fw-bold mb-4 text-dark">{{ total_students_count }}</h3>
                     
-                    <div class="py-3 bg-danger bg-opacity-10 rounded-4 border border-danger border-opacity-20 mb-3">
-                        <h1 class="display-6 fw-bold text-danger mb-0">{{ critical_late_count|default:0 }}</h1>
-                        <p class="text-danger small fw-bold mb-0">متأخرات مالية حرجة</p>
-                    </div>
-                    <a href="{% url 'debt_report' %}" class="btn btn-danger w-100 fw-bold rounded-pill py-2">
+                    
+                    <a href="{% url 'overdue_report' %}" class="btn btn-danger w-100 fw-bold rounded-pill py-2">
                         فتح تقرير المتأخرات <i class="bi bi-arrow-left-short me-1"></i>
                     </a>
                 </div>
@@ -230,6 +223,8 @@
                                         <span class="badge bg-soft-primary text-primary px-3 rounded-pill">مصروفات</span>
                                     {% elif activity.category == 'books' or '#' in activity.notes %}
                                         <span class="badge bg-soft-success text-success px-3 rounded-pill">كتب ومخزن</span>
+                                    {% elif 'مجموعة' in activity.notes or 'كورس' in activity.notes or 'اشتراك' in activity.notes %}
+                                        <span class="badge bg-soft-info text-info px-3 rounded-pill">كورسات ومجموعات</span>
                                     {% else %}
                                         <span class="badge bg-soft-warning text-warning px-3 rounded-pill">أخرى</span>
                                     {% endif %}

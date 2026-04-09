@@ -8,6 +8,19 @@ from django.db.models import Sum, Q
 from decimal import Decimal
 from django.db import models, transaction
 
+
+class SystemSettings(models.Model):
+    is_admission_open = models.BooleanField(default=True, verbose_name="فتح باب التقديم (إظهار زر الإضافة)")
+
+    class Meta:
+        verbose_name = "إعدادات النظام"
+        verbose_name_plural = "إعدادات النظام"
+
+    def __str__(self):
+        return "حالة التقديم"
+    
+    
+
 numbers_only = RegexValidator(
     regex=r'^\d+$',
     message='يجب إدخال أرقام فقط.'
@@ -493,38 +506,105 @@ class BookSale(models.Model):
         return f"{self.student.get_full_name()} - {self.item.display_name}"
     
 
+# models.py
+class ExternalStudent(models.Model):
+    full_name = models.CharField("اسم الطالب", max_length=200)
+    #national_id = models.CharField("الرقم القومي", max_length=14, unique=True)
+    phone_number = models.CharField("رقم التليفون", max_length=15)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.full_name
+    
+
 class CourseGroup(models.Model):
-    student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب", related_name="enrolled_courses")
+    student = models.ForeignKey(
+        'Student', 
+        on_delete=models.CASCADE, 
+        null=True,  # 🟢 إضافة هذه
+        blank=True, # 🟢 إضافة هذه
+        verbose_name="الطالب المدرسي", 
+        related_name="enrolled_courses"
+    )
+    # حقل الطالب الخارجي (الذي أضفناه سابقاً)
+    external_student = models.ForeignKey(
+        'ExternalStudent', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        verbose_name="الطالب الخارجي"
+    )
     course_info = models.ForeignKey('SubjectPrice', on_delete=models.PROTECT, verbose_name="بيانات الكورس والسعر")
     registration_date = models.DateField("تاريخ الاشتراك", auto_now_add=True)
     notes = models.TextField("ملاحظات إضافية", blank=True, null=True)
+    required_amount = models.DecimalField("المبلغ المطلوب", max_digits=10, decimal_places=2, default=0.00) 
+    total_sessions = models.PositiveIntegerField("إجمالي عدد الحصص المتفق عليها", default=8)
+    # حقل اختياري لتحديد موعد البدء الفعلي
+    start_date = models.DateField("تاريخ بدء الحصص", default=timezone.now)
 
     class Meta:
         verbose_name = "تسجيل كورس لطالب"
         verbose_name_plural = "سجل اشتراكات الطلاب"
 
-    # --- دوال حسابية ذكية ---
+    # --- الدوال الحسابية والذكية ---
     
     @property
     def total_paid(self):
-        """يجمع كل المبالغ المدفوعة لهذا الكورس من جدول التحصيلات المنفصل"""
-        return self.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
-
+        """يجمع كل المبالغ المدفوعة لهذا الكورس من جدول التحصيلات"""
+        return self.payments.aggregate(total=Sum('amount_paid'))['total'] or 0 
     @property
     def remaining_amount(self):
-        """يحسب المتبقي (سعر الكورس - إجمالي المدفوع)"""
-        return self.course_info.price - self.total_paid
-
+        """يحسب المتبقي بناءً على المبلغ المطلوب فعلياً (المربوط بعدد الحصص)"""
+        return self.required_amount - self.total_paid 
+    @property
+    def attended_sessions_count(self):
+        """حساب عدد الحصص التي حضرها الطالب فعلياً"""
+        return self.sessions.filter(attendance_status='attended').count() 
+    @property
+    def remaining_sessions(self):
+        """حساب عدد الحصص المتبقية للطالب بناءً على إجمالي الحصص المتفق عليها"""
+        return max(0, self.total_sessions - self.attended_sessions_count) 
+    @property
+    def session_status_label(self):
+        """تنبيه نصي بحالة الحصص لراحة المستخدم"""
+        rem = self.remaining_sessions 
+        if rem == 0:
+            return "انتهت الحصص (يجب التجديد) ⚠️" 
+        return f"متبقي {rem} حصة" 
     @property
     def payment_status(self):
-        """تحديد حالة الدفع نصياً"""
-        remaining = self.remaining_amount
+        """تحديد حالة الدفع بناءً على المبلغ المطلوب المخصص"""
+        remaining = self.remaining_amount 
         if remaining <= 0:
-            return "خالص ✅"
-        return f"باقي {remaining} ج.م"
+            return "خالص ✅" 
+        return f"باقي {remaining} ج.م" 
+    def __str__(self):
+        """تعديل لعرض اسم الطالب المدرسي أو الخارجي بشكل صحيح"""
+        # التحقق من وجود طالب مدرسي أولاً، وإلا استخدام اسم الطالب الخارجي 
+        student_name = self.student.get_full_name() if self.student else self.external_student.full_name 
+        return f"{student_name} - {self.course_info.subject.name}"
+
+class StudentSession(models.Model):
+    """الجدول الجديد لتسجيل كل حصة وتاريخها"""
+    STATUS_CHOICES = [
+        ('attended', 'حضر'),
+        ('absent', 'غائب'),
+        ('cancelled', 'ملغاة من المركز'),
+    ]
+
+    course_enrollment = models.ForeignKey(CourseGroup, on_delete=models.CASCADE, related_name="sessions")
+    session_date = models.DateField("تاريخ الحصة", default=timezone.now)
+    attendance_status = models.CharField("حالة الحضور", max_length=20, choices=STATUS_CHOICES, default='attended')
+    notes = models.CharField("ملاحظات/تقييم الحصة", max_length=255, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "حصة طالب"
+        verbose_name_plural = "تتبع حصص الطلاب"
+        # منع تكرار تسجيل حضور لنفس الطالب في نفس الكورس بنفس التاريخ
+        unique_together = ('course_enrollment', 'session_date')
 
     def __str__(self):
-        return f"{self.student} - {self.course_info.subject.name}"
+        return f"حصة {self.course_enrollment.student.first_name} - {self.session_date}"
 
 
 # 2. الكلاس الجديد: سجل تحصيلات الكورسات (الخزينة المنفصلة)

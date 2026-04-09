@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-5 bg-light" style="min-height: 90vh;">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            
+            <div class="text-center mb-4">
+                <div class="icon-circle bg-danger text-white d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; border-radius: 50%; font-size: 1.5rem; shadow: 0 4px 15px rgba(231, 74, 59, 0.4);">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <h3 class="font-weight-bold text-dark">نظام إدارة المصروفات النثرية</h3>
+                <p class="text-muted">قم بتسجيل تفاصيل الصرف بدقة لضمان مطابقة الخزينة اليومية</p>
+            </div>
+
+            <div class="card shadow-lg border-0 rounded-lg">
+                <div class="card-header bg-dark py-3 d-flex align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-white"><i class="fas fa-plus-circle ml-2"></i>إضافة حركة صرف جديدة</h6>
+                    <span class="badge badge-danger p-2">خارج من الخزينة</span>
+                </div>
+                
+                <div class="card-body p-4">
+                    <form method="POST" id="expenseForm">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label class="text-dark font-weight-bold">بيان الصرف (الغرض من الصرف)</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text bg-white border-left-0"><i class="fas fa-tag text-muted"></i></span>
+                                    </div>
+                                    <input type="text" name="title" class="form-control border-right-0" placeholder="مثلاً: شراء أحبار طابعات، صيانة تكييف..." required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="text-dark font-weight-bold">المبلغ المطلوب صرفه</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text bg-danger text-white border-0">ج.م</span>
+                                    </div>
+                                    <input type="number" name="amount" step="0.01" class="form-control form-control-lg font-weight-bold text-danger" placeholder="0.00" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="text-dark font-weight-bold">تاريخ الحركة</label>
+                                <input type="text" class="form-control form-control-lg bg-light" value="{{ today|date:'Y-m-d' }}" readonly>
+                            </div>
+
+                            <div class="col-12 mb-4">
+                                <label class="text-dark font-weight-bold">ملاحظات تفصيلية</label>
+                                <textarea name="notes" class="form-control" rows="3" placeholder="أضف أي تفاصيل إضافية هنا (رقم الفاتورة، اسم المورد...)"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-column shadow-sm rounded">
+                            <button type="submit" class="btn btn-danger btn-lg font-weight-bold mb-2 py-3">
+                                <i class="fas fa-check-double ml-2"></i>حفظ المصروف وترحيله للخزينة
+                            </button>
+                            <a href="{% url 'daily_cashier_summary' %}" class="btn btn-outline-secondary py-2">
+                                <i class="fas fa-arrow-right ml-2"></i>رجوع للملخص
+                            </a>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted"><i class="fas fa-user-shield ml-1"></i> يتم تسجيل هذه الحركة باسم المستخدم: <strong>{{ request.user.username }}</strong></small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control:focus {
+        border-color: #e74a3b;
+        box-shadow: 0 0 0 0.2rem rgba(231, 74, 59, 0.15);
+    }
+    .input-group-text {
+        border-radius: 0.35rem !important;
+    }
+    .card {
+        border-radius: 1rem !important;
+        overflow: hidden;
+    }
+    .btn-danger {
+        background-color: #e74a3b;
+        border: none;
+        transition: all 0.3s ease;
+    }
+    .btn-danger:hover {
+        background-color: #c0392b;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(231, 74, 59, 0.3);
+    }
+</style>
+
+<script>
+    document.getElementById('expenseForm').onsubmit = function() {
+        return confirm("سيتم خصم هذا المبلغ فوراً من رصيد الخزينة المفتوح. هل تود الاستمرار؟");
+    };
+</script>
+{% endblock %}

@@ -30,26 +30,31 @@
         </div>
 
         <div style="margin-top: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
-    <span style="font-weight: bold;">وذلك قيمة/</span> 
-    <span style="font-size: 1.1rem; border: 1px solid #ccc; padding: 0 8px; background-color: #f9f9f9;">
-        {{ payment.revenue_category.name }}
-    </span>
-    
-    {# فحص دقيق: لو القسط موجود وله اسم وليس صفر أو فاضي #}
-    {% if payment.installment and payment.installment.name and payment.installment.name != "0" and payment.installment.name != "None" %}
-         <span style="margin-right: 5px;">({{ payment.installment.name }})</span>
-    {% endif %}
-</div>
+            <span style="font-weight: bold;">وذلك قيمة/</span> 
+            <span style="font-size: 1.1rem; border: 1px solid #ccc; padding: 0 8px; background-color: #f9f9f9;">
+                {{ payment.revenue_category.name }}
+            </span>
+            
+            {% if payment.installment and payment.installment.name and payment.installment.name != "0" and payment.installment.name != "None" %}
+                 <span style="margin-right: 5px;">({{ payment.installment.name }})</span>
+            {% endif %}
+        </div>
 
-        <p style="font-size: 0.9rem;">التاريخ: {{ payment.payment_date|date:"Y/m/d" }} | العام: {{ payment.academic_year.name }}</p>
+        <div style="margin-top: 10px; font-size: 1rem; display: flex; gap: 20px;">
+            <span>إجمالي المسدد: <strong>{{ total_paid }} ج.م</strong></span>
+            <span style="margin-right: 20px;">المتبقي الكلي: <strong style="color: red;">{{ remaining_balance }} ج.م</strong></span>
+        </div>
+
+        <p style="font-size: 0.9rem; margin-top: 5px;">التاريخ: {{ payment.payment_date|date:"Y/m/d" }} | العام: {{ payment.academic_year.name }}</p>
     </div>
 
     <div class="d-print-none">
-    <table style="width: 100%; margin-top: 20px; text-align: center; font-weight: bold;" dir="rtl">
-        <tr>
-            <td style="width: 33%;">المحصل</td>
-            <td style="width: 33%;">شؤون الطلاب</td>
-            <td style="width: 34%;">ختم المدرسة</td>
-        </tr>
-    </table>
+        <table style="width: 100%; margin-top: 20px; text-align: center; font-weight: bold;" dir="rtl">
+            <tr>
+                <td style="width: 33%;">المحصل</td>
+                <td style="width: 33%;">شؤون الطلاب</td>
+                <td style="width: 34%;">ختم المدرسة</td>
+            </tr>
+        </table>
+    </div>
 </div>

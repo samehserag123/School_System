@@ -1,0 +1,63 @@
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="p-3 rounded-4 border border-primary border-opacity-25" style="background: #000; border-right: 5px solid #00d4ff;">
+            <div class="small text-secondary fw-bold">إجمالي الطلاب المسجلين</div>
+            <div class="fs-2 fw-900 text-info">{{ total_count }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="p-3 rounded-4 border border-success border-opacity-25" style="background: #000; border-right: 5px solid #39ff14;">
+            <div class="small text-secondary fw-bold">طلاب لديهم مجموعات</div>
+            <div class="fs-2 fw-900" style="color: #39ff14;">{{ active_count }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="p-3 rounded-4 border border-danger border-opacity-25" style="background: #000; border-right: 5px solid #ff3131;">
+            <div class="small text-secondary fw-bold">طلاب بدون اشتراك</div>
+            <div class="fs-2 fw-900" style="color: #ff3131;">{{ inactive_count }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="container-card">
+    <table class="table">
+        <thead>
+            <tr class="text-secondary small">
+                <th>اسم الطالب</th>
+                <th>الحالة</th>
+                <th>المواد المشترك بها</th>
+                <th>مواد لم يشترك بها</th>
+                <th>الإجراء</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in active_students %}
+            <tr>
+                <td class="fw-bold text-white">{{ student.get_full_name }}</td>
+                <td><span class="badge bg-success-subtle text-success">نشط</span></td>
+                <td>
+                    {% for group in student.coursegroup_set.all %}
+                        <span class="badge border border-info text-info small">{{ group.course_info.subject.name }}</span>
+                    {% endfor %}
+                </td>
+                <td class="text-secondary small">---</td>
+                <td>
+                    <a href="{% url 'student_detail' student.id %}" class="btn btn-sm btn-outline-info rounded-pill px-3">تفاصيل كاملة</a>
+                </td>
+            </tr>
+            {% endfor %}
+
+            {% for student in inactive_students %}
+            <tr style="opacity: 0.7;">
+                <td class="text-white-50">{{ student.get_full_name }}</td>
+                <td><span class="badge bg-danger-subtle text-danger">غير مشترك</span></td>
+                <td class="text-danger small">لا يوجد مواد</td>
+                <td><span class="text-info small">يحتاج تسويق</span></td>
+                <td>
+                    <a href="{% url 'student_detail' student.id %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">فتح الملف</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

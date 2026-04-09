@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% block title %}تفاصيل دفتر {{ book.book_number }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5" dir="rtl">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <!-- العنوان أصبح باللون الأبيض ليكون مرئياً بوضوح -->
+        <h3 class="fw-bold text-white"><i class="bi bi-journal-text me-2"></i> تفاصيل دفتر الإيصالات: <span class="text-info">{{ book.book_number }}</span></h3>
+        
+        <!-- الأزرار العلوية -->
+        <div>
+            <!-- زر عرض إيصالات اليوم فقط -->
+            <button id="btn-today" class="btn btn-warning fw-bold me-2 shadow-sm">
+                <i class="bi bi-calendar-event me-1"></i> إيصالات اليوم فقط
+            </button>
+            <!-- زر العودة لعرض الكل (مخفي افتراضياً) -->
+            <button id="btn-all" class="btn btn-outline-info fw-bold me-2 shadow-sm d-none">
+                <i class="bi bi-list-check me-1"></i> عرض كل الدفتر
+            </button>
+
+            <a href="{% url 'receipt_books_list' %}" class="btn btn-outline-light fw-bold">
+                <i class="bi bi-arrow-right me-1"></i> عودة للسجل
+            </a>
+        </div>
+    </div>
+
+    <!-- بطاقات الإحصائيات العلوية -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-white-50 fw-bold">الموظف (المحصل)</h6>
+                    <h4 class="fw-bold mb-0">{{ book.user.get_full_name|default:book.user.username }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-white-50 fw-bold">إجمالي التحصيلات بالدفتر</h6>
+                    <h4 class="fw-bold mb-0">{{ total_collected }} ج.م</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark text-white border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-white-50 fw-bold">الإيصالات المستخدمة</h6>
+                    <h4 class="fw-bold mb-0 text-info">{{ used_count }} ورقة</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-white-50 fw-bold">الإيصالات الفارغة (المتبقية)</h6>
+                    <!-- تم استخدام span مع ID ليتم حسابها بواسطة الجافاسكريبت أسفل الصفحة -->
+                    <h4 class="fw-bold mb-0"><span id="remaining_count_display"></span> ورقة</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- جدول جرد الدفتر -->
+    <div class="card shadow border-0 bg-dark">
+        <div class="card-header border-bottom border-secondary p-3">
+            <h5 class="mb-0 fw-bold text-white"><i class="bi bi-list-check me-2"></i> جرد تسلسلي لجميع أوراق الدفتر</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0 text-center">
+                    <thead class="table-active text-white">
+                        <tr>
+                            <th class="py-3">رقم السيريال المرجعي</th>
+                            <th class="py-3">حالة الورقة</th>
+                            <th class="py-3">اسم الطالب</th>
+                            <th class="py-3">بند التحصيل</th>
+                            <th class="py-3">المبلغ</th>
+                            <th class="py-3">تاريخ الحركة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in receipts_data %}
+                        <!-- تمت إضافة كلاس receipt-row و data-date لتسهيل الفلترة -->
+                        <tr class="receipt-row {% if item.status == 'فارغ' %}opacity-50{% endif %}" 
+                            data-date="{{ item.payment.payment_date|date:'Y-m-d'|default:'' }}" 
+                            data-status="{{ item.status }}">
+                            
+                            <!-- رقم الإيصال -->
+                            <td class="fw-bold fs-5 {% if item.status == 'فارغ' %}text-white-50{% else %}text-info{% endif %}">
+                                {{ item.number }}
+                            </td>
+                            
+                            <!-- حالة الورقة -->
+                            <td>
+                                {% if item.status == 'مستخدم' %}
+                                    <span class="badge bg-success rounded-pill px-3 py-2 shadow-sm"><i class="bi bi-check-circle me-1"></i> مستخدم</span>
+                                {% else %}
+                                    <span class="badge bg-secondary rounded-pill px-3 py-2 text-white-50"><i class="bi bi-dash-circle me-1"></i> غير مستخدم</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- تفاصيل الحركة -->
+                            {% if item.payment %}
+                                <td class="fw-bold text-white">{{ item.payment.student.get_full_name|default:"غير مسجل" }}</td>
+                                <td><span class="badge bg-info text-dark px-3 py-2 rounded-pill fw-bold shadow-sm">{{ item.payment.revenue_category.name|default:"-" }}</span></td>
+                                <td class="text-success fw-bold fs-6">{{ item.payment.amount_paid }} ج.م</td>
+                                <td class="small text-white-50 fw-bold">{{ item.payment.payment_date|date:"Y-m-d" }}</td>
+                            {% else %}
+                                <td class="text-white-50">-</td>
+                                <td class="text-white-50">-</td>
+                                <td class="text-white-50">-</td>
+                                <td class="text-white-50">-</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- سكريبت الفلترة وحساب الإيصالات -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. حساب الإيصالات المتبقية (الفارغة)
+        var total = parseInt("{{ total_count|default:0 }}");
+        var used = parseInt("{{ used_count|default:0 }}");
+        var remaining = total - used;
+        document.getElementById("remaining_count_display").innerText = remaining;
+
+        // 2. فلترة إيصالات اليوم
+        const btnToday = document.getElementById('btn-today');
+        const btnAll = document.getElementById('btn-all');
+        const rows = document.querySelectorAll('.receipt-row');
+        const todayString = "{% now 'Y-m-d' %}"; // الحصول على تاريخ اليوم من السيرفر
+
+        btnToday.addEventListener('click', function() {
+            rows.forEach(row => {
+                const rowDate = row.getAttribute('data-date');
+                const rowStatus = row.getAttribute('data-status');
+                
+                // إظهار السطر فقط إذا كان مستخدماً وتاريخه يطابق اليوم
+                if (rowStatus === 'مستخدم' && rowDate === todayString) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none'; // إخفاء الإيصالات الفارغة والقديمة
+                }
+            });
+            // تبديل الأزرار
+            btnToday.classList.add('d-none');
+            btnAll.classList.remove('d-none');
+        });
+
+        btnAll.addEventListener('click', function() {
+            rows.forEach(row => {
+                row.style.display = ''; // إظهار كافة الأسطر من جديد
+            });
+            // تبديل الأزرار
+            btnAll.classList.add('d-none');
+            btnToday.classList.remove('d-none');
+        });
+    });
+</script>
+{% endblock %}
