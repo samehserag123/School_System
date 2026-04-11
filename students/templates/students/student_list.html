@@ -9,16 +9,6 @@
 
 {% block content %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-{% if messages %}
-<div class="container-fluid px-2">
-{% for message in messages %}
-<div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show shadow-sm border-0">
-{{ message }}
-<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-{% endfor %}
-</div>
-{% endif %}
 
 <style>
 
@@ -89,26 +79,36 @@ opacity:.4;
 
     <div class="stat-item">
         <div class="small text-muted">إجمالي الطلاب</div>
-        <div id="stat-total" class="fw-bold text-info fs-5">{{ students.paginator.count }}</div>
+        <div id="stat-total" 
+             class="fw-bold text-info fs-5" 
+             data-original="{{ students.paginator.count }}">
+            {{ students.paginator.count }}
+        </div>
     </div> 
 
     <div class="stat-item" style="border-right-color:#6c757d">
         <div class="small text-muted">غير مسكنين</div>
-        <div id="stat-unassigned" class="fw-bold text-secondary fs-5">
+        <div id="stat-unassigned" 
+             class="fw-bold text-secondary fs-5" 
+             data-original="{{ unassigned_count }}">
             {{ unassigned_count }} 
         </div>
     </div>
 
     <div class="stat-item" style="border-right-color:#2ecc71">
         <div class="small text-muted">مسددين</div>
-        <div id="stat-paid" class="fw-bold text-success fs-5">
+        <div id="stat-paid" 
+             class="fw-bold text-success fs-5" 
+             data-original="{{ paid_count }}">
             {{ paid_count }} 
         </div>
     </div>
 
     <div class="stat-item" style="border-right-color:#ff4d4d">
         <div class="small text-muted">مديونين</div>
-        <div id="stat-debt" class="fw-bold text-danger fs-5">
+        <div id="stat-debt" 
+             class="fw-bold text-danger fs-5" 
+             data-original="{{ debt_count }}">
             {{ debt_count }} 
         </div>
     </div>
@@ -135,41 +135,47 @@ opacity:.4;
 {% endfor %}
 </select>
 </div>
-
 <div class="col-md-6">
     {% if user.is_superuser %}
-    <div class="promote-card mb-0 py-2 border-warning">
-        <div class="row g-2">
+    <div class="promote-card mb-0 py-2 border-warning animate__animated animate__fadeInRight shadow-lg" 
+         style="background: linear-gradient(45deg, #1a1d21, #24282e); border-right: 4px solid #ffc107 !important;">
+        <div class="row g-2 align-items-center">
             <div class="col-md-4">
-                <select name="target_year" class="form-select form-select-sm" required>
-                    <option value="">إلى سنة...</option>
-                    {% for year in all_years %}
-                    <option value="{{ year.id }}">{{ year.name }}</option>
-                    {% endfor %}
-                </select>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-warning text-dark border-warning"><i class="bi bi-calendar-event"></i></span>
+                    <select name="target_year" class="form-select form-select-sm bg-dark text-white border-warning" required>
+                        <option value="">إلى سنة...</option>
+                        {% for year in all_years %}
+                        <option value="{{ year.id }}">{{ year.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
             <div class="col-md-4">
-                <select name="target_grade" class="form-select form-select-sm" required>
-                    <option value="">إلى صف...</option>
-                    {% for grade in all_grades %}
-                    <option value="{{ grade.id }}">{{ grade.name }}</option>
-                    {% endfor %}
-                </select>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-warning text-dark border-warning"><i class="bi bi-mortarboard"></i></span>
+                    <select name="target_grade" class="form-select form-select-sm bg-dark text-white border-warning" required>
+                        <option value="">إلى صف...</option>
+                        {% for grade in all_grades %}
+                        <option value="{{ grade.id }}">{{ grade.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
             <div class="col-md-4">
-                <button type="submit" class="btn btn-warning btn-sm w-100 fw-bold">
-                    <i class="bi bi-rocket-takeoff-fill"></i> تنفيذ الترحيل
+                <button type="submit" class="btn btn-warning btn-sm w-100 fw-bold animate__animated animate__pulse animate__infinite">
+                    <i class="bi bi-rocket-takeoff-fill me-1"></i> تنفيذ الترحيل
                 </button>
             </div>
         </div>
     </div>
     {% else %}
-    <div class="alert alert-dark mb-0 py-2 border-0 text-center small shadow-sm">
-        <i class="bi bi-info-circle ms-1"></i> خاصية الترحيل السنوي متاحة للمدير فقط
+    <div class="alert alert-dark mb-0 py-2 border-0 text-center small shadow-sm opacity-75 animate__animated animate__fadeIn">
+        <i class="bi bi-shield-lock-fill text-warning me-1"></i> 
+        خاصية الترحيل السنوي متاحة لإدارة النظام فقط
     </div>
     {% endif %}
 </div>
-
 
 <div class="table-responsive shadow-lg animate__animated animate__fadeInUp">
 
@@ -221,11 +227,9 @@ opacity:.4;
     <!-- name -->
     <td class="text-end pe-4">
         <div class="d-flex flex-column text-end">
-            <a href="{% url 'add_student' %}?id={{ student.id }}&mode=view"
-               class="fw-bold text-info text-decoration-none">
+            <a href="{% url 'student_dashboard' student.id %}" class="fw-bold text-info text-decoration-none">
                 {{ student.get_full_name }}
             </a>
-
             <small class="text-muted">
                 <i class="bi bi-hash"></i>
                 {{ student.student_code }}
@@ -433,38 +437,30 @@ opacity:.4;
 
 
 <script>
-
-/* رسالة تأكيد الترحيل */
+/* 1. رسالة تأكيد الترحيل */
 document.getElementById("promoteForm").addEventListener("submit", function(e){
-
     let checked = document.querySelectorAll(".student-checkbox:checked").length;
-
     if(checked === 0){
         alert("يجب اختيار طالب واحد على الأقل");
         e.preventDefault();
         return;
     }
-
     if(!confirm("هل أنت متأكد من ترحيل الطلاب المحددين إلى السنة الجديدة؟")){
         e.preventDefault();
     }
-
 });
 
+/* 2. دالة حركة النبض (Pulse) عند تغير الأرقام */
 function applyPulse(id, newValue) {
     const el = document.getElementById(id);
     if (!el) return;
 
     const oldValue = el.innerText;
-    // لا تشغل الحركة إلا إذا تغير الرقم فعلياً أثناء البحث أو التصفية
     if (oldValue != newValue) {
         el.innerText = newValue;
-        
-        // البحث عن الكارت المحيط (stat-item) لتطبيق النبض عليه بالكامل
         const parentCard = el.closest('.stat-item');
         if (parentCard) {
             parentCard.classList.add('pulse-update');
-            // إزالة الكلاس بعد انتهاء الأنيميشن (0.5 ثانية) ليتمكن من العمل مرة أخرى
             setTimeout(() => {
                 parentCard.classList.remove('pulse-update');
             }, 500);
@@ -472,108 +468,93 @@ function applyPulse(id, newValue) {
     }
 }
 
-/* 2. تحديث الإحصائيات (تحديث العدادات بناءً على ما يظهر في الجدول) */
+/* 3. تحديث الإحصائيات (معدلة لتدعم الترقيم والبحث معاً) */
 function updateStats() {
-    let rows = document.querySelectorAll(".student-row");
+    let input = document.getElementById('searchInput').value.trim().toLowerCase();
+    
+    // العناصر المستهدفة
+    const stats = {
+        total: document.getElementById("stat-total"),
+        unassigned: document.getElementById("stat-unassigned"),
+        paid: document.getElementById("stat-paid"),
+        debt: document.getElementById("stat-debt")
+    };
 
-    let paid = 0;
-    let debt = 0;
-    let unassigned = 0;
-    let totalVisible = 0;
+    // الحالة الأولى: إذا كان مربع البحث فارغاً -> استرجاع الأرقام الكلية من السيرفر
+    if (input === "") {
+        for (let key in stats) {
+            if (stats[key]) {
+                // سحب القيمة الأصلية المخزنة في data-original
+                let originalVal = stats[key].getAttribute('data-original');
+                applyPulse(stats[key].id, originalVal);
+            }
+        }
+        return; 
+    }
+
+    // الحالة الثانية: يوجد بحث نشط -> الحساب من الجدول (للصفحة الحالية فقط)
+    let rows = document.querySelectorAll(".student-row");
+    let paid = 0, debt = 0, unassigned = 0, totalVisible = 0;
 
     rows.forEach(row => {
-        // تجاهل الصفوف المخفية (بعد البحث)
-        if (row.style.display === "none") return;
-
-        totalVisible++;
-
-        // الموقف المالي (العمود 9)
-        let badge = row.cells[8].querySelector(".badge");
-
-        if (badge) {
-            if (badge.classList.contains("bg-success")) {
-                paid++;
-            } else if (badge.classList.contains("bg-danger")) {
-                debt++;
-            } else if (badge.classList.contains("bg-secondary")) {
-                unassigned++;
+        if (row.style.display !== "none") {
+            totalVisible++;
+            let badge = row.cells[8].querySelector(".badge"); // الموقف المالي (العمود 9)
+            if (badge) {
+                if (badge.classList.contains("bg-success")) paid++;
+                else if (badge.classList.contains("bg-danger")) debt++;
+                else if (badge.classList.contains("bg-secondary")) unassigned++;
             }
         }
     });
 
-    // تحديث القيم مع الحركة (تأكد أن الـ IDs مطابقة للـ HTML لديك)
+    applyPulse("stat-total", totalVisible);
     applyPulse("stat-paid", paid);
     applyPulse("stat-debt", debt);
     applyPulse("stat-unassigned", unassigned);
-
-    // تحديث الإجمالي (الظاهر فقط)
-    let totalBox = document.getElementById("stat-total");
-    if (totalBox) {
-        applyPulse("stat-total", totalVisible);
-    } else {
-        // دعم للكلاس القديم في حال لم تضف الـ ID بعد
-        let oldTotalBox = document.querySelector(".text-info.fs-5");
-        if (oldTotalBox) oldTotalBox.innerText = totalVisible;
-    }
 }
-/* دالة البحث المتقدمة مع حركات الظهور للجدول */
+
+/* 4. دالة البحث المتقدمة */
 function runSearch() {
     let input = document.getElementById('searchInput').value.toLowerCase();
     let rows = document.querySelectorAll('.student-row');
 
     rows.forEach(row => {
         let text = row.dataset.search.toLowerCase();
-        
         if (text.includes(input)) {
-            // إذا كان الصف مخفياً وظهر الآن، نطبق عليه حركة دخول
             if (row.style.display === 'none') {
                 row.style.display = '';
-                // نستخدم animate__fadeInUp ليعطي تأثير الصعود من أسفل لأعلى
                 row.classList.add('animate__animated', 'animate__fadeInUp', 'animate__faster');
-                
-                // تنظيف الكلاسات بعد انتهاء الحركة لضمان عملها في المرة القادمة
                 setTimeout(() => {
                     row.classList.remove('animate__animated', 'animate__fadeInUp', 'animate__faster');
                 }, 500);
             }
         } else {
-            // إخفاء الصفوف التي لا تطابق البحث
             row.style.display = 'none';
         }
     });
 
-    // تحديث العدادات (التي تحتوي بدورها على حركة النبض Pulse)
+    // تشغيل تحديث العدادات بناءً على نتائج البحث
     updateStats(); 
 }
 
-
-/* تحديد الكل */
+/* 5. تحديد الكل (فقط للصفوف الظاهرة) */
 let selectAll = document.getElementById("selectAll");
-
 if(selectAll){
-
     selectAll.onclick = function(){
-
         document.querySelectorAll(".student-checkbox").forEach(cb => {
-
             let row = cb.closest("tr");
-
             if(row.style.display !== "none"){
                 cb.checked = this.checked;
             }
-
         });
-
     }
-
 }
 
-
-/* تشغيل عند تحميل الصفحة */
+/* 6. تشغيل عند تحميل الصفحة */
 document.addEventListener("DOMContentLoaded", function(){
-    updateStats();
+    // ملاحظة: لا نستدعي updateStats هنا لأن الأرقام تأتي جاهزة من السيرفر لكل الصفحات
+    // الـ JavaScript سيتدخل فقط عندما يبدأ المستخدم في الكتابة في SearchInput
 });
-
 </script>
-
 {% endblock %}

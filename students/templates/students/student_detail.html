@@ -1,45 +1,402 @@
-{% extends "base.html" %} {% block content %}
-<div class="container mt-4">
-    <div class="container-card" style="background: #000; border: 1px solid #1e293b; padding: 30px; border-radius: 20px;">
-        <h2 class="text-info fw-900 mb-4 border-bottom border-secondary pb-2">
-            <i class="bi bi-person-badge"></i> ملف الطالب: {{ student.get_full_name }}
-        </h2>
+{% extends 'base.html' %}
+{% load static %}
 
-        <div class="row g-4">
-            <div class="col-md-6">
-                <h5 class="text-success fw-bold mb-3"><i class="bi bi-check-circle-fill"></i> المواد المسجلة</h5>
-                <div class="list-group">
-                    {% for item in enrollments %}
-                    <div class="list-group-item bg-dark text-white border-secondary mb-2 rounded shadow-sm">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong class="text-info">{{ item.course_info.subject.name }}</strong><br>
-                                <small class="text-secondary">المدرس: {{ item.course_info.teacher.name }}</small>
-                            </div>
-                            <span class="badge bg-primary">باقي {{ item.remaining_sessions }} حِصص</span>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <p class="text-secondary">لا يوجد اشتراكات نشطة</p>
-                    {% endfor %}
+{% block title %}ملف الطالب | {{ student.get_full_name }}{% endblock %}
+
+{% block extra_css %}
+<!-- Chart.js للرسوم البيانية -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    /* تعديلات خاصة بصفحة الطالب فقط لتتوافق مع الـ base.html 
+     بدون تغيير ألوان الـ base.html الأساسية
+    */
+    .student-dashboard-wrapper {
+        --card-inner: #020617;
+        --text-main: #e2e8f0;
+        --accent-primary: #38bdf8;
+        --accent-success: #39ff14;
+        --accent-danger: #ff3131;
+        --accent-warning: #facc15;
+    }
+
+    /* تنسيق البطاقات */
+    .student-dashboard-wrapper .dashboard-card {
+        background: var(--card-inner);
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        height: 100%;
+    }
+
+    .student-dashboard-wrapper .stat-box {
+        background: #000;
+        border-radius: 12px;
+        padding: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: transform 0.3s ease;
+    }
+    .student-dashboard-wrapper .stat-box:hover { transform: translateY(-5px); }
+
+    /* ألوان النيون للحدود الجانبية */
+    .student-dashboard-wrapper .border-left-info { border-right: 4px solid var(--accent-primary) !important; border-left: none !important; }
+    .student-dashboard-wrapper .border-left-success { border-right: 4px solid var(--accent-success) !important; border-left: none !important; }
+    .student-dashboard-wrapper .border-left-danger { border-right: 4px solid var(--accent-danger) !important; border-left: none !important; }
+
+    /* شريط التقدم للحصص */
+    .student-dashboard-wrapper .progress-dark {
+        background-color: #0f172a;
+        height: 12px;
+        border-radius: 20px;
+        border: 1px solid #1e293b;
+        overflow: hidden;
+    }
+    .student-dashboard-wrapper .progress-bar-neon {
+        background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    }
+
+    /* شارات الحالات */
+    .student-dashboard-wrapper .badge-neon-danger {
+        background: rgba(255, 49, 49, 0.1);
+        color: var(--accent-danger);
+        border: 1px solid rgba(255, 49, 49, 0.3);
+        font-weight: 800;
+    }
+    .student-dashboard-wrapper .badge-neon-success {
+        background: rgba(57, 255, 20, 0.1);
+        color: var(--accent-success);
+        border: 1px solid rgba(57, 255, 20, 0.3);
+        font-weight: 800;
+    }
+
+    .student-dashboard-wrapper .subject-item {
+        background: #000;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        transition: all 0.3s ease;
+    }
+    .student-dashboard-wrapper .subject-item:hover { border-color: var(--accent-primary); }
+
+    .student-dashboard-wrapper .unenrolled-item {
+        background: rgba(250, 204, 21, 0.05);
+        border: 1px dashed rgba(250, 204, 21, 0.3);
+        border-radius: 10px;
+        padding: 12px 15px;
+        margin-bottom: 10px;
+        color: var(--accent-warning);
+    }
+
+    /* حاوية الرسوم البيانية */
+    .student-dashboard-wrapper .chart-container {
+        position: relative;
+        height: 250px;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block page_title %}التحليل الإحصائي لملف الطالب{% endblock %}
+
+{% block content %}
+<div class="student-dashboard-wrapper">
+    
+    <!-- رأس الصفحة وأزرار التحكم -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 dashboard-card" style="padding: 15px 25px;">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-primary bg-opacity-10 p-3 rounded-circle border border-primary border-opacity-25">
+                <i class="bi bi-person-bounding-box fs-3 text-info"></i>
+            </div>
+            <div>
+                <h3 class="fw-900 m-0 text-white">{{ student.get_full_name }}</h3>
+                <div class="small text-secondary mt-1">
+                    <span class="me-3"><i class="bi bi-hash text-info"></i> كود: {{ student.student_code }}</span>
+                    <span><i class="bi bi-mortarboard text-warning"></i> الصف: {{ student.grade.name|default:"غير محدد" }}</span>
                 </div>
             </div>
+        </div>
+        
+        <!-- زر العودة -->
+        <a href="{% url 'students_analytics' %}" class="btn btn-outline-info rounded-pill px-4 mt-3 mt-md-0 fw-bold shadow-sm" style="border: 2px solid #38bdf8; background: rgba(56, 189, 248, 0.05);">
+            <i class="bi bi-arrow-right-circle me-2"></i> عودة للوحة التحكم
+        </a>
+    </div>
 
-            <div class="col-md-6">
-                <h5 class="text-warning fw-bold mb-3"><i class="bi bi-exclamation-triangle"></i> مواد غير مشترك بها</h5>
-                <div class="d-flex flex-wrap gap-2">
-                    {% for sub in other_subjects %}
-                        <span class="badge border border-secondary text-secondary p-2">{{ sub.name }}</span>
-                    {% empty %}
-                    <p class="text-success">مشترك في جميع المواد المتاحة</p>
-                    {% endfor %}
+    <!-- الإحصائيات السريعة (الملخص المالي والحصص) -->
+    <div class="row g-3 mb-4">
+        <!-- إجمالي الديون -->
+        <div class="col-md-4">
+            <div class="stat-box border-left-danger shadow-lg">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small text-secondary fw-bold">إجمالي المديونية (مستحقات)</div>
+                    <i class="bi bi-cash-coin fs-4" style="color: var(--accent-danger);"></i>
+                </div>
+                <div class="fs-2 fw-900" style="color: var(--accent-danger);" id="totalDebtDisplay">
+                    0 <span class="fs-6 text-secondary fw-normal">ج.م</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- عدد المواد -->
+        <div class="col-md-4">
+            <div class="stat-box border-left-info shadow-lg">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small text-secondary fw-bold">المواد المشترك بها</div>
+                    <i class="bi bi-book fs-4 text-info"></i>
+                </div>
+                <div class="fs-2 fw-900 text-info">
+                    {{ enrollments.count }} <span class="fs-6 text-secondary fw-normal">مادة</span>
                 </div>
             </div>
         </div>
 
-        <div class="mt-5">
-            <a href="{% url 'course_prices' %}" class="btn btn-outline-secondary rounded-pill px-4">عودة للوحة التحكم</a>
+        <!-- إجمالي الحصص المتبقية -->
+        <div class="col-md-4">
+            <div class="stat-box border-left-success shadow-lg">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small text-secondary fw-bold">إجمالي الحصص المتبقية (رصيد)</div>
+                    <i class="bi bi-calendar-check fs-4" style="color: var(--accent-success);"></i>
+                </div>
+                <div class="fs-2 fw-900" style="color: var(--accent-success);" id="totalSessionsDisplay">
+                    0 <span class="fs-6 text-secondary fw-normal">حصة</span>
+                </div>
+            </div>
         </div>
     </div>
+
+    <!-- الرسوم البيانية -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-8">
+            <div class="dashboard-card">
+                <h5 class="fw-bold text-info mb-4"><i class="bi bi-bar-chart-fill me-2"></i> تحليل الحضور والغياب (لكل مادة)</h5>
+                <div class="chart-container">
+                    <canvas id="attendanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="dashboard-card">
+                <h5 class="fw-bold text-warning mb-4"><i class="bi bi-pie-chart-fill me-2"></i> الموقف المالي للمواد</h5>
+                <div class="chart-container">
+                    <canvas id="financeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- التفاصيل (المواد المشتركة والغير مشتركة) -->
+    <div class="row g-4">
+        
+        <!-- المواد المشترك بها -->
+        <div class="col-lg-8">
+            <div class="dashboard-card">
+                <h5 class="fw-bold text-success mb-4"><i class="bi bi-check-circle-fill me-2"></i> المواد المشترك بها وتفاصيلها</h5>
+                
+                {% for course in enrollments %}
+                <div class="subject-item shadow-sm">
+                    <div class="row align-items-center">
+                        <div class="col-md-4 mb-3 mb-md-0">
+                            <h5 class="fw-bold text-white mb-1">{{ course.course_info.subject.name }}</h5>
+                            <div class="small text-secondary"><i class="bi bi-person-video3 text-info"></i> المدرس: {{ course.course_info.teacher.name }}</div>
+                            <div class="small text-secondary mt-1" style="font-size: 0.75rem;">
+                                <i class="bi bi-calendar3"></i> تاريخ الاشتراك: {{ course.created_at|date:"Y-m-d"|default:"غير متوفر" }}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-5 mb-3 mb-md-0 px-md-4 border-start border-end border-secondary border-opacity-25">
+                            <div class="d-flex justify-content-between small fw-bold mb-1">
+                                <span class="text-secondary">نسبة الحضور</span>
+                                <span class="text-info">{{ course.attended_sessions_count }} / {{ course.total_sessions }}</span>
+                            </div>
+                            <div class="progress-dark mb-1">
+                                <div class="progress-bar-neon h-100" style="width: {% widthratio course.attended_sessions_count course.total_sessions 100 %}%"></div>
+                            </div>
+                            <div class="small text-white-50 mt-1">المتبقي: <b class="text-success session-calc">{{ course.remaining_sessions }}</b> حصة</div>
+                        </div>
+
+                        <div class="col-md-3 text-center text-md-start px-md-4">
+                            <div class="small text-secondary fw-bold mb-1">الموقف المالي</div>
+                            {% if course.remaining_amount <= 0 %}
+                                <span class="badge badge-neon-success w-100 py-2 fs-6 rounded-pill"><i class="bi bi-check2-all"></i> خالص (مسدد)</span>
+                                <!-- داتا مخفية للرسم البياني -->
+                                <input type="hidden" class="debt-data" data-subject="{{ course.course_info.subject.name }}" value="0">
+                            {% else %}
+                                <span class="badge badge-neon-danger w-100 py-2 fs-6 rounded-pill"><i class="bi bi-exclamation-octagon"></i> عليه: {{ course.remaining_amount }} ج</span>
+                                <!-- داتا مخفية للرسم البياني -->
+                                <input type="hidden" class="debt-data" data-subject="{{ course.course_info.subject.name }}" value="{{ course.remaining_amount }}">
+                            {% endif %}
+                            
+                            <!-- داتا مخفية للرسم البياني (الحضور) -->
+                            <input type="hidden" class="attendance-data" 
+                                   data-subject="{{ course.course_info.subject.name }}" 
+                                   data-attended="{{ course.attended_sessions_count }}" 
+                                   data-remaining="{{ course.remaining_sessions }}">
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-5 text-secondary">
+                    <i class="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i>
+                    هذا الطالب غير مشترك في أي مادة حالياً.
+                </div>
+                {% endfor %}
+
+            </div>
+        </div>
+
+        <!-- المواد الغير مشترك بها (فرص التسويق) -->
+        <div class="col-lg-4">
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold text-warning m-0"><i class="bi bi-exclamation-triangle-fill me-2"></i> مواد غير مشترك بها</h5>
+                    <span class="badge bg-warning text-dark rounded-pill">{{ other_subjects.count }}</span>
+                </div>
+                
+                <div class="unenrolled-list">
+                    {% for subject in other_subjects %}
+                    <div class="unenrolled-item d-flex justify-content-between align-items-center">
+                        <span class="fw-bold"><i class="bi bi-dash-circle me-1 opacity-50"></i> {{ subject.name }}</span>
+                        <!-- يمكنك لاحقاً تحويل هذا الزر ليفتح مودال إضافة اشتراك سريع -->
+                        <button class="btn btn-sm btn-outline-warning rounded-pill py-0 px-2" style="font-size: 0.75rem;">تسويق</button>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-4 text-success fw-bold small bg-success bg-opacity-10 rounded border border-success border-opacity-25">
+                        <i class="bi bi-star-fill me-1"></i> الطالب مشترك في جميع المواد المتاحة!
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+    </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        
+        // 1. حساب إجمالي الديون وإجمالي الحصص المتبقية برمجياً من الصفحة
+        let totalDebt = 0;
+        let totalSessions = 0;
+        
+        // حساب الديون
+        document.querySelectorAll('.debt-data').forEach(item => {
+            totalDebt += parseFloat(item.value) || 0;
+        });
+        document.getElementById('totalDebtDisplay').innerHTML = totalDebt + ' <span class="fs-6 text-secondary fw-normal">ج.م</span>';
+        
+        // حساب الحصص
+        document.querySelectorAll('.session-calc').forEach(item => {
+            totalSessions += parseInt(item.innerText) || 0;
+        });
+        document.getElementById('totalSessionsDisplay').innerHTML = totalSessions + ' <span class="fs-6 text-secondary fw-normal">حصة</span>';
+
+
+        // 2. تجميع بيانات الرسم البياني من الحقول المخفية
+        let subjects = [];
+        let attendedData = [];
+        let remainingData = [];
+        let debtValues = [];
+        let debtLabels = [];
+
+        document.querySelectorAll('.attendance-data').forEach(item => {
+            subjects.push(item.getAttribute('data-subject'));
+            attendedData.push(parseInt(item.getAttribute('data-attended')));
+            remainingData.push(parseInt(item.getAttribute('data-remaining')));
+        });
+
+        document.querySelectorAll('.debt-data').forEach(item => {
+            let val = parseFloat(item.value);
+            if(val > 0) {
+                debtLabels.push(item.getAttribute('data-subject'));
+                debtValues.push(val);
+            }
+        });
+
+        // إعدادات افتراضية للرسوم البيانية
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = 'Cairo';
+
+        // 3. رسم بياني: الحضور والغياب (Bar Chart)
+        if(subjects.length > 0) {
+            const ctxAttendance = document.getElementById('attendanceChart').getContext('2d');
+            new Chart(ctxAttendance, {
+                type: 'bar',
+                data: {
+                    labels: subjects,
+                    datasets: [
+                        {
+                            label: 'حصص تم حضورها',
+                            data: attendedData,
+                            backgroundColor: '#38bdf8',
+                            borderRadius: 5
+                        },
+                        {
+                            label: 'حصص متبقية (رصيد)',
+                            data: remainingData,
+                            backgroundColor: '#39ff14',
+                            borderRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            stacked: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' } 
+                        },
+                        x: { 
+                            stacked: true,
+                            grid: { display: false } 
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top' }
+                    }
+                }
+            });
+        }
+
+        // 4. رسم بياني: المديونية (Doughnut Chart)
+        const ctxFinance = document.getElementById('financeChart').getContext('2d');
+        if(debtValues.length > 0) {
+            new Chart(ctxFinance, {
+                type: 'doughnut',
+                data: {
+                    labels: debtLabels,
+                    datasets: [{
+                        data: debtValues,
+                        backgroundColor: ['#ff3131', '#facc15', '#f43f5e', '#ec4899', '#8b5cf6'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        } else {
+            // في حالة عدم وجود ديون
+            document.getElementById('financeChart').parentElement.innerHTML = `
+                <div class="h-100 d-flex flex-column align-items-center justify-content-center text-success">
+                    <i class="bi bi-shield-check" style="font-size: 4rem;"></i>
+                    <h5 class="fw-bold mt-2">لا توجد ديون</h5>
+                    <p class="small text-secondary">الطالب مسدد لجميع اشتراكاته</p>
+                </div>
+            `;
+        }
+    });
+</script>
 {% endblock %}

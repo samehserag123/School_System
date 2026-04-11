@@ -159,6 +159,94 @@
                 display: none !important; 
             }
         }
+
+        /* ========================================== */
+        /* 🚀 نظام الإشعارات العائمة الذكية (Toasts) */
+        /* ========================================== */
+        .toast-notification-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            pointer-events: none; /* حتى لا تمنع الضغط على ما خلفها */
+        }
+
+        .modern-toast {
+            min-width: 300px;
+            max-width: 400px;
+            background: rgba(2, 6, 23, 0.95);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: toastSlideIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        .modern-toast.toast-fade-out {
+            animation: toastSlideOut 0.4s ease-in forwards;
+        }
+
+        @keyframes toastSlideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes toastSlideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(-100%); opacity: 0; }
+        }
+
+        .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            width: 100%;
+            background: #fff;
+            animation: toastProgress 4s linear forwards;
+        }
+
+        @keyframes toastProgress {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+
+        .toast-icon {
+            font-size: 1.5rem;
+            margin-left: 15px;
+        }
+        
+        .toast-message {
+            font-family: 'Cairo', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .toast-success { border-right: 5px solid #39ff14; }
+        .toast-success .toast-icon { color: #39ff14; }
+        .toast-success .toast-progress { background: #39ff14; }
+
+        .toast-error, .toast-danger { border-right: 5px solid #ff3131; }
+        .toast-error .toast-icon, .toast-danger .toast-icon { color: #ff3131; }
+        .toast-error .toast-progress, .toast-danger .toast-progress { background: #ff3131; }
+
+        .toast-warning { border-right: 5px solid #facc15; }
+        .toast-warning .toast-icon { color: #facc15; }
+        .toast-warning .toast-progress { background: #facc15; }
+
+        .toast-info { border-right: 5px solid #38bdf8; }
+        .toast-info .toast-icon { color: #38bdf8; }
+        .toast-info .toast-progress { background: #38bdf8; }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -246,13 +334,44 @@
         </div>
     </div>
     
+    <!-- تم تغيير الإشعارات القديمة المزعجة إلى إشعارات عائمة حديثة -->
     {% if messages %}
+    <div class="toast-notification-container">
         {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show text-center shadow-sm">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="modern-toast toast-{{ message.tags }}" role="alert">
+            <div class="toast-icon">
+                {% if message.tags == 'success' %}
+                    <i class="bi bi-check-circle-fill"></i>
+                {% elif message.tags == 'error' or message.tags == 'danger' %}
+                    <i class="bi bi-x-circle-fill"></i>
+                {% elif message.tags == 'warning' %}
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                {% else %}
+                    <i class="bi bi-info-circle-fill"></i>
+                {% endif %}
             </div>
+            <div class="toast-message">
+                {{ message }}
+            </div>
+            <div class="toast-progress"></div>
+        </div>
         {% endfor %}
+    </div>
+
+    <script>
+        // برمجة اختفاء الإشعارات تلقائياً بعد 4 ثوانٍ
+        document.addEventListener("DOMContentLoaded", function() {
+            const toasts = document.querySelectorAll('.modern-toast');
+            toasts.forEach(toast => {
+                setTimeout(() => {
+                    toast.classList.add('toast-fade-out');
+                    setTimeout(() => {
+                        toast.remove();
+                    }, 400); 
+                }, 4000); 
+            });
+        });
+    </script>
     {% endif %}
 
     {% block content %}{% endblock %}

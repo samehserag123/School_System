@@ -56,7 +56,7 @@ class Student(models.Model):
     # --- الخيارات (Choices) ---
     RELIGION_CHOICES = [("Muslim", "مسلم"), ("Christian", "مسيحي")]
     STATUS_CHOICES = [("New", "مستجد"), ("Transferred", "منقول"), ("Home", "عمال"), ("Promoted", "ناجح ومنقول")]
-    GENDER_CHOICES = [('Male', 'ذكر'), ('Female', 'أنثى')]
+    GENDER_CHOICES = [('Male', 'بنين'), ('Female', 'بنات')]
     SPECIALIZATION_CHOICES = [
         ("General", "شعبة عامة"), ("Restaurant", "مطعم"), ("Kitchen", "مطبخ"),
         ("Guidance", "ارشاد"), ("Internal", "اشراف داخلي"), ("Computer", "حاسب الي"),
@@ -638,3 +638,120 @@ class CoursePayment(models.Model):
             'total_due': total_required - total_paid,
             'pending_items_count': pending_delivery, # أشياء دفع ثمنها ولم يستلمها
         }
+        
+
+class BusRoute(models.Model):
+    """جدول خطوط الباصات"""
+    name = models.CharField("اسم الخط / المنطقة", max_length=150, unique=True)
+    driver_name = models.CharField("اسم السائق", max_length=100, blank=True, null=True)
+    driver_phone = models.CharField("هاتف السائق", max_length=20, blank=True, null=True)
+    bus_number = models.CharField("رقم اللوحة", max_length=50, blank=True, null=True)
+    capacity = models.PositiveIntegerField("سعة الباص (عدد الكراسي)", default=20)
+    
+    # أسعار الخط (يمكن تركها 0 وتحديد السعر وقت الاشتراك)
+    monthly_price = models.DecimalField("السعر الشهري", max_digits=10, decimal_places=2, default=0)
+    term_price = models.DecimalField("سعر التيرم", max_digits=10, decimal_places=2, default=0)
+    yearly_price = models.DecimalField("السعر السنوي", max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        verbose_name = "خط باص"
+        verbose_name_plural = "خطوط الباصات"
+
+    @property
+    def current_occupancy(self):
+        """يحسب عدد الطلاب المشتركين حالياً في هذا الخط"""
+        return self.subscriptions.filter(is_active=True).count()
+
+    def __str__(self):
+        return f"{self.name} (سعة: {self.capacity})"
+
+
+class BusSubscription(models.Model):
+    """جدول اشتراكات الطلاب في الباص"""
+    SUBSCRIPTION_TYPES = [
+        ('monthly', 'شهري'),
+        ('term', 'تيرم (فصل دراسي)'),
+        ('yearly', 'سنوي (عام كامل)'),
+        ('custom', 'مخصص'),
+    ]
+
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب", related_name="bus_subscriptions")
+    route = models.ForeignKey(BusRoute, on_delete=models.PROTECT, verbose_name="خط الباص", related_name="subscriptions")
+    sub_type = models.CharField("نوع الاشتراك", max_length=20, choices=SUBSCRIPTION_TYPES, default='monthly')
+    
+    start_date = models.DateField("تاريخ بداية الاشتراك")
+    end_date = models.DateField("تاريخ نهاية الاشتراك")
+    
+    required_amount = models.DecimalField("المبلغ المطلوب", max_digits=10, decimal_places=2)
+    is_active = models.BooleanField("حالة الاشتراك (فعال)", default=True)
+    notes = models.TextField("ملاحظات", blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "اشتراك باص"
+        verbose_name_plural = "اشتراكات الباص"
+        ordering = ['-created_at']
+
+    @property
+    def total_paid(self):
+        """إجمالي المدفوع لهذا الاشتراك (بافتراض وجود موديل BusPayment مشابه لـ CoursePayment)"""
+        # يمكنك ربطه بجدول الخزينة الخاص بك، هنا وضعنا دالة جاهزة للعمل
+        return self.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
+
+    @property
+    def remaining_amount(self):
+        """المبلغ المتبقي"""
+        return self.required_amount - self.total_paid
+
+    @property
+    def payment_status_label(self):
+        if self.remaining_amount <= 0:
+            return "مسدد بالكامل"
+        elif self.total_paid > 0:
+            return "سداد جزئي"
+        return "لم يتم السداد"
+
+    def __str__(self):
+        return f"{self.student.get_full_name()} - {self.route.name}"
+
+
+class BusPayment(models.Model):
+    """سجل تحصيلات الباص (الخزينة)"""
+    subscription = models.ForeignKey(BusSubscription, on_delete=models.CASCADE, verbose_name="الاشتراك", related_name="payments")
+    amount_paid = models.DecimalField("المبلغ المدفوع", max_digits=10, decimal_places=2)
+    payment_date = models.DateTimeField("تاريخ التحصيل", auto_now_add=True)
+    collected_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "تحصيل باص"
+        verbose_name_plural = "تحصيلات الباص"
+
+# ... existing code ...
+class MiscellaneousRevenue(models.Model):
+    """جدول الإيرادات المتنوعة (أخرى)"""
+    REVENUE_TYPES = [
+        ('canteen', 'إيجار كانتين'),
+        ('donation', 'تبرعات'),
+        ('activities', 'رسوم أنشطة / رحلات'),
+        ('papers', 'رسوم استخراج أوراق'),
+        ('other', 'أخرى متنوعة'),
+    ]
+    
+    title = models.CharField("بيان الإيراد", max_length=200)
+    revenue_type = models.CharField("تصنيف الإيراد", max_length=50, choices=REVENUE_TYPES, default='other')
+    amount = models.DecimalField("المبلغ المورد", max_digits=12, decimal_places=2)
+    date = models.DateTimeField("تاريخ ووقت التحصيل", auto_now_add=True)
+    collected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="الموظف المستلم")
+    notes = models.TextField("ملاحظات إضافية", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "إيراد متنوع"
+        verbose_name_plural = "الإيرادات المتنوعة"
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.title} - {self.amount} ج.م"
+    
+    
+    
+    

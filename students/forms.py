@@ -8,6 +8,7 @@ from .models import InventoryRestock  # 👈 هذا هو السطر الناقص
 
 from treasury.models import GeneralLedger
 
+from .models import BusSubscription, BusRoute
 
 
 class GeneralLedgerForm(forms.ModelForm):
@@ -152,55 +153,24 @@ def __init__(self, *args, **kwargs):
     
     self.fields['student'].required = False
 
-# class CourseGroupForm(forms.ModelForm):
-#     # 1. حقل المدرس (فلتر وهمي): لاختيار المدرس وتصفية المواد بناءً عليه
-#     teacher = forms.ModelChoiceField(
-#         queryset=Teacher.objects.all(),
-#         label="1. اختر المدرس",
-#         required=False,
-#         empty_label="--- ابحث واختار اسم المدرس ---",
-#         widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_teacher_filter'})
-#     )
-
-#     class Meta:
-#         model = CourseGroup
-#         # ترتيب الحقول: الطالب -> المدرس -> المادة -> عدد الحصص -> ملاحظات
-#         fields = ['student', 'teacher', 'course_info', 'total_sessions', 'notes'] 
+class BusSubscriptionForm(forms.ModelForm):
+    class Meta:
+        model = BusSubscription
+        fields = ['student', 'route', 'sub_type', 'start_date', 'end_date', 'required_amount', 'notes']
+        widgets = {
+            'student': forms.Select(attrs={'class': 'form-select bg-black text-white border-secondary select2'}),
+            'route': forms.Select(attrs={'class': 'form-select bg-black text-white border-secondary'}),
+            'sub_type': forms.Select(attrs={'class': 'form-select bg-black text-white border-secondary'}),
+            'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control bg-black text-white border-secondary'}),
+            'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control bg-black text-white border-secondary'}),
+            'required_amount': forms.NumberInput(attrs={'class': 'form-control border-info text-info', 'style': 'background: rgba(56, 189, 248, 0.05);', 'placeholder': '0.00'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control bg-black text-white border-secondary', 'rows': 2}),
+        }
         
-#         widgets = {
-#             # حقل الطالب: لتركيب Select2 عليه في الـ HTML
-#             'student': forms.Select(attrs={'class': 'form-select select2-student'}),
-            
-#             # حقل المادة: يتم فلترته بواسطة JavaScript بناءً على المدرس
-#             'course_info': forms.Select(attrs={'class': 'form-select', 'id': 'id_course_info'}),
-            
-#             # 🟢 التعديل الجوهري: حقل عدد الحصص كـ NumberInput لضمان التفعيل والظهور
-#             'total_sessions': forms.NumberInput(attrs={
-#                 'class': 'form-control',
-#                 'placeholder': '4',
-#                 'min': '1',
-#                 'style': 'font-weight: 900; text-align: center;' # لضمان الوضوح الفائق
-#             }),
-            
-#             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 1, 'placeholder': 'أي ملاحظات إضافية...'}),
-#         }
-        
-#         labels = {
-#             'student': 'اسم الطالب (بحث بالاسم)',
-#             'course_info': '2. المادة / النوع / السعر',
-#             'total_sessions': 'إجمالي الحصص',
-#             'notes': 'ملاحظات',
-#         }
-
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         # تخصيص رسائل القوائم الفارغة والتحقق من التفعيل
-#         self.fields['course_info'].empty_label = "--- اختر المدرس أولاً لرؤية مواده ---"
-#         self.fields['student'].empty_label = "اكتب اسم الطالب للبحث..."
-        
-#         # التأكد من أن حقل الحصص مطلوب ونشط [cite: 2026-04-06]
-#         self.fields['total_sessions'].required = True
-             
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # يمكنك هنا إضافة فلاتر مخصصة، مثلاً:
+        # self.fields['route'].queryset = BusRoute.objects.filter(capacity__gt=0)             
         
 class StudentForm(forms.ModelForm):
     class Meta:

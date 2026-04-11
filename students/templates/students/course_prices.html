@@ -53,7 +53,7 @@
             box-shadow: inset 0 0 20px rgba(0,0,0,1);
         }
 
-                /* تنسيق الطالب والمادة - محاذاة لليمين وتصغير الخط */
+        /* تنسيق الطالب والمادة - محاذاة لليمين وتصغير الخط */
         /* --- تنسيق عمود الطالب والمادة --- */
         .student-box {
             text-align: right !important; /* ضمان المحاذاة لليمين */
@@ -142,9 +142,6 @@
         /* --- نظام Select2 المطور (أسود فاحم + أبيض ناصع) --- */
         
         /* 1. القائمة المفتوحة */
-        /* --- نظام القوائم السوداء الموحد (المدرس، الباقة، الطالب) --- */
-
-/* 1. القائمة المفتوحة */
         .select2-dropdown {
             background-color: #000000 !important;
             border: 1px solid #38bdf8 !important;
@@ -162,9 +159,8 @@
             background-color: #000000 !important;
             color: #ffffff !important;
             border-bottom: 1px solid #0f172a;
-            padding: 10px 15px !important;
-            padding: 4px 12px !important; /* تقليل التباعد الرأسي من 10 إلى 4 */
-            line-height: 1.1 !important;  /* ضغط الأسطر لتقليل الارتفاع الكلي */
+            padding: 4px 12px !important; 
+            line-height: 1.1 !important;  
         }
 
         /* 4. خيار الماوس (التظليل السماوي المضيء) */
@@ -178,10 +174,10 @@
         .select2-container--default .select2-selection--single {
             background-color: #000000 !important;
             border: 2px solid #334155 !important;
-            height: 40px !important; /* توحيد الارتفاع مع حقل الحصص */
+            height: 40px !important; 
             border-radius: 10px !important;
             display: flex !important;
-            align-items: center !important; /* توسيط المحتوى رأسياً */
+            align-items: center !important; 
             overflow: hidden !important; 
         }
         
@@ -195,8 +191,8 @@
             color: #ffffff !important;
             font-weight: 800 !important;
             padding-right: 15px !important;
-            font-size: 0.85rem !important; /* تصغير الخط قليلاً ليتناسب مع المساحة */
-            line-height: 1.2 !important;   /* تقليل المسافة بين السطور داخل الصندوق */
+            font-size: 0.85rem !important; 
+            line-height: 1.2 !important;   
             display: block !important;
         }
 
@@ -221,7 +217,7 @@
 
         /* حالة الوقوف على الحقل للكتابة */
         input[name="total_sessions"]:focus {
-            border-color: #39ff14 !important; /* يتحول للأخضر عند الكتابة */
+            border-color: #39ff14 !important; 
             box-shadow: 0 0 10px rgba(57, 255, 20, 0.5) !important;
         }
 
@@ -233,7 +229,7 @@
             margin-bottom: 8px;
             display: block;
         }
-                /* --- تطوير نظام الترقيم (Pagination) الاحترافي --- */
+        /* --- تطوير نظام الترقيم (Pagination) الاحترافي --- */
         .pagination-container {
             margin-top: 30px;
             padding: 20px 0;
@@ -431,6 +427,7 @@
                                 <div class="student-box px-2">
                                     <div class="name" style="font-size: 1.1rem; margin-bottom: 2px;">
                                         {% if course.student %}
+                                            <!-- تم التأكد من أن الرابط يوجه إلى مسار تفاصيل الطالب -->
                                             <a href="{% url 'student_analytics_detail' course.student.id %}" class="text-decoration-none text-white fw-bold">
                                                 {{ course.student.get_full_name }}
                                             </a>
@@ -453,11 +450,11 @@
                             </td>
                             <td><span class="badge teacher-pill">{{ course.course_info.teacher.name }}</span></td>
                             <td style="min-width: 160px;">
-                                <div class="session-stats mb-1 small text-end">
-                                    <span>حضر <b>{{ course.attended_sessions_count }}</b> من {{ course.total_sessions }}</span>
+                                <div class="session-stats mb-1 small text-end" id="stats-{{ course.id }}">
+                                    <span>حضر <b id="attended-{{ course.id }}">{{ course.attended_sessions_count }}</b> من {{ course.total_sessions }}</span>
                                 </div>
-                                <div class="progress"><div class="progress-bar bg-info" style="width: {% widthratio course.attended_sessions_count course.total_sessions 100 %}%"></div></div>
-                                <small class="text-secondary mt-1 d-block text-start">باقي {{ course.remaining_sessions }} حصة</small>
+                                <div class="progress"><div class="progress-bar bg-info" id="progress-{{ course.id }}" style="width: {% widthratio course.attended_sessions_count course.total_sessions 100 %}%"></div></div>
+                                <small class="text-secondary mt-1 d-block text-start" id="remaining-{{ course.id }}">باقي {{ course.remaining_sessions }} حصة</small>
                             </td>
                         <td>
                             {% if course.remaining_amount <= 0 %}
@@ -469,8 +466,16 @@
                         </td>
                         <td>
                             <div class="d-flex justify-content-center gap-1">
-                                <button class="btn btn-success btn-sm px-3 fw-bold" onclick="markAttendance(this, {{ course.id }})" {% if course.remaining_sessions <= 0 %}disabled{% endif %}>تحضير</button>
-                                <button class="btn btn-outline-info btn-sm" onclick="showHistory({{ course.id }}, '{{ course.student.get_full_name }}')"><i class="bi bi-clock-history"></i></button>
+                                <!-- تم ربط دالة التحضير -->
+                                <button class="btn btn-success btn-sm px-3 fw-bold" 
+                                        data-url="{% url 'mark_session_attendance' course.id %}"
+                                        onclick="markAttendance(this)" 
+                                        {% if course.remaining_sessions <= 0 %}disabled{% endif %} 
+                                        id="btn-attend-{{ course.id }}">تحضير</button>
+                                <!-- تم ربط دالة عرض السجل -->
+                                <button class="btn btn-outline-info btn-sm" 
+                                        data-url="{% url 'session_history_api' course.id %}"
+                                        onclick="showHistory(this, '{% if course.student %}{{ course.student.get_full_name|escapejs }}{% else %}{{ course.external_student.full_name|escapejs }}{% endif %}')"><i class="bi bi-clock-history"></i></button>
                             </div>
                         </td>
                     </tr>
@@ -510,7 +515,9 @@
                 <h6 class="modal-title text-info" id="historyTitle">تاريخ الحصص</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-0" id="historyBody"></div>
+            <div class="modal-body p-3 text-white" id="historyBody">
+                <!-- سيتم وضع السجل هنا بواسطة جافاسكريبت -->
+            </div>
         </div>
     </div>
 </div>
@@ -520,8 +527,99 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+    // دالة للحصول على CSRF Token لإرسال طلبات POST آمنة
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // 1. دالة التحضير السريع (Mark Attendance)
+    function markAttendance(btn) {
+        // تغيير شكل الزر إلى حالة التحميل
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        btn.disabled = true;
+
+        // الحصول على الرابط من الزر
+        const url = btn.getAttribute('data-url');
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+        })
+        .then(response => {
+            if(response.ok) {
+                // نجاح العملية: عمل reload كامل للصفحة
+                location.reload(); 
+            } else if (response.status === 404) {
+                alert('خطأ 404: المسار غير موجود. يجب برمجة دالة التحضير في views.py وإضافتها في urls.py.');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            } else {
+                alert('حدث خطأ أثناء التحضير. يرجى المحاولة مرة أخرى.');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('تعذر الاتصال بالخادم.');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    }
+
+    // 2. دالة عرض سجل الحصص (Show History)
+    function showHistory(btn, studentName) {
+        // تغيير عنوان المودال
+        document.getElementById('historyTitle').innerText = 'سجل حضور: ' + studentName;
+        document.getElementById('historyBody').innerHTML = '<div class="text-center py-4"><div class="spinner-border text-info" role="status"></div></div>';
+        
+        // إظهار المودال
+        var myModal = new bootstrap.Modal(document.getElementById('historyModal'));
+        myModal.show();
+
+        // الحصول على الرابط من الزر
+        const url = btn.getAttribute('data-url');
+
+        fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('HTTP status ' + response.status);
+            }
+            return response.text();
+        })
+        .then(html => {
+            // وضع الكود المرجع من الـ view داخل المودال
+            document.getElementById('historyBody').innerHTML = html;
+        })
+        .catch(error => {
+            document.getElementById('historyBody').innerHTML = `
+                <div class="alert alert-danger text-center m-0">
+                    <i class="bi bi-exclamation-triangle-fill fs-3 d-block mb-2"></i>
+                    لم يتم العثور على مسار السجل في السيرفر!<br>
+                    يرجى إنشاء مسار <code>/students/course-history/id/</code> في Django.
+                </div>`;
+        });
+    }
+
+
     $(document).ready(function() {
-        // 1. تفعيل التصميم الموحد لجميع القوائم داخل حاوية الاشتراك (المدرس، الباقة، الطالب)
+        // إعدادات Select2
         $('#addEnrollment select').select2({ 
             width: '100%', 
             dir: 'rtl', 
@@ -529,7 +627,6 @@
             escapeMarkup: function(m) { return m; }
         });
 
-        // 2. تخصيص حقل الطالب تحديدا لدعم البحث المطور (اسم | كود | قومي) وتنسيق العرض
         $('select[name="student"]').select2({ 
             width: '100%', 
             dir: 'rtl', 
@@ -538,10 +635,9 @@
             escapeMarkup: function(m) { return m; }, 
             templateResult: formatStudentOption,    
             templateSelection: formatStudentOption, 
-            matcher: modelMatcher // استخدام دالة البحث المتطورة المحددة أدناه
+            matcher: modelMatcher
         });
 
-        // دالة البحث من أول حرف (للطالب)
         function modelMatcher(params, data) {
             if ($.trim(params.term) === '') { return data; }
             if (typeof data.text === 'undefined') { return null; }
@@ -556,7 +652,6 @@
             return null;
         }
 
-        // دالة التنسيق لعرض الكود والقومي بخط صغير أسفل الاسم
         function formatStudentOption(state) {
             if (!state.id) return state.text;
 
@@ -575,7 +670,6 @@
                 </div>`;
         }
 
-        // 3. البحث السريع داخل الجدول السفلي
         $("#tableSearch").on("keyup", function() {
             var value = $(this).val().toLowerCase();
             $("#mainTable tbody tr").filter(function() {
@@ -583,7 +677,6 @@
             });
         });
 
-        // 4. التبديل بين الطالب المسجل والخارجي
         $('#flexSwitchExternal').on('change', function() {
             const fields = $('#external_fields');
             const studentSelect = $('select[name="student"]');

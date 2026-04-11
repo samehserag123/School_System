@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="container-fluid py-4" style="direction: rtl;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-white fw-bold">
+            <i class="bi bi-speedometer2 text-info me-2"></i> لوحة تحليل بيانات: {{ student.get_full_name }}
+        </h2>
+        <a href="{% url 'student_list' %}" class="btn btn-outline-light btn-sm">عودة للسجل</a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-3">
+            <div class="card bg-dark border-info text-white shadow-sm p-3">
+                <small class="text-info">إجمالي المطلوب</small>
+                <h3 class="fw-bold">{{ total_required }}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark border-success text-white shadow-sm p-3">
+                <small class="text-success">إجمالي المحصل</small>
+                <h3 class="fw-bold text-success">{{ total_paid }}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark border-danger text-white shadow-sm p-3">
+                <small class="text-danger">المتأخرات الحالية</small>
+                <h3 class="fw-bold text-danger">{{ total_overdue }}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark border-warning text-white shadow-sm p-3">
+                <small class="text-warning">مديونية سابقة</small>
+                <h3 class="fw-bold text-warning">{{ student.previous_debt }}</h3>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card bg-dark border-secondary p-4 h-100 shadow">
+                <h5 class="text-white mb-4 text-center">نسبة السداد الكلية</h5>
+                <canvas id="paymentChart"></canvas>
+                <div class="text-center mt-3 text-white">تم سداد {{ paid_percentage }}%</div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card bg-dark border-secondary p-4 h-100 shadow">
+                <h5 class="text-white mb-4 text-center">تحليل خطة الأقساط</h5>
+                <canvas id="timelineChart"></canvas>
+            </div>
+        </div>
+
+        <div class="col-12 mt-4">
+            <div class="card bg-dark border-secondary shadow">
+                <div class="card-header border-secondary bg-transparent d-flex justify-content-between">
+                    <h5 class="text-info mb-0 py-2">تفاصيل خطة التسكين والمدفوعات</h5>
+                    <span class="badge bg-primary pt-2">عدد الأقساط: {{ installments.count }}</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 text-center">
+                        <thead>
+                            <tr>
+                                <th>القسط</th>
+                                <th>تاريخ الاستحقاق</th>
+                                <th>قيمة القسط</th>
+                                <th>المدفوع</th>
+                                <th>المتبقي</th>
+                                <th>الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inst in installments %}
+                            <tr>
+                                <td>{{ inst.name }}</td>
+                                <td>{{ inst.due_date|date:"Y-m-d" }}</td>
+                                <td>{{ inst.amount_due }}</td>
+                                <td class="text-success">{{ inst.paid_amount }}</td>
+                                <td class="text-danger">{{ inst.remaining_amount }}</td>
+                                <td>
+                                    {% if inst.paid_amount >= inst.amount_due %}
+                                        <span class="badge bg-success">خالص ✅</span>
+                                    {% elif inst.paid_amount > 0 %}
+                                        <span class="badge bg-warning text-dark">سداد جزئي ⏳</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">لم يسدد ❌</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// الرسم الدائري
+const ctx1 = document.getElementById('paymentChart').getContext('2d');
+new Chart(ctx1, {
+    type: 'doughnut',
+    data: {
+        labels: ['المحصل', 'المتبقي'],
+        datasets: [{
+            data: [{{ total_paid }}, {{ remaining_balance }}],
+            backgroundColor: ['#198754', '#dc3545'],
+            borderWidth: 0
+        }]
+    },
+    options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+});
+
+// الرسم البياني الزمني للأقساط
+const ctx2 = document.getElementById('timelineChart').getContext('2d');
+new Chart(ctx2, {
+    type: 'line',
+    data: {
+        labels: [{% for i in installments %}"{{ i.name }}",{% endfor %}],
+        datasets: [{
+            label: 'المبلغ المطلوب',
+            data: [{% for i in installments %}{{ i.amount_due }},{% endfor %}],
+            borderColor: '#0dcaf0',
+            tension: 0.3
+        }, {
+            label: 'المسدد',
+            data: [{% for i in installments %}{{ i.paid_amount }},{% endfor %}],
+            borderColor: '#198754',
+            backgroundColor: 'rgba(25, 135, 84, 0.2)',
+            fill: true
+        }]
+    },
+    options: { scales: { y: { beginAtZero: true } } }
+});
+</script>
+{% endblock %}

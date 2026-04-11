@@ -5,7 +5,7 @@
 
 {% block content %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 <style>
     /* تصميم كروت الإحصائيات المطور */
     .stats-grid {
@@ -89,61 +89,75 @@
     .badge-status { font-size: 0.7rem; padding: 5px 10px; border-radius: 6px; }
 
     /* تحسين شكل الترقيم */
-.pagination .page-link {
-    color: #0dcaf0;
-    background-color: #1e2227;
-    border-color: #334155;
-    transition: all 0.3s;
-}
+    .pagination .page-link {
+        color: #0dcaf0;
+        background-color: #1e2227;
+        border-color: #334155;
+        transition: all 0.3s;
+    }
 
-.pagination .page-item.active .page-link {
-    background-color: #0dcaf0;
-    border-color: #0dcaf0;
-    color: #000;
-}
+    .pagination .page-item.active .page-link {
+        background-color: #0dcaf0;
+        border-color: #0dcaf0;
+        color: #000;
+    }
 
-.pagination .page-link:hover {
-    background-color: #0dcaf0;
-    color: #000;
-}
+    .pagination .page-link:hover {
+        background-color: #0dcaf0;
+        color: #000;
+    }
+        /* إجبار الأيقونات على الظهور داخل أزرار الإجراءات */
+    .btn-outline-danger i, .btn-outline-warning i {
+        display: inline-block !important;
+        min-width: 1rem;
+        min-height: 1rem;
+        color: inherit; /* لتأخذ لون الزر الأحمر أو الأصفر */
+    }
 
 </style>
+{% if is_archive %}
+<div class="alert alert-warning border-warning bg-dark text-warning d-flex align-items-center animate__animated animate__fadeIn">
+    <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+    <div>
+        <strong>وضع الأرشيف:</strong> أنت الآن تتصفح بيانات الطلاب للعام الدراسي <strong>{{ current_year.name }}</strong>. 
+        (للاطلاع فقط)
+    </div>
+</div>
+{% endif %}
 
 <div class="container-fluid px-3 animate__animated animate__fadeIn">
-    
     <div class="stats-grid" id="statsContainer">
-        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #0dcaf0;">
+        <div class="stat-card" style="border-bottom: 3px solid #0dcaf0;">
             <div class="label">إجمالي الطلاب</div>
-            <div class="value counter" id="count-all">0</div>
+            <div class="value counter" id="count-all">{{ stats.total|default:0 }}</div>
         </div>
 
         <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #2ecc71; animation-delay: 0.1s;">
-            <div class="label">بنين (ذكر)</div>
-            <div class="value counter" id="count-male">0</div>
+            <div class="label">بنين</div>
+            <div class="value counter" id="count-male">{{ stats.male|default:0 }}</div>
         </div>
 
         <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #f39c12; animation-delay: 0.2s;">
-            <div class="label">بنات (أنثى)</div>
-            <div class="value counter" id="count-female">0</div>
+            <div class="label">بنات</div>
+            <div class="value counter" id="count-female">{{ stats.female|default:0 }}</div>
         </div>
 
         <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #3498db; animation-delay: 0.3s;">
             <div class="label">مسلم</div>
-            <div class="value counter" id="count-muslim">0</div>
+            <div class="value counter" id="count-muslim">{{ stats.muslim|default:0 }}</div>
         </div>
 
         <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #e74c3c; animation-delay: 0.4s;">
             <div class="label">مسيحي</div>
-            <div class="value counter" id="count-christian">0</div>
+            <div class="value counter" id="count-christian">{{ stats.christian|default:0 }}</div>
         </div>
 
         <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #f1c40f; animation-delay: 0.5s;">
             <div class="label">طلاب الدمج</div>
-            <div class="value counter" id="count-integ">0</div>
+            <div class="value counter" id="count-integ">{{ stats.integration|default:0 }}</div>
         </div>
     </div>
 </div>
-
     <div class="filter-section animate__animated animate__fadeInUp">
         <div class="row g-3">
             <div class="col-md-3">
@@ -177,8 +191,8 @@
                     <div class="col-md-2">
                         <select id="f-gender" onchange="runFilters()" class="form-select form-select-sm">
                             <option value="">النوع</option>
-                            <option value="ذكر">ذكر</option>
-                            <option value="أنثى">أنثى</option>
+                            <option value="بنين">بنين</option>
+                            <option value="بنات">بنات</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -203,75 +217,98 @@
     <div class="table-container shadow-lg animate__animated animate__fadeInUp" style="animation-delay: 0.2s;">
         <table class="table table-dark table-hover text-center align-middle mb-0" id="studentTable">
             <thead>
-                <tr>
-                    <th class="py-3">البيانات الأساسية للطلاب</th>
-                    <th>النوع</th>
-                    <th>الديانة</th>
-                    <th>الجنسية</th>
-                    <th>حالة القيد</th>
-                    <th>رقم القيد</th>
-                    <th>موقف الدمج</th>
-                    <th>الرادار المالي</th> </tr>
-                </tr>
-            </thead>
-            <tbody id="tableBody">
-                {% for student in students %}
-                <tr class="student-row" 
-                    data-grade="{{ student.grade.name }}" 
-                    data-class="{{ student.classroom.name }}"
-                    data-spec="{{ student.specialization.name }}">
-                    
-                    <td class="text-end pe-3">
-                        <div style="display: block;">
-                            <a href="{% url 'add_student' %}?id={{ student.id }}&mode=view" 
-                            class="student-link fs-6 fw-bold text-info text-decoration-none d-block mb-1">
-                                {{ student.first_name }}
-                            </a>
-                            
-                            <span class="text-white-50 small fw-bold d-block mb-1">
-                                {{ student.last_name }}
-                            </span>
-                            
-                            <span class="badge bg-info text-dark shadow-sm d-inline-block mt-1" 
-                                style="font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; padding: 5px 10px;">
-                                <i class="bi bi-person-vcard me-1 text-dark opacity-75"></i>{{ student.national_id }}
-                            </span>
-                        </div>
-                    </td>
+    <tr>
+        <th class="py-3 text-end pe-4">البيانات الأساسية للطلاب</th>
+        <th>النوع</th>
+        <th>الديانة</th>
+        <th>الجنسية</th>
+        <th>حالة القيد</th>
+        <th>رقم القيد</th>
+        <th>موقف الدمج</th>
+        <th class="text-center">الإجراءات</th> 
+    </tr>
+</thead>
 
-                    <td class="gender-val">
-                        {% if student.get_gender_display == "بنين" %}
-                            <span class="badge bg-primary-subtle text-primary border border-primary px-3 shadow-sm" style="font-size: 0.75rem; font-weight: 700;">
-                                <i class="bi bi-gender-male me-1"></i>بنين
-                            </span>
-                        {% elif student.get_gender_display == "بنات" %}
-                            <span class="badge bg-warning-subtle text-warning border border-warning px-3 shadow-sm" style="font-size: 0.75rem; font-weight: 700;">
-                                <i class="bi bi-gender-female me-1"></i>بنات
-                            {% else %}
-                                <span class="badge bg-secondary text-white">{{ student.get_gender_display }}</span>
-                        {% endif %}
-                    </td>
-                    <td class="religion-val">{{ student.get_religion_display }}</td>
-                    <td><img src="https://flagcdn.com/16x12/eg.png" class="me-1"> {{ student.nationality }}</td>
-                    <td><span class="badge bg-primary-subtle text-primary border border-primary badge-status">{{ student.get_enrollment_status_display }}</span></td>
-                    <td class="text-info mono">{{ student.registration_number|default:"---" }}</td>
-                    <td class="integ-val">
-                        {% if student.integration_status %}
-                            <span class="badge bg-warning text-dark">دمج ✅</span>
-                        {% else %}
-                            <span class="text-muted">لا</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-center">
-                        <a href="{% url 'student_finance_detail' student.id %}" 
-                        class="btn btn-sm btn-outline-info border-0 animate__animated animate__pulse animate__infinite animate__slow" 
-                        title="عرض الرادار المالي">
-                            <i class="bi bi-radar fs-5"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
+    <tbody id="tableBody">
+        {% for student in students %}
+        <tr class="student-row" 
+            data-grade="{{ student.grade.name }}" 
+            data-class="{{ student.classroom.name }}"
+            data-spec="{{ student.specialization.name }}">
+            
+            <td class="text-end pe-3">
+                <div style="display: block;">
+                    <a href="{% url 'add_student' %}?id={{ student.id }}" 
+                    class="student-link fs-6 fw-bold text-info text-decoration-none d-block mb-1">
+                        {{ student.first_name }}
+                    </a>
+                    
+                    <span class="text-white-50 small fw-bold d-block mb-1">
+                        {{ student.last_name }}
+                    </span>
+                    
+                    <span class="badge bg-info text-dark shadow-sm d-inline-block mt-1" 
+                        style="font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; padding: 5px 10px;">
+                        <i class="bi bi-person-vcard me-1 text-dark opacity-75"></i>{{ student.national_id }}
+                    </span>
+                </div>
+            </td>
+
+            <td class="gender-val">
+                {% if student.get_gender_display == "بنين" %}
+                    <span class="badge bg-primary-subtle text-primary border border-primary px-3 shadow-sm" style="font-size: 0.75rem; font-weight: 700;">
+                        بنين
+                    </span>
+                {% elif student.get_gender_display == "بنات" %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning px-3 shadow-sm" style="font-size: 0.75rem; font-weight: 700;">
+                        بنات
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary text-white">{{ student.get_gender_display }}</span>
+                {% endif %}
+            </td>
+
+            <td class="religion-val">{{ student.get_religion_display }}</td>
+
+            <td>
+                <img src="https://flagcdn.com/16x12/eg.png" class="me-1" alt="Egypt Flag"> 
+                {{ student.nationality }}
+            </td>
+
+            <td>
+                <span class="badge bg-primary-subtle text-primary border border-primary badge-status">
+                    {{ student.get_enrollment_status_display }}
+                </span>
+            </td>
+
+            <td class="text-info mono">{{ student.registration_number|default:"---" }}</td>
+
+            <td class="integ-val">
+                {% if student.integration_status %}
+                    <span class="badge bg-warning text-dark">دمج ✅</span>
+                {% else %}
+                    <span class="text-muted">لا</span>
+                {% endif %}
+            </td>
+
+            <td class="text-center">
+                <div class="d-flex justify-content-center gap-2">
+                    <a href="{% url 'add_student' %}?id={{ student.id }}" 
+                    class="btn btn-sm btn-outline-warning border-0" 
+                    title="تعديل بيانات الطالب">
+                        <i class="bi bi-pencil-square fs-5"></i>
+                    </a>
+
+                    <a href="{% url 'overdue_calls' %}?student_id={{ student.id }}" 
+                    class="btn btn-sm btn-outline-danger border-0 animate__animated animate__pulse animate__infinite animate__slow" 
+                    title="عرض استحقاقات الطالب: {{ student.get_full_name }}">
+                        <i class="bi bi-bell-fill fs-5"></i>
+                    </a>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
         </table>
     </div>
 </div>
@@ -333,8 +370,16 @@ function animateValue(obj, start, end, duration) {
     };
     window.requestAnimationFrame(step);
 }
+// 1. تخزين الأعداد الحقيقية القادمة من السيرفر في متغيرات ثابتة
+const TOTAL_SERVER = parseInt("{{ stats.total|default:0 }}");
+const MALE_SERVER = parseInt("{{ stats.male|default:0 }}");
+const FEMALE_SERVER = parseInt("{{ stats.female|default:0 }}");
+const MUSLIM_SERVER = parseInt("{{ stats.muslim|default:0 }}");
+const CHRISTIAN_SERVER = parseInt("{{ stats.christian|default:0 }}");
+const INTEG_SERVER = parseInt("{{ stats.integration|default:0 }}");
 
 function runFilters() {
+    // جلب قيم الفلاتر
     let search = document.getElementById("tableSearch").value.toLowerCase();
     let fGrade = document.getElementById("f-grade").value;
     let fClass = document.getElementById("f-class").value;
@@ -343,65 +388,80 @@ function runFilters() {
     let fRelig = document.getElementById("f-religion").value;
     let fInteg = document.getElementById("f-integ").value;
 
+    // فحص: هل المستخدم يقوم بعملية تصفية فعلياً؟
+    let isFiltering = search || fGrade || fClass || fSpec || fGender || fRelig || fInteg;
+
     let rows = document.querySelectorAll(".student-row");
-    
-    // 1. إضافة integ: 0 لتبدأ الحساب من الصفر
-    let stats = { all:0, male:0, female:0, muslim:0, christian:0, integ:0 };
+    let currentStats = { all: 0, male: 0, female: 0, muslim: 0, christian: 0, integ: 0 };
 
     rows.forEach(row => {
         let text = row.innerText.toLowerCase();
         let grade = row.getAttribute("data-grade");
         let classroom = row.getAttribute("data-class");
         let spec = row.getAttribute("data-spec");
-        let gender = row.querySelector(".gender-val").innerText.trim();
-        let religion = row.querySelector(".religion-val").innerText.trim();
-        let integText = row.querySelector(".integ-val").innerText.trim();
+        let gender = row.querySelector(".gender-val") ? row.querySelector(".gender-val").innerText.trim() : "";
+        let religion = row.querySelector(".religion-val") ? row.querySelector(".religion-val").innerText.trim() : "";
+        let integText = row.querySelector(".integ-val") ? row.querySelector(".integ-val").innerText.trim() : "";
 
         let isMatch = text.includes(search) &&
                       (!fGrade || grade === fGrade) &&
                       (!fClass || classroom === fClass) &&
                       (!fSpec || spec === fSpec) &&
-                      (!fGender || gender === fGender) &&
-                      (!fRelig || religion === fRelig) &&
+                      (!fGender || gender.includes(fGender)) &&
+                      (!fRelig || religion.includes(fRelig)) &&
                       (!fInteg || integText.includes(fInteg));
 
         if (isMatch) {
             row.style.display = "";
-            stats.all++;
-            if(gender === "بنين") stats.male++;
-            if(gender === "بنات") stats.female++;
-            if(religion === "مسلم") stats.muslim++;
-            if(religion === "مسيحي") stats.christian++;
-            
-            // 2. فحص ما إذا كان الطالب "دمج" لزيادة العداد
-            // نبحث عن كلمة "دمج" أو "نعم" حسب المكتوب في جدولك
-            if(integText.includes("دمج") || integText.includes("نعم")) {
-                stats.integ++;
-            }
+            currentStats.all++;
+            if (gender === "بنين") currentStats.male++;
+            if (gender === "بنات") currentStats.female++;
+            if (religion === "مسلم") currentStats.muslim++;
+            if (religion === "مسيحي") currentStats.christian++;
+            if (integText.includes("دمج") || integText.includes("نعم")) currentStats.integ++;
         } else {
             row.style.display = "none";
         }
     });
 
-    // 3. تحديث جميع العدادات بما فيها عداد الدمج الجديد
-    updateCounter("count-all", stats.all);
-    updateCounter("count-male", stats.male);
-    updateCounter("count-female", stats.female);
-    updateCounter("count-muslim", stats.muslim);
-    updateCounter("count-christian", stats.christian);
-    updateCounter("count-integ", stats.integ); // تحديث عداد الدمج
+    // المنطق الذكي لتحديث العدادات
+    if (!isFiltering) {
+        // إذا لم يكن هناك بحث، اعرض أرقام السيرفر كاملة (36)
+        updateCounter("count-all", TOTAL_SERVER);
+        updateCounter("count-male", MALE_SERVER);
+        updateCounter("count-female", FEMALE_SERVER);
+        updateCounter("count-muslim", MUSLIM_SERVER);
+        updateCounter("count-christian", CHRISTIAN_SERVER);
+        updateCounter("count-integ", INTEG_SERVER);
+    } else {
+        // إذا كان هناك بحث، اعرض نتائج ما هو موجود في الصفحة الحالية فقط
+        updateCounter("count-all", currentStats.all);
+        updateCounter("count-male", currentStats.male);
+        updateCounter("count-female", currentStats.female);
+        updateCounter("count-muslim", currentStats.muslim);
+        updateCounter("count-christian", currentStats.christian);
+        updateCounter("count-integ", currentStats.integ);
+    }
 }
 
 function updateCounter(id, newValue) {
     const el = document.getElementById(id);
-    const oldValue = parseInt(el.innerText);
+    if (!el) return;
+    const oldValue = parseInt(el.innerText) || 0;
+    
     if (oldValue !== newValue) {
         animateValue(el, oldValue, newValue, 300);
-        el.parentElement.classList.add('animate__animated', 'animate__pulse');
-        setTimeout(() => el.parentElement.classList.remove('animate__animated', 'animate__pulse'), 500);
+        const card = el.closest('.stat-card');
+        if (card) {
+            card.classList.add('animate__animated', 'animate__pulse');
+            setTimeout(() => card.classList.remove('animate__animated', 'animate__pulse'), 500);
+        }
     }
 }
 
-document.addEventListener("DOMContentLoaded", runFilters);
+document.addEventListener("DOMContentLoaded", function() {
+    // عند التحميل، تأكد أن الأرقام تعكس أرقام السيرفر أولاً
+    runFilters(); 
+});
 </script>
 {% endblock %}

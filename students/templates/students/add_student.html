@@ -116,7 +116,17 @@
         <h3 class="text-center fw-bold text-white mb-4">
             {% if student %} بيانات الطالب: {{ student.get_full_name }} {% else %} إضافة طالب جديد {% endif %}
         </h3>
-
+         {% if form.errors %}
+            <div class="alert alert-danger border-0 shadow-sm mb-4" style="border-radius: 15px;">
+                <ul class="mb-0">
+                    {% for field, errors in form.errors.items %}
+                        {% for error in errors %}
+                            <li><strong>{{ field }}:</strong> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
         <form method="post" id="studentForm" enctype="multipart/form-data">
             {% csrf_token %}
 

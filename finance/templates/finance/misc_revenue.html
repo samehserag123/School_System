@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}الإيرادات المتنوعة{% endblock %}
+
+{% block extra_css %}
+<style>
+    .misc-wrapper {
+        --card-inner: #020617;
+        --text-main: #e2e8f0;
+        --accent-primary: #38bdf8;
+        --accent-success: #39ff14;
+        --accent-warning: #facc15;
+    }
+
+    .misc-wrapper .dashboard-card {
+        background: var(--card-inner);
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        margin-bottom: 25px;
+    }
+
+    .misc-wrapper .stat-box {
+        background: #000;
+        border-radius: 15px;
+        padding: 20px;
+        border: 1px solid #1e293b;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.3s ease;
+    }
+    .misc-wrapper .stat-box:hover { transform: translateY(-5px); }
+
+    .misc-wrapper .stat-box::before {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; width: 4px; height: 100%;
+    }
+    .misc-wrapper .border-info::before { background: var(--accent-primary); box-shadow: 0 0 15px var(--accent-primary); }
+    .misc-wrapper .border-success::before { background: var(--accent-success); box-shadow: 0 0 15px var(--accent-success); }
+
+    .misc-wrapper .table-dark-custom { --bs-table-bg: transparent; color: var(--text-main); }
+    .misc-wrapper .table-dark-custom thead th { border-bottom: 2px solid #1e293b; color: #94a3b8; font-weight: 700; padding-bottom: 15px;}
+    .misc-wrapper .table-dark-custom tbody tr { border-bottom: 1px solid #0f172a; transition: background 0.2s; }
+    .misc-wrapper .table-dark-custom tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+    /* تنسيق Modal */
+    .modal-content { background-color: #020617 !important; border: 1px solid #1e293b !important; box-shadow: 0 10px 50px rgba(0,0,0,0.9) !important; color: #e2e8f0; }
+    .modal-header, .modal-footer { border-color: #1e293b !important; }
+    .modal-content .form-control, .modal-content .form-select { background-color: #000 !important; color: #fff !important; border-color: #334155 !important; }
+    .modal-content .form-control:focus, .modal-content .form-select:focus { border-color: #38bdf8 !important; box-shadow: 0 0 10px rgba(56, 189, 248, 0.2) !important; }
+</style>
+{% endblock %}
+
+{% block page_title %}إدارة الإيرادات المتنوعة{% endblock %}
+
+{% block content %}
+<div class="misc-wrapper text-end" dir="rtl">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 dashboard-card" style="padding: 15px 25px;">
+        <h3 class="fw-900 m-0" style="color: #38bdf8;">
+            <i class="bi bi-wallet-fill me-2"></i> سجل الإيرادات المتنوعة
+        </h3>
+        <button class="btn btn-success fw-bold rounded-pill px-4 mt-3 mt-md-0 shadow-sm" data-bs-toggle="modal" data-bs-target="#newMiscModal">
+            <i class="bi bi-plus-circle me-1"></i> إضافة إيراد جديد
+        </button>
+    </div>
+
+    <!-- الإحصائيات -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="stat-box border-success">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small text-secondary fw-bold">إجمالي الإيرادات المتنوعة (الكلي)</div>
+                    <div class="bg-success bg-opacity-10 p-2 rounded"><i class="bi bi-safe2-fill text-success fs-5"></i></div>
+                </div>
+                <div class="display-6 fw-900 text-success">{{ total_revenue }} <span class="fs-6 text-secondary">ج.م</span></div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="stat-box border-info">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small text-secondary fw-bold">إيرادات اليوم فقط</div>
+                    <div class="bg-info bg-opacity-10 p-2 rounded"><i class="bi bi-calendar-day text-info fs-5"></i></div>
+                </div>
+                <div class="display-6 fw-900 text-info">{{ today_revenue }} <span class="fs-6 text-secondary">ج.م</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- جدول السجلات -->
+    <div class="dashboard-card">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="fw-bold text-white m-0"><i class="bi bi-card-list me-2 text-warning"></i> حركات الإيرادات المسجلة</h5>
+            <input type="text" id="searchMisc" class="form-control bg-black text-white border-secondary w-25" placeholder="بحث في الإيرادات...">
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-dark-custom align-middle text-center" id="miscTable">
+                <thead class="text-start">
+                    <tr>
+                        <th>بيان الإيراد</th>
+                        <th>التصنيف</th>
+                        <th>التاريخ والوقت</th>
+                        <th>المحصل</th>
+                        <th class="text-end ps-4">المبلغ</th>
+                    </tr>
+                </thead>
+                <tbody class="text-start">
+                    {% for rev in revenues %}
+                    <tr>
+                        <td class="fw-bold text-white">{{ rev.title }}
+                            {% if rev.notes %}<br><small class="text-secondary">{{ rev.notes }}</small>{% endif %}
+                        </td>
+                        <td><span class="badge bg-dark border border-secondary text-info px-3 py-2 rounded-pill">{{ rev.get_revenue_type_display }}</span></td>
+                        <td class="small text-secondary">{{ rev.date|date:"Y-m-d" }} <br> {{ rev.date|time:"h:i A" }}</td>
+                        <td><span class="text-warning"><i class="bi bi-person-fill me-1"></i>{{ rev.collected_by.username|default:"النظام" }}</span></td>
+                        <td class="fw-bold text-success text-end ps-4">+ {{ rev.amount }} ج.م</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-center text-secondary py-5">لا توجد إيرادات متنوعة مسجلة حالياً.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal إضافة إيراد جديد -->
+<div class="modal fade" id="newMiscModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{% url 'misc_revenue' %}">
+                {% csrf_token %}
+                <div class="modal-header border-secondary bg-success bg-opacity-10">
+                    <h5 class="modal-title text-success fw-bold"><i class="bi bi-cash-stack me-2"></i> إضافة إيراد متنوع جديد للخزينة</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-end" dir="rtl">
+                    <div class="mb-3">
+                        <label class="form-label text-white small fw-bold">بيان الإيراد (الاسم / الوصف) *</label>
+                        <input type="text" name="title" class="form-control" placeholder="مثال: إيجار الكانتين لشهر أكتوبر" required>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-white small fw-bold">التصنيف *</label>
+                            <select name="revenue_type" class="form-select" required>
+                                <option value="canteen">إيجار كانتين</option>
+                                <option value="donation">تبرعات</option>
+                                <option value="activities">رسوم أنشطة / رحلات</option>
+                                <option value="papers">رسوم استخراج أوراق</option>
+                                <option value="other" selected>أخرى متنوعة</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-success fw-bold small">المبلغ المورد (ج.م) *</label>
+                            <input type="number" name="amount" step="0.01" class="form-control border-success text-success fw-bold fs-5" style="background: rgba(57, 255, 20, 0.05) !important;" required>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label text-secondary small fw-bold">ملاحظات (اختياري)</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="أي تفاصيل إضافية عن الإيراد..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-5 fw-bold">حفظ وتسميع في الخزينة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // فلترة الجدول بالبحث
+        $("#searchMisc").on("keyup", function() {
+            var value = $(this).val().toLowerCase();
+            $("#miscTable tbody tr").filter(function() {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+            });
+        });
+    });
+</script>
+{% endblock %}

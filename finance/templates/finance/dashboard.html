@@ -42,15 +42,28 @@
         backdrop-filter: blur(10px);
         border-radius: 20px;
     }
+    .time-badge {
+        font-size: 0.85rem;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        color: #495057;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
 </style>
 
 <div class="container-fluid py-4 main-container" dir="rtl">
     <div class="d-flex justify-content-between align-items-center mb-4 p-4 shadow-sm glass-header border-bottom border-primary border-3 flex-wrap">
         <div>
             <h2 class="fw-bold m-0 text-primary"><i class="bi bi-cpu-fill ms-2"></i>المركز المالي الذكي</h2>
-            <p class="text-muted mb-0 mt-1">إحصائيات العام الدراسي: <span class="badge rounded-pill bg-soft-primary text-primary fw-bold">{{ active_year }}</span></p>
+            <div class="d-flex gap-2 mt-2 align-items-center flex-wrap">
+                <span class="badge rounded-pill bg-soft-primary text-primary fw-bold px-3">إحصائيات العام: {{ active_year }}</span>
+                <!-- 🟢 بادج التوقيت المحلي الجديد -->
+                <span class="badge rounded-pill time-badge px-3 py-2 fw-bold">
+                    <i class="bi bi-clock-history text-primary me-1"></i>
+                    توقيت مصر: {{ current_time|date:"l, d F Y | h:i A" }}
+                </span>
+            </div>
         </div>
-        
     </div>
 
     <div class="row g-4 mb-4">
@@ -213,7 +226,8 @@
                         <tbody>
                             {% for activity in recent_activities %}
                             <tr>
-                                <td class="ps-4 small text-muted">{{ activity.date|date:"H:i" }}</td>
+                                <!-- 🟢 التعديل: إظهار الوقت بنظام 12 ساعة PM/AM واضح جداً -->
+                                <td class="ps-4 fw-bold text-primary">{{ activity.date|date:"h:i A" }}</td>
                                 <td>
                                     <div class="fw-bold text-dark">{{ activity.student.get_full_name|default:"إيراد عام" }}</div>
                                     <div class="small text-muted">{{ activity.notes|truncatechars:45 }}</div>

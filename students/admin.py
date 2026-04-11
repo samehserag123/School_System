@@ -12,6 +12,35 @@ from .models import BookSale
 
 from .models import SystemSettings
 
+from .models import BusRoute, BusSubscription, BusPayment
+
+@admin.register(BusRoute)
+class BusRouteAdmin(admin.ModelAdmin):
+    list_display = ('name', 'driver_name', 'bus_number', 'capacity', 'monthly_price', 'term_price', 'yearly_price')
+    search_fields = ('name', 'driver_name', 'bus_number')
+    list_filter = ('capacity',)
+
+@admin.register(BusSubscription)
+class BusSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ('student', 'route', 'sub_type', 'start_date', 'end_date', 'is_active', 'required_amount', 'remaining_amount')
+    list_filter = ('sub_type', 'is_active', 'route')
+    search_fields = ('student__first_name', 'student__last_name', 'student__student_code', 'route__name')
+    date_hierarchy = 'start_date'
+    
+    # إضافة حقول للعرض فقط (Read-only) لحمايتها من التعديل الخطأ
+    readonly_fields = ('created_at',)
+
+@admin.register(BusPayment)
+class BusPaymentAdmin(admin.ModelAdmin):
+    list_display = ('subscription', 'amount_paid', 'payment_date', 'collected_by')
+    list_filter = ('payment_date', 'collected_by')
+    search_fields = ('subscription__student__first_name', 'subscription__student__last_name', 'subscription__route__name')
+    date_hierarchy = 'payment_date'
+    
+    readonly_fields = ('payment_date',)
+
+
+
 @admin.register(SystemSettings)
 class SystemSettingsAdmin(admin.ModelAdmin):
     list_display = ('is_admission_open',)

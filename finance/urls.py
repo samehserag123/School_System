@@ -20,6 +20,8 @@ urlpatterns = [
     path('plans/', views.installment_plan_list, name='installment_plan_list'),
     path('generate-installments/<int:account_id>/', views.generate_installments_view, name='generate_installments'),
     
+    path('archives/', views.archives_list_view, name='archives_list'),
+
     # 🧾 التحصيل والطباعة
     path('quick-collection/', views.quick_collection, name='quick_collection'),
     path('receipt/<int:payment_id>/', views.print_receipt, name='print_receipt'),

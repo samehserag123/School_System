@@ -14,6 +14,7 @@ urlpatterns = [
     path('departments/add/', views.department_create, name='department_create'),
     path('departments/edit/<int:pk>/', views.department_update, name='department_update'),
     
+
     # مسارات الإجازات
     path('leaves/', views.leave_list, name='leave_list'),
     path('leaves/add/', views.leave_create, name='leave_create'),

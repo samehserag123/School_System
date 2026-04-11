@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4" style="direction: rtl;">
+    <h2 class="text-white mb-4 border-bottom pb-2">
+        <i class="bi bi-archive-fill text-warning me-2"></i> أرشيف السنوات الدراسية السابقة
+    </h2>
+
+    <div class="row g-4">
+        {% for year in past_years %}
+        <div class="col-md-4">
+            <div class="card bg-dark border-secondary h-100 shadow-sm hover-shadow transition">
+                <div class="card-body text-center">
+                    <div class="display-6 text-info mb-3"><i class="bi bi-calendar-check"></i></div>
+                    <h4 class="card-title text-white">العام الدراسي {{ year.name }}</h4>
+                    <p class="text-muted small">حالة السنة: مكتملة ومؤرشفة</p>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'student_registry' %}?year={{ year.id }}" class="btn btn-outline-info">
+                            <i class="bi bi-people"></i> بيانات الطلاب
+                        </a>
+                        <a href="{% url 'student_list' %}?year_id={{ year.id }}" class="btn btn-outline-success">
+                            <i class="bi bi-person-lines-fill"></i> الإدارة المالية للطلاب
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <div class="alert alert-info bg-dark text-info border-info">
+                <i class="bi bi-info-circle me-2"></i> لا توجد سنوات مؤرشفة حالياً.
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.4) !important;
+        border-color: #0dcaf0 !important;
+    }
+    .transition { transition: all 0.3s ease; }
+</style>
+{% endblock %}

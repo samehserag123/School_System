@@ -38,6 +38,197 @@ from datetime import timedelta
 
 # students/views.py
 from django.db.models import Count
+from .models import BusRoute, BusSubscription, BusPayment, MiscellaneousRevenue
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.utils import timezone
+from django.db import transaction
+from django.contrib.auth.decorators import login_required
+from decimal import Decimal
+import time
+import traceback
+
+
+@login_required
+def misc_revenue_view(request):
+    if request.method == 'POST':
+        try:
+            # 🟢 الحماية البنكية: إما أن يحفظ في الجدولين أو يلغي العملية
+            with transaction.atomic():
+                title = request.POST.get('title')
+                revenue_type = request.POST.get('revenue_type')
+                amount = Decimal(request.POST.get('amount', 0))
+                notes = request.POST.get('notes', '')
+
+                # 1. الحفظ في جدول الإيرادات المتنوعة
+                misc_rev = MiscellaneousRevenue.objects.create(
+                    title=title,
+                    revenue_type=revenue_type,
+                    amount=amount,
+                    notes=notes,
+                    collected_by=request.user
+                )
+
+                # 2. محاولة استيراد الخزينة الذكية (بحث في treasury ثم finance)
+                try:
+                    from treasury.models import GeneralLedger
+                except ImportError:
+                    from finance.models import GeneralLedger
+                
+                # 3. التسميع المباشر في الخزينة العامة
+                unique_receipt = f"MISC-{misc_rev.id}-{int(time.time())}"
+                
+                GeneralLedger.objects.create(
+                    student=None, # إيراد عام لا يخص طالباً بعينه
+                    amount=amount,
+                    category='other',  # 🟢 'other' هي الكلمة السرية ليظهر في الجرد كإيراد متنوع
+                    notes=f"إيراد متنوع: {title} ({misc_rev.get_revenue_type_display()})",
+                    receipt_number=unique_receipt,
+                    collected_by=request.user 
+                )
+                
+            
+        except Exception as e:
+            print(traceback.format_exc())
+            messages.error(request, f"⚠️ فشل تسجيل الإيراد! السبب: {str(e)}")
+            
+        return redirect('misc_revenue')
+
+    # ==========================================
+    # تجهيز البيانات للعرض (GET Request)
+    # ==========================================
+    revenues = MiscellaneousRevenue.objects.all()
+    total_revenue = sum(rev.amount for rev in revenues)
+    
+    # حساب إيرادات اليوم فقط
+    today = timezone.now().date()
+    today_revenue = sum(rev.amount for rev in revenues if rev.date.date() == today)
+
+    context = {
+        'revenues': revenues,
+        'total_revenue': total_revenue,
+        'today_revenue': today_revenue,
+    }
+    return render(request, 'finance/misc_revenue.html', context)
+
+
+@login_required
+def bus_dashboard_view(request):
+    # ==========================================
+    # 1. معالجة طلبات الـ POST (النماذج - Modals)
+    # ==========================================
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        # أ) إضافة خط سير جديد
+        if action == 'add_route':
+            try:
+                BusRoute.objects.create(
+                    name=request.POST.get('name'),
+                    driver_name=request.POST.get('driver_name'),
+                    driver_phone=request.POST.get('driver_phone'),
+                    bus_number=request.POST.get('bus_number'),
+                    capacity=request.POST.get('capacity', 20),
+                    monthly_price=request.POST.get('monthly_price', 0),
+                    term_price=request.POST.get('term_price', 0),
+                    yearly_price=request.POST.get('yearly_price', 0),
+                )
+            except Exception as e:
+                messages.error(request, f'خطأ أثناء إضافة الخط: {e}')
+            return redirect('bus_dashboard')
+
+        # ب) إضافة اشتراك طالب جديد
+        elif action == 'add_subscription':
+            try:
+                student_id = request.POST.get('student_id')
+                route_id = request.POST.get('route_id')
+                
+                student = get_object_or_404(Student, id=student_id)
+                route = get_object_or_404(BusRoute, id=route_id)
+                
+                BusSubscription.objects.create(
+                    student=student,
+                    route=route,
+                    sub_type=request.POST.get('sub_type'),
+                    start_date=request.POST.get('start_date'),
+                    end_date=request.POST.get('end_date'),
+                    required_amount=request.POST.get('required_amount', 0),
+                    notes=request.POST.get('notes', '')
+                )
+            except Exception as e:
+                messages.error(request, f'خطأ أثناء إضافة الاشتراك: {e}')
+            return redirect('bus_dashboard')
+
+        # ج) تحصيل مبلغ (سداد) وتسميعه في الخزينة
+        elif action == 'add_payment':
+            sub_id = request.POST.get('subscription_id')
+            amount = request.POST.get('amount_paid')
+            
+            try:
+                # 🟢 الحماية البنكية: إما أن تتم الإضافة في الجدولين، أو يتم التراجع عنهما معاً
+                with transaction.atomic():
+                    subscription = get_object_or_404(BusSubscription, id=sub_id)
+                    
+                    # 1. تسجيل الدفع في نظام الباص (لكي تنقص مديونيته)
+                    payment = BusPayment.objects.create(
+                        subscription=subscription,
+                        amount_paid=Decimal(amount),
+                        collected_by=request.user,
+                    )
+                    
+                    # 2. محاولة استيراد الخزينة الذكية (بحث في Treasury ثم Finance)
+                    try:
+                        from treasury.models import GeneralLedger
+                    except ImportError:
+                        from finance.models import GeneralLedger
+                    
+                    # 3. التسميع المباشر في الخزينة العامة
+                    unique_receipt = f"BUS-{payment.id}-{int(time.time())}"
+                    
+                    GeneralLedger.objects.create(
+                        student=subscription.student,
+                        amount=Decimal(amount),
+                        category='bus',  # 🟢 شرط التسميع في الجرد كـ "اشتراك باص"
+                        notes=f"تحصيل اشتراك باص - خط: {subscription.route.name}",
+                        receipt_number=unique_receipt,
+                        collected_by=request.user 
+                    )
+                    
+                # لن تظهر هذه الرسالة إلا إذا تمت العملية في الجدولين بنجاح
+                
+            except Exception as e:
+                # طباعة الخطأ كاملاً للمطور في شاشة الدوس (Terminal)
+                print(traceback.format_exc())
+                # عرض الخطأ صراحة للمستخدم ليعرف السبب الحقيقي
+                messages.error(request, f"⚠️ فشل التحصيل والتسميع! السبب: {str(e)}")
+                
+            return redirect('bus_dashboard')
+
+    # ==========================================
+    # 2. تجهيز البيانات للعرض (GET)
+    # ==========================================
+    routes = BusRoute.objects.all()
+    subscriptions = BusSubscription.objects.select_related('student', 'route').all()
+    
+    # قائمة الطلاب للـ Select2
+    students = Student.objects.filter(is_active=True).values('id', 'first_name', 'last_name', 'student_code')
+    
+    # إحصائيات علوية
+    total_bus_students = subscriptions.filter(is_active=True).count()
+    total_revenue = sum(sub.total_paid for sub in subscriptions)
+    total_debt = sum(sub.remaining_amount for sub in subscriptions if sub.remaining_amount > 0)
+    
+    context = {
+        'routes': routes,
+        'subscriptions': subscriptions,
+        'students': students,
+        'total_bus_students': total_bus_students,
+        'total_revenue': total_revenue,
+        'total_debt': total_debt,
+        'today': timezone.now().date(),
+    }
+    return render(request, 'students/bus_dashboard.html', context)
 
 
 def students_analytics_view(request):
@@ -267,7 +458,6 @@ def collect_fee_view(request, enrollment_id):
                 collected_by=request.user 
             )
             
-            messages.success(request, f"تم تحصيل {amount_paid} ج.م بنجاح.")
             return redirect('course_prices')
             
     # 5. عرض صفحة التحصيل في حالة الـ GET
@@ -275,91 +465,50 @@ def collect_fee_view(request, enrollment_id):
 
 
 def student_registry_view(request):
-    # 1. جلب كل الطلاب النشطين مرتبين (الترتيب مهم جداً للترقيم)
-    student_list = Student.objects.filter(is_active=True).order_by('first_name')
+    # 1. استقبال معرف السنة من الرابط (إذا جاء من الأرشيف)
+    year_id = request.GET.get('year_id')
     
-    # 2. إعداد نظام الترقيم (مثلاً: 20 طالب في كل صفحة)
+    if year_id:
+        # إذا تم اختيار سنة معينة، نجلب بيانات هذه السنة (أرشيف)
+        target_year = get_object_or_404(AcademicYear, id=year_id)
+        # هنا لا نشترط is_active=True لأننا نبحث في الأرشيف
+        base_query = Student.objects.filter(academic_year=target_year)
+    else:
+        # الحالة الطبيعية: جلب طلاب السنة النشطة الحالية فقط
+        active_year = AcademicYear.objects.filter(is_active=True).first()
+        base_query = Student.objects.filter(academic_year=active_year, is_active=True)
+
+    # 2. حساب الإحصائيات بناءً على الطلاب المستخرجين (سواء أرشيف أو حالي)
+    stats = {
+        'total': base_query.count(),
+        'male': base_query.filter(gender='Male').count(),
+        'female': base_query.filter(gender='Female').count(),
+        'muslim': base_query.filter(religion='Muslim').count(),
+        'christian': base_query.filter(religion='Christian').count(),
+        'integration': base_query.filter(integration_status=True).count(),
+    }
+    
+    # 3. نظام الترقيم (Pagination)
+    student_list = base_query.order_by('first_name')
     paginator = Paginator(student_list, 20)
     page_number = request.GET.get('page')
     students_page = paginator.get_page(page_number)
     
-    # 3. جلب بيانات الفلاتر من الجداول الخاصة بها
+    # 4. جلب بيانات الفلاتر (تظل كما هي)
     all_grades = Grade.objects.all()
     all_classrooms = Classroom.objects.all()
     all_specs = Student.SPECIALIZATION_CHOICES
     
     context = {
-        'students': students_page,  # نرسل كائن الصفحة بدلاً من القائمة الكاملة
+        'students': students_page,
+        'stats': stats,
         'all_grades': all_grades,
         'all_classrooms': all_classrooms,
         'all_specs': all_specs,
+        'current_year': target_year if year_id else active_year, # لإظهار اسم السنة في الصفحة
+        'is_archive': True if year_id else False, # لتمييز ما إذا كنا في وضع الأرشيف
     }
     return render(request, 'student_registry.html', context)
-
-# def student_basic_data(request):
-
-#     students = Student.objects.select_related(
-#         'grade', 'classroom', 'specialization'
-#     ).all()
-
-#     # الفلاتر
-#     grade = request.GET.get('grade')
-#     classroom = request.GET.get('classroom')
-#     specialization = request.GET.get('specialization')
-#     gender = request.GET.get('gender')
-#     integration = request.GET.get('integration')
-#     religion = request.GET.get('religion')
-#     nationality = request.GET.get('nationality')
-
-#     if grade:
-#         students = students.filter(grade_id=grade)
-
-#     if classroom:
-#         students = students.filter(classroom_id=classroom)
-
-#     if specialization:
-#         students = students.filter(specialization_id=specialization)
-
-#     if gender:
-#         students = students.filter(gender=gender)
-
-#     if integration:
-#         students = students.filter(integration_status=integration)
-
-#     if religion:
-#         students = students.filter(religion=religion)
-
-#     if nationality:
-#         students = students.filter(nationality=nationality)
-
-#     # الإحصائيات
-#     stats = {
-#         "total": students.count(),
-#         "male": students.filter(gender="Male").count(),
-#         "female": students.filter(gender="Female").count(),
-#         "islam": students.filter(religion="Islam").count(),
-#         "christian": students.filter(religion="Christian").count(),
-#     }
-
-#     # حسب الصف
-#     grade_counts = students.values("grade__name").annotate(count=Count("id"))
-
-#     # حسب الفصل
-#     class_counts = students.values("classroom__name").annotate(count=Count("id"))
-
-#     # حسب التخصص
-#     spec_counts = students.values("specialization__name").annotate(count=Count("id"))
-
-#     context = {
-#         "students": students,
-#         "stats": stats,
-#         "grade_counts": grade_counts,
-#         "class_counts": class_counts,
-#         "spec_counts": spec_counts,
-#     }
-
-#     return render(request, "students/student_basic_data.html", context)
-
 
 def get_pending_sales_api(request, student_id):
     # جلب الأذونات التي لم تدفع بالكامل لهذا الطالب
@@ -391,7 +540,6 @@ def admin_add_restock(request):
             # 🛑 تنبيه: لا تضف سطر (item.stock_quantity += ...) هنا 
             # لأننا نعتمد الآن على الحساب التلقائي في الموديل لمنع التكرار
             
-            messages.success(request, f"✅ تم تسجيل توريد {restock.quantity} قطعة لصنف ({item.display_name})")
             return redirect('admin_add_restock') 
         
         # في حال كان الفورم غير صحيح
@@ -620,16 +768,53 @@ def get_classrooms(request):
     return JsonResponse(list(classrooms), safe=False)
 
 
+def student_dashboard(request, student_id):
+    student = get_object_or_404(Student, id=student_id)
+    
+    # جلب كافة الأقساط
+    installments = StudentInstallment.objects.filter(student=student).order_by('due_date')
+    
+    # حسابات إجمالية
+    total_required = installments.aggregate(Sum('amount_due'))['amount_due__sum'] or 0
+    total_paid = installments.aggregate(Sum('paid_amount'))['paid_amount__sum'] or 0
+    remaining_balance = total_required - total_paid
+    
+    # حساب الأقساط المتأخرة (تاريخ استحقاقها مضى ولم تدفع بالكامل)
+    import datetime
+    today = datetime.date.today()
+    overdue_installments = installments.filter(due_date__lt=today, paid_amount__lt=F('amount_due'))
+    total_overdue = sum(i.amount_due - i.paid_amount for i in overdue_installments)
+
+    # تجهيز بيانات الرسم البياني (دائري)
+    paid_percentage = (total_paid / total_required * 100) if total_required > 0 else 0
+    
+    context = {
+        'student': student,
+        'installments': installments,
+        'total_required': total_required,
+        'total_paid': total_paid,
+        'remaining_balance': remaining_balance,
+        'total_overdue': total_overdue,
+        'paid_percentage': round(paid_percentage, 1),
+    }
+    return render(request, "students/student_dashboard.html", context)
+
+
 def student_list(request):
+    # 1. جلب البيانات الأساسية للفلاتر والأرشيف
     all_years = AcademicYear.objects.all().order_by('-name')
     all_grades = Grade.objects.all().order_by('id')
     selected_year_id = request.GET.get('year_id')
 
+    # 2. تحديد السنة الدراسية المطلوب عرضها (الأرشيف أو الحالية)
     if selected_year_id:
-        current_view_year = AcademicYear.objects.filter(id=selected_year_id).first()
+        current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
+        is_archive = not current_view_year.is_active
     else:
         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
+        is_archive = False
 
+    # 3. تصفير العدادات قبل الحساب
     total_previous_debt = 0
     paid_count = 0 
     debt_count = 0 
@@ -642,52 +827,58 @@ def student_list(request):
             academic_year=current_view_year
         ).select_related("grade", "classroom").order_by('first_name')
 
-        from django.db.models import Sum
+        # حساب إجمالي المديونيات القديمة للسنة بالكامل
         total_previous_debt = students_query.aggregate(total=Sum('previous_debt'))['total'] or 0
+
+        # --- حساب "غير المسكنين" بدقة لجميع طلاب السنة ---
+        # الطالب غير المسكن هو من ليس لديه أي سجل في جدول الأقساط لهذه السنة
+        unassigned_count = students_query.annotate(
+            inst_count=Count('installments')
+        ).filter(inst_count=0).count()
         
+        # 4. معالجة بيانات كل طالب للحسابات المالية والعدادات
         for student in students_query:
-            # 🚀 التعديل الجوهري هنا: سحب الأرقام مباشرة من جدول الأقساط الموثوق
-            # نحسب إجمالي ما دفعه الطالب فعلياً في كل أقساطه
-            real_paid = StudentInstallment.objects.filter(
-                student=student
-            ).aggregate(Sum('paid_amount'))['paid_amount__sum'] or 0
+            # حساب الأرقام الحقيقية من جدول الأقساط
+            installments_stats = StudentInstallment.objects.filter(student=student).aggregate(
+                real_paid=Sum('paid_amount'),
+                real_required=Sum('amount_due')
+            )
             
-            # نحسب إجمالي المطلوب منه (مجموع مبالغ الأقساط الأصلية)
-            real_required = StudentInstallment.objects.filter(
-                student=student
-            ).aggregate(Sum('amount_due'))['amount_due__sum'] or 0
-            
-            # حساب المتبقي
+            real_paid = installments_stats['real_paid'] or 0
+            real_required = installments_stats['real_required'] or 0
             total_due = real_required - real_paid
 
-            # تحديث الإحصائيات (Stats)
-            if total_due <= 0:
+            # تحديث العدادات (هذه الحسابات ستظل ثابتة لأنها تتم قبل الترقيم)
+            if real_required <= 0:
+                # هذا الطالب لم يسكن بعد (تم حسابه بالفعل في unassigned_count أعلاه عبر الـ Query)
+                pass 
+            elif total_due <= 0:
                 paid_count += 1
             else:
                 debt_count += 1
 
-            # 🎯 تمرير البيانات للـ Template لتظهر في الجدول
-            # student.total_paid_display سيظهر الآن 3174 بدلاً من 65
+            # تمرير البيانات المخصصة للكائن ليتم عرضها في الجدول
             student.total_paid_display = real_paid 
             student.fees_display = real_required
             student.old_debt_display = student.previous_debt or 0
             student.calculated_remaining = total_due
-            student.total_required_display = real_required
             
             processed_students.append(student)
 
-        # نظام الترقيم
+        # 5. نظام الترقيم (Pagination) - يتم بعد حساب كل العدادات
         paginator = Paginator(processed_students, 20) 
         page_number = request.GET.get('page')
-        students = paginator.get_page(page_number)
+        students_page = paginator.get_page(page_number)
     else:
-        students = []
+        students_page = []
 
+    # 6. إرسال البيانات للقالب
     context = {
-        "students": students, 
+        "students": students_page, 
         "all_years": all_years, 
         "all_grades": all_grades, 
         "current_view_year": current_view_year,
+        "is_archive": is_archive,
         "total_previous_debt": total_previous_debt,
         "paid_count": paid_count,
         "debt_count": debt_count,
@@ -695,6 +886,10 @@ def student_list(request):
     }
     return render(request, "students/student_list.html", context)
 
+ 
+
+
+
 
 # def student_list(request):
 #     all_years = AcademicYear.objects.all().order_by('-name')
@@ -706,10 +901,6 @@ def student_list(request):
 #     else:
 #         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
 
-#     # تهيئة المتغيرات
-#     # ... الكود السابق (تحديد السنة) ...
-
-#     # تهيئة المتغيرات
 #     total_previous_debt = 0
 #     paid_count = 0 
 #     debt_count = 0 
@@ -717,142 +908,49 @@ def student_list(request):
 #     processed_students = []
 
 #     if current_view_year:
-#         # استرجاع الطلاب للسنة المحددة مع تحسين الاستعلام
-#         students_query = Student.objects.filter(
-#             academic_year=current_view_year
-#         ).select_related(
-#             "grade", 
-#             "classroom"
-#         ).prefetch_related(
-#             "accounts",
-#             "all_payments"
-#         ).order_by('first_name')
-
-#         # 🔥 التعديل: حساب إجمالي المديونية القديمة (المبالغ المرحلة فقط)
-#         # الطريقة دي بتجمع حقل previous_debt الثابت في قاعدة البيانات مباشرة
-#         from django.db.models import Sum
-#         total_previous_debt = students_query.aggregate(
-#             total=Sum('previous_debt')
-#         )['total'] or 0
-        
-#         # حساب الطلاب غير المسكنين
-#         unassigned_count = students_query.exclude(
-#             accounts__academic_year=current_view_year
-#         ).distinct().count()
-
-#         for student in students_query:
-#             # 1. المديونية القديمة (القيمة الثابتة في الحقل)
-#             # بنستخدم الحقل مباشرة عشان العداد والجدول يقرأوا من نفس "الخزنة"
-#             old_debt = student.previous_debt or 0
-#             total_due = student.total_balance_due
-
-#             # 2. حساب إحصائيات الطلاب (Stats)
-#             # هنا بنعتمد على الموقف الكلي للطالب (هل مسدد ولا لسه مديون)
-#             if total_due <= 0:
-#                 paid_count += 1
-#             else:
-#                 debt_count += 1
-
-#             # 3. تجهيز بيانات العرض للتمبلت
-#             student.total_paid_display = student.current_year_paid if hasattr(student, 'current_year_paid') else 0
-#             student.fees_display = student.current_year_fees_amount
-#             student.old_debt_display = old_debt # عرض المديونية المرحلة
-#             student.calculated_remaining = total_due
-            
-#             # الإجمالي المطلوب (القديم الثابت + مصاريف السنة دي)
-#             student.total_required_display = old_debt + student.current_year_fees_amount
-            
-#             processed_students.append(student)
-
-#         # 4. نظام الترقيم (Pagination)
-#         paginator = Paginator(processed_students, 20) 
-#         page_number = request.GET.get('page')
-#         students = paginator.get_page(page_number)
-
-#     else:
-#         students = []
-
-#     context = {
-#         "students": students, 
-#         "all_years": all_years, 
-#         "all_grades": all_grades, 
-#         "current_view_year": current_view_year,
-#         "total_previous_debt": total_previous_debt, # العداد الأصفر
-#         "paid_count": paid_count,
-#         "debt_count": debt_count,
-#         "unassigned_count": unassigned_count,
-#     }
-
-#     return render(request, "students/student_list.html", context)
-
-# def student_list(request):
-#     all_years = AcademicYear.objects.all().order_by('-name')
-#     all_grades = Grade.objects.all().order_by('id')
-#     selected_year_id = request.GET.get('year_id')
-
-#     if selected_year_id:
-#         current_view_year = AcademicYear.objects.filter(id=selected_year_id).first()
-#     else:
-#         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
-
-#     students_list = []
-#     total_previous_debt = 0
-#     paid_count = 0 
-#     debt_count = 0 
-#     unassigned_count = 0 
-
-#     if current_view_year:
 #         # استرجاع الطلاب للسنة المحددة
 #         students_query = Student.objects.filter(
 #             academic_year=current_view_year
-#         ).select_related(
-#             "grade", 
-#             "classroom"
-#         ).prefetch_related(
-#             "accounts",
-#             "all_payments"
-#         ).order_by('first_name')
-        
-#         # 1. حساب الطلاب غير المسكنين (يعتمد على قاعدة البيانات - شغال تمام)
-#         unassigned_count = students_query.exclude(
-#             accounts__academic_year=current_view_year
-#         ).distinct().count()
+#         ).select_related("grade", "classroom").order_by('first_name')
 
-#         # مصفوفة مؤقتة لمعالجة البيانات وحساب الإحصائيات برمجياً
-#         processed_students = []
+#         from django.db.models import Sum
+#         total_previous_debt = students_query.aggregate(total=Sum('previous_debt'))['total'] or 0
         
 #         for student in students_query:
-#             # 1. المديونية القديمة (المحسوبة اللي بتصفر لما يدفع)
-#             prev_debt = student.calculated_previous_debt 
+#             # 🚀 التعديل الجوهري هنا: سحب الأرقام مباشرة من جدول الأقساط الموثوق
+#             # نحسب إجمالي ما دفعه الطالب فعلياً في كل أقساطه
+#             real_paid = StudentInstallment.objects.filter(
+#                 student=student
+#             ).aggregate(Sum('paid_amount'))['paid_amount__sum'] or 0
             
-#             # 2. المتبقي الكلي (اللي بيطلع -200 أو صفر)
-#             total_due = student.total_balance_due
+#             # نحسب إجمالي المطلوب منه (مجموع مبالغ الأقساط الأصلية)
+#             real_required = StudentInstallment.objects.filter(
+#                 student=student
+#             ).aggregate(Sum('amount_due'))['amount_due__sum'] or 0
+            
+#             # حساب المتبقي
+#             total_due = real_required - real_paid
 
-#             # حساب الإحصائيات (Stats)
-#             total_previous_debt += prev_debt
-            
+#             # تحديث الإحصائيات (Stats)
 #             if total_due <= 0:
 #                 paid_count += 1
 #             else:
 #                 debt_count += 1
 
-#             # تجهيز بيانات العرض (لضمان السرعة في التمبلت)
-#             # ملاحظة: اتأكد إن الدوال دي موجودة في الموديل بنفس الأسماء
-#             student.total_paid_display = student.current_year_paid if hasattr(student, 'current_year_paid') else 0
-#             student.fees_display = student.current_year_fees_amount
-#             student.old_debt_display = prev_debt
+#             # 🎯 تمرير البيانات للـ Template لتظهر في الجدول
+#             # student.total_paid_display سيظهر الآن 3174 بدلاً من 65
+#             student.total_paid_display = real_paid 
+#             student.fees_display = real_required
+#             student.old_debt_display = student.previous_debt or 0
 #             student.calculated_remaining = total_due
-            
-#             # الإجمالي المطلوب (قديم + جديد)
-#             student.total_required_display = (student.previous_debt or 0) + student.current_year_fees_amount
+#             student.total_required_display = real_required
             
 #             processed_students.append(student)
 
-#         # الـ Pagination يستخدم القائمة المعالجة
+#         # نظام الترقيم
 #         paginator = Paginator(processed_students, 20) 
 #         page_number = request.GET.get('page')
 #         students = paginator.get_page(page_number)
-
 #     else:
 #         students = []
 
@@ -866,86 +964,8 @@ def student_list(request):
 #         "debt_count": debt_count,
 #         "unassigned_count": unassigned_count,
 #     }
-
 #     return render(request, "students/student_list.html", context)
 
-# def student_list(request):
-#     all_years = AcademicYear.objects.all().order_by('-name')
-#     all_grades = Grade.objects.all().order_by('id')
-#     selected_year_id = request.GET.get('year_id')
-
-#     if selected_year_id:
-#         current_view_year = AcademicYear.objects.filter(id=selected_year_id).first()
-#     else:
-#         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
-
-#     students_list = []
-#     # تعريف المتغيرات بقيمة مبدئية صفر
-#     total_previous_debt = 0
-#     total_required = 0
-#     paid_count = 0  # مضاف لضمان عدم حدوث خطأ إذا لم يوجد عام
-#     debt_count = 0  # مضاف لضمان عدم حدوث خطأ إذا لم يوجد عام
-#     unassigned_count = 0 # المتغير الجديد للطلاب غير المسكنين
-
-#     if current_view_year:
-#         students_query = Student.objects.filter(
-#             academic_year=current_view_year
-#         ).select_related(
-#             "grade", 
-#             "classroom"
-#         ).prefetch_related(
-#             "accounts",
-#             "all_payments"
-#         ).order_by('first_name')
-        
-#         total_previous_debt = sum([
-#             s.final_remaining for s in students_query
-#         ])
-        
-#         # total_previous_debt = students_query.aggregate(Sum('previous_debt'))['previous_debt__sum'] or 0
-
-#         # 1. حساب الطلاب غير المسكنين (الجديد) ✅
-#         # هم الطلاب الموجودين في السنة الحالية ولكن ليس لديهم سجل في StudentAccount لهذه السنة
-#         unassigned_count = students_query.exclude(
-#             accounts__academic_year=current_view_year
-#         ).count()
-
-#         # 2. حساب عدد المسددين (الجديد) ✅
-#         paid_count = students_query.filter(previous_debt=0, accounts__total_fees__lte=0).count() 
-
-#         # 3. حساب عدد المديونين (الجديد) ✅
-#         debt_count = students_query.filter(Q(previous_debt__gt=0) | Q(accounts__total_fees__gt=0)).distinct().count()
-
-#         for student in students_query:
-#             student.total_paid_display = student.current_year_paid
-#             student.fees_display = student.current_year_fees_amount
-#             student.old_debt_display = student.previous_debt
-#             student.calculated_remaining = (
-#                 (student.previous_debt or 0) + student.final_remaining
-#             )
-#             student.total_required_display = student.total_required_amount
-#             students_list.append(student)
-
-#         paginator = Paginator(students_list, 20) 
-#         page_number = request.GET.get('page')
-#         students = paginator.get_page(page_number)
-
-#     else:
-#         students = []
-
-#     context = {
-#         "students": students, 
-#         "all_years": all_years, 
-#         "all_grades": all_grades, 
-#         "current_view_year": current_view_year,
-#         # ✅ نرسل الإجماليات للتمبلت هنا
-#         "total_previous_debt": total_previous_debt,
-#         "paid_count": paid_count,                   # العداد الأخضر
-#         "debt_count": debt_count,                   # العداد الأحمر
-#         "unassigned_count": unassigned_count,       # العداد الجديد (الأسود)
-#     }
-
-#     return render(request, "students/student_list.html", context)
 
 
 def add_student(request):
@@ -980,43 +1000,22 @@ def add_student(request):
         'hide_sidebar': False
     })
 
-# def add_student(request):
-#     student_id = request.GET.get('id')
-#     mode = request.GET.get('mode') # التأكد إذا كان عرض فقط أو تعديل
-#     student = None
 
-#     if student_id:
-#         student = get_object_or_404(Student, id=student_id)
+from django.contrib.auth.decorators import user_passes_test
 
-#     if request.method == 'POST':
-#         form = StudentForm(request.POST, request.FILES, instance=student)
-#         if form.is_valid():
-#             form.save()
-#             messages.success(request, "تم حفظ بيانات الطالب بنجاح")
-#             # التعديل هنا: نجعله يعود لصفحة الإضافة بدلاً من السجل
-#             return redirect('add_student') 
-#     else:
-#         form = StudentForm(instance=student)
-
-#     # هنا الحل لظهور السايدبار المطور:
-#     # نرسل student_admin_mode فقط إذا كنا في وضع العرض (view) أو كان الطالب موجوداً
-#     is_admin_mode = True if (student and mode == 'view') else False
-
-#     return render(request, 'students/add_student.html', {
-#         'form': form, 
-#         'student': student,
-#         'student_admin_mode': is_admin_mode, # تفعيل القائمة الجانبية الخاصة بالطالب
-#         'hide_sidebar': False
-#     })
-
+@user_passes_test(lambda u: u.is_superuser) # منع أي مستخدم ليس آدمن من الدخول
 def promote_student(request, student_id):
     try:
+        # تأكيد إضافي داخل الدالة للأمان
+        if not request.user.is_superuser:
+            messages.error(request, "عذراً، لا تمتلك صلاحية تنفيذ هذا الإجراء الحساس.")
+            return redirect("students_list")
+
         student = get_object_or_404(Student, id=student_id)
 
-        # هات السنة الجاية
+        # منطق جلب السنة التالية كما هو في كودك...
         all_years = list(AcademicYear.objects.all().order_by('name'))
         next_year = None
-
         for i, year in enumerate(all_years):
             if year.id == student.academic_year.id:
                 if i + 1 < len(all_years):
@@ -1027,22 +1026,58 @@ def promote_student(request, student_id):
             messages.warning(request, "لا توجد سنة تالية")
             return redirect("students_list")
 
-        # 🔥 استدعاء الدالة الأساسية فقط
+        # استدعاء دالة الترحيل
         success = promote_student_action(
             student_id=student.id,
             target_year_id=next_year.id,
-            target_grade_id=student.grade.id  # أو غيرها حسب النظام
+            target_grade_id=student.grade.id
         )
 
         if success:
-            messages.success(request, "تم الترحيل بنجاح")
+            messages.success(request, f"تم ترحيل الطالب {student.get_full_name()} بنجاح")
         else:
-            messages.error(request, "فشل الترحيل")
+            messages.error(request, "فشل الترحيل، يرجى مراجعة سجل الأخطاء")
 
     except Exception as e:
-        messages.error(request, str(e))
+        messages.error(request, f"خطأ غير متوقع: {str(e)}")
 
     return redirect("students_list")
+
+
+# def promote_student(request, student_id):
+#     try:
+#         student = get_object_or_404(Student, id=student_id)
+
+#         # هات السنة الجاية
+#         all_years = list(AcademicYear.objects.all().order_by('name'))
+#         next_year = None
+
+#         for i, year in enumerate(all_years):
+#             if year.id == student.academic_year.id:
+#                 if i + 1 < len(all_years):
+#                     next_year = all_years[i+1]
+#                 break
+
+#         if not next_year:
+#             messages.warning(request, "لا توجد سنة تالية")
+#             return redirect("students_list")
+
+#         # 🔥 استدعاء الدالة الأساسية فقط
+#         success = promote_student_action(
+#             student_id=student.id,
+#             target_year_id=next_year.id,
+#             target_grade_id=student.grade.id  # أو غيرها حسب النظام
+#         )
+
+#         if success:
+#             messages.success(request, "تم الترحيل بنجاح")
+#         else:
+#             messages.error(request, "فشل الترحيل")
+
+#     except Exception as e:
+#         messages.error(request, str(e))
+
+#     return redirect("students_list")
     
 # 
 
@@ -1073,12 +1108,44 @@ def add_ledger_entry(request):
             entry = form.save(commit=False)
             entry.collected_by = request.user
             entry.save()
-            messages.success(request, "تم تسجيل القيد في الخزينة العامة بنجاح")
             return redirect('student_list') # أو أي صفحة أخرى
     else:
         form = GeneralLedgerForm()
+        
     
     return render(request, 'treasury/treasury_form.html', {'form': form})
+
+
+def overdue_installments_list(request):
+    student_id = request.GET.get('student_id')
+    today = timezone.now().date()
+    
+    query = Q(installments__due_date__lt=today, installments__paid_amount__lt=F('installments__amount_due'))
+    
+    if student_id:
+        students_list = Student.objects.filter(query, id=student_id).distinct()
+    else:
+        students_list = Student.objects.filter(query).distinct()
+
+    # حساب المديونية لكل طالب في القائمة الكاملة أولاً
+    for student in students_list:
+        overdue_total = StudentInstallment.objects.filter(
+            student=student,
+            due_date__lt=today,
+            paid_amount__lt=F('amount_due')
+        ).aggregate(total=Sum(F('amount_due') - F('paid_amount')))['total'] or 0
+        student.total_overdue = overdue_total
+
+    # إعداد نظام الترقيم (مثلاً 10 طلاب لكل صفحة)
+    paginator = Paginator(students_list, 10) 
+    page_number = request.GET.get('page')
+    students_page = paginator.get_page(page_number)
+
+    context = {
+        'students': students_page, # نرسل كائن الصفحة بدلاً من القائمة الكاملة
+        'today': today,
+    }
+    return render(request, 'students/overdue_list.html', context)
 
 
 

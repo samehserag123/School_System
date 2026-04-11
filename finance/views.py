@@ -2144,13 +2144,26 @@ def quick_collection(request):
 #         'selected_student_id': url_student_id,
 #     })
 
+
 @login_required
 def finance_dashboard(request):
     active_year = get_active_year()
     if not active_year:
         return render(request, "finance/dashboard.html", {"error": "⚠️ لا توجد سنة نشطة."})
 
-    today = timezone.now().date()
+    # 🟢 التعديل الجوهري: إجبار النظام على استخدام توقيت مصر بدقة
+    from django.utils import timezone
+    try:
+        import zoneinfo
+        egypt_tz = zoneinfo.ZoneInfo("Africa/Cairo")
+        local_now = timezone.now().astimezone(egypt_tz)
+    except ImportError:
+        import pytz
+        egypt_tz = pytz.timezone('Africa/Cairo')
+        local_now = timezone.now().astimezone(egypt_tz)
+        
+    today = local_now.date() # هذا هو "اليوم" الحقيقي في مصر
+
     from treasury.models import GeneralLedger
     from students.models import Student, Grade 
     from finance.models import StudentInstallment
@@ -2212,8 +2225,81 @@ def finance_dashboard(request):
         "total_students_count": all_students.count(),
         "grades_efficiency": grades_efficiency,
         "recent_activities": GeneralLedger.objects.filter(date__date=today).order_by('-date')[:10],
+        "current_time": local_now, # إرسال وقت وتاريخ مصر للقالب
     }
     return render(request, 'finance/dashboard.html', context)
+
+
+# @login_required
+# def finance_dashboard(request):
+#     active_year = get_active_year()
+#     if not active_year:
+#         return render(request, "finance/dashboard.html", {"error": "⚠️ لا توجد سنة نشطة."})
+
+#     today = timezone.now().date()
+#     from treasury.models import GeneralLedger
+#     from students.models import Student, Grade 
+#     from finance.models import StudentInstallment
+#     from django.db.models import Sum
+
+#     # 1. إيرادات الخزينة (المحصل الفعلي اليوم وفي الشهر)
+#     today_revenue_all = GeneralLedger.objects.filter(date__date=today).aggregate(total=Sum('amount'))['total'] or 0
+#     month_revenue_all = GeneralLedger.objects.filter(date__month=today.month, date__year=today.year).aggregate(total=Sum('amount'))['total'] or 0
+#     year_revenue_all = GeneralLedger.objects.aggregate(total=Sum('amount'))['total'] or 0
+
+#     # 2. حساب إجمالي المدفوعات الحقيقي من واقع جدول الأقساط (بدلاً من s.current_year_paid)
+#     # ده اللي هيخلي الـ 3174 تظهر في الحسابات
+#     total_paid_students = StudentInstallment.objects.filter(
+#         academic_year=active_year
+#     ).aggregate(total=Sum('paid_amount'))['total'] or 0
+
+#     # 3. حساب المستهدف والمديونيات
+#     # إجمالي المطلوب (أقساط) + مديونيات قديمة مرحلة في ملف الطالب
+#     total_fees_req = StudentInstallment.objects.filter(
+#         academic_year=active_year
+#     ).aggregate(total=Sum('amount_due'))['total'] or 0
+    
+#     all_students = Student.objects.filter(academic_year=active_year)
+#     total_old_debts = all_students.aggregate(total=Sum('previous_debt'))['total'] or 0
+    
+#     total_target_all = total_fees_req + total_old_debts
+    
+#     # المديونية المتبقية النهائية (الرقم الأحمر الكبير في الداشبورد)
+#     total_debt_combined = max(total_target_all - total_paid_students, 0)
+
+#     # 4. كفاءة الصفوف (تحديثها لتسحب من الأقساط)
+#     grades_efficiency = []
+#     for grade in Grade.objects.all():
+#         # حساب المستهدف لهذا الصف (مجموع أقساط الطلاب في هذا الصف)
+#         g_installments = StudentInstallment.objects.filter(student__grade=grade, academic_year=active_year)
+#         if g_installments.exists():
+#             g_target_fees = g_installments.aggregate(total=Sum('amount_due'))['total'] or 0
+#             g_paid = g_installments.aggregate(total=Sum('paid_amount'))['total'] or 0
+            
+#             # إضافة المديونية القديمة لطلاب هذا الصف
+#             g_old_debt = all_students.filter(grade=grade).aggregate(total=Sum('previous_debt'))['total'] or 0
+#             g_total_target = g_target_fees + g_old_debt
+
+#             grades_efficiency.append({
+#                 'grade': grade.name,
+#                 'target': g_total_target,
+#                 'paid': g_paid,
+#                 'remaining': max(g_total_target - g_paid, 0),
+#                 'percentage': round((g_paid / g_total_target * 100), 1) if g_total_target > 0 else 0
+#             })
+
+#     context = {
+#         "active_year": active_year,
+#         "today_revenue_all": today_revenue_all, 
+#         "month_revenue_all": month_revenue_all,
+#         "year_revenue_all": year_revenue_all,
+#         "total_debt_combined": total_debt_combined,
+#         "total_percentage": round((total_paid_students / total_target_all * 100), 1) if total_target_all > 0 else 0,
+#         "total_students_count": all_students.count(),
+#         "grades_efficiency": grades_efficiency,
+#         "recent_activities": GeneralLedger.objects.filter(date__date=today).order_by('-date')[:10],
+#     }
+#     return render(request, 'finance/dashboard.html', context)
 
 
 # @login_required
@@ -2786,15 +2872,6 @@ def finance_dashboard(request):
 #     return render(request, 'finance/dashboard.html', context)
 
 
-from decimal import Decimal
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib import messages
-from django.db import transaction
-from django.utils import timezone
-from django.contrib.admin.views.decorators import staff_member_required
-
-from students.models import Student
-
 @staff_member_required
 @transaction.atomic
 def assign_plan(request, student_id=None):
@@ -2851,7 +2928,7 @@ def assign_plan(request, student_id=None):
                     payment_date=timezone.now().date(),
                     notes=f"تحصيل قيمة الفائدة فقط عند تسكين الخطة: {plan.name}"
                 )
-                msg = f"✅ تم التسكين وتحصيل الفائدة ({plan.interest_value} ج.م) في الخزينة."
+                msg = f"✅ تم التسكين وتحصيل رسوم فتح الملف ({plan.interest_value} ج.م) في الخزينة."
             else:
                 msg = f"✅ تم اعتماد البرنامج المالي بنجاح للطالب {student.get_full_name()}"
 
@@ -3509,3 +3586,29 @@ def receipt_book_detail(request, book_id):
     
     # تأكد أن هذا السطر مكتوب هكذا بالأقواس، وليس return render فقط
     return render(request, 'finance/receipt_book_detail.html', context)
+
+
+
+# أضف هذه الدالة في آخر الملف
+def archives_list_view(request):
+    # 1. جلب السنوات المؤرشفة
+    past_years = AcademicYear.objects.filter(is_active=False).order_by('-name')
+    
+    # 2. استقبال الطلب لسنة معينة
+    selected_year_id = request.GET.get('year_id')
+    selected_year = None
+    students_data = None
+
+    if selected_year_id:
+        selected_year = get_object_or_404(AcademicYear, id=selected_year_id)
+        students_data = Student.objects.filter(academic_year=selected_year)
+
+    # 3. تجهيز القاموس
+    context = {
+        'past_years': past_years,
+        'selected_year': selected_year,
+        'students_data': students_data,
+    }
+    
+    # 4. الإرجاع (تأكد من كتابة context هنا وليس يدوياً)
+    return render(request, 'archives/archives_main.html', context)

@@ -1,0 +1,550 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}لوحة إدارة الباص المدرسي{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    .bus-wrapper {
+        --card-inner: #020617;
+        --text-main: #e2e8f0;
+        --accent-primary: #38bdf8;
+        --accent-success: #39ff14;
+        --accent-danger: #ff3131;
+        --accent-warning: #facc15;
+        --accent-purple: #c084fc;
+    }
+
+    .bus-wrapper .dashboard-card {
+        background: var(--card-inner);
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        height: 100%;
+        margin-bottom: 25px;
+    }
+
+    .bus-wrapper .stat-box {
+        background: #000;
+        border-radius: 15px;
+        padding: 20px;
+        border: 1px solid #1e293b;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.3s ease;
+    }
+    .bus-wrapper .stat-box:hover { transform: translateY(-5px); }
+
+    .bus-wrapper .stat-box::before {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; width: 4px; height: 100%;
+    }
+    .bus-wrapper .border-info::before { background: var(--accent-primary); box-shadow: 0 0 15px var(--accent-primary); }
+    .bus-wrapper .border-success::before { background: var(--accent-success); box-shadow: 0 0 15px var(--accent-success); }
+    .bus-wrapper .border-danger::before { background: var(--accent-danger); box-shadow: 0 0 15px var(--accent-danger); }
+
+    .bus-wrapper .table-dark-custom { --bs-table-bg: transparent; color: var(--text-main); }
+    .bus-wrapper .table-dark-custom thead th { border-bottom: 2px solid #1e293b; color: #94a3b8; font-weight: 700; padding-bottom: 15px;}
+    .bus-wrapper .table-dark-custom tbody tr { border-bottom: 1px solid #0f172a; transition: background 0.2s; }
+    .bus-wrapper .table-dark-custom tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+    .badge-neon-success { background: rgba(57, 255, 20, 0.1); color: var(--accent-success); border: 1px solid var(--accent-success); }
+    .badge-neon-warning { background: rgba(250, 204, 21, 0.1); color: var(--accent-warning); border: 1px solid var(--accent-warning); }
+    .badge-neon-danger { background: rgba(255, 49, 49, 0.1); color: var(--accent-danger); border: 1px solid var(--accent-danger); }
+    .badge-neon-primary { background: rgba(56, 189, 248, 0.1); color: var(--accent-primary); border: 1px solid var(--accent-primary); }
+
+    /* حل مشكلة شفافية الـ Modals وتداخلها مع الخلفية */
+    .modal-content { 
+        background-color: #020617 !important; 
+        border: 1px solid #1e293b !important; 
+        box-shadow: 0 10px 50px rgba(0,0,0,0.9) !important;
+        color: #e2e8f0;
+    }
+    .modal-header, .modal-footer {
+        border-color: #1e293b !important;
+    }
+    .modal-content .form-control, .modal-content .form-select { 
+        background-color: #000 !important; 
+        color: #fff !important; 
+        border-color: #334155 !important; 
+    }
+    .modal-content .form-control:focus, .modal-content .form-select:focus { 
+        border-color: #38bdf8 !important; 
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.2) !important; 
+    }
+    
+    /* تنسيق خاص بـ Select2 داخل المودال ليتماشى مع الثيم المظلم */
+    .select2-container--default .select2-selection--single {
+        background-color: #000 !important;
+        border: 1px solid #334155 !important;
+        height: 38px !important;
+        border-radius: 6px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered { color: #fff !important; }
+    .select2-container--default .select2-dropdown { background-color: #000 !important; border: 1px solid #38bdf8 !important; }
+    .select2-container--default .select2-search--dropdown .select2-search__field { background-color: #050505 !important; border: 1px solid #1e293b !important; color: #fff !important; }
+    .select2-container--default .select2-results__option { background-color: #000 !important; color: #fff !important; border-bottom: 1px solid #0f172a; }
+    .select2-container--default .select2-results__option--highlighted[aria-selected] { background-color: #38bdf8 !important; color: #000 !important; }
+</style>
+{% endblock %}
+
+{% block page_title %}إدارة الباص المدرسي والمواصلات{% endblock %}
+
+{% block content %}
+<div class="bus-wrapper text-end" dir="rtl">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 dashboard-card" style="padding: 15px 25px;">
+        <h3 class="fw-900 m-0" style="color: #38bdf8;">
+            <i class="bi bi-bus-front me-2"></i> المركز الشامل للمواصلات
+        </h3>
+        <div class="d-flex gap-2 mt-3 mt-md-0">
+            <button class="btn btn-outline-warning fw-bold rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#newRouteModal">
+                <i class="bi bi-signpost-split me-1"></i> إضافة خط سير
+            </button>
+            <button class="btn btn-primary fw-bold rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#newSubscriptionModal">
+                <i class="bi bi-person-plus me-1"></i> اشتراك طالب
+            </button>
+        </div>
+    </div>
+
+    <!-- الإحصائيات السريعة -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="stat-box border-info">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small text-secondary fw-bold">إجمالي طلاب الباص</div>
+                    <div class="bg-info bg-opacity-10 p-2 rounded"><i class="bi bi-people-fill text-info fs-5"></i></div>
+                </div>
+                <div class="display-6 fw-900 text-white">{{ total_bus_students }} <span class="fs-6 text-secondary">طالب</span></div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-box border-success">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small text-secondary fw-bold">إجمالي المحصل (إيرادات)</div>
+                    <div class="bg-success bg-opacity-10 p-2 rounded"><i class="bi bi-wallet2 text-success fs-5"></i></div>
+                </div>
+                <div class="display-6 fw-900" style="color: #39ff14;">{{ total_revenue }} <span class="fs-6 text-secondary">ج.م</span></div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-box border-danger">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small text-secondary fw-bold">مديونيات متأخرة (باقي)</div>
+                    <div class="bg-danger bg-opacity-10 p-2 rounded"><i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i></div>
+                </div>
+                <div class="display-6 fw-900" style="color: #ff3131;">{{ total_debt }} <span class="fs-6 text-secondary">ج.م</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- قسم الخطوط والتحليلات -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="dashboard-card h-100">
+                <h5 class="fw-bold text-info mb-4"><i class="bi bi-geo-alt-fill me-2"></i> خطوط السير والتسعير والكثافة</h5>
+                <div class="table-responsive">
+                    <table class="table table-dark-custom align-middle">
+                        <thead>
+                            <tr>
+                                <th>اسم الخط / المنطقة</th>
+                                <th>السائق</th>
+                                <th>التسعير (شهري/تيرم/سنوي)</th>
+                                <th class="text-center">الكثافة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for route in routes %}
+                            <tr>
+                                <td class="fw-bold text-white">{{ route.name }}</td>
+                                <td class="text-secondary small">
+                                    {{ route.driver_name|default:"غير محدد" }}<br>
+                                    <span style="font-size: 0.75rem;"><i class="bi bi-telephone"></i> {{ route.driver_phone|default:"-" }}</span>
+                                </td>
+                                <td class="small" style="color: #94a3b8;">
+                                    <span class="text-info">{{ route.monthly_price }}</span> / <span class="text-warning">{{ route.term_price }}</span> / <span class="text-success">{{ route.yearly_price }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge {% if route.current_occupancy >= route.capacity %}badge-neon-danger{% else %}badge-neon-success{% endif %} rounded-pill px-3">
+                                        {{ route.current_occupancy }} / {{ route.capacity }}
+                                    </span>
+                                </td>
+                                <input type="hidden" class="route-chart-data" data-name="{{ route.name }}" data-count="{{ route.current_occupancy }}">
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center text-secondary py-4">لا توجد خطوط باص مسجلة حالياً.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="dashboard-card h-100">
+                <h5 class="fw-bold text-warning mb-4"><i class="bi bi-pie-chart-fill me-2"></i> الكثافة وتوزيع الطلاب</h5>
+                <div class="chart-container" style="height: 250px;">
+                    <canvas id="busDensityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- قسم الاشتراكات والتحصيل -->
+    <div class="dashboard-card">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="fw-bold text-white m-0"><i class="bi bi-list-columns-reverse me-2 text-success"></i> السجل المالي لاشتراكات الطلاب</h5>
+            <input type="text" id="searchSub" class="form-control bg-black text-white border-secondary w-25" placeholder="بحث باسم الطالب...">
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-dark-custom align-middle text-center" id="subscriptionsTable">
+                <thead class="text-start">
+                    <tr>
+                        <th>الطالب</th>
+                        <th>خط الباص</th>
+                        <th>النظام (الفترة)</th>
+                        <th>الموقف المالي</th>
+                        <th class="text-center">الإجراء</th>
+                    </tr>
+                </thead>
+                <tbody class="text-start">
+                    {% for sub in subscriptions %}
+                    <tr>
+                        <td class="fw-bold" style="color: #e2e8f0;">
+                            {{ sub.student.first_name }} {{ sub.student.last_name }}<br>
+                            <small class="text-info"><i class="bi bi-hash"></i> {{ sub.student.student_code }}</small>
+                        </td>
+                        <td><span class="badge badge-neon-primary px-3 rounded-pill">{{ sub.route.name }}</span></td>
+                        <td class="small text-secondary">
+                            <span class="text-white">{{ sub.get_sub_type_display }}</span><br>
+                            {{ sub.start_date|date:"Y-m-d" }} <i class="bi bi-arrow-left-short text-warning"></i> {{ sub.end_date|date:"Y-m-d" }}
+                        </td>
+                        <td>
+                            {% if sub.remaining_amount <= 0 %}
+                                <span class="badge badge-neon-success px-3 py-2 rounded-pill w-100"><i class="bi bi-check2-all"></i> مسدد ({{ sub.total_paid }})</span>
+                            {% elif sub.total_paid > 0 %}
+                                <span class="badge badge-neon-warning px-3 py-2 rounded-pill w-100">باقي: {{ sub.remaining_amount }} ج</span>
+                            {% else %}
+                                <span class="badge badge-neon-danger px-3 py-2 rounded-pill w-100">مطلوب: {{ sub.required_amount }} ج</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if sub.remaining_amount > 0 %}
+                                <button class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm" 
+                                        onclick="openPaymentModal('{{ sub.id }}', '{{ sub.student.first_name }} {{ sub.student.last_name }}', '{{ sub.remaining_amount }}')">
+                                    <i class="bi bi-cash-coin me-1"></i> تحصيل
+                                </button>
+                            {% else %}
+                                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 disabled">خالص</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-center text-secondary py-5">لا يوجد أي طلاب مشتركين في الباص.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- ============================================== -->
+<!-- 1. Modal إضافة خط سير باص جديد -->
+<!-- ============================================== -->
+<div class="modal fade" id="newRouteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{% url 'bus_dashboard' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_route">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-warning fw-bold"><i class="bi bi-signpost-split me-2"></i> إضافة خط سير جديد</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-end" dir="rtl">
+                    <div class="mb-3">
+                        <label class="form-label text-white small fw-bold">اسم الخط / المنطقة *</label>
+                        <input type="text" name="name" class="form-control" placeholder="مثال: المهندسين - شارع سوريا" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">اسم السائق</label>
+                            <input type="text" name="driver_name" class="form-control" placeholder="اسم السائق (اختياري)">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">هاتف السائق</label>
+                            <input type="text" name="driver_phone" class="form-control" placeholder="رقم الهاتف (اختياري)">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">رقم لوحة الباص</label>
+                            <input type="text" name="bus_number" class="form-control" placeholder="أ ب ج - 123 (اختياري)">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">سعة الباص (كراسي) *</label>
+                            <input type="number" name="capacity" class="form-control" value="20" required>
+                        </div>
+                    </div>
+                    
+                    <!-- التنسيق المطور لأسعار الخط -->
+                    <div class="mb-2 p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid #1e293b;">
+                        <h6 class="text-info mb-2 small fw-bold"><i class="bi bi-tags me-1"></i> قائمة أسعار الخط (كتالوج الأسعار)</h6>
+                        <small class="text-secondary d-block mb-3" style="font-size: 0.8rem; line-height: 1.6;">
+                            حدد الأسعار الافتراضية هنا. لاحقاً عند تسجيل "اشتراك لطالب" واختيار نظامه (شهري، تيرم، إلخ..)، سيقوم النظام بسحب السعر تلقائياً.
+                        </small>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary small fw-bold mb-1">اشتراك شهري</label>
+                                <input type="number" name="monthly_price" class="form-control text-center" placeholder="0 ج.م" value="0">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary small fw-bold mb-1">اشتراك التيرم</label>
+                                <input type="number" name="term_price" class="form-control text-center" placeholder="0 ج.م" value="0">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-success small fw-bold mb-1">اشتراك سنوي</label>
+                                <input type="number" name="yearly_price" class="form-control text-center text-success border-success fw-bold" placeholder="0 ج.م" value="0">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning rounded-pill fw-bold text-dark px-4">حفظ بيانات الخط</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================== -->
+<!-- 2. Modal إضافة اشتراك طالب -->
+<!-- ============================================== -->
+<div class="modal fade" id="newSubscriptionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="{% url 'bus_dashboard' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_subscription">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-info fw-bold"><i class="bi bi-person-plus me-2"></i> تسجيل اشتراك باص لطالب</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-end" dir="rtl">
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label text-white small fw-bold">اختر الطالب *</label>
+                        <select name="student_id" id="studentSelect" class="form-select select2-student" required style="width: 100%;">
+                            <option value="">-- ابحث واكتب اسم الطالب أو الكود --</option>
+                            {% for std in students %}
+                                <option value="{{ std.id }}">{{ std.first_name }} {{ std.last_name }} | كود: {{ std.student_code }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-white small fw-bold">خط السير *</label>
+                            <select name="route_id" class="form-select" required onchange="updatePriceHint(this)">
+                                <option value="">اختر الخط...</option>
+                                {% for route in routes %}
+                                    <option value="{{ route.id }}" 
+                                            data-monthly="{{ route.monthly_price }}" 
+                                            data-term="{{ route.term_price }}" 
+                                            data-yearly="{{ route.yearly_price }}">
+                                        {{ route.name }} (متاح: {{ route.capacity|add:"-"|add:route.current_occupancy }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-white small fw-bold">نظام الاشتراك *</label>
+                            <select name="sub_type" class="form-select" required id="subTypeSelect" onchange="updatePriceHint(document.querySelector('select[name=route_id]'))">
+                                <option value="monthly">شهري</option>
+                                <option value="term">تيرم (فصل دراسي)</option>
+                                <option value="yearly">سنوي كامل</option>
+                                <option value="custom">مخصص</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">تاريخ البدء</label>
+                            <input type="date" name="start_date" class="form-control" value="{{ today|date:'Y-m-d' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">تاريخ الانتهاء</label>
+                            <input type="date" name="end_date" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="col-md-12 p-3 rounded" style="background: rgba(56, 189, 248, 0.05); border: 1px dashed #38bdf8;">
+                        <label class="form-label text-info fw-bold">المبلغ المطلوب للاشتراك (ج.م) *</label>
+                        <input type="number" name="required_amount" id="requiredAmountInput" class="form-control border-info text-info fw-bold fs-5" required>
+                        <small class="text-secondary mt-1 d-block" id="priceHint">تمت القراءة تلقائياً من تسعيرة الخط. يمكنك تعديل المبلغ يدوياً إذا لزم الأمر.</small>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold">تأكيد الاشتراك</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================== -->
+<!-- 3. Modal تحصيل المبالغ (دفع) -->
+<!-- ============================================== -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <form method="POST" action="{% url 'bus_dashboard' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_payment">
+                <input type="hidden" name="subscription_id" id="pay_sub_id">
+                
+                <div class="modal-header border-secondary bg-success bg-opacity-10">
+                    <h6 class="modal-title text-success fw-bold"><i class="bi bi-wallet2 me-2"></i> تحصيل قسط باص</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-3">
+                        <span class="text-secondary small">الطالب:</span>
+                        <h6 class="text-white fw-bold m-0" id="pay_student_name"></h6>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-success fw-bold">المبلغ المدفوع (الآن)</label>
+                        <div class="input-group">
+                            <input type="number" name="amount_paid" id="pay_amount" class="form-control text-center fw-bold fs-4 text-success border-success" required>
+                            <span class="input-group-text bg-dark text-white border-success">ج.م</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary justify-content-center">
+                    <button type="submit" class="btn btn-success rounded-pill px-5 fw-bold w-100">تأكيد الاستلام <i class="bi bi-check-circle ms-1"></i></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // تهيئة Select2 عندما يفتح المودال لضمان ظهوره بشكل سليم
+        $('#newSubscriptionModal').on('shown.bs.modal', function () {
+            $('#studentSelect').select2({
+                dropdownParent: $('#newSubscriptionModal'),
+                dir: "rtl",
+                placeholder: "-- ابحث واكتب اسم الطالب أو الكود --",
+                allowClear: true,
+                width: '100%',
+                matcher: function(params, data) {
+                    // دالة بحث مخصصة للبحث بالاسم أو الكود
+                    if ($.trim(params.term) === '') { return data; }
+                    if (typeof data.text === 'undefined') { return null; }
+                    var searchTerm = params.term.toLowerCase().trim();
+                    var dataParts = data.text.toLowerCase().split('|');
+
+                    var matchFound = dataParts.some(function(part) {
+                        return part.trim().indexOf(searchTerm) > -1; // بحث جزئي في أي مكان من الاسم
+                    });
+
+                    if (matchFound) { return data; }
+                    return null;
+                }
+            });
+        });
+
+        // فلترة الجدول
+        $("#searchSub").on("keyup", function() {
+            var value = $(this).val().toLowerCase();
+            $("#subscriptionsTable tbody tr").filter(function() {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+            });
+        });
+    });
+
+    // دالة فتح مودال الدفع وتعبئة البيانات تلقائياً
+    function openPaymentModal(subId, studentName, remainingAmount) {
+        document.getElementById('pay_sub_id').value = subId;
+        document.getElementById('pay_student_name').innerText = studentName;
+        document.getElementById('pay_amount').value = remainingAmount; 
+        var myModal = new bootstrap.Modal(document.getElementById('paymentModal'));
+        myModal.show();
+    }
+
+    // دالة لتحديث السعر التلقائي في مودال الاشتراك بناءً على اختيار الخط والنظام
+    function updatePriceHint(routeSelect) {
+        if(!routeSelect || routeSelect.selectedIndex === 0) return;
+        
+        let selectedOption = routeSelect.options[routeSelect.selectedIndex];
+        let subType = document.getElementById('subTypeSelect').value;
+        let price = 0;
+        
+        if(subType === 'monthly') price = selectedOption.getAttribute('data-monthly');
+        else if(subType === 'term') price = selectedOption.getAttribute('data-term');
+        else if(subType === 'yearly') price = selectedOption.getAttribute('data-yearly');
+        
+        // منع ظهور "null" إذا لم يتم إدخال سعر في الداتا بيز
+        if(price === "None" || price === null) price = 0;
+
+        document.getElementById('requiredAmountInput').value = price;
+    }
+
+    // Chart.js للرسم البياني للكثافة
+    document.addEventListener("DOMContentLoaded", function() {
+        let labels = [];
+        let data = [];
+        
+        document.querySelectorAll('.route-chart-data').forEach(item => {
+            let count = parseInt(item.getAttribute('data-count'));
+            if(count > 0) {
+                labels.push(item.getAttribute('data-name'));
+                data.push(count);
+            }
+        });
+
+        if(data.length > 0) {
+            const ctx = document.getElementById('busDensityChart').getContext('2d');
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = 'Cairo';
+            new Chart(ctx, {
+                type: 'polarArea',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['rgba(56, 189, 248, 0.7)', 'rgba(57, 255, 20, 0.7)', 'rgba(250, 204, 21, 0.7)', 'rgba(255, 49, 49, 0.7)', 'rgba(192, 132, 252, 0.7)'],
+                        borderColor: '#020617',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { r: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } } },
+                    plugins: { legend: { position: 'right' } }
+                }
+            });
+        } else {
+            document.getElementById('busDensityChart').parentElement.innerHTML = `
+                <div class="h-100 d-flex align-items-center justify-content-center text-secondary opacity-50">
+                    <i class="bi bi-pie-chart me-2"></i> لا توجد بيانات للرسم
+                </div>`;
+        }
+    });
+</script>
+{% endblock %}
