@@ -492,14 +492,24 @@ class Payment(models.Model):
                         super(Payment, self).save(update_fields=['installment'])
 
 #   
-
 class Expense(models.Model):
+    # إضافة خيارات نوع المصروف
+    EXPENSE_TYPES = (
+        ('petty', 'مصروفات نثرية'),
+        ('general', 'مصروفات عمومية'),
+    )
+    
     title = models.CharField(max_length=200, verbose_name="بيان الصرف")
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="المبلغ")
-    expense_date = models.DateTimeField(default=timezone.now, verbose_name="تاريخ الصرف")
-    # ربط المصروف بالموظف الذي قام بالصرف
-    spent_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="قام بالصرف")
     
+    # 👇 الحقل الجديد المطلوب لحل الخطأ وتصنيف المصروفات 👇
+    expense_type = models.CharField(max_length=20, choices=EXPENSE_TYPES, default='petty', verbose_name="نوع المصروف")
+    
+    expense_date = models.DateTimeField(default=timezone.now, verbose_name="تاريخ الصرف")
+    
+    # ربط المصروف بالموظف الذي قام بالصرف
+    #spent_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="قام بالصرف")
+    spent_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     # ربط المصروف بالجرد اليومي (الخزينة)
     is_closed = models.BooleanField(default=False, verbose_name="تم ضمه للجرد")
     closure = models.ForeignKey(
@@ -522,11 +532,13 @@ class Expense(models.Model):
         if self.pk:
             original = Expense.objects.get(pk=self.pk)
             if original.is_closed:
+                from django.core.exceptions import ValidationError # للتأكد من استيراد دالة الخطأ
                 raise ValidationError("🚨 لا يمكن تعديل مصروف تم إغلاقه في الجرد.")
 
     def __str__(self):
         return f"{self.title} - {self.amount} ج.م"
-
+    
+    
  
 class ItemDefinition(models.Model):
     name = models.CharField("اسم الصنف (مثل: كتاب لغة عربية)", max_length=200)

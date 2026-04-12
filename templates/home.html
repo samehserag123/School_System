@@ -11,292 +11,398 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     
     <style>
+        :root {
+            --primary: #38bdf8;
+            --dark-glass: rgba(15, 23, 42, 0.85);
+            --darker-glass: rgba(2, 6, 23, 0.95);
+        }
+
         body {
             background: linear-gradient(-45deg, #0f172a, #1e3a8a, #2563eb, #1e40af);
             background-size: 400% 400%;
             animation: gradientBG 15s ease infinite;
             font-family: 'Cairo', sans-serif;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             margin: 0;
-            padding: 20px;
+            padding-top: 80px; 
             overflow-x: hidden;
+            color: #fff;
         }
 
-        /* أنيميشن الخلفية الأساسية */
         @keyframes gradientBG {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
 
-        /* أنيميشن طفو البطاقة الرئيسية */
-        @keyframes floatCard {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); box-shadow: 0 30px 50px rgba(0,0,0,0.6); }
-            100% { transform: translateY(0px); }
-        }
-
-        /* أنيميشن لمعان الأزرار المستمر */
-        @keyframes shimmerBtn {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        .main-card {
-            border-radius: 25px;
-            padding: 30px 25px;
-            background: rgba(15, 23, 42, 0.85); /* تغميق البطاقة قليلاً لزيادة التباين */
+        /* Navbar & Dropdown Styles */
+        .navbar-glass {
+            background: var(--dark-glass);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-            width: 100%;
-            max-width: 460px;
-            position: relative;
-            color: #ffffff;
-            z-index: 1;
-            display: flex;
-            flex-direction: column;
-            animation: floatCard 6s ease-in-out infinite; /* تطبيق حركة الطفو */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding: 10px 0;
+            transition: all 0.3s ease;
         }
 
-        .top-user-bar {
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 15px;
-            padding: 12px 18px;
-            margin-bottom: 25px;
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .title {
+        .navbar-brand {
             font-weight: 900;
-            margin-bottom: 25px;
-            font-size: 1.6rem;
-            position: relative;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            font-size: 1.4rem;
+            color: #fff !important;
+            text-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
         }
 
-        .title::after {
-            content: '';
-            display: block;
-            width: 60px;
-            height: 4px;
-            background: #38bdf8;
-            margin: 12px auto;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
-        }
-
-        .buttons-container {
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-            width: 100%;
-        }
-
-        .btn-custom {
-            width: 100%;
-            min-height: 52px;
-            font-size: 15px;
+        .nav-link {
+            color: #cbd5e1 !important;
             font-weight: 700;
-            border-radius: 14px;
+            padding: 10px 20px !important;
+            border-radius: 10px;
+            transition: all 0.3s;
+            margin: 0 5px;
+        }
+
+        .nav-link:hover, .nav-link.show {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--primary) !important;
+        }
+
+        .dropdown-menu {
+            background: var(--darker-glass);
+            backdrop-filter: blur(20px);
             border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            padding: 10px;
+            min-width: 250px;
+            margin-top: 10px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @media all and (min-width: 992px) {
+            .navbar .nav-item.dropdown:hover .dropdown-menu {
+                display: block; opacity: 1; visibility: visible; transform: translateY(0);
+            }
+            .navbar .dropdown-menu {
+                display: block; opacity: 0; visibility: hidden; transform: translateY(10px); transition: all 0.3s ease;
+            }
+        }
+
+        .dropdown-item {
+            color: #e2e8f0;
+            font-weight: 600;
+            padding: 12px 20px;
+            border-radius: 10px;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
-            justify-content: center;
             gap: 12px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            text-decoration: none;
-            color: white !important;
-            /* إعدادات حركة اللمعان المستمرة للأزرار */
-            background-size: 200% auto;
-            animation: shimmerBtn 4s linear infinite;
+            margin-bottom: 5px;
         }
 
-        .btn-custom i {
+        .dropdown-item i:first-child {
             font-size: 1.2rem;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-        }
-
-        /* تأثير المرور (Hover) */
-        .btn-custom:hover {
-            transform: scale(1.03) translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
-            border-color: rgba(255,255,255,0.3);
-            animation-play-state: paused; /* إيقاف اللمعان مؤقتاً عند التركيز عليه */
-            z-index: 2;
-        }
-
-        /* ألوان الأزرار المتناسقة (Tricolor Gradients) */
-        .btn-students { background-image: linear-gradient(45deg, #1e3a8a, #3b82f6, #1e3a8a); }
-        .btn-add      { background-image: linear-gradient(45deg, #065f46, #10b981, #065f46); }
-        .btn-registry { background-image: linear-gradient(45deg, #0891b2, #06b6d4, #0891b2); }
-        .btn-books    { background-image: linear-gradient(45deg, #4338ca, #6366f1, #4338ca); }
-        .btn-courses  { background-image: linear-gradient(45deg, #6d28d9, #8b5cf6, #6d28d9); }
-        .btn-bus      { background-image: linear-gradient(45deg, #b45309, #f59e0b, #b45309); } 
-        .btn-plans    { background-image: linear-gradient(45deg, #9a3412, #f97316, #9a3412); }
-        .btn-collection { background-image: linear-gradient(45deg, #047857, #34d399, #047857); }
-        .btn-misc     { background-image: linear-gradient(45deg, #701a75, #d946ef, #701a75); } /* لون زر الإيرادات المتنوعة الجديد */
-        .btn-treasury { background-image: linear-gradient(45deg, #854d0e, #eab308, #854d0e); }
-        .btn-finance  { background-image: linear-gradient(45deg, #b91c1c, #ef4444, #b91c1c); }
-        .btn-receipt-books { background-image: linear-gradient(45deg, #334155, #64748b, #334155); }
-        .btn-analytics { background-image: linear-gradient(45deg, #0369a1, #0ea5e9, #0369a1); }
-        .btn-admin    { background-image: linear-gradient(45deg, #0f172a, #334155, #0f172a); border-color: rgba(255,255,255,0.2); }
-
-        .school-footer {
-            width: 100%;
+            width: 25px;
             text-align: center;
-            margin-top: 35px;
-            padding-top: 20px;
-            border-top: 1px dashed rgba(255,255,255,0.1);
-            font-size: 0.75rem;
-            color: rgba(255,255,255,0.4);
-            text-transform: uppercase;
-            letter-spacing: 2px;
         }
 
-        .bg-icon {
-            position: absolute;
-            font-size: 8rem;
-            color: rgba(255,255,255,0.02);
-            z-index: -1;
-            top: -20px;
-            left: -20px;
-            transform: rotate(-15deg);
+        .dropdown-item:hover:not(.locked-link) {
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            transform: translateX(-5px);
         }
-        /* لون زر استحقاقات الأقساط المتأخرة الجديد */
-        .btn-overdue { background-image: linear-gradient(45deg, #7c2d12, #ea580c, #7c2d12); }
+
+        /* تنسيق الروابط المقفلة في النافبار */
+        .locked-link {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+            color: #94a3b8 !important;
+        }
+        .locked-link:hover {
+            background: transparent !important;
+        }
+
+        /* ألوان الأيقونات في القوائم */
+        .icon-student { color: #3b82f6; }
+        .icon-finance { color: #10b981; }
+        .icon-services { color: #8b5cf6; }
+        .icon-admin { color: #f59e0b; }
+        .icon-danger { color: #ef4444; }
+
+        /* Hero Section */
+        .hero-section {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: calc(100vh - 120px); text-align: center; position: relative; z-index: 1;
+        }
+        .welcome-card {
+            background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px); padding: 50px; border-radius: 30px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5); max-width: 600px; width: 90%;
+            animation: floatCard 6s ease-in-out infinite;
+        }
+        @keyframes floatCard { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
+        
+        .user-avatar {
+            width: 100px; height: 100px; background: linear-gradient(135deg, var(--primary), #1e3a8a);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 3rem; margin: 0 auto 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            border: 4px solid rgba(255,255,255,0.1);
+        }
+        .clock-display {
+            font-size: 2.5rem; font-weight: 900; font-family: monospace;
+            background: -webkit-linear-gradient(#38bdf8, #8b5cf6);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-top: 20px; letter-spacing: 2px;
+        }
+        .school-footer {
+            position: fixed; bottom: 10px; width: 100%; text-align: center;
+            font-size: 0.75rem; color: rgba(255,255,255,0.4); letter-spacing: 2px; z-index: 0;
+        }
+        .bg-icon {
+            position: absolute; font-size: 25vw; color: rgba(255,255,255,0.01);
+            z-index: -1; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg);
+        }
+
+        /* نظام الإشعارات في حال لم يكن مضمناً من ملف آخر */
+        .toast-notification-container {
+            position: fixed; top: 20px; left: 20px; z-index: 99999;
+            display: flex; flex-direction: column; gap: 15px; pointer-events: none;
+        }
+        .modern-toast {
+            min-width: 300px; max-width: 400px; background: rgba(2, 6, 23, 0.95);
+            backdrop-filter: blur(10px); color: #fff; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); overflow: hidden;
+            position: relative; display: flex; align-items: center; padding: 15px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: toastSlideIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+        .modern-toast.toast-fade-out { animation: toastSlideOut 0.4s ease-in forwards; }
+        @keyframes toastSlideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes toastSlideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-100%); opacity: 0; } }
+        .toast-progress {
+            position: absolute; bottom: 0; left: 0; height: 3px; width: 100%;
+            background: #ff3131; animation: toastProgress 4s linear forwards;
+        }
+        @keyframes toastProgress { from { width: 100%; } to { width: 0%; } }
+        .toast-icon { font-size: 1.5rem; margin-left: 15px; color:#ff3131; }
+        .toast-message { font-family: 'Cairo', sans-serif; font-size: 0.95rem; font-weight: 700; line-height: 1.4; }
     </style>
 </head>
 <body>
 
-<div class="main-card animate__animated animate__fadeInUp">
-    
-    <div class="top-user-bar d-flex justify-content-between align-items-center">
-        <div class="text-right">
-            <small class="opacity-50 d-block mb-1">مرحباً بك،</small>
-            <strong class="text-info fs-6">
-                <i class="bi bi-person-circle me-1"></i> {{ user.username }}
-            </strong>
+<nav class="navbar navbar-expand-lg navbar-dark fixed-top navbar-glass">
+    <div class="container-fluid px-4">
+        
+        <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+            <i class="bi bi-mortarboard-fill text-info"></i>
+            نظام إدارة المدرسة
+        </a>
+        
+        <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNavbar">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-1">
+                {% if user.is_authenticated %}
+                
+                <!-- قائمة شؤون الطلاب (تظهر للجميع لكن الروابط الداخلية محمية) -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-people-fill me-1"></i> شؤون الطلاب
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
+                        {% if admission_open %}
+                            {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                                <li><a class="dropdown-item" href="{% url 'add_student' %}"><i class="bi bi-person-plus-fill icon-student"></i> إضافة طالب جديد</a></li>
+                            {% else %}
+                                <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-person-plus-fill text-muted"></i> إضافة طالب جديد <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                            <li><a class="dropdown-item" href="{% url 'student_registry' %}"><i class="bi bi-card-list icon-student"></i> السجل المدني للطلاب</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-card-list text-muted"></i> السجل المدني للطلاب <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+                    </ul>
+                </li>
+
+                <!-- قائمة الإدارة المالية والحسابات -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-cash-stack me-1"></i> الإدارة المالية
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
+                        {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                            <li><a class="dropdown-item" href="{% url 'student_list' %}"><i class="bi bi-wallet2 icon-finance"></i> سجل الطلاب المالي</a></li>
+                            <li><a class="dropdown-item" href="{% url 'installment_plan_list' %}"><i class="bi bi-clipboard-data-fill icon-finance"></i> إدارة أنظمة التقسيط</a></li>
+                            <li><a class="dropdown-item" href="{% url 'overdue_calls' %}"><i class="bi bi-telephone-exclamation-fill icon-danger"></i> استحقاقات المتأخرة</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-wallet2 text-muted"></i> سجل الطلاب المالي <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-clipboard-data-fill text-muted"></i> إدارة أنظمة التقسيط <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-telephone-exclamation-fill text-muted"></i> استحقاقات المتأخرة <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+
+                        <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+
+                        {% if user.is_superuser or "Finance_Treasury" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                            <li><a class="dropdown-item" href="{% url 'misc_revenue' %}"><i class="bi bi-piggy-bank-fill icon-finance"></i> الإيرادات المتنوعة</a></li>
+                            
+                            <li><a class="dropdown-item" href="{% url 'daily_cashier_summary' %}"><i class="bi bi-safe2-fill icon-admin"></i> جرد وإغلاق الخزينة</a></li>
+                            
+                            <!-- إضافة روابط المصروفات هنا تحت جرد الخزينة مباشرة -->
+                            <li><a class="dropdown-item" href="{% url 'add_expense_view' %}?type=petty"><i class="bi bi-cup-hot text-warning"></i> مصروفات نثرية</a></li>
+                            <li><a class="dropdown-item" href="{% url 'add_expense_view' %}?type=general"><i class="bi bi-building-gear text-danger"></i> مصروفات عمومية</a></li>
+                            <!-- نهاية إضافة المصروفات -->
+                            
+                            <li><a class="dropdown-item" href="{% url 'finance_dashboard' %}"><i class="bi bi-pie-chart-fill icon-student"></i> الداشبورد المالي</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-piggy-bank-fill text-muted"></i> الإيرادات المتنوعة <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                            
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-safe2-fill text-muted"></i> جرد وإغلاق الخزينة <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                            
+                            <!-- الروابط المقفلة للمصروفات -->
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-cup-hot text-muted"></i> مصروفات نثرية <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-building-gear text-muted"></i> مصروفات عمومية <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                            
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-pie-chart-fill text-muted"></i> الداشبورد المالي <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+                    </ul>
+                </li>
+
+                <!-- قائمة الخدمات والكورسات -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-grid-fill me-1"></i> الخدمات المدرسية
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
+                        {% if user.is_superuser or "Finance_Books" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                            <li><a class="dropdown-item" href="{% url 'book_sales_list' %}"><i class="bi bi-book-half icon-services"></i> صرف الكتب والزي</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-book-half text-muted"></i> صرف الكتب والزي <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+
+                        {% if user.is_superuser or "Finance_Courses" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                            <li><a class="dropdown-item" href="{% url 'course_prices' %}"><i class="bi bi-currency-exchange icon-services"></i> أسعار الكورسات</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-currency-exchange text-muted"></i> أسعار الكورسات <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+
+                        {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                            <li><a class="dropdown-item" href="{% url 'bus_dashboard' %}"><i class="bi bi-bus-front-fill icon-admin"></i> إدارة الباص المدرسي</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-bus-front-fill text-muted"></i> إدارة الباص المدرسي <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+                    </ul>
+                </li>
+
+                <!-- قائمة النظام والإحصائيات -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear-fill me-1"></i> النظام والإحصاء
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
+                        {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                            <li><a class="dropdown-item" href="{% url 'students_analytics' %}"><i class="bi bi-graph-up-arrow icon-finance"></i> التحليل الإحصائي العام</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-graph-up-arrow text-muted"></i> التحليل الإحصائي العام <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+
+                        {% if user.is_superuser or user.is_staff %}
+                            <li><a class="dropdown-item" href="{% url 'receipt_books_list' %}"><i class="bi bi-journals icon-services"></i> دفاتر الإيصالات المرجعية</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-journals text-muted"></i> دفاتر الإيصالات المرجعية <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+
+                        <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+
+                        {% if user.is_superuser %}
+                            <li><a class="dropdown-item" href="{% url 'archives_list' %}"><i class="bi bi-archive-fill icon-admin"></i> أرشيف السنوات السابقة</a></li>
+                            <li><a class="dropdown-item" href="/admin/"><i class="bi bi-shield-lock-fill icon-danger"></i> لوحة تحكم الإدارة (Admin)</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-archive-fill text-muted"></i> أرشيف السنوات السابقة <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-shield-lock-fill text-muted"></i> لوحة تحكم الإدارة (Admin) <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+                    </ul>
+                </li>
+                
+                {% endif %}
+            </ul>
+
+            <div class="d-flex align-items-center gap-3 mt-3 mt-lg-0 pt-3 pt-lg-0 border-top border-secondary border-opacity-25 border-lg-0">
+                <div class="text-end d-none d-lg-block">
+                    <small class="text-secondary d-block lh-1">مرحباً،</small>
+                    <span class="fw-bold text-info">{{ user.username }}</span>
+                </div>
+                <form action="{% url 'logout' %}" method="post" class="m-0 w-100">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger rounded-pill px-4 fw-bold w-100 w-lg-auto">
+                        <i class="bi bi-power"></i> خروج
+                    </button>
+                </form>
+            </div>
         </div>
-        <form action="{% url 'logout' %}" method="post" class="m-0">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1 fw-bold">
-                <i class="bi bi-power"></i> خروج
-            </button>
-        </form>
     </div>
+</nav>
 
-    <i class="bi bi-mortarboard bg-icon"></i>
-    <h2 class="title text-center text-white">نظام إدارة المدرسة</h2>
+<div class="container hero-section animate__animated animate__fadeIn">
+    <i class="bi bi-diagram-3-fill bg-icon"></i>
     
-    <div class="buttons-container">
-            {% if user.is_authenticated %}
-                
-                {# 1. إدارة شؤون الطلاب #}
-                {% if admission_open %}
-                    {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
-                        <a href="{% url 'add_student' %}" class="btn-custom btn-add">
-                            <i class="bi bi-person-plus-fill"></i> إضافة طالب جديد
-                        </a>
-                    {% endif %}
-                {% endif %}
-
-                {% if user.is_superuser or user.groups.all %}
-                    <a href="{% url 'student_registry' %}" class="btn-custom btn-registry">
-                        <i class="bi bi-card-list"></i> السجل المدني للطلاب
-                    </a>
-
-                    {# الزر الجديد المضاف #}
-                    <a href="{% url 'overdue_calls' %}" class="btn-custom btn-overdue">
-                        <i class="bi bi-telephone-exclamation-fill"></i> استحقاقات الأقساط المتأخرة
-                    </a>
-                {% endif %}
-                
-                {# 2. الإدارة المالية والمحاسبية #}
-                {% if "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or user.is_superuser %}
-                    <a href="{% url 'student_list' %}" class="btn-custom btn-students">
-                        <i class="bi bi-people-fill"></i> إدارة الطلاب المالية
-                    </a>
-                    <a href="{% url 'installment_plan_list' %}" class="btn-custom btn-plans">
-                        <i class="bi bi-clipboard-data-fill"></i> إدارة أنظمة التقسيط
-                    </a>
-                {% endif %}
-                    
-                {# 3. الخدمات (كتب - كورسات - باص) #}
-                {% if "Finance_Books" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or user.is_superuser %}
-                    <a href="{% url 'book_sales_list' %}" class="btn-custom btn-books">
-                        <i class="bi bi-book-half"></i> نظام صرف الكتب والزي
-                    </a>
-                {% endif %}
-
-                {% if "Finance_Courses" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or user.is_superuser %}
-                    <a href="{% url 'course_prices' %}" class="btn-custom btn-courses">
-                        <i class="bi bi-currency-exchange"></i> قائمة أسعار الكورسات
-                    </a>
-                {% endif %}
-
-                {# --- إدارة الباص --- #}
-                {% if "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or user.is_superuser %}
-                    <a href="{% url 'bus_dashboard' %}" class="btn-custom btn-bus">
-                        <i class="bi bi-bus-front-fill"></i> إدارة الباص المدرسي
-                    </a>
-                {% endif %}
-                
-                {# 4. الخزينة والإحصائيات #}
-                {% if "Finance_Treasury" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or user.is_superuser %}
-                    <a href="{% url 'quick_collection' %}" class="btn-custom btn-collection">
-                        <i class="bi bi-cash-coin"></i> شاشة التحصيل والمقبوضات
-                    </a>
-                    
-                    <a href="{% url 'misc_revenue' %}" class="btn-custom btn-misc">
-                        <i class="bi bi-wallet-fill"></i> شاشة الإيرادات المتنوعة
-                    </a>
-
-                    <a href="{% url 'daily_cashier_summary' %}" class="btn-custom btn-treasury">
-                        <i class="bi bi-safe2-fill"></i> جرد وإغلاق الخزينة اليومي
-                    </a>
-                    <a href="{% url 'finance_dashboard' %}" class="btn-custom btn-finance">
-                        <i class="bi bi-pie-chart-fill"></i> الداشبورد المالي
-                    </a>
-                    
-                    {% if user.is_superuser or user.is_staff %}
-                    <a href="{% url 'receipt_books_list' %}" class="btn-custom btn-receipt-books">
-                        <i class="bi bi-journals"></i> سجل دفاتر الإيصالات المرجعية
-                    </a>
-                    {% endif %}
-                {% endif %}
-
-                {# 5. التحليل الإحصائي والأرشيف #}
-                {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name %}
-                    <a href="{% url 'students_analytics' %}" class="btn-custom btn-analytics mt-2">
-                        <i class="bi bi-graph-up-arrow"></i> التحليل الإحصائي العام
-                    </a>
-                    
-                    {# --- زر أرشيف السنوات السابقة المضاف حديثاً --- #}
-                    <a href="{% url 'archives_list' %}" class="btn-custom btn-archive mt-2">
-                        <i class="bi bi-archive-fill text-warning"></i> أرشيف السنوات الدراسية السابقة
-                    </a>
-                {% endif %}
-
-                {# 6. لوحة التحكم الإدارية #}
-                {% if user.is_superuser %}
-                    <a href="/admin/" class="btn-custom btn-admin mt-2 shadow-lg">
-                        <i class="bi bi-shield-lock-fill text-warning"></i> إعدادات لوحة التحكم (Admin)
-                    </a>
-                {% endif %}
-
-            {% endif %}
+    <div class="welcome-card text-center">
+        <div class="user-avatar">
+            <i class="bi bi-person-check-fill text-white"></i>
         </div>
-
-    <div class="school-footer">
-        TALAAT HARB HOTELIER HIGH SCHOOL | 2026
+        <h1 class="fw-bold mb-2">مرحباً بك، <span class="text-info">{{ user.username }}</span></h1>
+        <p class="text-secondary mb-4 fs-5">قم باختيار العملية المطلوبة من القوائم العلوية للبدء.</p>
+        
+        <div class="clock-display" id="realtimeClock">00:00:00</div>
+        <div class="text-secondary mt-2 fs-6 fw-bold" id="realtimeDate">جارِ التحميل...</div>
     </div>
 </div>
 
+<div class="school-footer">
+    TALAAT HARB HOTELIER HIGH SCHOOL | 2026
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function updateClock() {
+        const now = new Date();
+        const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+        document.getElementById('realtimeClock').textContent = now.toLocaleTimeString('ar-EG', timeOptions);
+        
+        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('realtimeDate').textContent = now.toLocaleDateString('ar-EG', dateOptions);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // السكريبت الخاص بإظهار التنبيه للمستخدم غير المصرح
+    function showAccessDenied(e) {
+        if(e) e.preventDefault();
+        
+        let container = document.querySelector('.toast-notification-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'toast-notification-container';
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = 'modern-toast toast-error';
+        toast.innerHTML = `
+            <div class="toast-icon"><i class="bi bi-shield-lock-fill"></i></div>
+            <div class="toast-message">عفواً، حسابك لا يملك الصلاحيات اللازمة للوصول لهذه الصفحة.</div>
+            <div class="toast-progress"></div>
+        `;
+        
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('toast-fade-out');
+            setTimeout(() => toast.remove(), 400);
+        }, 4000);
+    }
+</script>
 </body>
 </html>

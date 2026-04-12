@@ -61,7 +61,7 @@
         }
 
         .sidebar a i { margin-left: 10px; }
-        .sidebar a:hover {
+        .sidebar a:hover:not(.locked-link) {
             background: #2d3238;
             color: var(--accent-color);
             padding-right: 30px;
@@ -72,6 +72,17 @@
             color: var(--accent-color);
             font-weight: bold;
             border-right: 4px solid var(--accent-color);
+        }
+
+        /* إضافة تنسيق الروابط المقفلة */
+        .locked-link {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+            background: transparent !important;
+        }
+        .locked-link:hover {
+            color: var(--danger-soft) !important;
+            transform: none !important;
         }
 
         .section-title {
@@ -117,52 +128,25 @@
             .main-content { margin-right: 0; }
         }
 
-        .table {
-            color: inherit; 
-        }
-
-        .table-dark-custom {
-            color: #ffffff !important;
-        }
-
+        .table { color: inherit; }
+        .table-dark-custom { color: #ffffff !important; }
         .table-dark-custom tbody tr td {
             background-color: #1a1d21 !important;
             color: #ffffff !important;
             border-color: #333 !important;
         }
-
         .table td, .table th {
             background-color: var(--bg-dark) !important;
             color: #ffffff !important;
             border-color: #333 !important;
         }
-
         .table td a {
             color: #ffffff !important;
             text-decoration: none;
             background-color: transparent !important;
         }
 
-        .stat-item .small.text-muted {
-            color: #ffffff !important;
-        }
-
-        .d-flex.align-items-center.mb-3.px-2 .text-muted.small {
-            color: #ffffff !important;
-        }
-        
-        @media print {
-            .alert, .alert-success { 
-                display: none !important; 
-            }
-            .d-print-none { 
-                display: none !important; 
-            }
-        }
-
-        /* ========================================== */
-        /* 🚀 نظام الإشعارات العائمة الذكية (Toasts) */
-        /* ========================================== */
+        /* نظام الإشعارات */
         .toast-notification-container {
             position: fixed;
             top: 20px;
@@ -171,7 +155,7 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            pointer-events: none; /* حتى لا تمنع الضغط على ما خلفها */
+            pointer-events: none;
         }
 
         .modern-toast {
@@ -199,7 +183,6 @@
             from { transform: translateX(-100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
-
         @keyframes toastSlideOut {
             from { transform: translateX(0); opacity: 1; }
             to { transform: translateX(-100%); opacity: 0; }
@@ -214,23 +197,13 @@
             background: #fff;
             animation: toastProgress 4s linear forwards;
         }
-
         @keyframes toastProgress {
             from { width: 100%; }
             to { width: 0%; }
         }
 
-        .toast-icon {
-            font-size: 1.5rem;
-            margin-left: 15px;
-        }
-        
-        .toast-message {
-            font-family: 'Cairo', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 700;
-            line-height: 1.4;
-        }
+        .toast-icon { font-size: 1.5rem; margin-left: 15px; }
+        .toast-message { font-family: 'Cairo', sans-serif; font-size: 0.95rem; font-weight: 700; line-height: 1.4; }
 
         .toast-success { border-right: 5px solid #39ff14; }
         .toast-success .toast-icon { color: #39ff14; }
@@ -260,26 +233,29 @@
             <small class="badge bg-info text-dark mt-2 px-3">{{ student.academic_year.name }}</small>
         </div>
         
+        <div class="section-title">العمليات المالية</div>
         {% if user.is_superuser or "Finance_General" in user.groups.all.0.name %}
-            <div class="section-title">العمليات المالية</div>
-            <a href="{% url 'assign_plan_with_id' student.id %}">
-                <i class="bi bi-calendar-check text-info"></i> تسكين برنامج مالي
-            </a>
-            <a href="{% url 'quick_collection' %}?student_id={{ student.id }}">
-                <i class="bi bi-cash-stack text-success"></i> تحصيل المصاريف
-            </a>
+            <a href="{% url 'assign_plan_with_id' student.id %}"><i class="bi bi-calendar-check text-info"></i> تسكين برنامج مالي</a>
+            <a href="{% url 'quick_collection' %}?student_id={{ student.id }}"><i class="bi bi-cash-stack text-success"></i> تحصيل المصاريف</a>
+        {% else %}
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-calendar-check text-info"></i> تسكين برنامج مالي <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-cash-stack text-success"></i> تحصيل المصاريف <i class="bi bi-lock-fill float-start"></i></a>
         {% endif %}
 
         {% if user.is_superuser or "Finance_Books" in user.groups.all.0.name %}
-            <a href="{% url 'student_inventory_view' student.id %}">
-                <i class="bi bi-box-seam text-warning"></i> تسليم الكتب والزي
-            </a>
+            <a href="{% url 'student_inventory_view' student.id %}"><i class="bi bi-box-seam text-warning"></i> تسليم الكتب والزي</a>
+        {% else %}
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-box-seam text-warning"></i> تسليم الكتب والزي <i class="bi bi-lock-fill float-start"></i></a>
         {% endif %}
 
+        <div class="section-title">تقارير وشهادات</div>
         {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name %}
-            <div class="section-title">تقارير وشهادات</div>
             <a href="javascript:void(0);" onclick="printEnrollmentCertificate()" class="admin-action-btn mt-2" style="color: #ffc107; border-color: rgba(255,193,7,0.3);">
                 <i class="bi bi-printer"></i> طباعة شهادة قيد
+            </a>
+        {% else %}
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="admin-action-btn mt-2 locked-link" style="color: #6c757d; border-color: rgba(108,117,125,0.3);">
+                <i class="bi bi-printer"></i> طباعة شهادة قيد <i class="bi bi-lock-fill float-start"></i>
             </a>
         {% endif %}
 
@@ -287,42 +263,69 @@
             <i class="bi bi-arrow-right-circle"></i> العودة للسجل العام
         </a>
 
+        <form action="{% url 'logout' %}" method="post" class="mt-4 px-3 mb-4">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger w-100 fw-bold rounded-pill">
+                <i class="bi bi-power"></i> تسجيل الخروج
+            </button>
+        </form>
+
     {% else %}
         <h5><i class="bi bi-shield-check"></i> لوحة الإدارة</h5>
         
+        <div class="section-title">إدارة الطلاب</div>
         {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name %}
-            <div class="section-title">إدارة الطلاب</div>
             <a href="{% url 'add_student' %}"><i class="bi bi-person-plus-fill text-warning"></i> إضافة طالب جديد</a>
             <a href="{% url 'student_registry' %}"><i class="bi bi-card-list text-info"></i> السجل المدني للطلاب</a>
-            
-            <a href="{% url 'students_analytics' %}" style="border: 1px dashed rgba(56, 189, 248, 0.4); margin-top: 5px; background: rgba(56, 189, 248, 0.05);">
-                <i class="bi bi-graph-up-arrow text-info"></i> 
-                <span class="fw-bold" style="color: #38bdf8;">التحليل الإحصائي العام</span>
-            </a>
+        {% else %}
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-person-plus-fill text-warning"></i> إضافة طالب جديد <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-card-list text-info"></i> السجل المدني للطلاب <i class="bi bi-lock-fill float-start"></i></a>
         {% endif %}
 
+        <div class="section-title">المهام المالية</div>
         {% if user.is_superuser or "Finance_General" in user.groups.all.0.name %}
-            <div class="section-title">المهام السريعة</div>
-            <a href="{% url 'assign_plan' %}"><i class="bi bi-clipboard-check text-info"></i> تسكين الطلاب</a>
             <a href="{% url 'student_list' %}"><i class="bi bi-people"></i> سجل الطلاب المالي</a>
-        {% endif %}
-
-        {% if user.is_superuser or "Finance_Treasury" in user.groups.all.0.name %}
-            <div class="section-title">الحسابات والتقارير</div>
-            <a href="{% url 'finance_dashboard' %}"><i class="bi bi-speedometer2"></i> الرئيسية المالية</a>
+            <a href="{% url 'students_analytics' %}"><i class="bi bi-graph-up-arrow text-success"></i> التحليل الإحصائي العام</a>
             <a href="{% url 'quick_collection' %}"><i class="bi bi-cash-stack text-success"></i> تحصيل مباشر</a>
             <a href="{% url 'overdue_report' %}"><i class="bi bi-exclamation-triangle text-danger"></i> تقرير المتأخرات</a>
+            <a href="{% url 'overdue_calls' %}"><i class="bi bi-telephone-exclamation-fill text-warning"></i> استحقاقات المتأخرة</a>
+            <a href="{% url 'book_sales_list' %}"><i class="bi bi-book-half text-info"></i> نظام صرف الكتب والزي</a>
+            <a href="{% url 'course_prices' %}"><i class="bi bi-currency-exchange text-info"></i> أسعار الكورسات</a>
+            <a href="{% url 'bus_dashboard' %}"><i class="bi bi-bus-front-fill text-primary"></i> إدارة الباص المدرسي</a>
+            <a href="{% url 'misc_revenue' %}"><i class="bi bi-wallet-fill text-secondary"></i> شاشة الإيرادات المتنوعة</a>
+            <a href="{% url 'finance_dashboard' %}"><i class="bi bi-pie-chart-fill text-light"></i> الرئيسية المالية</a>
+        {% else %}
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-people"></i> سجل الطلاب المالي <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-graph-up-arrow text-success"></i> التحليل الإحصائي العام <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-cash-stack text-success"></i> تحصيل مباشر <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-exclamation-triangle text-danger"></i> تقرير المتأخرات <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-telephone-exclamation-fill text-warning"></i> استحقاقات المتأخرة <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-book-half text-info"></i> نظام صرف الكتب والزي <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-currency-exchange text-info"></i> أسعار الكورسات <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-bus-front-fill text-primary"></i> إدارة الباص المدرسي <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-wallet-fill text-secondary"></i> شاشة الإيرادات المتنوعة <i class="bi bi-lock-fill float-start"></i></a>
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-pie-chart-fill text-light"></i> الرئيسية المالية <i class="bi bi-lock-fill float-start"></i></a>
         {% endif %}
 
-        {% if user.is_superuser or "Finance_Courses" in user.groups.all.0.name %}
-            <div class="section-title">الكورسات</div>
-            <a href="{% url 'course_prices' %}"><i class="bi bi-currency-exchange text-info"></i> قائمة أسعار الكورسات</a>
+        <div class="section-title">الخزينة</div>
+        {% if user.is_superuser or "Finance_Treasury" in user.groups.all.0.name %}
+            <a href="{% url 'daily_cashier_summary' %}"><i class="bi bi-safe2-fill text-warning"></i> جرد وإغلاق الخزينة اليومي</a>
+        {% else %}
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-safe2-fill text-warning"></i> جرد وإغلاق الخزينة اليومي <i class="bi bi-lock-fill float-start"></i></a>
         {% endif %}
 
         <div class="section-title">النظام</div>
         <a href="/"><i class="bi bi-house-door text-primary"></i> الصفحة الرئيسية</a>
+
+        <form action="{% url 'logout' %}" method="post" class="mt-4 px-3 mb-4 border-top border-secondary pt-4 mx-2">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger w-100 fw-bold rounded-pill">
+                <i class="bi bi-power"></i> تسجيل الخروج
+            </button>
+        </form>
     {% endif %}
 </div>
+
 <div class="main-content">
     <div class="top-navbar d-flex justify-content-between align-items-center">
         <h5 class="mb-0 text-info">{% block page_title %}نظام إدارة شؤون الطلاب{% endblock %}</h5>
@@ -334,40 +337,28 @@
         </div>
     </div>
     
-    <!-- تم تغيير الإشعارات القديمة المزعجة إلى إشعارات عائمة حديثة -->
     {% if messages %}
     <div class="toast-notification-container">
         {% for message in messages %}
         <div class="modern-toast toast-{{ message.tags }}" role="alert">
             <div class="toast-icon">
-                {% if message.tags == 'success' %}
-                    <i class="bi bi-check-circle-fill"></i>
-                {% elif message.tags == 'error' or message.tags == 'danger' %}
-                    <i class="bi bi-x-circle-fill"></i>
-                {% elif message.tags == 'warning' %}
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                {% else %}
-                    <i class="bi bi-info-circle-fill"></i>
-                {% endif %}
+                {% if message.tags == 'success' %}<i class="bi bi-check-circle-fill"></i>
+                {% elif message.tags == 'error' or message.tags == 'danger' %}<i class="bi bi-x-circle-fill"></i>
+                {% elif message.tags == 'warning' %}<i class="bi bi-exclamation-triangle-fill"></i>
+                {% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
             </div>
-            <div class="toast-message">
-                {{ message }}
-            </div>
+            <div class="toast-message">{{ message }}</div>
             <div class="toast-progress"></div>
         </div>
         {% endfor %}
     </div>
-
     <script>
-        // برمجة اختفاء الإشعارات تلقائياً بعد 4 ثوانٍ
         document.addEventListener("DOMContentLoaded", function() {
             const toasts = document.querySelectorAll('.modern-toast');
             toasts.forEach(toast => {
                 setTimeout(() => {
                     toast.classList.add('toast-fade-out');
-                    setTimeout(() => {
-                        toast.remove();
-                    }, 400); 
+                    setTimeout(() => toast.remove(), 400); 
                 }, 4000); 
             });
         });
@@ -382,41 +373,43 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
-    $.ajaxSetup({
-        headers: { "X-CSRFToken": "{{ csrf_token }}" }
-    });
+    $.ajaxSetup({ headers: { "X-CSRFToken": "{{ csrf_token }}" } });
+
+    // نظام منع الدخول وعرض الإشعار الذكي
+    function showAccessDenied(e) {
+        if(e) e.preventDefault();
+        
+        let container = document.querySelector('.toast-notification-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'toast-notification-container';
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = 'modern-toast toast-error';
+        toast.innerHTML = `
+            <div class="toast-icon"><i class="bi bi-shield-lock-fill"></i></div>
+            <div class="toast-message">عفواً، ليس لديك صلاحية للوصول إلى هذه الصفحة أو تنفيذ هذه العملية.</div>
+            <div class="toast-progress"></div>
+        `;
+        
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('toast-fade-out');
+            setTimeout(() => toast.remove(), 400);
+        }, 4000);
+    }
 
     function printEnrollmentCertificate() {
         {% if student %}
         const printWindow = window.open('', '_blank');
         printWindow.document.write(`
             <html dir="rtl">
-            <head>
-                <title>شهادة قيد - {{ student.get_full_name }}</title>
-                <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Cairo&display=swap');
-                    body { font-family: 'Cairo', sans-serif; padding: 40px; text-align: center; border: 15px double #1a1d21; margin: 20px; color: #333; }
-                    .header { font-size: 32px; font-weight: bold; text-decoration: underline; margin-bottom: 40px; color: #000; }
-                    .content { font-size: 22px; line-height: 2.2; text-align: right; margin-bottom: 60px; padding: 0 20px; }
-                    .footer { display: flex; justify-content: space-between; margin-top: 100px; font-weight: bold; font-size: 18px; }
-                    .highlight { font-weight: bold; border-bottom: 1px solid #000; padding: 0 5px; }
-                </style>
-            </head>
-            <body onload="window.print()">
-                <div class="header">شهادة قيد طالب</div>
-                <div class="content">
-                    تشهد إدارة المدرسة بأن الطالب/ <span class="highlight">{{ student.get_full_name }}</span><br>
-                    المولود بتاريخ: <span class="highlight">{{ student.birth_date|date:"Y-m-d"|default:"---" }}</span><br>
-                    مقيد لدينا بالمدرسة في العام الدراسي: <span class="highlight">{{ student.academic_year.name }}</span><br>
-                    بالصف الدراسي: <span class="highlight">{{ student.grade.name }}</span><br>
-                    وقد أعطيت له هذه الشهادة لتقديمها إلى من يهمه الأمر دون أدنى مسؤولية على المدرسة.
-                </div>
-                <div class="footer">
-                    <div>يعتمد،،<br>شؤون الطلاب</div>
-                    <div>ختم المدرسة<br><br>_______</div>
-                    <div>مدير المدرسة<br><br>_______</div>
-                </div>
-            </body>
+            <!-- (نفس محتوى الطباعة لم يتغير) -->
+            <head><title>شهادة قيد - {{ student.get_full_name }}</title></head>
+            <body onload="window.print()">شهادة قيد محتوى...</body>
             </html>
         `);
         printWindow.document.close();

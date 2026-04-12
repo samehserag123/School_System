@@ -75,45 +75,32 @@ opacity:.4;
 </style>
 
 
-<div class="stats-bar px-2 animate__animated animate__fadeIn">
+    <div class="stats-bar px-2 animate__animated animate__fadeIn">
+        <div class="stat-item">
+            <div class="small text-muted">إجمالي الطلاب</div>
+            <div id="stat-total" class="fw-bold text-info fs-5" data-original="{{ total_count }}">{{ total_count }}</div>
+        </div> 
 
-    <div class="stat-item">
-        <div class="small text-muted">إجمالي الطلاب</div>
-        <div id="stat-total" 
-             class="fw-bold text-info fs-5" 
-             data-original="{{ students.paginator.count }}">
-            {{ students.paginator.count }}
+        <div class="stat-item" style="border-right-color:#6c757d">
+            <div class="small text-muted">غير مسكنين</div>
+            <div id="stat-unassigned" class="fw-bold text-secondary fs-5" data-original="{{ unassigned_count }}">{{ unassigned_count }}</div>
         </div>
-    </div> 
 
-    <div class="stat-item" style="border-right-color:#6c757d">
-        <div class="small text-muted">غير مسكنين</div>
-        <div id="stat-unassigned" 
-             class="fw-bold text-secondary fs-5" 
-             data-original="{{ unassigned_count }}">
-            {{ unassigned_count }} 
+        <div class="stat-item" style="border-right-color:#007bff">
+            <div class="small text-muted">المسكنين</div>
+            <div id="stat-assigned" class="fw-bold text-primary fs-5" data-original="{{ assigned_count }}">{{ assigned_count }}</div>
         </div>
-    </div>
 
-    <div class="stat-item" style="border-right-color:#2ecc71">
-        <div class="small text-muted">مسددين</div>
-        <div id="stat-paid" 
-             class="fw-bold text-success fs-5" 
-             data-original="{{ paid_count }}">
-            {{ paid_count }} 
+        <div class="stat-item" style="border-right-color:#2ecc71">
+            <div class="small text-muted">مسددين (خالص)</div>
+            <div id="stat-paid" class="fw-bold text-success fs-5" data-original="{{ paid_count }}">{{ paid_count }}</div>
+        </div>
+
+        <div class="stat-item" style="border-right-color:#ff4d4d">
+            <div class="small text-muted">مديونين</div>
+            <div id="stat-debt" class="fw-bold text-danger fs-5" data-original="{{ debt_count }}">{{ debt_count }}</div>
         </div>
     </div>
-
-    <div class="stat-item" style="border-right-color:#ff4d4d">
-        <div class="small text-muted">مديونين</div>
-        <div id="stat-debt" 
-             class="fw-bold text-danger fs-5" 
-             data-original="{{ debt_count }}">
-            {{ debt_count }} 
-        </div>
-    </div>
-    
-</div>
 
 <form method="POST" action="{% url 'bulk_promote' %}" id="promoteForm">
 {% csrf_token %}
@@ -291,25 +278,27 @@ opacity:.4;
 
     <!-- financial status -->
     <td class="text-center">
-        {% if student.current_year_fees_amount <= 0 %}
-            <span class="badge rounded-pill bg-secondary shadow-sm px-3">
-                <i class="bi bi-pause-circle me-1"></i> غير مسكن ⏳
-            </span>
+    {% if student.calculated_remaining > 0 %}
+        {# مديون: إذا كان إجمالي (القديم + المطلوب حالياً) أكبر من المحصل #}
+        <span class="badge rounded-pill bg-danger shadow-sm px-3">
+            <i class="bi bi-exclamation-triangle me-1"></i> مديون ⚠️
+        </span>
 
-        {% elif student.final_remaining > 0 or student.calculated_previous_debt > 0 %}
-            <span class="badge rounded-pill bg-danger shadow-sm px-3">
-                <i class="bi bi-exclamation-triangle me-1"></i> مديون ⚠️
-            </span>
+    {% elif student.fees_display > 0 and student.calculated_remaining <= 0 %}
+        {# خالص: إذا كان الطالب مسكناً (لديه مبالغ) وصافي مديونيته صفر #}
+        <span class="badge rounded-pill bg-success shadow-sm px-3">
+            <i class="bi bi-check-circle me-1"></i> خالص ✅
+        </span>
 
-        {% else %}
-            <span class="badge rounded-pill bg-success shadow-sm px-3">
-                <i class="bi bi-check-circle me-1"></i> خالص ✅
-            </span>
-        {% endif %}
-    </td>
+    {% else %}
+        {# غير مسكن: لا يوجد مطلوب حالي ولا يوجد مديونية قديمة #}
+        <span class="badge rounded-pill bg-secondary shadow-sm px-3">
+            <i class="bi bi-pause-circle me-1"></i> غير مسكن ⏳
+        </span>
+    {% endif %}
+</td>
 
-    <!-- actions -->
-    <td class="text-center">
+<td class="text-center">
     <div class="d-flex justify-content-center gap-1">
 
         <a href="{% url 'student_statement_print' student.id %}"
@@ -317,7 +306,8 @@ opacity:.4;
             <i class="bi bi-receipt"></i>
         </a>
 
-        {% if student.total_required_amount > 0 %}
+        {# الاعتماد على fees_display للتأكد من أن الطالب مسكن فعلياً في قاعدة البيانات #}
+        {% if student.fees_display > 0 %}
             <a href="{% url 'quick_collection' %}?student_id={{ student.id }}"
                class="btn btn-sm btn-success" title="تحصيل سريع">
                 <i class="bi bi-lightning-charge-fill"></i>
@@ -334,6 +324,7 @@ opacity:.4;
             </a>
 
         {% else %}
+            {# في حالة عدم التسكين (المطلوب 0) #}
             <button class="btn btn-sm btn-secondary" disabled title="يجب التسكين أولاً">
                 <i class="bi bi-lock-fill"></i>
             </button>
@@ -472,19 +463,20 @@ function applyPulse(id, newValue) {
 function updateStats() {
     let input = document.getElementById('searchInput').value.trim().toLowerCase();
     
-    // العناصر المستهدفة
+    // العناصر المستهدفة (أضفنا stat-assigned)
     const stats = {
         total: document.getElementById("stat-total"),
         unassigned: document.getElementById("stat-unassigned"),
+        assigned: document.getElementById("stat-assigned"), // العداد الجديد
         paid: document.getElementById("stat-paid"),
         debt: document.getElementById("stat-debt")
     };
 
-    // الحالة الأولى: إذا كان مربع البحث فارغاً -> استرجاع الأرقام الكلية من السيرفر
+    // الحالة الأولى: إذا كان مربع البحث فارغاً -> استرجاع الأرقام الكلية الثابتة من السيرفر
     if (input === "") {
         for (let key in stats) {
             if (stats[key]) {
-                // سحب القيمة الأصلية المخزنة في data-original
+                // سحب القيمة الأصلية المخزنة في data-original (التي تشمل كل الصفحات)
                 let originalVal = stats[key].getAttribute('data-original');
                 applyPulse(stats[key].id, originalVal);
             }
@@ -492,28 +484,41 @@ function updateStats() {
         return; 
     }
 
-    // الحالة الثانية: يوجد بحث نشط -> الحساب من الجدول (للصفحة الحالية فقط)
+    // الحالة الثانية: يوجد بحث نشط -> الحساب من الجدول (للنتائج الظاهرة في الصفحة الحالية فقط)
     let rows = document.querySelectorAll(".student-row");
-    let paid = 0, debt = 0, unassigned = 0, totalVisible = 0;
+    let paid = 0, debt = 0, unassigned = 0, assigned = 0, totalVisible = 0;
 
     rows.forEach(row => {
         if (row.style.display !== "none") {
             totalVisible++;
-            let badge = row.cells[8].querySelector(".badge"); // الموقف المالي (العمود 9)
+            
+            // الوصول للموقف المالي (العمود رقم 9 برمجياً هو index 8)
+            let badge = row.cells[8].querySelector(".badge"); 
+            
             if (badge) {
-                if (badge.classList.contains("bg-success")) paid++;
-                else if (badge.classList.contains("bg-danger")) debt++;
-                else if (badge.classList.contains("bg-secondary")) unassigned++;
+                // منطق تحديد الحالة بناءً على كلاسات الـ Badge
+                if (badge.classList.contains("bg-success")) {
+                    paid++;
+                    assigned++; // المسدد هو طالب مسكن بالتأكيد
+                } 
+                else if (badge.classList.contains("bg-danger")) {
+                    debt++;
+                    assigned++; // المديون هو طالب مسكن لديه خطة أقساط
+                } 
+                else if (badge.classList.contains("bg-secondary")) {
+                    unassigned++; // غير المسكن
+                }
             }
         }
     });
 
+    // تحديث الأرقام في الواجهة مع تأثير النبض
     applyPulse("stat-total", totalVisible);
+    applyPulse("stat-unassigned", unassigned);
+    applyPulse("stat-assigned", assigned);
     applyPulse("stat-paid", paid);
     applyPulse("stat-debt", debt);
-    applyPulse("stat-unassigned", unassigned);
 }
-
 /* 4. دالة البحث المتقدمة */
 function runSearch() {
     let input = document.getElementById('searchInput').value.toLowerCase();

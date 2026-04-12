@@ -1,46 +1,57 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<!-- استدعاء مكتبة الرسوم البيانية Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
-    /* تنسيق كروت الإحصائيات الفاخرة [cite: 2026-04-09] */
+    /* تنسيق كروت الإحصائيات الفاخرة */
     .stat-card {
         background: #000;
         border: 1px solid #1e293b;
         border-radius: 20px;
         padding: 25px;
-        transition: transform 0.3s ease;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
         box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        height: 100%; /* للحفاظ على تناسق الارتفاعات */
     }
     .stat-card:hover { 
         transform: translateY(-5px); 
         border-color: #38bdf8; 
+        box-shadow: 0 15px 35px rgba(56, 189, 248, 0.1);
     }
-    /* النصوص المشعة (Neon) [cite: 2026-04-09] */
+    /* النصوص المشعة (Neon) */
     .neon-text-info { 
         color: #00d4ff; 
         text-shadow: 0 0 10px rgba(0, 212, 255, 0.3); 
     }
-    /* أشرطة التقدم المخصصة [cite: 2026-04-09] */
+    .neon-text-success {
+        color: #39ff14;
+        text-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+    }
+    /* أشرطة التقدم المخصصة */
     .progress-custom { 
         background: #0f172a; 
         height: 12px; 
         border-radius: 10px; 
         border: 1px solid rgba(255,255,255,0.05);
     }
-    /* تنسيق التبويبات (Tabs) [cite: 2026-04-09] */
+    /* تنسيق التبويبات (Tabs) */
     .nav-pills .nav-link {
         color: #94a3b8;
         border-radius: 10px;
         padding: 10px 25px;
         transition: all 0.3s;
+        font-weight: bold;
     }
     .nav-pills .nav-link.active {
         background-color: rgba(56, 189, 248, 0.1) !important;
         color: #38bdf8 !important;
         border: 1px solid #38bdf8;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
     }
     
-    /* تأثيرات روابط الطلاب الذكية [cite: 2026-04-09] */
+    /* تأثيرات روابط الطلاب الذكية */
     .student-link {
         transition: all 0.2s ease;
         display: inline-block;
@@ -53,7 +64,7 @@
         text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
     }
 
-    /* زر العودة المطور الظاهر في صورتك [cite: 2026-04-09] */
+    /* زر العودة المطور */
     .back-btn-top {
         background: rgba(255, 255, 255, 0.05);
         color: #94a3b8;
@@ -74,12 +85,20 @@
         box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
         transform: scale(1.05);
     }
+    
+    /* حاوية الرسوم البيانية */
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
 </style>
 
 <div class="container-fluid py-4 text-end" dir="rtl">
     
+    <!-- العنوان وزر العودة -->
     <div class="d-flex justify-content-between align-items-center mb-5 flex-row-reverse">
-        <h2 class="fw-900 text-white m-0">
+        <h2 class="fw-bold text-white m-0">
             <i class="bi bi-pie-chart-fill neon-text-info me-2"></i> لوحة تحليل بيانات الطلاب المجمعة
         </h2>
         <a href="{% url 'course_prices' %}" class="back-btn-top">
@@ -88,27 +107,64 @@
         </a>
     </div>
 
-    <div class="row g-4 mb-5">
+    <!-- كروت الإحصائيات العلوية -->
+    <div class="row g-4 mb-4">
         <div class="col-md-4">
-            <div class="stat-card text-center">
+            <div class="stat-card text-center d-flex flex-column justify-content-center">
                 <div class="small text-secondary fw-bold mb-2">إجمالي طلاب المدرسة</div>
-                <div class="display-5 fw-900 text-white">{{ total_students }}</div>
+                <div class="display-5 fw-bold text-white">{{ total_students }}</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stat-card text-center" style="border-right: 5px solid #39ff14 !important;">
-                <div class="small text-secondary fw-bold mb-2 text-success">طلاب مشتركين (فعالين)</div>
-                <div class="display-5 fw-900 text-success">{{ enrolled_count }}</div>
+            <div class="stat-card text-center d-flex flex-column justify-content-center" style="border-right: 5px solid #39ff14 !important;">
+                <div class="small fw-bold mb-2 text-success">طلاب مشتركين (فعالين)</div>
+                <div class="display-5 fw-bold neon-text-success">{{ enrolled_count }}</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stat-card text-center" style="border-right: 5px solid #ff3131 !important;">
-                <div class="small text-secondary fw-bold mb-2 text-danger">طلاب بدون اشتراكات</div>
-                <div class="display-5 fw-900 text-danger">{{ non_enrolled_count }}</div>
+            <div class="stat-card text-center d-flex flex-column justify-content-center" style="border-right: 5px solid #ff3131 !important;">
+                <div class="small fw-bold mb-2 text-danger">طلاب بدون اشتراكات</div>
+                <div class="display-5 fw-bold text-danger">{{ non_enrolled_count }}</div>
             </div>
         </div>
     </div>
 
+    <!-- قسم الرسوم البيانية (Charts Section) -->
+    <div class="row g-4 mb-4">
+        <!-- رسم بياني: نسبة المشتركين لغير المشتركين -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="stat-card">
+                <h6 class="text-white fw-bold mb-4 text-center"><i class="bi bi-pie-chart me-2"></i> حالة الاشتراكات العامة</h6>
+                <div class="chart-container">
+                    <canvas id="enrollmentStatusChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- رسم بياني: إحصائيات المدرسين -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="stat-card">
+                <h6 class="text-white fw-bold mb-4 text-center"><i class="bi bi-bar-chart-line me-2"></i> إحصائيات المدرسين (الأكثر والأقل اشتراكاً)</h6>
+                <div class="chart-container">
+                    <canvas id="teachersChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-5">
+        <!-- رسم بياني: المواد مقترنة باسم المدرس -->
+        <div class="col-12">
+            <div class="stat-card">
+                <h6 class="text-info fw-bold mb-4 text-center"><i class="bi bi-graph-up-arrow me-2"></i> معدلات الاشتراك في المواد (بناءً على المدرس)</h6>
+                <div class="chart-container" style="height: 350px;">
+                    <canvas id="subjectsByTeacherChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- الجدول الإحصائي للمواد -->
     <div class="stat-card mb-5">
         <h5 class="text-info fw-bold mb-4">
             <i class="bi bi-book me-2"></i> تحليل كثافة الاشتراكات والانتشار حسب المادة
@@ -145,6 +201,7 @@
         </div>
     </div>
 
+    <!-- قوائم الطلاب (المشتركين وغير المشتركين) -->
     <div class="stat-card">
         <div class="d-flex justify-content-between align-items-center mb-4 flex-row-reverse">
             <h5 class="text-white fw-bold m-0"><i class="bi bi-people me-2"></i> قوائم الطلاب التفصيلية</h5>
@@ -164,6 +221,7 @@
         </div>
 
         <div class="tab-content">
+            <!-- قائمة المشتركين -->
             <div class="tab-pane fade show active" id="enrolledList">
                 <div class="table-responsive">
                     <table class="table table-dark table-hover align-middle">
@@ -194,6 +252,7 @@
                 </div>
             </div>
 
+            <!-- قائمة غير المشتركين -->
             <div class="tab-pane fade" id="nonEnrolledList">
                 <div class="table-responsive">
                     <table class="table table-dark table-hover align-middle">
@@ -225,4 +284,145 @@
         </div>
     </div>
 </div>
+
+<!-- سكريبت الرسوم البيانية -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    
+    // إعدادات عامة للرسوم البيانية لتناسب الـ Dark Theme
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    Chart.defaults.plugins.tooltip.titleColor = '#38bdf8';
+    Chart.defaults.plugins.tooltip.padding = 12;
+    Chart.defaults.plugins.tooltip.borderColor = '#1e293b';
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+
+    // ==========================================
+    // 1. رسم بياني: المشتركين vs غير المشتركين (Doughnut)
+    // ==========================================
+    const ctxStatus = document.getElementById('enrollmentStatusChart').getContext('2d');
+    new Chart(ctxStatus, {
+        type: 'doughnut',
+        data: {
+            labels: ['مشتركين', 'غير مشتركين'],
+            datasets: [{
+                data: [{{ enrolled_count|default:0 }}, {{ non_enrolled_count|default:0 }}],
+                backgroundColor: [
+                    'rgba(57, 255, 20, 0.8)', // أخضر مشع
+                    'rgba(255, 49, 49, 0.8)'  // أحمر مشع
+                ],
+                borderColor: ['#39ff14', '#ff3131'],
+                borderWidth: 1,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#fff' } }
+            },
+            cutout: '70%'
+        }
+    });
+
+    // ==========================================
+    // 2. رسم بياني: إحصائيات المدرسين (Bar Chart)
+    // ==========================================
+    // ملاحظة للمبرمج: يجب تمرير المتغيرات التالية من views.py كـ JSON (قوائم)
+    // teacher_names_list = ["أ. أحمد", "أ. محمد", ...]
+    // teacher_students_count = [150, 40, ...]
+    
+    const teacherNames = {{ teacher_names_list|safe|default:'["أ. محمود", "أ. إبراهيم", "أ. مصطفى", "أ. علي", "أ. حسن"]' }};
+    const teacherCounts = {{ teacher_students_count|safe|default:'[120, 95, 60, 30, 15]' }};
+
+    const ctxTeachers = document.getElementById('teachersChart').getContext('2d');
+    new Chart(ctxTeachers, {
+        type: 'bar',
+        data: {
+            labels: teacherNames,
+            datasets: [{
+                label: 'عدد الطلاب المشتركين',
+                data: teacherCounts,
+                backgroundColor: 'rgba(56, 189, 248, 0.6)', // أزرق سماوي نيون
+                borderColor: '#38bdf8',
+                borderWidth: 2,
+                borderRadius: 5,
+                hoverBackgroundColor: '#38bdf8'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { 
+                    beginAtZero: true, 
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8' }
+                },
+                x: { 
+                    grid: { display: false },
+                    ticks: { color: '#fff', font: { weight: 'bold' } }
+                }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+
+    // ==========================================
+    // 3. رسم بياني: المواد باسم المدرس (Horizontal Bar)
+    // ==========================================
+    // ملاحظة للمبرمج: مرر المتغيرات من الـ views
+    // subject_teacher_labels = ["فيزياء - أ. محمود", "كيمياء - أ. إبراهيم", ...]
+    // subject_teacher_counts = [100, 85, ...]
+    
+    const subTeacherLabels = {{ subject_teacher_labels|safe|default:'["لغة عربية - أ. أحمد", "رياضيات - أ. محمود", "فيزياء - أ. علي", "كيمياء - أ. مصطفى"]' }};
+    const subTeacherCounts = {{ subject_teacher_counts|safe|default:'[150, 110, 80, 45]' }};
+
+    const ctxSubjects = document.getElementById('subjectsByTeacherChart').getContext('2d');
+    new Chart(ctxSubjects, {
+        type: 'bar', // لجعلها أفقية نستخدم indexAxis: 'y'
+        data: {
+            labels: subTeacherLabels,
+            datasets: [{
+                label: 'حجم الإقبال',
+                data: subTeacherCounts,
+                backgroundColor: [
+                    'rgba(177, 66, 255, 0.6)', // بنفسجي نيون
+                    'rgba(253, 224, 71, 0.6)', // أصفر
+                    'rgba(57, 255, 20, 0.6)',  // أخضر
+                    'rgba(56, 189, 248, 0.6)'  // أزرق
+                ],
+                borderColor: [
+                    '#b142ff', '#fde047', '#39ff14', '#38bdf8'
+                ],
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y', // يحول الرسم البياني إلى أفقي
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { 
+                    beginAtZero: true, 
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' } 
+                },
+                y: { 
+                    grid: { display: false },
+                    ticks: { color: '#fff', font: { size: 13 } }
+                }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+
+});
+</script>
 {% endblock %}

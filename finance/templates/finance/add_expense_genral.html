@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}تسجيل مصروف نثري{% endblock %}
+{% block title %}تسجيل مصروف عمومي{% endblock %}
 
 {% block content %}
 <style>
@@ -12,7 +12,7 @@
     }
     .expense-header {
         background: rgba(0,0,0,0.2);
-        border-bottom: 2px solid #f59e0b; /* Warning color for Petty */
+        border-bottom: 2px solid #ef4444; /* Danger color for General */
         padding: 20px;
         border-radius: 16px 16px 0 0;
     }
@@ -22,8 +22,8 @@
         color: #fff !important;
     }
     .dark-input:focus {
-        border-color: #f59e0b !important;
-        box-shadow: 0 0 0 0.25rem rgba(245, 158, 11, 0.25) !important;
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 0 0.25rem rgba(239, 68, 68, 0.25) !important;
     }
 </style>
 
@@ -32,37 +32,37 @@
         <div class="col-md-8 col-lg-6">
             <div class="expense-card">
                 <div class="expense-header">
-                    <h4 class="mb-0 text-warning fw-bold">
-                        <i class="bi bi-cup-hot-fill me-2"></i> تسجيل مصروف نثري / عام
+                    <h4 class="mb-0 text-danger fw-bold">
+                        <i class="bi bi-building-gear me-2"></i> تسجيل مصروف عمومي
                     </h4>
                 </div>
                 <div class="card-body p-4 text-white">
                     <form method="POST" action="{% url 'add_expense_view' %}">
                         {% csrf_token %}
                         <!-- إرسال نوع المصروف للباك اند -->
-                        <input type="hidden" name="expense_type" value="petty">
+                        <input type="hidden" name="expense_type" value="general">
                         
                         <div class="mb-4">
-                            <label class="form-label text-warning fw-bold">بيان الصرف (فيما تم الصرف) <span class="text-danger">*</span></label>
-                            <input type="text" name="title" class="form-control dark-input form-control-lg" placeholder="مثال: أدوات نظافة، بوفيه، إكراميات..." required autofocus>
+                            <label class="form-label text-danger fw-bold">بيان الصرف (فيما تم الصرف) <span class="text-white-50">*</span></label>
+                            <input type="text" name="title" class="form-control dark-input form-control-lg" placeholder="مثال: فواتير كهرباء، إيجار مبنى، صيانة معدات..." required autofocus>
                         </div>
                         
                         <div class="mb-4">
-                            <label class="form-label text-warning fw-bold">المبلغ (ج.م) <span class="text-danger">*</span></label>
+                            <label class="form-label text-danger fw-bold">المبلغ (ج.م) <span class="text-white-50">*</span></label>
                             <div class="input-group input-group-lg">
                                 <input type="number" step="0.01" min="1" name="amount" class="form-control dark-input text-start fw-bold fs-4" placeholder="0.00" required>
-                                <span class="input-group-text bg-dark text-warning border-secondary fw-bold">ج.م</span>
+                                <span class="input-group-text bg-dark text-danger border-secondary fw-bold">ج.م</span>
                             </div>
                         </div>
                         
                         <div class="mb-4">
-                            <label class="form-label text-white-50">ملاحظات إضافية (اختياري)</label>
-                            <textarea name="notes" class="form-control dark-input" rows="3" placeholder="أضف أي تفاصيل أخرى هنا..."></textarea>
+                            <label class="form-label text-white-50">ملاحظات / رقم الفاتورة (اختياري)</label>
+                            <textarea name="notes" class="form-control dark-input" rows="3" placeholder="رقم المستند، المورد، أو تفاصيل إضافية..."></textarea>
                         </div>
                         
                         <div class="d-flex gap-3 mt-5">
-                            <button type="submit" class="btn btn-warning btn-lg w-100 fw-bold shadow">
-                                <i class="bi bi-check-circle-fill me-2"></i> حفظ المصروف النثري
+                            <button type="submit" class="btn btn-danger btn-lg w-100 fw-bold shadow">
+                                <i class="bi bi-check-circle-fill me-2"></i> حفظ المصروف العمومي
                             </button>
                             <a href="{% url 'daily_cashier_summary' %}" class="btn btn-outline-light btn-lg w-100 fw-bold">
                                 <i class="bi bi-arrow-return-right me-2"></i> إلغاء والعودة

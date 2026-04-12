@@ -72,51 +72,120 @@ def is_manager(user):
 def daily_closure_report(request):
     today = timezone.now().date()
     
-    # 1. جلب كافة الحركات المالية لليوم وغير المغلقة
-    base_qs = GeneralLedger.objects.filter(
-        date__date=today,
-        is_closed=False
-    ).select_related('collected_by')
+    # 1. جلب كافة الحركات المالية (الإيرادات) غير المغلقة من الخزينة العامة
+    base_qs = GeneralLedger.objects.filter(is_closed=False).select_related('collected_by')
 
-    # 2. تقسيم الحركات لمنع الازدواجية وحماية السجنال
-    fees_qs = base_qs.filter(category='fees') # المصروفات الأساسية
-    other_qs = base_qs.exclude(category='fees') # الزي، الكتب، المجموعات
+    # 2. حساب إجمالي الإيرادات (المقبوضات)
+    total_revenues = base_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-    # 3. حساب الإجمالي العام بدقة ومنع تكرار المبالغ
-    unique_fees = fees_qs.values('receipt_number').annotate(amt=Max('amount'))
-    total_fees = sum(item['amt'] for item in unique_fees)
-    total_other = other_qs.aggregate(total=Sum('amount'))['total'] or 0
-    grand_total = total_fees + total_other
+    # --- 3. معالجة المصروفات المعلقة وفصلها ---
+    # تهيئة المتغيرات بقيم افتراضية لتجنب أي خطأ في حال كانت الجداول فارغة
+    total_expenses = Decimal('0.00')
+    petty_expenses = []
+    general_expenses = []
 
-    # 4. تجميع ملخص الموظفين مع إضافة حقل username للربط مع الـ JavaScript
+    try:
+        from finance.models import Expense # تأكد من أن المسار يطابق تطبيقك
+        open_expenses = Expense.objects.filter(is_closed=False)
+        
+        # فصل المصروفات بناءً على النوع المسجل في قاعدة البيانات
+        petty_expenses = open_expenses.filter(expense_type='petty')
+        general_expenses = open_expenses.filter(expense_type='general')
+        
+        # حساب إجمالي المصروفات (المدفوعات)
+        total_expenses = open_expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    except (ImportError, AttributeError):
+        # في حال عدم وجود الموديل أو الحقل تظل القيم أصفاراً
+        pass
+
+    # 4. حساب صافي الخزينة الدفتري (الرصيد المفترض وجوده فعلياً)
+    total_day = total_revenues - total_expenses
+
+    # 5. تجميع عهدة الموظفين (للجدول الذكي وتصفية الكاش)
     user_summary = []
-    active_users = User.objects.filter(id__in=base_qs.values_list('collected_by', flat=True).distinct())
+    user_ids = base_qs.values_list('collected_by', flat=True).distinct()
+    active_users = User.objects.filter(id__in=user_ids)
     
     for user in active_users:
-        u_fees = fees_qs.filter(collected_by=user).values('receipt_number').annotate(amt=Max('amount'))
-        u_fees_total = sum(item['amt'] for item in u_fees)
-        u_other_total = other_qs.filter(collected_by=user).aggregate(total=Sum('amount'))['total'] or 0
+        user_receipts = base_qs.filter(collected_by=user)
+        # حماية لمنع ازدواجية القيم (تجميع القيمة الأكبر لكل إيصال فريد)
+        unique_receipts = user_receipts.values('receipt_number').annotate(amt=Max('amount'))
+        user_total = sum(item['amt'] for item in unique_receipts) if unique_receipts else Decimal('0.00')
         
         user_summary.append({
             'user_display': user.get_full_name() or user.username,
-            'username': user.username, # هذا الحقل هو المحرك للـ Modal
-            'total_collected': u_fees_total + u_other_total,
-            'receipts_count': base_qs.filter(collected_by=user).values('receipt_number').distinct().count()
+            'username': user.username, 
+            'total_collected': user_total,
+            'receipts_count': user_receipts.values('receipt_number').distinct().count()
         })
 
-    # 5. 🔥 الإضافة الجوهرية: جلب كافة التفاصيل (لكل الجداول) لعرضها عند الضغط
-    # نستخدم Max لضمان عدم ظهور سطرين لنفس الإيصال في النافذة المنبثقة
-    detailed_entries = base_qs.values(
-        'collected_by__username', 'receipt_number', 'category', 'amount', 'date', 'notes'
-    ).annotate(actual_amt=Max('amount')).order_by('-date')
+    # 6. تفاصيل الحركات الكاملة للنافذة المنبثقة (Modal)
+    detailed_entries = base_qs.order_by('-date')
 
-    return render(request, 'treasury/daily_closure.html', {
-        'user_summary': user_summary,
-        'detailed_entries': detailed_entries, # البيانات التي ستظهر في النافذة
-        'grand_total': grand_total,
+    # 7. بناء السياق النهائي (Context) الموحد لضمان وصول كافة البيانات للـ HTML
+    context = {
         'today': today,
+        'total_day': total_day,            # يغذي المربع الأزرق (صافي النظام)
+        'total_revenues': total_revenues,  # يغذي المربع الأخضر (الإيرادات)
+        'total_expenses': total_expenses,  # يغذي المربع الأحمر (المصروفات)
+        'petty_expenses': petty_expenses,   # يغذي جدول النثريات
+        'general_expenses': general_expenses, # يغذي جدول العموميات
+        'user_summary': user_summary,       # يغذي جدول تصفية العهد
+        'detailed_entries': detailed_entries, # بيانات الـ Modal للمراجعة
         'denominations': [200, 100, 50, 20, 10, 5, 1],
-    })
+    }
+    
+    return render(request, 'treasury/daily_closure.html', context)
+
+
+# def daily_closure_report(request):
+#     today = timezone.now().date()
+    
+#     # 1. جلب كافة الحركات المالية لليوم وغير المغلقة
+#     base_qs = GeneralLedger.objects.filter(
+#         date__date=today,
+#         is_closed=False
+#     ).select_related('collected_by')
+
+#     # 2. تقسيم الحركات لمنع الازدواجية وحماية السجنال
+#     fees_qs = base_qs.filter(category='fees') # المصروفات الأساسية
+#     other_qs = base_qs.exclude(category='fees') # الزي، الكتب، المجموعات
+
+#     # 3. حساب الإجمالي العام بدقة ومنع تكرار المبالغ
+#     unique_fees = fees_qs.values('receipt_number').annotate(amt=Max('amount'))
+#     total_fees = sum(item['amt'] for item in unique_fees)
+#     total_other = other_qs.aggregate(total=Sum('amount'))['total'] or 0
+#     grand_total = total_fees + total_other
+
+#     # 4. تجميع ملخص الموظفين مع إضافة حقل username للربط مع الـ JavaScript
+#     user_summary = []
+#     active_users = User.objects.filter(id__in=base_qs.values_list('collected_by', flat=True).distinct())
+    
+#     for user in active_users:
+#         u_fees = fees_qs.filter(collected_by=user).values('receipt_number').annotate(amt=Max('amount'))
+#         u_fees_total = sum(item['amt'] for item in u_fees)
+#         u_other_total = other_qs.filter(collected_by=user).aggregate(total=Sum('amount'))['total'] or 0
+        
+#         user_summary.append({
+#             'user_display': user.get_full_name() or user.username,
+#             'username': user.username, # هذا الحقل هو المحرك للـ Modal
+#             'total_collected': u_fees_total + u_other_total,
+#             'receipts_count': base_qs.filter(collected_by=user).values('receipt_number').distinct().count()
+#         })
+
+#     # 5. 🔥 الإضافة الجوهرية: جلب كافة التفاصيل (لكل الجداول) لعرضها عند الضغط
+#     # نستخدم Max لضمان عدم ظهور سطرين لنفس الإيصال في النافذة المنبثقة
+#     detailed_entries = base_qs.values(
+#         'collected_by__username', 'receipt_number', 'category', 'amount', 'date', 'notes'
+#     ).annotate(actual_amt=Max('amount')).order_by('-date')
+
+#     return render(request, 'treasury/daily_closure.html', {
+#         'user_summary': user_summary,
+#         'detailed_entries': detailed_entries, # البيانات التي ستظهر في النافذة
+#         'grand_total': grand_total,
+#         'today': today,
+#         'denominations': [200, 100, 50, 20, 10, 5, 1],
+#     })
 
 
 @staff_member_required
@@ -212,26 +281,46 @@ def closure_detail(request, closure_id):
         'ledger_entries': related_ledger,
         'expenses': related_expenses,
     })    
+# استبدل دالة add_expense_view الحالية في ملف views.py بهذا الكود
 
-@staff_member_required
+
+# استبدل دالة add_expense_view الحالية في ملف views.py بهذا الكود
+
+@login_required
 def add_expense_view(request):
     if request.method == "POST":
         title = request.POST.get('title')
         amount = request.POST.get('amount')
         notes = request.POST.get('notes', '')
+        # نستقبل النوع من الحقل المخفي في الـ HTML
+        expense_type = request.POST.get('expense_type', 'petty') 
         
         if title and amount:
-            Expense.objects.create(
-                title=title,
-                amount=Decimal(amount),
-                spent_by=request.user,
-                notes=notes
-            )
-            messages.success(request, f"تم تسجيل مصروف بقيمة {amount} ج.م بنجاح.")
-            return redirect('daily_cashier_summary')
+            try:
+                from finance.models import Expense # تأكد من المسار الصحيح للموديل الخاص بك
+                Expense.objects.create(
+                    title=title,
+                    amount=Decimal(amount),
+                    spent_by=request.user,
+                    notes=notes,
+                    expense_type=expense_type
+                )
+                messages.success(request, f"تم تسجيل المصروف بقيمة {amount} ج.م بنجاح.")
+                # غيّر 'daily_cashier_summary' للاسم الفعلي لرابط صفحة الخزينة في ملف urls.py إن كان مختلفاً
+                return redirect('daily_cashier_summary') 
+            except Exception as e:
+                messages.error(request, f"حدث خطأ: {str(e)}")
     
-    return render(request, 'finance/add_expense.html')
-
+    # === في حالة الـ GET (فتح الصفحة لأول مرة) ===
+    # نقرأ نوع الزر الذي ضغط عليه المستخدم من الـ URL (مثل: ?type=general)
+    exp_type = request.GET.get('type', 'petty')
+    
+    if exp_type == 'general':
+        return render(request, 'finance/add_expense_genral.html')
+    else:
+        return render(request, 'finance/add_expense.html')
+    
+    
 def student_has_old_debt(student):
     return student.previous_debt > 0
 
@@ -754,7 +843,8 @@ def close_daily_accounts_view(request):
         return redirect('daily_cashier_summary')
     
     return redirect('daily_cashier_summary')
-
+        
+        
 @staff_member_required
 @transaction.atomic
 def close_daily_accounts_view(request):
