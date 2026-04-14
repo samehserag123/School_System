@@ -3,58 +3,84 @@
 {% block title %}إدارة أنظمة التقسيط{% endblock %}
 
 {% block content %}
-<div class="container py-5 text-white">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold text-info"><i class="bi bi-clipboard-data me-2"></i> أنظمة التقسيط المتاحة</h2>
-        <a href="/admin/finance/installmentplan/add/" class="btn btn-success">
-            <i class="bi bi-plus-circle me-1"></i> إضافة نظام جديد
-        </a>
-    </div>
+<div class="container py-5 text-white" dir="rtl">
+    <div class="d-flex justify-content-between align-items-end mb-5 border-bottom border-secondary pb-3">
+        <div>
+            <h2 class="fw-bold text-info mb-2">
+                <i class="bi bi-clipboard-data me-2"></i> أنظمة التقسيط المتاحة
+            </h2>
+            <p class="text-muted small mb-0">
+                <i class="bi bi-info-circle me-1"></i> استعراض وتعديل تفاصيل الجداول والخطط المالية للعام الدراسي
+            </p>
+        </div>
+        </div>
 
     <div class="row g-4">
         {% for plan in plans %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 bg-dark border-secondary shadow" style="border-radius: 20px;">
-                <div class="card-header bg-primary bg-opacity-10 border-secondary p-3 text-center">
-                    <h5 class="mb-0 fw-bold">{{ plan.name }}</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-3">
-                        <span class="text-muted small">إجمالي المبلغ:</span>
-                        <span class="badge bg-info fs-6">{{ plan.total_amount }} ج.م</span>
+            <div class="card h-100 plan-card border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+                <div class="card-header bg-gradient-dark border-0 p-4 d-flex align-items-center">
+                    <div class="bg-info bg-opacity-10 rounded-circle p-3 ms-3">
+                        <i class="bi bi-shield-check text-info fs-4"></i>
                     </div>
-                    <div class="d-flex justify-content-between mb-4">
-                        <span class="text-muted small">عدد الأقساط:</span>
-                        <span class="badge bg-secondary">{{ plan.number_of_installments }}</span>
+                    <h5 class="mb-0 fw-bold text-white">{{ plan.name }}</h5>
+                </div>
+
+                <div class="card-body p-4 bg-dark-custom">
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3 bg-dark rounded-3 p-3 border border-secondary border-opacity-25">
+                        <div class="d-flex align-items-center text-muted small">
+                            <i class="bi bi-cash-coin fs-5 text-success ms-2"></i> إجمالي المبلغ
+                        </div>
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success fs-6 px-3 py-2 rounded-pill">
+                            {{ plan.total_amount }} ج.م
+                        </span>
                     </div>
 
-                    <h6 class="text-warning small mb-3 border-bottom border-secondary pb-2">جدول الأقساط المبرمج:</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-dark table-borderless small mb-0">
-                            <thead>
-                                <tr class="text-muted">
-                                    <th>م</th>
-                                    <th>المبلغ</th>
-                                    <th>التاريخ</th>
+                    <div class="d-flex justify-content-between align-items-center mb-4 bg-dark rounded-3 p-3 border border-secondary border-opacity-25">
+                        <div class="d-flex align-items-center text-muted small">
+                            <i class="bi bi-calendar3 fs-5 text-warning ms-2"></i> عدد الأقساط
+                        </div>
+                        <span class="badge bg-secondary fs-6 px-3 py-2 rounded-pill">
+                            {{ plan.number_of_installments }}
+                        </span>
+                    </div>
+
+                    <h6 class="text-info small mb-3 fw-bold">
+                        <i class="bi bi-table ms-1"></i> جدول الاستحقاقات المبرمج:
+                    </h6>
+                    <div class="table-responsive rounded-3" style="max-height: 200px; overflow-y: auto;">
+                        <table class="table table-sm table-custom-dark mb-0 text-center align-middle">
+                            <thead class="sticky-top bg-dark">
+                                <tr class="text-muted small">
+                                    <th class="py-2">م</th>
+                                    <th class="py-2">المبلغ</th>
+                                    <th class="py-2">تاريخ الاستحقاق</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in plan.items.all %}
                                 <tr>
-                                    <td>{{ forloop.counter }}</td>
-                                    <td>{{ item.amount }} ج</td>
-                                    <td>{{ item.due_date|date:"d/m/Y" }}</td>
+                                    <td class="text-muted">{{ forloop.counter }}</td>
+                                    <td class="fw-bold text-white">{{ item.amount }} ج</td>
+                                    <td class="text-warning">{{ item.due_date|date:"Y/m/d" }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="3" class="text-center text-muted">لم يتم تحديد أقساط بعد</td></tr>
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-4">
+                                        <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+                                        لم يتم تحديد أقساط بعد
+                                    </td>
+                                </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
-                <div class="card-footer bg-transparent border-secondary text-center">
-                    <a href="/admin/finance/installmentplan/{{ plan.id }}/change/" class="btn btn-outline-info btn-sm w-100">
-                        <i class="bi bi-pencil-square me-1"></i> تعديل النظام
+
+                <div class="card-footer bg-dark-custom border-top border-secondary border-opacity-25 p-3 text-center">
+                    <a href="/admin/finance/installmentplan/{{ plan.id }}/change/" class="btn btn-outline-info btn-sm rounded-pill w-100 py-2 fw-bold action-btn">
+                        <i class="bi bi-pencil-square me-1"></i> تعديل تفاصيل النظام
                     </a>
                 </div>
             </div>
@@ -62,4 +88,61 @@
         {% endfor %}
     </div>
 </div>
+
+<style>
+    /* ألوان وخلفيات مخصصة */
+    .bg-dark-custom {
+        background-color: #1a1d20;
+    }
+    .bg-gradient-dark {
+        background: linear-gradient(135deg, #2b3035 0%, #1a1d20 100%);
+    }
+
+    /* تأثيرات الحركة للكروت (Hover) */
+    .plan-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        background-color: #212529;
+    }
+    .plan-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    /* تنسيق الجدول */
+    .table-custom-dark {
+        color: #fff;
+    }
+    .table-custom-dark td, .table-custom-dark th {
+        background-color: transparent !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .table-custom-dark tbody tr:hover {
+        background-color: rgba(255, 255, 255, 0.02) !important;
+    }
+    
+    /* شريط التمرير (Scrollbar) للجدول الداخلي */
+    .table-responsive::-webkit-scrollbar {
+        width: 6px;
+    }
+    .table-responsive::-webkit-scrollbar-track {
+        background: #1a1d20; 
+    }
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: #495057; 
+        border-radius: 10px;
+    }
+    .table-responsive::-webkit-scrollbar-thumb:hover {
+        background: #0dcaf0; 
+    }
+
+    /* تأثيرات الزر */
+    .action-btn {
+        transition: all 0.3s ease;
+    }
+    .action-btn:hover {
+        background-color: #0dcaf0;
+        color: #000;
+        transform: scale(1.02);
+    }
+</style>
 {% endblock %}

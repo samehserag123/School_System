@@ -1,0 +1,399 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    /* =========================================
+       1. التنسيقات المشتركة وتنسيقات الشاشة (اللوحة الرسومية)
+       ========================================= */
+    body { background-color: #0f172a; font-family: 'Cairo', sans-serif; }
+    
+    .analytics-card { background: #1e293b; border: 1px solid rgba(255,255,255,0.05); border-radius: 15px; }
+    .stat-value { font-size: 1.8rem; font-weight: 800; font-family: 'monospace'; }
+    .filter-btn { border-radius: 20px; padding: 5px 15px; font-size: 0.85rem; }
+    .active-preset { background: #38bdf8 !important; color: #000 !important; }
+
+    /* إخفاء ورقة الطباعة على الشاشة (تظهر فقط عند الطباعة) */
+    .print-view { display: none; }
+
+    /* =========================================
+       2. تنسيقات الطباعة (ورقة A4 الرسمية)
+       ========================================= */
+    @media print {
+        /* إخفاء اللوحة الرسومية والقوائم العلوية (بما فيها شريط نظام إدارة شؤون الطلاب) والجانبية */
+        .dashboard-view, .navbar, .sidebar, .top-navbar, .d-print-none { display: none !important; }
+        
+        /* تبييض خلفية الصفحة للطباعة وإزالة هوامش النظام */
+        body { background-color: #fff !important; margin: 0 !important; padding: 0 !important; }
+        .main-content { margin: 0 !important; padding: 0 !important; border: none !important; }
+        
+        @page { margin: 1cm; }
+        
+        /* إظهار الورقة الرسمية للطباعة */
+        .print-view { 
+            display: block !important; 
+            background: #ffffff;
+            color: #000000;
+            width: 100%;
+        }
+
+        /* ترويسة الورقة */
+        .paper-header {
+            text-align: center;
+            border-bottom: 3px double #000;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        .paper-header h2 { font-weight: 800; color: #000; margin-bottom: 5px; font-size: 24px; }
+        .paper-header p { margin: 0; color: #333; font-size: 16px; font-weight: 600; }
+
+        /* الجداول الرسمية */
+        .official-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+        .official-table th, .official-table td {
+            border: 1px solid #000 !important;
+            padding: 10px 15px;
+            text-align: right;
+            font-size: 15px;
+            color: #000 !important;
+        }
+        .official-table th {
+            background-color: #f1f5f9 !important;
+            font-weight: 700;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .official-table .amount-col { text-align: left; font-weight: 700; width: 150px; }
+
+        /* ملخص المؤشرات للورقة */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .summary-box {
+            border: 2px solid #000 !important;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+        }
+        .summary-box.net-box {
+            background-color: #f8fafc !important;
+            border-width: 3px !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .summary-title { font-size: 14px; font-weight: 700; color: #555 !important; margin-bottom: 5px; }
+        .summary-value { font-size: 22px; font-weight: 900; color: #000 !important; }
+
+        /* منطقة التوقيعات */
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 50px;
+            padding-top: 20px;
+            page-break-inside: avoid;
+        }
+        .signature-box { text-align: center; width: 200px; }
+        .signature-line { border-bottom: 1px dashed #000 !important; height: 40px; margin-bottom: 10px; }
+    }
+</style>
+
+<div class="container-fluid mt-4 mb-5" dir="rtl">
+    
+    <!-- =========================================
+         الجزء الأول: اللوحة الرسومية (تظهر على الشاشة)
+         ========================================= -->
+    <div class="dashboard-view">
+        <!-- شريط الفلاتر والتحكم -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+            <h3 class="text-white fw-bold"><i class="bi bi-bar-chart-line text-info me-2"></i> التحليل المالي العام</h3>
+            
+            <form method="GET" class="d-flex gap-2 align-items-center flex-wrap">
+                <div class="btn-group shadow-sm">
+                    <a href="?preset=today" class="btn btn-dark filter-btn {% if preset == 'today' %}active-preset{% endif %}">اليوم</a>
+                    <a href="?preset=this_month" class="btn btn-dark filter-btn {% if preset == 'this_month' %}active-preset{% endif %}">الشهر الحالي</a>
+                    <a href="?preset=this_year" class="btn btn-dark filter-btn {% if preset == 'this_year' %}active-preset{% endif %}">السنة</a>
+                </div>
+                <input type="date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
+                <span class="text-white-50">إلى</span>
+                <input type="date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
+                <button type="submit" class="btn btn-info btn-sm rounded-pill px-3 fw-bold">استعلام</button>
+                
+                <!-- زر الطباعة -->
+                <button type="button" onclick="window.print()" class="btn btn-light btn-sm rounded-pill px-4 shadow ms-2 fw-bold">
+                    <i class="bi bi-printer-fill me-1 text-danger"></i> طباعة التقرير
+                </button>
+            </form>
+        </div>
+
+        <!-- المؤشرات الرئيسية الرسومية -->
+        <div class="row g-3 mb-4 text-center">
+            <div class="col-md-3">
+                <div class="analytics-card p-3 border-top border-4 border-secondary">
+                    <small class="text-muted d-block mb-1">رصيد أول المدة (مُرحل)</small>
+                    <div class="stat-value text-secondary">{{ opening_balance|default:"0.00" }}</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="analytics-card p-3 border-top border-4 border-success">
+                    <small class="text-muted d-block mb-1">إجمالي الإيرادات للفترة</small>
+                    <div class="stat-value text-success">+ {{ total_revenues|default:"0.00" }}</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="analytics-card p-3 border-top border-4 border-danger">
+                    <small class="text-muted d-block mb-1">إجمالي المصروفات للفترة</small>
+                    <div class="stat-value text-danger">- {{ total_expenses|default:"0.00" }}</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="analytics-card p-3 border-top border-4 border-info">
+                    <small class="text-muted d-block mb-1">صافي إيرادات الفترة (بعد المصروفات)</small>
+                    <div class="stat-value text-info">{{ net_period|default:"0.00" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الجزء العلوي: الرسم البياني وجدول الإيرادات -->
+        <div class="row g-4">
+            <!-- الرسم البياني (دائرة) -->
+            <div class="col-lg-6">
+                <div class="analytics-card p-4 h-100">
+                    <h6 class="text-white mb-4"><i class="bi bi-pie-chart me-2 text-info"></i> تحليل مصادر الدخل</h6>
+                    <canvas id="revenueChart" height="250"></canvas>
+                </div>
+            </div>
+
+            <!-- جدول ملخص الإيرادات الرسومي -->
+            <div class="col-lg-6">
+                <div class="analytics-card p-4 h-100">
+                    <h6 class="text-white mb-4"><i class="bi bi-arrow-down-left-circle me-2 text-success"></i> ملخص بنود الإيرادات</h6>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                                <tr class="text-muted">
+                                    <th>البند / التصنيف</th>
+                                    <th class="text-end">الإجمالي</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in revenue_by_cat %}
+                                <tr>
+                                    <td>
+                                        <span class="color-dot d-inline-block rounded-circle me-2" style="width:12px; height:12px;"></span>
+                                        <span class="fw-bold">{{ item.category }}</span>
+                                    </td>
+                                    <td class="text-end fw-bold text-success">+{{ item.total }} ج.م</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="2" class="text-center p-4">لا توجد إيرادات مسجلة</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الجزء السفلي: جدول المصروفات -->
+        <div class="row g-4 mt-2">
+            <div class="col-lg-6">
+                <div class="analytics-card p-4 h-100 border-top border-4 border-danger">
+                    <h6 class="text-white mb-4"><i class="bi bi-arrow-up-right-circle me-2 text-danger"></i> ملخص بنود المصروفات</h6>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                                <tr class="text-muted">
+                                    <th>نوع المصروف</th>
+                                    <th class="text-end">الإجمالي</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in expense_by_cat %}
+                                <tr>
+                                    <td>
+                                        <span class="d-inline-block rounded-circle me-2 bg-danger" style="width:12px; height:12px;"></span>
+                                        <span class="fw-bold">
+                                            {% if item.expense_type == 'petty' %}مصروفات نثرية
+                                            {% elif item.expense_type == 'general' %}مصروفات عمومية
+                                            {% else %}{{ item.expense_type|default:'أخرى' }}{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-bold text-danger">-{{ item.total }} ج.م</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="2" class="text-center p-4">لا توجد مصروفات مسجلة</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- زر الإغلاق الشهري -->
+        <div class="mt-5 text-center pb-5">
+            <button class="btn btn-outline-danger px-5 py-3 rounded-pill fw-bold shadow" onclick="confirmMonthClosure()">
+                <i class="bi bi-lock-fill me-2"></i> إغلاق حسابات شهر {{ start_date|date:"F Y" }} وترحيل الرصيد
+            </button>
+        </div>
+    </div>
+
+    <!-- =========================================
+         الجزء الثاني: الورقة الرسمية (تظهر فقط للطباعة)
+         ========================================= -->
+    <div class="print-view">
+        <div class="paper-header">
+            <h2>التقرير المالي المجمع (إيرادات ومصروفات)</h2>
+            <p>عن الفترة من: <span dir="ltr">{{ start_date|date:'Y/m/d' }}</span> إلى: <span dir="ltr">{{ end_date|date:'Y/m/d' }}</span></p>
+        </div>
+
+        <div class="summary-grid">
+            <div class="summary-box">
+                <div class="summary-title">رصيد أول المدة (مُرحل من السابق)</div>
+                <div class="summary-value">{{ opening_balance|default:"0.00" }} ج.م</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-title">إجمالي الإيرادات (المُحصلة)</div>
+                <div class="summary-value">+ {{ total_revenues|default:"0.00" }} ج.م</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-title">إجمالي المصروفات (المدفوعة)</div>
+                <div class="summary-value" style="color: #d32f2f !important;">- {{ total_expenses|default:"0.00" }} ج.م</div>
+            </div>
+            <div class="summary-box net-box">
+                <div class="summary-title">صافي الرصيد الحالي للمدرسة</div>
+                <div class="summary-value" style="color: #1976d2 !important;">{{ final_balance|default:"0.00" }} ج.م</div>
+            </div>
+        </div>
+
+        <h4 style="font-weight: 800; font-size: 18px; margin-bottom: 10px;">أولاً: بيان الإيرادات والتحصيلات</h4>
+        <table class="official-table">
+            <thead>
+                <tr>
+                    <th>م</th>
+                    <th>بند الإيراد / التصنيف</th>
+                    <th class="amount-col">الإجمالي المورد</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in revenue_by_cat %}
+                <tr>
+                    <td style="width: 50px; text-align: center;">{{ forloop.counter }}</td>
+                    <td>{{ item.category }}</td>
+                    <td class="amount-col">{{ item.total }} ج.م</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" style="text-align: center; padding: 20px;">لا توجد إيرادات مسجلة خلال هذه الفترة.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if revenue_by_cat %}
+            <tfoot>
+                <tr>
+                    <th colspan="2" style="text-align: left;">إجمالي التحصيلات:</th>
+                    <th class="amount-col">{{ total_revenues|default:"0.00" }} ج.م</th>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+
+        <h4 style="font-weight: 800; font-size: 18px; margin-bottom: 10px; margin-top: 30px;">ثانياً: بيان المصروفات والمدفوعات</h4>
+        <table class="official-table">
+            <thead>
+                <tr>
+                    <th>م</th>
+                    <th>نوع المصروف</th>
+                    <th class="amount-col">الإجمالي المنصرف</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in expense_by_cat %}
+                <tr>
+                    <td style="width: 50px; text-align: center;">{{ forloop.counter }}</td>
+                    <td>
+                        {% if item.expense_type == 'petty' %}مصروفات نثرية
+                        {% elif item.expense_type == 'general' %}مصروفات عمومية
+                        {% else %}{{ item.expense_type|default:'أخرى' }}{% endif %}
+                    </td>
+                    <td class="amount-col">{{ item.total }} ج.م</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" style="text-align: center; padding: 20px;">لا توجد مصروفات مسجلة خلال هذه الفترة.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if expense_by_cat %}
+            <tfoot>
+                <tr>
+                    <th colspan="2" style="text-align: left;">إجمالي المصروفات:</th>
+                    <th class="amount-col" style="color: #d32f2f !important;">{{ total_expenses|default:"0.00" }} ج.م</th>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+
+        <div class="signatures">
+            <div class="signature-box">
+                <div class="summary-title">توقيع المحاسب / أمين الخزينة</div>
+                <div class="signature-line"></div>
+                <small>الاسم: ........................</small>
+            </div>
+            <div class="signature-box">
+                <div class="summary-title">مراجعة المدير المالي</div>
+                <div class="signature-line"></div>
+                <small>الاسم: ........................</small>
+            </div>
+            <div class="signature-box">
+                <div class="summary-title">اعتماد مدير المدرسة</div>
+                <div class="signature-line"></div>
+                <small>الاسم: ........................</small>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- سكريبت الرسم البياني (يعمل للشاشة فقط) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const labels = [{% for item in revenue_by_cat %}"{{ item.category }}",{% endfor %}];
+    const data = [{% for item in revenue_by_cat %}{{ item.total }},{% endfor %}];
+    
+    const distinctColors = [
+        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+        '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#6366f1'
+    ];
+
+    document.querySelectorAll('.color-dot').forEach((dot, index) => {
+        dot.style.backgroundColor = distinctColors[index % distinctColors.length];
+    });
+
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: distinctColors,
+                borderWidth: 0
+            }]
+        },
+        options: { 
+            plugins: { 
+                legend: { position: 'bottom', labels: { color: '#e2e8f0', font: {family: 'Cairo', size: 12} } } 
+            },
+            cutout: '65%'
+        }
+    });
+
+    function confirmMonthClosure() {
+        if(confirm("تحذير: إغلاق الشهر سيقوم بتثبيت الرصيد وترحيله كـ 'رصيد أول مدة' للشهر الجديد. هل أنت متأكد؟")) {
+            window.location.href = "{% url 'daily_cashier_summary' %}"; 
+        }
+    }
+</script>
+{% endblock %}

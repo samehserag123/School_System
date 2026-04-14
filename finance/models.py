@@ -602,14 +602,21 @@ class DeliveryRecord(models.Model):
 
     def __str__(self):
         return f"{self.student.get_full_name()} | {self.inventory_item.item.name} | {self.delivery_date.strftime('%Y-%m-%d')}"
+    
+    
 class MonthlyClosure(models.Model):
-    month = models.DateField()
-    total_collected = models.DecimalField(max_digits=10, decimal_places=2)
-    total_remaining = models.DecimalField(max_digits=10, decimal_places=2)
+    month = models.DateField(verbose_name="الشهر")
+    opening_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="رصيد أول المدة")
+    total_revenues = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="إجمالي الإيرادات")
+    total_expenses = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="إجمالي المصروفات")
+    net_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="صافي الربح/الخسارة")
+    closing_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="الرصيد المرحل للشهر التالي")
     closed_at = models.DateTimeField(auto_now_add=True)
+    closed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
-        return f"Closure - {self.month.strftime('%B %Y')}"
+        return f"إغلاق شهر {self.month.strftime('%m-%Y')}"
+
 
 class Coupon(models.Model):
     code = models.CharField(max_length=20, unique=True)

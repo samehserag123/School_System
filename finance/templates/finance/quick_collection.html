@@ -72,13 +72,13 @@
                                 <div class="col-md-6 text-right">
                                     <div class="card bg-danger bg-opacity-10 border-danger border-start border-4 p-3 h-100 shadow-sm">
                                         <small class="text-white-50 d-block mb-1">المستحق دفعه (متأخرات):</small>
-                                        <h4 id="current_due" class="text-danger fw-bold mb-0">0.00</h4>
+                                        <h4 id="current_due" class="text-danger fw-bold mb-0">0</h4>
                                     </div>
                                 </div>
                                 <div class="col-md-6 text-right">
                                     <div class="card bg-info bg-opacity-10 border-info border-start border-4 p-3 h-100 shadow-sm">
                                         <small class="text-white-50 d-block mb-1">إجمالي مديونية الطالب المتبقية:</small>
-                                        <h4 id="total_debt" class="text-info fw-bold mb-0">0.00</h4>
+                                        <h4 id="total_debt" class="text-info fw-bold mb-0">0</h4>
                                     </div>
                                 </div>
                             </div>
@@ -107,7 +107,7 @@
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label text-success fw-bold">المبلغ المحصل:</label>
-                                <input type="number" name="amount" id="id_amount" class="form-control bg-dark text-success fw-bold border-secondary fs-5" placeholder="0.00" step="0.01" required>
+                                <input type="number" name="amount" id="id_amount" class="form-control bg-dark text-success fw-bold border-secondary fs-5" placeholder="0" step="1" required>
                             </div>
                         </div>
 
@@ -160,6 +160,24 @@ $(document).ready(function() {
         if (this.value) window.location.href = '?student_id=' + this.value;
     });
 
+    // ==========================================
+    // التعديل الثاني: منع الكسور العشرية برمجياً
+    // ==========================================
+    const amountInput = $('#id_amount');
+    
+    // منع كتابة النقطة (.) أو الفاصلة (,) من لوحة المفاتيح
+    amountInput.on('keydown', function(e) {
+        if (e.key === '.' || e.key === ',') {
+            e.preventDefault();
+        }
+    });
+    
+    // تنظيف الحقل من أي رمز غير رقمي (في حالة النسخ واللصق)
+    amountInput.on('input', function() {
+        this.value = this.value.replace(/[^0-9]/g, '');
+    });
+    // ==========================================
+
     // دالة تطبيع للنصوص العربية لضمان تطابق الكلمات
     function normalizeArabic(text) {
         if (!text) return "";
@@ -192,16 +210,16 @@ $(document).ready(function() {
                     let remaining = data.total_remaining || data.total_debt || 0;
                     let due = data.current_due || 0;
 
-                    // تحديث المربعين بالأرقام الحقيقية (3174.00)
-                    $('#current_due').text(Number(due).toLocaleString() + " ج.م");
-                    $('#total_debt').text(Number(remaining).toLocaleString() + " ج.م");
+                    // تحديث المربعين بالأرقام الحقيقية بدون كسور
+                    $('#current_due').text(Math.round(due).toLocaleString() + " ج.م");
+                    $('#total_debt').text(Math.round(remaining).toLocaleString() + " ج.م");
                 } else {
-                    $('#current_due, #total_debt').text("0.00");
+                    $('#current_due, #total_debt').text("0");
                 }
             },
             error: function(xhr, status, error) {
                 console.error("خطأ في الاتصال:", error);
-                $('#current_due, #total_debt').text("0.00");
+                $('#current_due, #total_debt').text("0");
             }
         });
     }

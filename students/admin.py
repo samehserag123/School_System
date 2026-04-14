@@ -14,6 +14,33 @@ from .models import SystemSettings
 
 from .models import BusRoute, BusSubscription, BusPayment
 
+from .models import RemedialFeeSetting, RemedialProgramRecord
+
+@admin.register(RemedialFeeSetting)
+class RemedialFeeSettingAdmin(admin.ModelAdmin):
+    list_display = ('academic_year', 'fee_per_subject')
+    list_editable = ('fee_per_subject',) # تسمح بتعديل السعر من الشاشة الرئيسية للأدمن
+    search_fields = ('academic_year__name',)
+
+@admin.register(RemedialProgramRecord)
+class RemedialProgramRecordAdmin(admin.ModelAdmin):
+    # إظهار البيانات بشكل منظم في لوحة التحكم
+    list_display = ('student', 'academic_year', 'subjects_count', 'total_amount', 'is_paid', 'created_at')
+    list_filter = ('academic_year', 'is_paid', 'created_at')
+    search_fields = ('student__get_full_name', 'student__student_code')
+    readonly_fields = ('total_amount', 'created_by', 'created_at') # منع تعديل الإجمالي يدوياً لضمان الدقة
+    
+    # ربط الموظف الذي قام بالإدخال آلياً عند الحفظ من داخل الأدمن
+    def save_model(self, request, obj, form, change):
+        if not obj.pk: # إذا كان سجلاً جديداً
+            obj.created_by = request.user
+            # حساب الإجمالي بناءً على السعر المحدد في RemedialFeeSetting
+            fee_setting = RemedialFeeSetting.objects.filter(academic_year=obj.academic_year).first()
+            fee = fee_setting.fee_per_subject if fee_setting else 150
+            obj.total_amount = obj.subjects_count * fee
+        super().save_model(request, obj, form, change)
+        
+        
 @admin.register(BusRoute)
 class BusRouteAdmin(admin.ModelAdmin):
     list_display = ('name', 'driver_name', 'bus_number', 'capacity', 'monthly_price', 'term_price', 'yearly_price')

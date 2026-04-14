@@ -257,7 +257,35 @@ class Student(models.Model):
 # ----------------------------------------------------------------
 # الجداول الجديدة: المدرسين، المواد، والكورسات
 # ----------------------------------------------------------------
+class RemedialFeeSetting(models.Model):
+    """
+    جدول مخصص للأدمن لتحديد سعر مادة البرنامج العلاجي لكل عام دراسي
+    """
+    # نستخدم 'finance.AcademicYear' بدلاً من 'AcademicYear' فقط
+    academic_year = models.OneToOneField('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
+    fee_per_subject = models.DecimalField(max_digits=10, decimal_places=2, default=150.00, verbose_name="رسوم المادة الواحدة")
 
+    def __str__(self):
+        return f"رسوم العلاجي - {self.academic_year.name}"
+
+class RemedialProgramRecord(models.Model):
+    """
+    جدول لتسجيل الطلاب في البرنامج العلاجي (من قبل شئون الطلاب)
+    """
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب")
+    # نستخدم 'finance.AcademicYear' هنا أيضاً
+    academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
+    subjects_count = models.PositiveIntegerField(default=1, verbose_name="عدد المواد المتخلف عنها")
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="إجمالي الرسوم المطلوبة")
+    is_paid = models.BooleanField(default=False, verbose_name="تم السداد؟")
+    notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات")
+    
+    created_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, verbose_name="مسجل البيان")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.student.get_full_name()} - {self.subjects_count} مواد"    
+    
 class Teacher(models.Model):
     name = models.CharField("اسم المدرس", max_length=150)
     phone = models.CharField("رقم الهاتف", max_length=20, validators=[numbers_only], blank=True, null=True)
@@ -509,14 +537,13 @@ class BookSale(models.Model):
 # models.py
 class ExternalStudent(models.Model):
     full_name = models.CharField("اسم الطالب", max_length=200)
-    #national_id = models.CharField("الرقم القومي", max_length=14, unique=True)
     phone_number = models.CharField("رقم التليفون", max_length=15)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.full_name
+        # سنضيف رقم الهاتف بجانب الاسم لتمييزهم في لوحة التحكم
+        return f"{self.full_name} - {self.phone_number}"
     
-
 class CourseGroup(models.Model):
     student = models.ForeignKey(
         'Student', 

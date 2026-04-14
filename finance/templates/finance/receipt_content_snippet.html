@@ -9,11 +9,13 @@
             <td style="text-align: center; width: 30%;">
                 <div style="border: 2px solid #000; padding: 5px; background: #fff;">
                     <h5 style="margin:0; font-weight: bold;">إيصال استلام</h5>
-                    <div style="border-top: 1px solid #000; margin-top:2px;">رقم: #{{ payment.id|stringformat:"05d" }}</div>
+                    <div style="border-top: 1px solid #000; margin-top:2px; font-weight: bold; font-size: 1.1rem;">
+                        رقم دفتري: #{{ payment.receipt_number|default:payment.id }}
+                    </div>
                 </div>
             </td>
             <td style="text-align: left; width: 35%;">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=ID:{{payment.id}}|Amt:{{payment.amount_paid}}" style="width:65px;">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=Receipt:{{payment.receipt_number|default:payment.id}}|Amt:{{payment.amount_paid}}" style="width:65px;">
             </td>
         </tr>
     </table>
@@ -45,13 +47,19 @@
             <span style="margin-right: 20px;">المتبقي الكلي: <strong style="color: red;">{{ remaining_balance }} ج.م</strong></span>
         </div>
 
-        <p style="font-size: 0.9rem; margin-top: 5px;">التاريخ: {{ payment.payment_date|date:"Y/m/d" }} | العام: {{ payment.academic_year.name }}</p>
+        <p style="font-size: 0.9rem; margin-top: 5px;">
+            التاريخ: {{ payment.payment_date|date:"Y/m/d" }} | العام: {{ payment.academic_year.name }} | 
+            
+        </p>
     </div>
 
-    <div class="d-print-none">
-        <table style="width: 100%; margin-top: 20px; text-align: center; font-weight: bold;" dir="rtl">
+    <div style="margin-top: 25px;">
+        <table style="width: 100%; text-align: center; font-weight: bold;" dir="rtl">
             <tr>
-                <td style="width: 33%;">المحصل</td>
+                <td style="width: 33%;">
+                    المحصل<br>
+                    <span style="font-size: 0.8rem; font-weight: normal; color: #555;">({{ request.user.get_full_name|default:request.user.username }})</span>
+                </td>
                 <td style="width: 33%;">شؤون الطلاب</td>
                 <td style="width: 34%;">ختم المدرسة</td>
             </tr>

@@ -292,6 +292,22 @@
             box-shadow: 0 0 10px rgba(0, 212, 255, 0.2) !important;
             outline: none;
         }
+            /* زر العودة للرئيسية الاحترافي */
+        .btn-home-return {
+            background: rgba(15, 23, 42, 0.7); /* خلفية داكنة شفافة */
+            backdrop-filter: blur(10px); /* تأثير زجاجي */
+            border: 1px solid rgba(56, 189, 248, 0.3); /* إطار سماوي خفيف */
+            color: #e2e8f0;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+        .btn-home-return:hover {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: #38bdf8;
+            color: #fff;
+            transform: translateY(-3px); /* حركة خفيفة للأعلى */
+            box-shadow: 0 8px 20px rgba(56, 189, 248, 0.2); /* توهج سماوي */
+        }
     </style>
 </head>
 <body>
@@ -305,7 +321,12 @@
                 <i class="bi bi-plus-lg me-1"></i> اشتراك جديد
             </button>
         </div>
-
+            <div class="d-print-none mb-4 text-end">
+                    <a href="/" class="btn btn-home-return rounded-pill px-4 py-2 fw-bold shadow-sm d-inline-flex align-items-center">
+                        العودة للرئيسية
+                        <i class="bi bi-house-door-fill text-info ms-2 fs-5"></i>
+                    </a>
+                </div>
         <div class="collapse mb-4" id="addEnrollment">
             <div class="card card-body bg-black border-secondary rounded-4 shadow-lg">
                 <form method="POST" class="row g-3">
@@ -323,7 +344,19 @@
                     <div id="external_fields" style="display: none;" class="row g-3 mb-3 border-bottom border-secondary border-opacity-10 pb-3 mx-0">
                         <div class="col-md-8"> 
                             <label class="form-label small fw-bold text-info">اسم الطالب الخارجي</label>
-                            <input type="text" name="ext_name" class="form-control bg-black text-white border-secondary" placeholder="الاسم الرباعي بالكامل">
+                            <input type="text" 
+                                name="ext_name" 
+                                id="ext_name_input"
+                                list="external_names_list" 
+                                class="form-control bg-black text-white border-secondary" 
+                                placeholder="الاسم الرباعي بالكامل"
+                                autocomplete="off"> 
+                                
+                            <datalist id="external_names_list">
+                                {% for name in existing_external_names %}
+                                    <option value="{{ name }}"></option>
+                                {% endfor %}
+                            </datalist>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small fw-bold text-info">رقم التليفون</label>

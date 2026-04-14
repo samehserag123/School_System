@@ -20,6 +20,12 @@ from django.utils.html import format_html
 from .models import ReceiptBook
 
 
+# finance/admin.py
+
+
+    
+    
+    
 @admin.register(ReceiptBook)
 class ReceiptBookAdmin(admin.ModelAdmin):
     list_display = ('book_number', 'user', 'start_serial', 'end_serial', 'is_active', 'created_at')
@@ -33,6 +39,7 @@ class GradePriceListAdmin(admin.ModelAdmin):
     list_display = ('revenue_category', 'grade', 'academic_year', 'price')
     list_filter = ('grade', 'academic_year', 'revenue_category')
     search_fields = ('revenue_category__name', 'grade__name')
+    
 @admin.register(ItemDefinition)
 class ItemDefinitionAdmin(admin.ModelAdmin):
     list_display = ('name',)
@@ -169,7 +176,18 @@ class DailyClosureAdmin(admin.ModelAdmin):
 
 @admin.register(MonthlyClosure)
 class MonthlyClosureAdmin(admin.ModelAdmin):
-    list_display = ['month', 'total_collected', 'total_remaining']
+    # استخدام الحقول الجديدة التي أضفناها في التحديث الأخير
+    list_display = [
+        'month', 
+        'opening_balance', 
+        'total_revenues', 
+        'total_expenses', 
+        'net_balance', 
+        'closing_balance', 
+        'closed_at'
+    ]
+    list_filter = ['month', 'closed_at']
+
 
 @admin.register(Coupon)
 class CouponAdmin(admin.ModelAdmin):

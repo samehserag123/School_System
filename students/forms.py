@@ -9,7 +9,27 @@ from .models import InventoryRestock  # 👈 هذا هو السطر الناقص
 from treasury.models import GeneralLedger
 
 from .models import BusSubscription, BusRoute
+from .models import RemedialProgramRecord, RemedialFeeSetting
 
+class RemedialProgramForm(forms.ModelForm):
+    class Meta:
+        model = RemedialProgramRecord
+        fields = ['student', 'subjects_count', 'notes']
+        widgets = {
+            'student': forms.Select(attrs={'class': 'form-control select2'}),
+            'subjects_count': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'step': '1'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+class RemedialFeeSettingForm(forms.ModelForm):
+    class Meta:
+        model = RemedialFeeSetting
+        fields = ['academic_year', 'fee_per_subject']
+        widgets = {
+            'academic_year': forms.Select(attrs={'class': 'form-select'}),
+            'fee_per_subject': forms.NumberInput(attrs={'class': 'form-control', 'step': '1'}),
+        }
+        
 
 class GeneralLedgerForm(forms.ModelForm):
     class Meta:

@@ -29,8 +29,18 @@ urlpatterns = [
     path('sales/', views.book_sales_list, name='book_sales_list'),
     path('sales/add/', views.add_book_sale, name='add_book_sale'),
     path('sales/print/<int:sale_id>/', views.print_receipt_view, name='print_book_receipt'),
+    path('api/financial-info/<int:student_id>/', views.student_financial_api, name='student_financial_api'),
     path('inventory/report/', views.inventory_category_report, name='inventory_report'),
     path('admin/inventory/add-stock/', views.admin_add_restock, name='admin_add_restock'),
     path('students/api/get-pending-sales/<int:student_id>/', get_pending_sales_api, name='get_pending_sales_api'),
     path('collect-fee/<int:enrollment_id>/', views.collect_fee_view, name='collect_fee'),
+    path('remedial/add/', views.add_remedial_program, name='add_remedial_program'),
+    
+    path('remedial/dashboard/', views.manage_remedial_dashboard, name='remedial_dashboard'),
+    
+    path('remedial/save-quick/', views.save_remedial_from_registry, name='save_remedial_from_registry'),
+
+    # 2. مسار API عملية السداد المباشر (الذي يتم استدعاؤه عند الضغط على زر "سداد الآن")
+    path('api/remedial/pay/<int:record_id>/', views.pay_remedial_record, name='pay_remedial_record'),
+   
 ]

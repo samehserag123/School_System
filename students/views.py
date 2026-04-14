@@ -24,7 +24,8 @@ from .models import BookSale, InventoryItem, InventoryRestock, GradePackagePrice
 # الاستيراد من الفورمات (النماذج) - هذا هو السطر الذي ينقصك
 from .forms import RestockForm
 from .forms import BookSaleForm
-
+import datetime
+import json
 # تأكد من استيراد الموديلات الصحيحة من تطبيقاتك
 from students.models import Student, Grade, Classroom 
 from finance.models import StudentInstallment
@@ -34,20 +35,102 @@ from treasury.models import GeneralLedger
 import uuid # لاستخدامه في توليد رقم فريد
 from decimal import Decimal
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 # students/views.py
 from django.db.models import Count
 from .models import BusRoute, BusSubscription, BusPayment, MiscellaneousRevenue
-
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.utils import timezone
-from django.db import transaction
-from django.contrib.auth.decorators import login_required
-from decimal import Decimal
+from .models import RemedialFeeSetting
 import time
 import traceback
+from .forms import RemedialProgramForm  # تأكد من إضافة هذا السطر
+
+from .models import RemedialProgramRecord
+
+
+def save_remedial_from_registry(request):
+    if request.method == 'POST':
+        student_id = request.POST.get('student')
+        subjects_count = int(request.POST.get('subjects_count', 1))
+        notes = request.POST.get('notes', '')
+        
+        try:
+            student = Student.objects.get(id=student_id)
+            active_year = get_active_year() 
+            fee_per_subject = 150.00 
+            total_amount = subjects_count * fee_per_subject
+            
+            RemedialProgramRecord.objects.create(
+                student=student,
+                academic_year=active_year,
+                subjects_count=subjects_count,
+                total_amount=total_amount,
+                notes=notes,
+                is_paid=False
+            )
+            # بدلاً من redirect، نرسل رد نجاح بصيغة JSON
+            return JsonResponse({'success': True, 'message': f'تم تأكيد البرنامج للطالب {student.first_name} بنجاح.'})
+            
+        except Student.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'خطأ: لم يتم العثور على الطالب.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+
+    return JsonResponse({'success': False, 'message': 'طلب غير صالح.'})
+
+
+
+def manage_remedial_dashboard(request):
+    """دالة عرض لوحة تحكم البرنامج العلاجي"""
+    active_year = get_active_year() # تأكد من وجود دالة get_active_year لديك
+    
+    # جلب السجلات مقسمة (مسدد وغير مسدد)
+    unpaid_records = RemedialProgramRecord.objects.filter(academic_year=active_year, is_paid=False).order_by('-created_at')
+    paid_records = RemedialProgramRecord.objects.filter(academic_year=active_year, is_paid=True).order_by('-created_at')
+
+    context = {
+        'unpaid_records': unpaid_records,
+        'paid_records': paid_records,
+        'active_year': active_year,
+    }
+    # هنا السيرفر سيبحث عن الملف الجديد الذي أنشأناه
+    return render(request, 'students/remedial_dashboard.html', context)
+
+def pay_remedial_record(request, record_id):
+    """دالة تأكيد السداد"""
+    if request.method == 'POST':
+        try:
+            record = RemedialProgramRecord.objects.get(id=record_id)
+            if not record.is_paid:
+                record.is_paid = True
+                record.save()
+                return JsonResponse({'success': True, 'message': 'تم تسجيل السداد بنجاح ونقل الطالب للأرشيف.'})
+            else:
+                return JsonResponse({'success': False, 'error': 'هذه المديونية مسددة بالفعل.'})
+        except RemedialProgramRecord.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'السجل غير موجود.'})        
+
+def add_remedial_program(request):
+    active_year = get_active_year() 
+    students = Student.objects.all()
+    
+    fee_setting = RemedialFeeSetting.objects.filter(academic_year=active_year).first()
+    fee_per_subject = fee_setting.fee_per_subject if fee_setting else 150.00
+
+    if request.method == 'POST':
+        # ... (نفس كود الحفظ الموجود لديك لا تغيره) ...
+        pass # افترض أن كود الحفظ هنا
+
+    # 🌟 السطر الجديد: جلب كل الطلاب المسجلين في البرنامج العلاجي لهذا العام
+    remedial_records = RemedialProgramRecord.objects.filter(academic_year=active_year).order_by('-created_at')
+
+    context = {
+        'students': students,
+        'fee_per_subject': float(fee_per_subject),
+        'active_year': active_year,
+        'remedial_records': remedial_records, # 🌟 إرسال السجل للصفحة
+    }
+    return render(request, 'students/add_remedial.html', context)
 
 
 @login_required
@@ -286,13 +369,12 @@ def student_detail_analytics(request, student_id):
     }
     return render(request, 'students/student_detail.html', context)
 
-# students/views.py
 def course_prices_view(request):
     # 1. معالجة الطلب بناءً على النوع (POST أو GET)
     if request.method == 'POST':
         form = CourseGroupForm(request.POST)
         
-        # إعداد شكل عرض الطالب فوراً حتى لو فشل التحقق من البيانات
+        # إعداد شكل عرض الطالب (للطالب الداخلي)
         form.fields['student'].queryset = Student.objects.all()
         form.fields['student'].label_from_instance = lambda obj: f"{obj.get_full_name()} | {obj.student_code} | {obj.national_id}"
 
@@ -309,15 +391,12 @@ def course_prices_view(request):
             instance.required_amount = calculated_amount
             
             if is_external:
-                # التعامل مع الطالب الخارجي
-                ext_student, created = ExternalStudent.objects.get_or_create(
+                # التعامل مع الطالب الخارجي:
+                # نقوم بإنشاء سجل جديد دائماً للسماح بتكرار الأسماء (بدون بحث منعاً للخطأ)
+                ext_student = ExternalStudent.objects.create(
                     full_name=form.cleaned_data.get('ext_name'),
-                    defaults={'phone_number': form.cleaned_data.get('ext_phone')}
+                    phone_number=form.cleaned_data.get('ext_phone')
                 )
-                if not created:
-                    ext_student.phone_number = form.cleaned_data.get('ext_phone')
-                    ext_student.save()
-
                 instance.external_student = ext_student
                 instance.student = None
             
@@ -326,7 +405,6 @@ def course_prices_view(request):
     else:
         # حالة الـ GET (فتح الصفحة لأول مرة)
         form = CourseGroupForm(initial={'total_sessions': 4})
-        # تخصيص شكل الاختيار للبحث بالاسم والكود والقومي [cite: 2026-04-09]
         form.fields['student'].queryset = Student.objects.all()
         form.fields['student'].label_from_instance = lambda obj: f"{obj.get_full_name()} | {obj.student_code} | {obj.national_id}"
 
@@ -361,7 +439,11 @@ def course_prices_view(request):
     page_number = request.GET.get('page')
     courses_page = paginator.get_page(page_number)
 
-    # 6. تمرير البيانات للتمبلت
+    # 6. جلب قائمة الأسماء الخارجية الفريدة (للبحث السريع في التمبلت)
+    # نستخدم values_list للحصول على الأسماء فقط مع حذف التكرار في القائمة المقترحة
+    existing_external_names = ExternalStudent.objects.values_list('full_name', flat=True).distinct()
+
+    # 7. تمرير البيانات للتمبلت
     context = {
         'courses': courses_page,
         'form': form,
@@ -371,6 +453,7 @@ def course_prices_view(request):
         'current_filter': time_filter,
         'date_from': date_from,
         'date_to': date_to,
+        'existing_external_names': existing_external_names, # الأسماء المقترحة
         'title': 'سجل المجموعات والإيرادات'
     }
     
@@ -655,12 +738,10 @@ def book_sales_list(request):
 
 # ابحث عن دالة add_book_sale وقم بتعديلها لتصبح هكذا:
 
-# students/views.py
-# students/views.py
-
-
-
 def add_book_sale(request):
+    # جلب السنة الأكاديمية النشطة في البداية لتجنب أخطاء NoneType
+    active_year = get_active_year() 
+    
     if request.method == 'POST':
         form = BookSaleForm(request.POST)
         if form.is_valid():
@@ -668,8 +749,17 @@ def add_book_sale(request):
             inventory_item = sale.item 
             student = sale.student
             requested_qty = sale.quantity
+
+            # 1. التحقق من وجود السنة الأكاديمية للطالب وللنظام
+            if not student.academic_year:
+                messages.error(request, f"⚠️ الطالب {student.get_full_name()} غير مرتبط بسنة أكاديمية.")
+                return render(request, 'books/add_sale.html', {'form': form})
             
-            # 1. جلب السعر بناءً على (الصف + السنة الدراسية للطالب)
+            if not student.grade:
+                messages.error(request, f"⚠️ الطالب {student.get_full_name()} غير مرتبط بصف دراسي.")
+                return render(request, 'books/add_sale.html', {'form': form})
+
+            # 2. جلب السعر بناءً على (الصف + السنة الدراسية للطالب)
             try:
                 package = GradePackagePrice.objects.get(
                     grade=student.grade, 
@@ -681,29 +771,33 @@ def add_book_sale(request):
                     unit_price = package.uniform_price
                 
                 sale.total_amount = unit_price * requested_qty
+                # ربط عملية البيع بالسنة الأكاديمية النشطة
                 
             except GradePackagePrice.DoesNotExist:
-                messages.error(request, f"⚠️ لم يتم تحديد سعر الباقة لصف {student.grade.name} في سنة {student.academic_year.name}")
+                # استخدام .name بأمان عبر التحقق أو استخدام default
+                grade_name = student.grade.name if student.grade else "غير معروف"
+                year_name = student.academic_year.name if student.academic_year else "غير محددة"
+                messages.error(request, f"⚠️ لم يتم تحديد سعر الباقة لصف {grade_name} في سنة {year_name}")
                 return render(request, 'books/add_sale.html', {'form': form})
 
-            # 2. التأكد من توفر الكمية في المخزن
+            # 3. التأكد من توفر الكمية في المخزن
             if requested_qty > inventory_item.remaining_qty:
                 messages.error(request, f"⚠️ المخزن غير كافٍ! المتوفر حالياً: {inventory_item.remaining_qty}")
                 return render(request, 'books/add_sale.html', {'form': form})
             
-            # 3. الربط مع الموظف الحالي (مهم جداً لعملية السداد الآلي في الموديل)
+            # 4. الربط مع الموظف الحالي (مهم جداً لعملية السداد الآلي في الموديل)
             sale._current_user = request.user 
             
-            # 4. الحفظ النهائي (سيقوم الموديل تلقائياً بإنشاء قيد الخزينة بناءً على قيمة pay_now)
+            # 5. الحفظ النهائي
             sale.save()
             
-            # 5. رسالة نجاح مخصصة حسب حالة الدفع
+            # 6. رسالة نجاح مخصصة حسب حالة الدفع
             if sale.pay_now > 0:
                 messages.success(request, f"✅ تم تسجيل الصرف وتوريد مبلغ {sale.pay_now} ج.م للخزينة للطالب {student.get_full_name()}.")
             else:
                 messages.warning(request, f"تم تسجيل إذن الصرف للطالب {student.get_full_name()} بدون سداد مالي.")
             
-            # توجيه المستخدم لصفحة الطباعة فوراً أو لقائمة المبيعات
+            # توجيه المستخدم لصفحة الطباعة فوراً
             return redirect('print_book_receipt', sale_id=sale.id)
         
         return render(request, 'books/add_sale.html', {'form': form})
@@ -712,10 +806,147 @@ def add_book_sale(request):
         form = BookSaleForm()
     
     return render(request, 'books/add_sale.html', {'form': form})
-# هذه الدالة هي المسؤولة عن فتح الإيصال "فقط" عند الضغط على زر الطابعة في الجدول
+
+from django.http import JsonResponse
+from django.db.models import Sum
+
+def student_financial_api(request, student_id):
+    try:
+        student = Student.objects.get(id=student_id)
+        
+        # 1. جلب أسعار الباقات منفصلة
+        books_price = 0
+        uniform_price = 0
+        try:
+            active_year = student.academic_year
+            package = GradePackagePrice.objects.get(grade=student.grade, academic_year=active_year)
+            books_price = package.books_price
+            uniform_price = package.uniform_price
+        except GradePackagePrice.DoesNotExist:
+            pass
+
+        # 2. جلب المبيعات
+        sales = BookSale.objects.filter(student=student)
+        
+        # 3. فصل المبالغ المدفوعة بناءً على نوع الصنف (كتاب أم زي)
+        # نفترض أن حق النوع في موديل المخزن اسمه item_type وقيمه 'book' و 'uniform'
+        books_paid = sales.filter(item__item_type='book').aggregate(Sum('pay_now'))['pay_now__sum'] or 0
+        uniform_paid = sales.filter(item__item_type='uniform').aggregate(Sum('pay_now'))['pay_now__sum'] or 0
+        
+        # 4. قائمة أسماء الكتب
+        received_items = [str(sale.item) for sale in sales if sale.item]
+
+        # إرسال البيانات مفصلة للمتصفح
+        return JsonResponse({
+            'books_total': float(books_price),
+            'books_paid': float(books_paid),
+            'uniform_total': float(uniform_price),
+            'uniform_paid': float(uniform_paid),
+            'received_items': received_items
+        })
+    except Student.DoesNotExist:
+        return JsonResponse({'error': 'Student not found'}, status=404)    
+
+
 def print_receipt_view(request, sale_id):
+    # 1. جلب الفاتورة الأساسية
     sale = get_object_or_404(BookSale, id=sale_id)
-    return render(request, 'books/print_receipt.html', {'sale': sale})
+    student = sale.student
+    
+    # 2. معرفة نوع الصنف المطبوع (هل هو كتاب أم زي؟)
+    # نفترض أن الحقل اسمه item_type، قم بتعديله إذا كان مختلفاً لديك
+    item_type = sale.item.item_type 
+    
+    # 3. حساب إجمالي الباقة المطلوبة لهذا الصنف فقط
+    total_required = 0
+    try:
+        package = GradePackagePrice.objects.get(grade=student.grade, academic_year=student.academic_year)
+        if item_type == 'book':
+            total_required = package.books_price
+        else:
+            total_required = package.uniform_price
+    except GradePackagePrice.DoesNotExist:
+        pass
+
+    # 4. حساب إجمالي ما دفعه الطالب مسبقاً لهذا القسم تحديداً (كتب أو زي)
+    sales_for_category = BookSale.objects.filter(student=student, item__item_type=item_type)
+    total_paid = sales_for_category.aggregate(Sum('pay_now'))['pay_now__sum'] or 0
+
+    # 5. حساب المبلغ المتبقي بدقة
+    remaining_amount = total_required - total_paid
+
+    # 6. إرسال جميع البيانات إلى صفحة الطباعة
+    context = {
+        'sale': sale,
+        'total_required': total_required,
+        'total_paid': total_paid,
+        'remaining_amount': remaining_amount,
+    }
+    
+    return render(request, 'books/print_receipt.html', context)
+
+        
+# def print_receipt_view(request, sale_id):
+#     # استخدام get_object_or_404 لضمان عدم حدوث خطأ إذا كان الـ ID غير صحيح
+#     sale = get_object_or_404(BookSale, id=sale_id)
+#     return render(request, 'books/print_receipt.html', {'sale': sale})
+
+# def add_book_sale(request):
+#     if request.method == 'POST':
+#         form = BookSaleForm(request.POST)
+#         if form.is_valid():
+#             sale = form.save(commit=False)
+#             inventory_item = sale.item 
+#             student = sale.student
+#             requested_qty = sale.quantity
+            
+#             # 1. جلب السعر بناءً على (الصف + السنة الدراسية للطالب)
+#             try:
+#                 package = GradePackagePrice.objects.get(
+#                     grade=student.grade, 
+#                     academic_year=student.academic_year
+#                 )
+#                 if inventory_item.item_type == 'book':
+#                     unit_price = package.books_price
+#                 else:
+#                     unit_price = package.uniform_price
+                
+#                 sale.total_amount = unit_price * requested_qty
+                
+#             except GradePackagePrice.DoesNotExist:
+#                 messages.error(request, f"⚠️ لم يتم تحديد سعر الباقة لصف {student.grade.name} في سنة {student.academic_year.name}")
+#                 return render(request, 'books/add_sale.html', {'form': form})
+
+#             # 2. التأكد من توفر الكمية في المخزن
+#             if requested_qty > inventory_item.remaining_qty:
+#                 messages.error(request, f"⚠️ المخزن غير كافٍ! المتوفر حالياً: {inventory_item.remaining_qty}")
+#                 return render(request, 'books/add_sale.html', {'form': form})
+            
+#             # 3. الربط مع الموظف الحالي (مهم جداً لعملية السداد الآلي في الموديل)
+#             sale._current_user = request.user 
+            
+#             # 4. الحفظ النهائي (سيقوم الموديل تلقائياً بإنشاء قيد الخزينة بناءً على قيمة pay_now)
+#             sale.save()
+            
+#             # 5. رسالة نجاح مخصصة حسب حالة الدفع
+#             if sale.pay_now > 0:
+#                 messages.success(request, f"✅ تم تسجيل الصرف وتوريد مبلغ {sale.pay_now} ج.م للخزينة للطالب {student.get_full_name()}.")
+#             else:
+#                 messages.warning(request, f"تم تسجيل إذن الصرف للطالب {student.get_full_name()} بدون سداد مالي.")
+            
+#             # توجيه المستخدم لصفحة الطباعة فوراً أو لقائمة المبيعات
+#             return redirect('print_book_receipt', sale_id=sale.id)
+        
+#         return render(request, 'books/add_sale.html', {'form': form})
+
+#     else:
+#         form = BookSaleForm()
+    
+#     return render(request, 'books/add_sale.html', {'form': form})
+# # هذه الدالة هي المسؤولة عن فتح الإيصال "فقط" عند الضغط على زر الطابعة في الجدول
+# def print_receipt_view(request, sale_id):
+#     sale = get_object_or_404(BookSale, id=sale_id)
+#     return render(request, 'books/print_receipt.html', {'sale': sale})
 
 
 def collect_course_fee_view(request, enrollment_id):
@@ -782,7 +1013,7 @@ def student_dashboard(request, student_id):
     remaining_balance = total_required - total_paid
     
     # حساب الأقساط المتأخرة (تاريخ استحقاقها مضى ولم تدفع بالكامل)
-    today = datetime.date.today()
+    today = date.today()
     overdue_installments = installments.filter(due_date__lt=today, paid_amount__lt=F('amount_due'))
     total_overdue = float(sum(i.amount_due - i.paid_amount for i in overdue_installments))
 
@@ -1163,4 +1394,24 @@ class StudentListAPI(generics.ListAPIView):
     search_fields = ['first_name', 'last_name', 'national_id']
 
 
+from .models import RemedialProgramRecord
 
+def get_remedial_balance_api(request, student_id):
+    """API مخصص لجلب رصيد البرنامج العلاجي فقط"""
+    try:
+        remedial_qs = RemedialProgramRecord.objects.filter(
+            student_id=student_id, 
+            is_paid=False
+        )
+        
+        remedial_debt = remedial_qs.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        remedial_notes_list = list(remedial_qs.values_list('notes', flat=True))
+        remedial_notes = " - ".join([note for note in remedial_notes_list if note])
+
+        return JsonResponse({
+            'success': True,
+            'remedial_debt': float(remedial_debt),
+            'remedial_notes': remedial_notes,
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

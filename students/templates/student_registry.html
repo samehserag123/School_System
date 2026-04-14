@@ -214,103 +214,73 @@
         </div>
     </div>
 
-    <div class="table-container shadow-lg animate__animated animate__fadeInUp" style="animation-delay: 0.2s;">
-        <table class="table table-dark table-hover text-center align-middle mb-0" id="studentTable">
-            <thead>
-    <tr>
-        <th class="py-3 text-end pe-4">البيانات الأساسية للطلاب</th>
-        <th>النوع</th>
-        <th>الديانة</th>
-        <th>الجنسية</th>
-        <th>حالة القيد</th>
-        <th>رقم القيد</th>
-        <th>موقف الدمج</th>
-        <th class="text-center">الإجراءات</th> 
-    </tr>
-</thead>
+    <div class="table-container shadow-lg animate__animated animate__fadeInUp">
+    <table class="table table-dark table-hover text-center align-middle mb-0" id="studentTable">
+        <thead>
+            <tr class="text-info border-bottom border-secondary">
+                <th style="width: 40px;"><input type="checkbox" id="selectAllStudents" class="form-check-input"></th>
+                <th class="py-3 text-end pe-4" style="width: 30%;">البيانات الأساسية للطلاب</th>
+                <th>النوع</th>
+                <th>الديانة</th>
+                <th>حالة القيد</th>
+                <th>موقف الدمج</th>
+                <th class="text-center">إجراءات إدارية</th> 
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            {% for student in students %}
+            <tr class="student-row" data-grade="{{ student.grade.name }}" data-class="{{ student.classroom.name }}">
+                <td><input type="checkbox" class="student-checkbox form-check-input" value="{{ student.id }}"></td>
+                
+                <td class="text-end pe-3">
+                    <div style="display: block;">
+                        <a href="{% url 'add_student' %}?id={{ student.id }}" class="student-link fs-6 fw-bold text-info text-decoration-none d-block mb-1">
+                            {{ student.get_full_name }}
+                        </a>
+                        <span class="badge bg-info text-dark" style="font-size: 0.7rem;">
+                            <i class="bi bi-person-vcard me-1"></i>{{ student.national_id }}
+                        </span>
+                    </div>
+                </td>
 
-    <tbody id="tableBody">
-        {% for student in students %}
-        <tr class="student-row" 
-            data-grade="{{ student.grade.name }}" 
-            data-class="{{ student.classroom.name }}"
-            data-spec="{{ student.specialization.name }}">
-            
-            <td class="text-end pe-3">
-                <div style="display: block;">
-                    <a href="{% url 'add_student' %}?id={{ student.id }}" 
-                    class="student-link fs-6 fw-bold text-info text-decoration-none d-block mb-1">
-                        {{ student.first_name }}
-                    </a>
-                    
-                    <span class="text-white-50 small fw-bold d-block mb-1">
-                        {{ student.last_name }}
-                    </span>
-                    
-                    <span class="badge bg-info text-dark shadow-sm d-inline-block mt-1" 
-                        style="font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; padding: 5px 10px;">
-                        <i class="bi bi-person-vcard me-1 text-dark opacity-75"></i>{{ student.national_id }}
-                    </span>
-                </div>
-            </td>
+                <td class="gender-val">
+                    {% if student.get_gender_display == "بنين" %}
+                        <span class="badge bg-primary-subtle text-primary border border-primary px-2">بنين</span>
+                    {% else %}
+                        <span class="badge bg-warning-subtle text-warning border border-warning px-2">بنات</span>
+                    {% endif %}
+                </td>
 
-            <td class="gender-val">
-                {% if student.get_gender_display == "بنين" %}
-                    <span class="badge bg-primary-subtle text-primary border border-primary px-3 shadow-sm" style="font-size: 0.75rem; font-weight: 700;">
-                        بنين
-                    </span>
-                {% elif student.get_gender_display == "بنات" %}
-                    <span class="badge bg-warning-subtle text-warning border border-warning px-3 shadow-sm" style="font-size: 0.75rem; font-weight: 700;">
-                        بنات
-                    </span>
-                {% else %}
-                    <span class="badge bg-secondary text-white">{{ student.get_gender_display }}</span>
-                {% endif %}
-            </td>
+                <td class="religion-val">{{ student.get_religion_display }}</td>
 
-            <td class="religion-val">{{ student.get_religion_display }}</td>
+                <td><span class="badge bg-primary-subtle text-primary border border-primary">{{ student.get_enrollment_status_display }}</span></td>
 
-            <td>
-                <img src="https://flagcdn.com/16x12/eg.png" class="me-1" alt="Egypt Flag"> 
-                {{ student.nationality }}
-            </td>
+                <td class="integ-val">
+                    {% if student.integration_status %}<span class="badge bg-warning text-dark">دمج</span>{% else %}<span class="text-muted small">عادي</span>{% endif %}
+                </td>
 
-            <td>
-                <span class="badge bg-primary-subtle text-primary border border-primary badge-status">
-                    {{ student.get_enrollment_status_display }}
-                </span>
-            </td>
+                <td class="text-center">
+                    <div class="d-flex justify-content-center gap-1">
+                        <a href="{% url 'add_student' %}?id={{ student.id }}" class="btn btn-sm btn-outline-warning border-0" title="تعديل">
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
 
-            <td class="text-info mono">{{ student.registration_number|default:"---" }}</td>
+                        <button type="button" class="btn btn-sm btn-outline-info border-0" 
+                                onclick="openRemedialModal('{{ student.id }}', '{{ student.get_full_name }}')"
+                                title="إضافة للبرنامج العلاجي">
+                            <i class="bi bi-journal-medical"></i>
+                        </button>
 
-            <td class="integ-val">
-                {% if student.integration_status %}
-                    <span class="badge bg-warning text-dark">دمج ✅</span>
-                {% else %}
-                    <span class="text-muted">لا</span>
-                {% endif %}
-            </td>
-
-            <td class="text-center">
-                <div class="d-flex justify-content-center gap-2">
-                    <a href="{% url 'add_student' %}?id={{ student.id }}" 
-                    class="btn btn-sm btn-outline-warning border-0" 
-                    title="تعديل بيانات الطالب">
-                        <i class="bi bi-pencil-square fs-5"></i>
-                    </a>
-
-                    <a href="{% url 'overdue_calls' %}?student_id={{ student.id }}" 
-                    class="btn btn-sm btn-outline-danger border-0 animate__animated animate__pulse animate__infinite animate__slow" 
-                    title="عرض استحقاقات الطالب: {{ student.get_full_name }}">
-                        <i class="bi bi-bell-fill fs-5"></i>
-                    </a>
-                </div>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-        </table>
-    </div>
+                        <a href="{% url 'overdue_calls' %}?student_id={{ student.id }}" class="btn btn-sm btn-outline-danger border-0" title="المديونية">
+                            <i class="bi bi-bell-fill"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 </div>
 <div class="d-flex justify-content-between align-items-center mt-3 animate__animated animate__fadeInUp">
     <div class="text-white-50 small">
@@ -356,8 +326,44 @@
     </nav>
 </div>
 
+<div class="modal fade" id="quickRemedialModal" tabindex="-1" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-info shadow-lg">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title fw-bold text-info"><i class="bi bi-journal-medical me-2"></i> تسجيل برنامج علاجي</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <form id="remedialForm" method="POST">
+                {% csrf_token %}
+                <div class="modal-body text-end">
+                    <input type="hidden" name="student" id="modal_student_id">
+                    
+                    <p class="mb-3">الطالب: <strong id="modal_student_name" class="text-warning fs-5"></strong></p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small text-info">عدد المواد المتخلف عنها:</label>
+                        <input type="number" name="subjects_count" id="modal_subjects_count" class="form-control bg-black text-white border-secondary text-center fs-4" value="1" min="1" required>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted">أسماء المواد (ملاحظات):</label>
+                        <textarea name="notes" class="form-control bg-black text-white border-secondary" rows="2" placeholder="اكتب أسماء المواد هنا..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-info fw-bold">تأكيد البرنامج العلاجي</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
-// دالة لتحديث الأرقام بحركة (Counter effect)
+// ==========================================
+// 1. أكواد الإحصائيات والفلاتر (Counter Effect)
+// ==========================================
 function animateValue(obj, start, end, duration) {
     let startTimestamp = null;
     const step = (timestamp) => {
@@ -370,7 +376,7 @@ function animateValue(obj, start, end, duration) {
     };
     window.requestAnimationFrame(step);
 }
-// 1. تخزين الأعداد الحقيقية القادمة من السيرفر في متغيرات ثابتة
+
 const TOTAL_SERVER = parseInt("{{ stats.total|default:0 }}");
 const MALE_SERVER = parseInt("{{ stats.male|default:0 }}");
 const FEMALE_SERVER = parseInt("{{ stats.female|default:0 }}");
@@ -379,7 +385,6 @@ const CHRISTIAN_SERVER = parseInt("{{ stats.christian|default:0 }}");
 const INTEG_SERVER = parseInt("{{ stats.integration|default:0 }}");
 
 function runFilters() {
-    // جلب قيم الفلاتر
     let search = document.getElementById("tableSearch").value.toLowerCase();
     let fGrade = document.getElementById("f-grade").value;
     let fClass = document.getElementById("f-class").value;
@@ -388,9 +393,7 @@ function runFilters() {
     let fRelig = document.getElementById("f-religion").value;
     let fInteg = document.getElementById("f-integ").value;
 
-    // فحص: هل المستخدم يقوم بعملية تصفية فعلياً؟
     let isFiltering = search || fGrade || fClass || fSpec || fGender || fRelig || fInteg;
-
     let rows = document.querySelectorAll(".student-row");
     let currentStats = { all: 0, male: 0, female: 0, muslim: 0, christian: 0, integ: 0 };
 
@@ -424,9 +427,7 @@ function runFilters() {
         }
     });
 
-    // المنطق الذكي لتحديث العدادات
     if (!isFiltering) {
-        // إذا لم يكن هناك بحث، اعرض أرقام السيرفر كاملة (36)
         updateCounter("count-all", TOTAL_SERVER);
         updateCounter("count-male", MALE_SERVER);
         updateCounter("count-female", FEMALE_SERVER);
@@ -434,7 +435,6 @@ function runFilters() {
         updateCounter("count-christian", CHRISTIAN_SERVER);
         updateCounter("count-integ", INTEG_SERVER);
     } else {
-        // إذا كان هناك بحث، اعرض نتائج ما هو موجود في الصفحة الحالية فقط
         updateCounter("count-all", currentStats.all);
         updateCounter("count-male", currentStats.male);
         updateCounter("count-female", currentStats.female);
@@ -460,8 +460,62 @@ function updateCounter(id, newValue) {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-    // عند التحميل، تأكد أن الأرقام تعكس أرقام السيرفر أولاً
     runFilters(); 
+});
+
+// ==========================================
+// 2. أكواد النافذة المنبثقة والإرسال (AJAX)
+// ==========================================
+function openRemedialModal(studentId, studentName) {
+    document.getElementById('modal_student_id').value = studentId;
+    document.getElementById('modal_student_name').innerText = studentName;
+    document.getElementById('modal_subjects_count').value = 1;
+    
+    var myModal = new bootstrap.Modal(document.getElementById('quickRemedialModal'));
+    myModal.show();
+}
+
+// كود إرسال البيانات بدون تحديث الصفحة
+document.addEventListener("DOMContentLoaded", function() {
+    const form = document.getElementById('remedialForm');
+    
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault(); // 🚫 يمنع المتصفح من الانتقال لصفحة أخرى
+
+            const formData = new FormData(this);
+            
+            // إرسال البيانات إلى السيرفر في الخلفية
+            fetch("{% url 'save_remedial_from_registry' %}", {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest', // إخبار السيرفر أنه طلب AJAX
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 1. إغلاق النافذة
+                    var modalElement = document.getElementById('quickRemedialModal');
+                    var modal = bootstrap.Modal.getInstance(modalElement);
+                    modal.hide();
+
+                    // 2. إظهار رسالة نجاح
+                    alert(data.message || 'تم تأكيد البرنامج العلاجي بنجاح!');
+                    
+                    // 3. تصفير الحقول للعملية القادمة
+                    form.reset();
+                } else {
+                    alert("حدث خطأ: " + (data.message || 'الرجاء المحاولة مرة أخرى.'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert("تعذر الاتصال بالسيرفر. يرجى التحقق من اتصالك بالإنترنت.");
+            });
+        });
+    }
 });
 </script>
 {% endblock %}

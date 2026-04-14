@@ -61,10 +61,15 @@
                         </div>
                         
                         <div class="d-flex gap-3 mt-5">
+                            {% if next_url %}
+                                <input type="hidden" name="next" value="{{ next_url }}">
+                            {% endif %}
+
                             <button type="submit" class="btn btn-warning btn-lg w-100 fw-bold shadow">
                                 <i class="bi bi-check-circle-fill me-2"></i> حفظ المصروف النثري
                             </button>
-                            <a href="{% url 'daily_cashier_summary' %}" class="btn btn-outline-light btn-lg w-100 fw-bold">
+                            
+                            <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'daily_cashier_summary' %}{% endif %}" class="btn btn-outline-light btn-lg w-100 fw-bold">
                                 <i class="bi bi-arrow-return-right me-2"></i> إلغاء والعودة
                             </a>
                         </div>

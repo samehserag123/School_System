@@ -46,4 +46,6 @@ urlpatterns = [
     path('expenses/add/', views.add_expense_view, name='add_expense_view'), # <--- السطر المطلوب لحل الخطأ الحالي
     path('closures-archive/', views.daily_closures_archive, name='closures_archive'),
     path('closure/<str:closure_id>/', views.closure_detail, name='closure_detail'),
+    path('finance-analytics/', views.finance_analytics_view, name='finance_analytics'),
+    path('my-treasury/', views.my_treasury_view, name='my_treasury'),
 ]

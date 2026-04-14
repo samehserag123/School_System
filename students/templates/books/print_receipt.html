@@ -86,14 +86,14 @@
 
 {% block content %}
 <div class="no-print text-center mb-3">
-    {% if sale.remaining_amount <= 0 %}
+    {% if remaining_amount <= 0 %}
         <button onclick="window.print()" class="btn btn-success btn-lg shadow">
             <i class="bi bi-printer-fill me-2"></i> طباعة الإيصال (تم السداد)
         </button>
     {% else %}
         <div class="alert alert-danger d-inline-block p-3 fw-bold shadow-sm border-2">
             <i class="bi bi-exclamation-octagon-fill me-2"></i> 
-            لا يمكن الطباعة: بانتظار سداد المبلغ بالخزينة (المتبقي: {{ sale.remaining_amount }} ج.م)
+            لا يمكن الطباعة: بانتظار سداد المبلغ بالخزينة (المتبقي للقسم: {{ remaining_amount }} ج.م)
         </div>
         <br>
         <p class="text-muted small mt-2">يرجى التأكد من تسجيل المبلغ في الخزينة مع كتابة <strong>#{{ sale.id }}</strong> في الملاحظات</p>
@@ -102,8 +102,8 @@
 </div>
 
 <div class="receipt-container">
-    <div class="status-watermark {% if sale.remaining_amount <= 0 %}text-paid{% else %}text-pending{% endif %}">
-        {% if sale.remaining_amount <= 0 %} تم السداد {% else %} قيد الانتظار {% endif %}
+    <div class="status-watermark {% if remaining_amount <= 0 %}text-paid{% else %}text-pending{% endif %}">
+        {% if remaining_amount <= 0 %} تم السداد {% else %} قيد الانتظار {% endif %}
     </div>
 
     <div class="d-flex justify-content-between align-items-center border-bottom border-2 border-dark pb-2 mb-3">
@@ -135,14 +135,14 @@
             <tr>
                 <th>بيان الصنف المنصرف</th>
                 <th style="width: 15%;">الكمية</th>
-                <th style="width: 30%;">الموقف المالي</th>
+                <th style="width: 30%;">الموقف المالي للقسم</th>
             </tr>
         </thead>
         <tbody>
             <tr>
                 <td class="text-start px-3">
                     <span class="small fw-bold text-muted">
-                        {% if sale.item.item_type == 'book' %} [ كتاب دراسي ] {% else %} [ زي مدرسي ] {% endif %}
+                        {% if sale.item.item_type == 'book' %} [ باقة الكتب الدراسية ] {% else %} [ باقة الزي المدرسي ] {% endif %}
                     </span>
                     <span class="item-name-bold my-1">
                         {% if sale.item.item_type == 'book' and sale.item.subject %}
@@ -158,11 +158,11 @@
                 <td><span class="fs-2 fw-bold">{{ sale.quantity }}</span></td>
                 <td>
                     <div class="small fw-bold text-end px-2">
-                        <div class="d-flex justify-content-between"><span>إجمالي المطلوب:</span> <span>{{ sale.total_amount }}</span></div>
-                        <div class="d-flex justify-content-between text-success"><span>المسدد بالخزينة:</span> <span>{{ sale.calculated_paid_amount }}</span></div>
-                        <div class="d-flex justify-content-between border-top border-dark mt-1 pt-1 {% if sale.remaining_amount > 0 %}text-danger{% endif %}">
+                        <div class="d-flex justify-content-between"><span>إجمالي المطلوب:</span> <span>{{ total_required }}</span></div>
+                        <div class="d-flex justify-content-between text-success"><span>المسدد بالخزينة:</span> <span>{{ total_paid }}</span></div>
+                        <div class="d-flex justify-content-between border-top border-dark mt-1 pt-1 {% if remaining_amount > 0 %}text-danger{% endif %}">
                             <span>المتبقي:</span> 
-                            <span>{{ sale.remaining_amount }} ج.م</span>
+                            <span>{{ remaining_amount }} ج.م</span>
                         </div>
                     </div>
                 </td>

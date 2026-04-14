@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+{% block title %}عهدتي المالية - {{ request.user.get_full_name|default:request.user.username }}{% endblock %}
+
+{% block content %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+
+    body { 
+        background: radial-gradient(circle at top right, #1e293b, #0f172a); 
+        font-family: 'Cairo', sans-serif; 
+        color: #f8fafc;
+        min-height: 100vh;
+    }
+    
+    /* تخصيص شريط التمرير */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+    /* ألوان النصوص */
+    .text-emerald { color: #10b981 !important; }
+    .text-rose { color: #f43f5e !important; }
+    .text-indigo { color: #818cf8 !important; }
+
+    /* البطاقات الرئيسية */
+    .finance-card { 
+        background: rgba(30, 41, 59, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08); 
+        border-radius: 16px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        overflow: hidden;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .finance-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.35);
+    }
+    
+    .card-header-custom {
+        padding: 1rem 1.25rem;
+        background: rgba(15, 23, 42, 0.7);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* مربعات الإحصائيات (الأرقام) */
+    .stat-box {
+        border-radius: 16px;
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        color: white;
+        z-index: 1;
+        transition: transform 0.3s;
+    }
+    .stat-box:hover { transform: scale(1.02); }
+    .stat-box::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; bottom: 0; left: 0;
+        background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%);
+        z-index: -1;
+    }
+    .stat-revenue { background: linear-gradient(135deg, #059669, #10b981); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .stat-expense { background: linear-gradient(135deg, #e11d48, #f43f5e); border: 1px solid rgba(251, 113, 133, 0.3); }
+    .stat-net { background: linear-gradient(135deg, #4f46e5, #6366f1); border: 1px solid rgba(129, 140, 248, 0.3); }
+
+    .stat-icon {
+        position: absolute;
+        top: 50%;
+        left: -10px;
+        transform: translateY(-50%);
+        font-size: 5rem;
+        opacity: 0.15;
+        z-index: -1;
+    }
+
+    /* الجداول الاحترافية */
+    .pro-table { width: 100%; margin: 0; border-collapse: separate; border-spacing: 0; }
+    .pro-table th { 
+        background: rgba(15, 23, 42, 0.8); 
+        color: #94a3b8; 
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 1rem; 
+        border-bottom: 1px solid rgba(255,255,255,0.08); 
+        white-space: nowrap;
+    }
+    .pro-table td { 
+        padding: 1rem; 
+        border-bottom: 1px solid rgba(255,255,255,0.03); 
+        color: #cbd5e1; 
+        vertical-align: middle; 
+        font-size: 0.95rem;
+    }
+    .pro-table tbody tr { transition: background-color 0.2s ease; }
+    .pro-table tbody tr:hover { background-color: rgba(255,255,255,0.03); }
+    .pro-table tbody tr:last-child td { border-bottom: none; }
+
+    /* الأزرار */
+    .btn-expense {
+        background: linear-gradient(135deg, #e11d48, #f43f5e);
+        color: white;
+        border: none;
+        transition: all 0.3s ease;
+    }
+    .btn-expense:hover { background: linear-gradient(135deg, #be123c, #e11d48); color: white; transform: translateY(-1px); }
+    
+    .btn-print {
+        background: #f8fafc;
+        color: #0f172a;
+        border: none;
+        transition: all 0.3s ease;
+    }
+    .btn-print:hover { background: #e2e8f0; color: #0f172a; transform: translateY(-1px); }
+
+    /* تنسيقات الطباعة */
+    @media print {
+        body { background: #fff !important; color: #000 !important; font-size: 12pt; }
+        .d-print-none, .navbar, .sidebar { display: none !important; }
+        .main-content { margin: 0 !important; padding: 0 !important; }
+        .finance-card { border: 1px solid #ccc !important; box-shadow: none !important; background: #fff !important; margin-bottom: 20px; }
+        .card-header-custom { background: #f8f9fa !important; border-bottom: 2px solid #000 !important; }
+        .card-header-custom h6 { color: #000 !important; font-weight: bold; }
+        .stat-box { border: 1px solid #000 !important; color: #000 !important; background: #fff !important; box-shadow: none !important; }
+        .stat-box h6, .stat-box h2 { color: #000 !important; }
+        .stat-icon { display: none; }
+        .text-emerald, .text-rose, .text-indigo, .text-white, .text-white-50 { color: #000 !important; }
+        .pro-table th { background: #f1f5f9 !important; color: #000 !important; border-bottom: 2px solid #000 !important; }
+        .pro-table td { color: #000 !important; border-bottom: 1px solid #e2e8f0 !important; }
+        .badge { border: 1px solid #000; color: #000 !important; background: transparent !important; }
+        .print-header { display: block !important; text-align: center; margin-bottom: 25px; border-bottom: 2px solid #000; padding-bottom: 15px; }
+        .table-responsive { max-height: none !important; overflow: visible !important; }
+    }
+    .print-header { display: none; }
+</style>
+
+<div class="container-fluid mt-4 mb-5" dir="rtl">
+    
+    <!-- ترويسة الطباعة -->
+    <div class="print-header">
+        <h2 class="fw-bold mb-3">كشف حركة درج المحصل (قبل التوريد)</h2>
+        <h5 class="mb-2">الموظف: {{ request.user.get_full_name|default:request.user.username }}</h5>
+        <p class="mb-0 text-muted">وقت وتاريخ الطباعة: {% now "Y-m-d h:i A" %}</p>
+    </div>
+
+    <!-- التحكم والإجراءات -->
+    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none flex-wrap gap-3">
+        <h3 class="text-white fw-bold mb-0">
+            <i class="bi bi-person-bounding-box text-indigo me-2"></i> حركة خزينتي اليومية
+        </h3>
+        
+        <div class="d-flex gap-2 flex-wrap">
+            <!-- زر تسجيل مصروف نثري فقط (مباشر بدون قائمة منسدلة) مع تمرير رابط العودة -->
+            <a href="{% url 'add_expense_view' %}?type=petty&next={% url 'my_treasury' %}" class="btn btn-expense rounded-pill px-4 shadow-sm fw-bold">
+                <i class="bi bi-cup-hot me-1"></i> تسجيل مصروف نثري
+            </a>
+
+            <!-- زر الطباعة -->
+            <button onclick="window.print()" class="btn btn-print rounded-pill px-4 shadow-sm fw-bold">
+                <i class="bi bi-printer-fill me-1"></i> طباعة كشف التوريد
+            </button>
+        </div>
+    </div>
+
+    <!-- مربعات الإحصائيات -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="stat-box stat-revenue">
+                <i class="bi bi-graph-up-arrow stat-icon"></i>
+                <h6 class="text-white-50 fw-bold mb-2">إجمالي الإيرادات (التحصيلات)</h6>
+                <h2 class="fw-bold text-white mb-0">+ {{ total_collected|default:"0.00" }} <small class="fs-6 fw-normal">ج.م</small></h2>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-box stat-expense">
+                <i class="bi bi-graph-down-arrow stat-icon"></i>
+                <h6 class="text-white-50 fw-bold mb-2">إجمالي المدفوعات (المصروفات)</h6>
+                <h2 class="fw-bold text-white mb-0">- {{ total_spent|default:"0.00" }} <small class="fs-6 fw-normal">ج.م</small></h2>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-box stat-net">
+                <i class="bi bi-safe2 stat-icon"></i>
+                <h6 class="text-white-50 fw-bold mb-2">صافي التوريد المطلوب للدرج</h6>
+                <h2 class="fw-bold text-white mb-0">{{ net_required|default:"0.00" }} <small class="fs-6 fw-normal">ج.م</small></h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- الجداول -->
+    <div class="row g-4">
+        <!-- جدول الإيرادات -->
+        <div class="col-lg-7">
+            <div class="finance-card h-100">
+                <div class="card-header-custom">
+                    <h6 class="mb-0 text-emerald fw-bold"><i class="bi bi-receipt me-2"></i> الإيصالات المحصلة</h6>
+                    <span class="badge bg-emerald bg-opacity-25 text-emerald border border-emerald rounded-pill px-3 py-2">{{ my_ledgers.count }} حركة</span>
+                </div>
+                <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+                    <table class="table table-borderless pro-table mb-0">
+                        <thead class="position-sticky top-0" style="z-index: 1;">
+                            <tr>
+                                <th>الإيصال / البيان</th>
+                                <th>الوقت</th>
+                                <th class="text-end">المبلغ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in my_ledgers %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-white">حركة #{{ item.receipt_number|default:item.id }}</div>
+                                    <small class="text-muted d-block mt-1">{{ item.category }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-dark text-light border border-secondary">{{ item.date|time:"h:i A" }}</span>
+                                </td>
+                                <td class="text-end fw-bold text-emerald">+{{ item.amount }} ج.م</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center p-5">
+                                    <i class="bi bi-inbox fs-1 text-muted opacity-50 mb-3 d-block"></i>
+                                    <span class="text-muted">لم تقم بأي عمليات تحصيل حتى الآن.</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- جدول المصروفات -->
+        <div class="col-lg-5">
+            <div class="finance-card h-100">
+                <div class="card-header-custom">
+                    <h6 class="mb-0 text-rose fw-bold"><i class="bi bi-wallet2 me-2"></i> المصروفات النثرية المنفذة</h6>
+                    <span class="badge bg-rose bg-opacity-25 text-rose border border-rose rounded-pill px-3 py-2">{{ my_expenses.count }} حركة</span>
+                </div>
+                <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+                    <table class="table table-borderless pro-table mb-0">
+                        <thead class="position-sticky top-0" style="z-index: 1;">
+                            <tr>
+                                <th>بيان الصرف</th>
+                                <th class="text-end">المبلغ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for exp in my_expenses %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-white">{{ exp.title }}</div>
+                                    <span class="badge bg-secondary bg-opacity-50 text-light mt-1" style="font-size: 0.7rem;">مصروف نثري</span>
+                                </td>
+                                <td class="text-end fw-bold text-rose">-{{ exp.amount }} ج.م</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="2" class="text-center p-5">
+                                    <i class="bi bi-cup-hot fs-1 text-muted opacity-50 mb-3 d-block"></i>
+                                    <span class="text-muted">لا توجد أي مصروفات مسجلة اليوم.</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- جزء التوقيعات (يظهر في الطباعة فقط) -->
+    <div class="d-none d-print-block mt-5 pt-5">
+        <div class="row text-center mt-4">
+            <div class="col-6">
+                <p class="fw-bold mb-5 fs-5">توقيع الموظف (المُقر بالعهدة)</p>
+                <p class="text-muted">.....................................................</p>
+            </div>
+            <div class="col-6">
+                <p class="fw-bold mb-5 fs-5">توقيع أمين الخزينة المستلم</p>
+                <p class="text-muted">.....................................................</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
