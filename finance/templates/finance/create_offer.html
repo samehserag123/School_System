@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+
+{% block title %}إنشاء عروض ترويجية وخصومات{% endblock %}
+
+{% block content %}
+<style>
+.input-group .btn-warning {
+    border-radius: 0 12px 12px 0;
+}
+
+.input-group .form-control {
+    border-radius: 12px 0 0 12px;
+}
+</style>
+<div class="container py-5" dir="rtl">
+
+    <div class="text-center mb-4">
+        <h2 class="fw-bold text-warning">
+            <i class="bi bi-stars me-2"></i> نظام إدارة كوبونات الخصم 
+        </h2>
+        <p class="text-light">إنشاء وإدارة الخصومات الطلابيه  </p>
+    </div>
+
+    <div class="card main-card border-0 shadow-lg">
+
+        <div class="card-header custom-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold fs-5">
+                <i class="bi bi-tags-fill me-2"></i> إعداد عرض جديد
+            </span>
+            <span class="badge badge-glow" id="offerBadge">عرض عام</span>
+        </div>
+
+        <div class="card-body p-4">
+
+            <!-- Tabs -->
+            <ul class="nav nav-pills nav-fill mb-4 gap-2 p-2 tabs-container" id="offerTabs">
+                <li class="nav-item">
+                    <button class="nav-link active" onclick="setOfferType('general','عرض عام', event)">كوبون عام</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="setOfferType('early_pay','تعجيل الدفع', event)">تعجيل الدفع</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="setOfferType('full_pay','سداد شامل', event)">السداد الكامل</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="setOfferType('new_student','طلاب جدد', event)">طلاب جدد</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="setOfferType('specific_student','طالب محدد', event)">طالب محدد</button>
+                </li>
+            </ul>
+
+            <!-- Description -->
+            <div id="offerDescription" class="info-box mb-4">
+                <span>هذا العرض يمكن استخدامه بواسطة أي طالب يمتلك الكود الصحيح.</span>
+            </div>
+
+            <!-- Form -->
+            <form method="POST" action="{% url 'create_offer' %}">
+                {% csrf_token %}
+                <input type="hidden" name="offer_type" id="hiddenOfferType" value="general">
+
+                <div class="row g-4">
+
+                    <div class="input-group">
+                        <input type="text" id="offerCode" name="code" class="form-control custom-input" required placeholder="اضغط توليد">
+                        
+                        <button type="button" class="btn btn-warning fw-bold" onclick="generateCode()">
+                            <i class="bi bi-magic"></i> توليد
+                        </button>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label label-custom">نوع الخصم</label>
+                        <select name="discount_type" class="form-select custom-input">
+                            <option value="percentage">نسبة %</option>
+                            <option value="fixed">قيمة ثابتة</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label label-custom">قيمة الخصم</label>
+                        <input type="number" name="discount_value" class="form-control custom-input" required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label label-custom">تاريخ البداية</label>
+                        <input type="date" name="start_date" class="form-control custom-input" value="{% now 'Y-m-d' %}">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label label-custom">تاريخ النهاية</label>
+                        <input type="date" name="expiry_date" class="form-control custom-input">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label label-custom">عدد الاستخدام</label>
+                        <input type="number" name="usage_limit" class="form-control custom-input" value="100">
+                    </div>
+
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label label-custom">أماكن الدفع المشمولة</label>
+                        <div class="d-flex gap-3 custom-input p-2 rounded" style="background: #111;">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="payment_places" value="all" id="placeAll" checked>
+                                <label class="form-check-label text-light" for="placeAll">جميع الأماكن</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="payment_places" value="website" id="placeWeb">
+                                <label class="form-check-label text-light" for="placeWeb">الموقع الإلكتروني</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="payment_places" value="branch_1" id="placeBranch1">
+                                <label class="form-check-label text-light" for="placeBranch1">الفرع الرئيسي</label>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-light fw-bold">مكان التحصيل الحالي:</label>
+                                
+                                <div class="form-control bg-dark text-white-50 border-secondary" readonly>
+                                    <i class="bi bi-geo-alt-fill text-danger me-1"></i> 
+                                    {{ request.user.profile.branch.name|default:"لم يتم تحديد مكان" }}
+                                </div>
+                                
+                                <small class="text-success mt-1 d-block">
+                                    <i class="bi bi-shield-lock"></i> محدد تلقائياً حسب صلاحياتك
+                                </small>
+                            </div>
+                            </div>
+                    </div>
+
+                    <!-- Students -->
+                    <div class="col-md-12 d-none" id="specificStudentSection">
+                        <div class="student-box">
+
+                            <label class="form-label text-success fw-bold mb-2">
+                                🔍 البحث عن طالب
+                            </label>
+
+                            <!-- 🔥 Search -->
+                            <input type="text" id="studentSearch" class="form-control custom-input mb-3" placeholder="اكتب اسم الطالب...">
+
+                            <select name="target_students" id="studentSelect" class="form-select custom-input" multiple style="height:200px;">
+                                {% for student in students %}
+                                <option value="{{ student.id }}">
+                                    {{ student.first_name }} {{ student.last_name }} ({{ student.id }})
+                                </option>
+                                {% endfor %}
+                            </select>
+
+                        </div>
+                    </div>
+
+                </div>
+
+                <hr class="my-4">
+
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn btn-warning btn-lg flex-grow-1 fw-bold shadow">
+                        حفظ العرض
+                    </button>
+                    <a href="{% url 'finance_dashboard' %}" class="btn btn-outline-light btn-lg">
+                        إلغاء
+                    </a>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<style>
+body {
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+}
+
+.label-custom {
+    color: #ffc107;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.main-card {
+    background: rgba(20,20,20,0.95);
+    border-radius: 20px;
+}
+
+.custom-header {
+    background: linear-gradient(45deg, #ffc107, #ff9800);
+    color: #000;
+}
+
+.badge-glow {
+    background: #000;
+    color: #ffc107;
+    box-shadow: 0 0 10px #ffc107;
+}
+
+.tabs-container {
+    background: rgba(0,0,0,0.4);
+    border-radius: 15px;
+}
+
+.nav-pills .nav-link {
+    color: #ccc;
+}
+
+.nav-pills .nav-link.active {
+    background: #ffc107 !important;
+    color: #000 !important;
+}
+
+.custom-input {
+    background: #111;
+    color: #fff;
+    border: 1px solid #444;
+}
+
+.custom-input:focus {
+    border-color: #ffc107;
+    box-shadow: 0 0 8px #ffc107;
+}
+
+.info-box {
+    background: rgba(0,123,255,0.1);
+    padding: 10px;
+    border-radius: 10px;
+    color: #ddd;
+}
+
+.student-box {
+    background: rgba(0,255,100,0.05);
+    padding: 15px;
+    border-radius: 12px;
+}
+</style>
+
+<script>
+function setOfferType(type, label, event) {
+
+    document.getElementById('hiddenOfferType').value = type;
+    document.getElementById('offerBadge').innerText = label;
+
+    document.querySelectorAll('#offerTabs .nav-link').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.currentTarget.classList.add('active');
+
+    const studentSection = document.getElementById('specificStudentSection');
+    if (type === 'specific_student') {
+        studentSection.classList.remove('d-none');
+    } else {
+        studentSection.classList.add('d-none');
+    }
+}
+
+
+function generateCode() {
+
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let result = "OFF-";
+
+    for (let i = 0; i < 5; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    document.getElementById("offerCode").value = result;
+}
+
+
+/* 🔥 Search Filter */
+document.getElementById('studentSearch')?.addEventListener('keyup', function () {
+    let filter = this.value.toLowerCase();
+    let options = document.getElementById('studentSelect').options;
+
+    for (let i = 0; i < options.length; i++) {
+        let text = options[i].text.toLowerCase();
+        options[i].style.display = text.includes(filter) ? "" : "none";
+    }
+});
+</script>
+
+{% endblock %}

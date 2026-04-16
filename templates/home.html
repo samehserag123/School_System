@@ -227,57 +227,59 @@
                 {% endif %}
             </ul>
         </li>
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+            <i class="bi bi-cash-stack me-1"></i> الإدارة المالية
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
+            
+            {# --- 1. سجل الطلاب وأنظمة التقسيط --- #}
+            {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                <li><a class="dropdown-item" href="{% url 'student_list' %}"><i class="bi bi-wallet2 icon-finance"></i> سجل الطلاب المالي</a></li>
+                <li><a class="dropdown-item" href="{% url 'installment_plan_list' %}"><i class="bi bi-clipboard-data-fill icon-finance"></i> إدارة أنظمة التقسيط</a></li>
+            {% else %}
+                <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-wallet2 text-muted"></i> سجل الطلاب المالي <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-clipboard-data-fill text-muted"></i> إدارة أنظمة التقسيط <i class="bi bi-lock-fill ms-auto"></i></a></li>
+            {% endif %}
 
-        <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                <i class="bi bi-cash-stack me-1"></i> الإدارة المالية
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
-                
-                {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
-                    <li><a class="dropdown-item" href="{% url 'student_list' %}"><i class="bi bi-wallet2 icon-finance"></i> سجل الطلاب المالي</a></li>
-                    <li><a class="dropdown-item" href="{% url 'installment_plan_list' %}"><i class="bi bi-clipboard-data-fill icon-finance"></i> إدارة أنظمة التقسيط</a></li>
-                {% else %}
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-wallet2 text-muted"></i> سجل الطلاب المالي <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-clipboard-data-fill text-muted"></i> إدارة أنظمة التقسيط <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                {% endif %}
+            {# --- 2. المتأخرات والبرنامج العلاجي --- #}
+            {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or "Call_Center" in user.groups.all.0.name or "Student_Affairs" in user.groups.all.0.name %}
+                <li><a class="dropdown-item" href="{% url 'overdue_calls' %}"><i class="bi bi-telephone-exclamation-fill icon-danger"></i> استحقاقات المتأخرة</a></li>
+                <li><a class="dropdown-item" href="{% url 'remedial_dashboard' %}"><i class="bi bi-journal-medical text-primary"></i> تحصيلات البرنامج العلاجي</a></li>
+            {% else %}
+                <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-telephone-exclamation-fill text-muted"></i> استحقاقات المتأخرة <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-journal-medical text-muted"></i> تحصيلات البرنامج العلاجي <i class="bi bi-lock-fill ms-auto"></i></a></li>
+            {% endif %}
 
-                {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or "Call_Center" in user.groups.all.0.name or "Student_Affairs" in user.groups.all.0.name %}
-                    <li><a class="dropdown-item" href="{% url 'overdue_calls' %}"><i class="bi bi-telephone-exclamation-fill icon-danger"></i> استحقاقات المتأخرة</a></li>
-                    <li><a class="dropdown-item" href="{% url 'remedial_dashboard' %}"><i class="bi bi-journal-medical text-primary"></i> تحصيلات البرنامج العلاجي</a></li>
-                {% else %}
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-telephone-exclamation-fill text-muted"></i> استحقاقات المتأخرة <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-journal-medical text-muted"></i> تحصيلات البرنامج العلاجي <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                {% endif %}
+            <li><hr class="dropdown-divider border-secondary opacity-25"></li>
 
+            {# --- 3. حركة الخزينة والجرد --- #}
+            {% if user.is_superuser or "Finance_Treasury" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                <li><a class="dropdown-item" href="{% url 'misc_revenue' %}"><i class="bi bi-piggy-bank-fill icon-finance"></i> الإيرادات المتنوعة</a></li>
+                <li><a class="dropdown-item" href="{% url 'my_treasury' %}"><i class="bi bi-person-bounding-box text-info"></i> حركة خزينتي (التوريد)</a></li>
+                <li><a class="dropdown-item" href="{% url 'daily_cashier_summary' %}"><i class="bi bi-safe2-fill icon-admin"></i> جرد وإغلاق الخزينة</a></li>
+            {% else %}
+                <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-piggy-bank-fill text-muted"></i> الإيرادات المتنوعة <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-person-bounding-box text-muted"></i> حركة خزينتي (التوريد) <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-safe2-fill text-muted"></i> جرد وإغلاق الخزينة <i class="bi bi-lock-fill ms-auto"></i></a></li>
+            {% endif %}
+
+            {# --- 4. المصروفات النثرية والداشبورد (مقيدة للمديرين فقط) --- #}
+            {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                <li><a class="dropdown-item" href="{% url 'add_expense_view' %}?type=petty"><i class="bi bi-cup-hot text-warning"></i> مصروفات نثرية</a></li>
+                <li><a class="dropdown-item" href="{% url 'finance_dashboard' %}"><i class="bi bi-pie-chart-fill icon-student"></i> الداشبورد المالي</a></li>
+            {% else %}
+                <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-cup-hot text-muted"></i> مصروفات نثرية <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-pie-chart-fill text-muted"></i> الداشبورد المالي <i class="bi bi-lock-fill ms-auto"></i></a></li>
+            {% endif %}
+
+            {# --- 5. الإغلاق الشهري (للسوبر أدمن فقط) --- #}
+            {% if user.is_superuser %}
                 <li><hr class="dropdown-divider border-secondary opacity-25"></li>
-
-                {% if user.is_superuser or "Finance_Treasury" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
-                    <li><a class="dropdown-item" href="{% url 'misc_revenue' %}"><i class="bi bi-piggy-bank-fill icon-finance"></i> الإيرادات المتنوعة</a></li>
-                    <li><a class="dropdown-item" href="{% url 'my_treasury' %}"><i class="bi bi-person-bounding-box text-info"></i> حركة خزينتي (التوريد)</a></li>
-                    <li><a class="dropdown-item" href="{% url 'daily_cashier_summary' %}"><i class="bi bi-safe2-fill icon-admin"></i> جرد وإغلاق الخزينة</a></li>
-                {% else %}
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-piggy-bank-fill text-muted"></i> الإيرادات المتنوعة <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-person-bounding-box text-muted"></i> حركة خزينتي (التوريد) <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-safe2-fill text-muted"></i> جرد وإغلاق الخزينة <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                {% endif %}
-
-                {% if user.is_superuser %}
-                    <li><a class="dropdown-item" href="{% url 'add_expense_view' %}?type=petty"><i class="bi bi-cup-hot text-warning"></i> مصروفات نثرية</a></li>
-                    <li><a class="dropdown-item" href="{% url 'add_expense_view' %}?type=general"><i class="bi bi-building-gear text-danger"></i> مصروفات عمومية</a></li>
-                {% else %}
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-cup-hot text-muted"></i> مصروفات نثرية <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-building-gear text-muted"></i> مصروفات عمومية <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                {% endif %}
-
-                {% if user.is_superuser or "Finance_Treasury" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
-                    <li><a class="dropdown-item" href="{% url 'finance_dashboard' %}"><i class="bi bi-pie-chart-fill icon-student"></i> الداشبورد المالي</a></li>
-                {% else %}
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-pie-chart-fill text-muted"></i> الداشبورد المالي <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                {% endif %}
-            </ul>
-        </li>
-
+                <li><a class="dropdown-item text-danger fw-bold" href="{% url 'close_month' %}"><i class="bi bi-lock-fill me-1"></i> نظام الإغلاق الشهري</a></li>
+            {% endif %}
+        </ul>
+    </li>
         <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                 <i class="bi bi-grid-fill me-1"></i> الخدمات المدرسية
@@ -304,34 +306,40 @@
         </li>
 
         <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                <i class="bi bi-gear-fill me-1"></i> النظام والإحصاء
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
-                
-                {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
-                    <li><a class="dropdown-item" href="{% url 'students_analytics' %}"><i class="bi bi-graph-up-arrow icon-finance"></i> التحليل الإحصائي العام</a></li>
-                {% else %}
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-graph-up-arrow text-muted"></i> التحليل الإحصائي العام <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                {% endif %}
+    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+        <i class="bi bi-gear-fill me-1"></i> النظام والإحصاء
+    </a>
+    <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
+        
+        {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+            <li><a class="dropdown-item" href="{% url 'students_analytics' %}"><i class="bi bi-graph-up-arrow icon-finance"></i> التحليل الإحصائي العام</a></li>
+        {% else %}
+            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-graph-up-arrow text-muted"></i> التحليل الإحصائي العام <i class="bi bi-lock-fill ms-auto"></i></a></li>
+        {% endif %}
 
-                {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
-                    <li><a class="dropdown-item" href="{% url 'receipt_books_list' %}"><i class="bi bi-journals icon-services"></i> دفاتر الإيصالات المرجعية</a></li>
-                {% else %}
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-journals text-muted"></i> دفاتر الإيصالات المرجعية <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                {% endif %}
+        {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+            <li><a class="dropdown-item" href="{% url 'receipt_books_list' %}"><i class="bi bi-journals icon-services"></i> دفاتر الإيصالات المرجعية</a></li>
+        {% else %}
+            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-journals text-muted"></i> دفاتر الإيصالات المرجعية <i class="bi bi-lock-fill ms-auto"></i></a></li>
+        {% endif %}
 
-                <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+        {% if user.is_superuser %}
+            <li><a class="dropdown-item" href="{% url 'create_offer' %}"><i class="bi bi-tags-fill text-warning"></i> إنشاء العروض والخصومات</a></li>
+        {% else %}
+            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-tags-fill text-muted"></i> إنشاء العروض والخصومات <i class="bi bi-lock-fill ms-auto"></i></a></li>
+        {% endif %}
 
-                {% if user.is_superuser %}
-                    <li><a class="dropdown-item" href="{% url 'archives_list' %}"><i class="bi bi-archive-fill icon-admin"></i> أرشيف السنوات السابقة</a></li>
-                    <li><a class="dropdown-item" href="/admin/"><i class="bi bi-shield-lock-fill icon-danger"></i> لوحة تحكم الإدارة (Admin)</a></li>
-                {% else %}
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-archive-fill text-muted"></i> أرشيف السنوات السابقة <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-shield-lock-fill text-muted"></i> لوحة تحكم الإدارة (Admin) <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                {% endif %}
-            </ul>
-        </li>
+        <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+
+        {% if user.is_superuser %}
+            <li><a class="dropdown-item" href="{% url 'archives_list' %}"><i class="bi bi-archive-fill icon-admin"></i> أرشيف السنوات السابقة</a></li>
+            <li><a class="dropdown-item" href="/admin/"><i class="bi bi-shield-lock-fill icon-danger"></i> لوحة تحكم الإدارة (Admin)</a></li>
+        {% else %}
+            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-archive-fill text-muted"></i> أرشيف السنوات السابقة <i class="bi bi-lock-fill ms-auto"></i></a></li>
+            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-shield-lock-fill text-muted"></i> لوحة تحكم الإدارة (Admin) <i class="bi bi-lock-fill ms-auto"></i></a></li>
+        {% endif %}
+    </ul>
+</li>
 
         {% endif %} 
     </ul>

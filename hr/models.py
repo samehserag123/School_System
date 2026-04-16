@@ -1,100 +1,107 @@
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 
+# 1. الإدارات
 class Department(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="اسم القسم")
-    description = models.TextField(null=True, blank=True, verbose_name="وصف القسم")
+    manager = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_departments')
 
     def __str__(self):
         return self.name
 
+# 2. القواعد العامة (هنا تضع قوانين الشركة)
+class AttendanceRule(models.Model):
+    name = models.CharField(max_length=100, verbose_name="اسم القاعدة (مثلاً: الدوام الصباحي)")
+    
+    # مواعيد العمل
+    work_start_time = models.TimeField(verbose_name="موعد الحضور الرسمي")
+    work_end_time = models.TimeField(verbose_name="موعد الانصراف الرسمي")
+    
+    # قوانين التأخير والإضافي
+    grace_period = models.PositiveIntegerField(default=15, verbose_name="فترة السماح (بالدقائق)")
+    deduction_multiplier = models.FloatField(default=1.0, verbose_name="معامل الخصم (ساعة التأخير بـ X ساعة)")
+    overtime_multiplier = models.FloatField(default=1.5, verbose_name="معامل الإضافي (ساعة الإضافي بـ X ساعة)")
+
+    # تحديد أيام العمل (True يعني يوم عمل، False يعني يوم إجازة)
+    monday = models.BooleanField(default=True, verbose_name="الاثنين")
+    tuesday = models.BooleanField(default=True, verbose_name="الثلاثاء")
+    wednesday = models.BooleanField(default=True, verbose_name="الأربعاء")
+    thursday = models.BooleanField(default=True, verbose_name="الخميس")
+    friday = models.BooleanField(default=False, verbose_name="الجمعة")
+    saturday = models.BooleanField(default=False, verbose_name="السبت")
+    sunday = models.BooleanField(default=True, verbose_name="الأحد")
+
     class Meta:
-        verbose_name = "قسم"
-        verbose_name_plural = "الأقسام"
+        verbose_name = "قاعدة حضور"
+        verbose_name_plural = "قواعد الحضور"
 
+    def __str__(self):
+        return self.name
 
+    def is_working_day(self, date_obj):
+        """وظيفة ذكية للتحقق هل التاريخ الممرر هو يوم عمل في هذه القاعدة أم لا"""
+        day_name = date_obj.strftime('%A').lower()  # يعطي اسم اليوم بالإنجليزية lowercase
+        return getattr(self, day_name, False)
+
+# 3. الموظف (تم تحديثه ليدعم الحالات الخاصة)
 class Employee(models.Model):
-    DAYS_OF_WEEK = [
-        ('Sunday', 'الأحد'),
-        ('Monday', 'الإثنين'),
-        ('Tuesday', 'الثلاثاء'),
-        ('Wednesday', 'الأربعاء'),
-        ('Thursday', 'الخميس'),
-        ('Friday', 'الجمعة'),
-        ('Saturday', 'السبت'),
-    ]
-
     emp_id = models.CharField(max_length=50, unique=True, verbose_name="رقم البصمة")
     name = models.CharField(max_length=100, verbose_name="اسم الموظف")
-    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="القسم")
-    job_title = models.CharField(max_length=100, null=True, blank=True, verbose_name="المسمى الوظيفي")
-    contract_date = models.DateField(null=True, blank=True, verbose_name="تاريخ التعاقد")
+    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, verbose_name="القسم")
     
-    base_salary = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="الراتب الأساسي")
-    hourly_rate = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="أجر الساعة")
+    # ربط الموظف بقاعدة حضور محددة (الحالة الخاصة)
+    attendance_rule = models.ForeignKey(AttendanceRule, on_delete=models.PROTECT, verbose_name="نظام الحضور المطبق")
     
-    social_insurance = models.DecimalField(max_digits=8, decimal_places=2, default=0, verbose_name="قيمة التأمينات الاجتماعية")
-    medical_insurance = models.DecimalField(max_digits=8, decimal_places=2, default=0, verbose_name="قيمة التأمين الطبي")
-    penalties = models.DecimalField(max_digits=8, decimal_places=2, default=0, verbose_name="الجزاءات")
-    loans = models.DecimalField(max_digits=8, decimal_places=2, default=0, verbose_name="السلفيات") 
+    is_active = models.BooleanField(default=True, verbose_name="على رأس العمل")
+    base_salary = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="الراتب الأساسي")
     
-    annual_leave_balance = models.IntegerField(default=21, verbose_name="رصيد الإجازات السنوية")
-    casual_leave_balance = models.IntegerField(default=6, verbose_name="رصيد الإجازات العارضة")
-    weekly_day_off = models.CharField(max_length=20, choices=DAYS_OF_WEEK, default='Friday', verbose_name="يوم الإجازة الأسبوعية (Day Off)")
+    # أرصدة الإجازات
+    annual_balance = models.FloatField(default=21)
+    casual_balance = models.FloatField(default=6)
 
     def __str__(self):
-        return f"{self.name} - {self.emp_id}"
+        return self.name
+
+# 4. سجل البصمة الخام (لرفع الملف بسهولة)
+class FingerprintLog(models.Model):
+    emp_id = models.CharField(max_length=50, verbose_name="رقم البصمة")
+    timestamp = models.DateTimeField(verbose_name="وقت البصمة")
+    device_id = models.CharField(max_length=50, null=True, blank=True)
 
     class Meta:
-        verbose_name = "موظف"
-        verbose_name_plural = "الموظفين"
+        verbose_name = "سجل البصمة الخام"
+        # لمنع تكرار نفس البصمة عند رفع الملف مرتين
+        unique_together = ('emp_id', 'timestamp')
 
-# ================= الجدول الجديد: أرشيف المرتبات =================
-class PayrollArchive(models.Model):
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, verbose_name="الموظف")
-    month = models.IntegerField(verbose_name="شهر الاستحقاق")
-    year = models.IntegerField(verbose_name="سنة الاستحقاق")
+# 5. الحضور والانصراف (الناتج المعالج)
+class DailyAttendance(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    date = models.DateField()
+    check_in = models.TimeField(null=True, blank=True)
+    check_out = models.TimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=[
+        ('present', 'حاضر'),
+        ('absent', 'غائب'),
+        ('leave', 'إجازة'),
+        ('holiday', 'عطلة رسمية'),
+    ])
+    late_minutes = models.IntegerField(default=0)
+    overtime_hours = models.FloatField(default=0)
+
+    class Meta:
+        unique_together = ('employee', 'date')
+
+# 6. سجل الإجازات الاحترافي
+class LeaveRequest(models.Model):
+    TYPES = [('annual', 'سنوية'), ('casual', 'عارضة'), ('sick', 'مرضي'), ('unpaid', 'بدون أجر')]
+    STATUS = [('pending', 'قيد الانتظار'), ('approved', 'مقبولة'), ('rejected', 'مرفوضة')]
     
-    base_salary = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="الأساسي وقتها")
-    days_present = models.IntegerField(verbose_name="أيام الحضور")
-    # الحقل الجديد لحفظ الإجازات في الأرشيف
-    lateness_deduction = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="خصم التأخير")
-    leaves_taken = models.IntegerField(verbose_name="إجازات الشهر", default=0)
-    absent_days = models.IntegerField(verbose_name="الغياب الفعلي")
-    absence_deduction = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="خصم الغياب")
-    penalties = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="الجزاءات المخصومة")
-    loans = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="السلف المخصومة")
-    insurances = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="التأمينات المخصومة")
-    net_salary = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="صافي الراتب المستحق")
-    archived_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الترحيل")
-
-    class Meta:
-        verbose_name = "سجل مرتب مرحل"
-        verbose_name_plural = "أرشيف المرتبات"
-        unique_together = ('employee', 'month', 'year')
-
-    def __str__(self):
-        return f"مرتب {self.employee.name} - {self.month}/{self.year}"
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    leave_type = models.CharField(max_length=10, choices=TYPES)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    status = models.CharField(max_length=10, choices=STATUS, default='pending')
     
-
-# أضف هذا في نهاية ملف hr/models.py
-class Leave(models.Model):
-    LEAVE_TYPES = [
-        ('Annual', 'إجازة سنوية'),
-        ('Casual', 'إجازة عارضة'),
-        ('Sick', 'إجازة مرضية'),
-        ('Unpaid', 'إجازة بدون أجر'),
-    ]
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, verbose_name="الموظف")
-    leave_type = models.CharField(max_length=20, choices=LEAVE_TYPES, verbose_name="نوع الإجازة")
-    start_date = models.DateField(verbose_name="من تاريخ")
-    end_date = models.DateField(verbose_name="إلى تاريخ")
-    days = models.IntegerField(verbose_name="عدد الأيام")
-    notes = models.TextField(null=True, blank=True, verbose_name="ملاحظات/السبب")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"إجازة {self.employee.name} - {self.days} أيام"
-
-    class Meta:
-        verbose_name = "إجازة"
-        verbose_name_plural = "سجل الإجازات"
+    @property
+    def duration(self):
+        return (self.end_date - self.start_date).days + 1

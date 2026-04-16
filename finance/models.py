@@ -9,7 +9,7 @@ from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-
+from django.contrib import admin 
 
 # =====================================================
 # السنة الدراسية
@@ -359,7 +359,6 @@ class StudentAccount(models.Model):
             if new_installments:
                 StudentInstallment.objects.bulk_create(new_installments)
                 
-        return True
 
 
 class Payment(models.Model):
@@ -441,24 +440,25 @@ class Payment(models.Model):
                 raise ValidationError("🚨 خطأ أمني: هذا الإيصال تم إغلاقه في الخزينة، لا يمكن تعديله.")
 
     def save(self, *args, **kwargs):
+        # 1. تجهيز البيانات قبل الحفظ
         is_new = not self.pk
         if self.student and not self.academic_year:
             self.academic_year = self.student.academic_year
 
+        # 2. عملية الحفظ داخل Transaction لضمان سلامة البيانات المالية
         with transaction.atomic():
+            # الحفظ الأساسي للإيصال
             super(Payment, self).save(*args, **kwargs)
             
             if self.student:
-                # 1. جلب بيانات الفئة والفئة الأم
+                # التحقق من فئة الإيراد
                 category = self.revenue_category
-                # نتحقق هل اسم الفئة أو اسم الفئة الرئيسية (Parent) يحتوي على كلمة "المصروفات"
                 is_educational_fee = False
                 if category:
-                    # التحقق من الفئة نفسها أو الفئة الأم
                     if "المصروفات" in category.name or (category.parent and "المصروفات" in category.parent.name):
                         is_educational_fee = True
                 
-                # 2. تحديث القسط المربوط يدوياً
+                # أ- إذا كان الإيصال مربوطاً بقسط محدد يدوياً
                 if self.installment:
                     inst = self.installment
                     total = Payment.objects.filter(installment=inst).aggregate(models.Sum('amount_paid'))['amount_paid__sum'] or 0
@@ -466,7 +466,7 @@ class Payment(models.Model):
                     inst.status = 'Paid' if inst.paid_amount >= inst.amount_due else 'Partial'
                     inst.save()
 
-                # 3. الخصم التلقائي لأي فئة تابعة للمصروفات
+                # ب- الخصم التلقائي (فقط للإيصالات الجديدة التابعة للمصروفات)
                 elif is_new and is_educational_fee:
                     open_installments = StudentInstallment.objects.filter(
                         student=self.student,
@@ -474,6 +474,8 @@ class Payment(models.Model):
                     ).exclude(status='Paid').order_by('due_date')
 
                     remaining = self.amount_paid
+                    last_inst = None
+                    
                     for inst in open_installments:
                         if remaining <= 0: break
                         needed = inst.amount_due - inst.paid_amount
@@ -486,12 +488,14 @@ class Payment(models.Model):
                             inst.status = 'Partial'
                             remaining = 0
                         inst.save()
-                        
-                        # ربط الإيصال بالقسط
-                        self.installment = inst
-                        super(Payment, self).save(update_fields=['installment'])
+                        last_inst = inst
+                    
+                    # ربط الإيصال بآخر قسط تم السداد فيه (بدون استدعاء save الموديل مرة أخرى)
+                    if last_inst:
+                        Payment.objects.filter(pk=self.pk).update(installment=last_inst)
 
-#   
+        # 🛑 تم حذف return True لأنه يسبب مشاكل في استجابة الـ View
+
 class Expense(models.Model):
     # إضافة خيارات نوع المصروف
     EXPENSE_TYPES = (
@@ -605,29 +609,116 @@ class DeliveryRecord(models.Model):
     
     
 class MonthlyClosure(models.Model):
-    month = models.DateField(verbose_name="الشهر")
+    STATUS_CHOICES = [
+        ('draft', 'مسودة'),
+        ('closed', 'مغلق نهائياً'),
+    ]
+
+    # الخطأ غالباً هنا: تأكد أن حقل التاريخ لا يحتوي على max_digits أو decimal_places
+    month = models.DateField(unique=True, verbose_name="الشهر") 
+    
+    # هذه الحقول هي فقط التي تقبل max_digits
     opening_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="رصيد أول المدة")
     total_revenues = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="إجمالي الإيرادات")
     total_expenses = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="إجمالي المصروفات")
-    net_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="صافي الربح/الخسارة")
-    closing_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="الرصيد المرحل للشهر التالي")
-    closed_at = models.DateTimeField(auto_now_add=True)
-    closed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-
-    def __str__(self):
-        return f"إغلاق شهر {self.month.strftime('%m-%Y')}"
-
-
-class Coupon(models.Model):
-    code = models.CharField(max_length=20, unique=True)
-    discount_value = models.DecimalField(max_digits=10, decimal_places=2)
-    expiry_date = models.DateField()
-    active = models.BooleanField(default=True)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
-
-    def is_valid(self):
-        return self.active and self.expiry_date >= timezone.now().date()
+    net_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="صافي المركز المالي")
+    closing_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="الرصيد الختامي")
     
-    def __str__(self):
-        return self.code
+    # حقل الحالة
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='closed', verbose_name="حالة الشهر")
+    
+    notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات الإغلاق")
+    closed_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإغلاق")
+    closed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="المسؤول")
 
+    class Meta:
+        ordering = ['-month']
+        verbose_name = "إغلاق شهري"
+        verbose_name_plural = "الإغلاقات الشهرية"
+
+    def __str__(self):
+        return f"إغلاق {self.month.strftime('%B %Y')}"
+ 
+class Coupon(models.Model):
+    OFFER_TYPES = [
+        ('general', 'كوبون ترويجي عام'),
+        ('early_pay', 'خصم تعجيل الدفع (قسط محدد)'),
+        ('full_pay', 'خصم السداد الشامل (كامل المديونية)'),
+        ('specific_student', 'خصم لطلاب محددين'),
+        ('new_student', 'خصم للطلبة الجدد'),
+    ]
+
+    DISCOUNT_CHOICES = [
+        ('percentage', 'نسبة مئوية'),
+        ('fixed', 'مبلغ ثابت'),
+    ]
+
+    # 🔥 الأقسام المسموح للكوبون العمل بها (متطابقة مع نظامك)
+    VALID_CATEGORIES = [
+        ('all', 'شامل جميع الأقسام'),
+        ('fees', 'مصروفات دراسيه'),
+        ('books', 'كتب وباقات دراسية'),
+        ('bus', 'اشتراك باص'),
+        ('courses', 'مجموعات وكورسات'),
+    ]
+
+    # الحقول الأساسية
+    code = models.CharField(max_length=50, unique=True, verbose_name="كود الخصم/العرض")
+    offer_type = models.CharField(max_length=30, choices=OFFER_TYPES, default='general', verbose_name="نوع العرض")
+    
+    # 🔥 الحقل الجديد للقسم
+    allowed_category = models.CharField(max_length=20, choices=VALID_CATEGORIES, default='all', verbose_name="صالح للاستخدام في قسم")
+
+    discount_type = models.CharField(max_length=20, choices=DISCOUNT_CHOICES, verbose_name="نوع الخصم")
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="قيمة الخصم")
+    
+    # حقول التحكم في الصلاحية
+    active = models.BooleanField(default=True, verbose_name="نشط")
+    start_date = models.DateField(null=True, blank=True, verbose_name="تاريخ بداية العرض")
+    expiry_date = models.DateField(null=True, blank=True, verbose_name="تاريخ انتهاء العرض")
+    
+    # حدود الاستخدام
+    times_used = models.PositiveIntegerField(default=0, verbose_name="مرات الاستخدام")
+    usage_limit = models.PositiveIntegerField(default=1, verbose_name="الحد الأقصى للاستخدام العام")
+    
+    # الاستهداف
+    target_students = models.ManyToManyField(
+        'students.Student', 
+        blank=True, 
+        related_name="special_coupons",
+        verbose_name="الطلاب المستهدفين"
+    )
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="المنشئ")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "عرض / كوبون خصم"
+        verbose_name_plural = "عروض وكوبونات الخصم"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.code} ({self.get_offer_type_display()})"
+
+    def check_validity(self, student=None):
+        today = timezone.localdate()
+        
+        if not self.active: return False
+        if self.start_date and today < self.start_date: return False
+        if self.expiry_date and today > self.expiry_date: return False
+        if self.times_used >= self.usage_limit: return False
+
+        if student:
+            if self.offer_type == 'specific_student':
+                if not self.target_students.filter(id=student.id).exists():
+                    return False
+            if self.offer_type == 'new_student':
+                limit_date = today - timezone.timedelta(days=30)
+                if student.created_at.date() < limit_date:
+                    return False
+
+        # السماح للطالب الخارجي بالكوبونات العامة والجديدة
+        elif not student and self.offer_type == 'specific_student':
+            return False 
+
+        return True

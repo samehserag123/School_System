@@ -382,8 +382,24 @@
                         </label>
                         {{ form.total_sessions }}
                     </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-warning">
+                            <i class="bi bi-ticket-perforated"></i> كود الخصم (اختياري)
+                        </label>
+                        <div class="input-group">
+                            <input type="text" name="coupon_code" id="coupon_code_input" class="form-control bg-black text-warning border-secondary text-uppercase" placeholder="الكود..." autocomplete="off">
+                            <button class="btn btn-outline-warning" type="button" id="btnApplyCoupon" onclick="applyCourseCoupon()">
+                                تطبيق
+                            </button>
+                        </div>
+                        <small id="coupon_message" class="d-block mt-1 fw-bold" style="font-size: 0.75rem;"></small>
+                    </div>
+
                     <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-success w-100 fw-bold">تأكيد الاشتراك</button>
+                        <button type="submit" class="btn btn-success w-100 fw-bold shadow-lg" style="height: 45px;">
+                            تأكيد الاشتراك
+                        </button>
                     </div>
                 </form>
             </div>

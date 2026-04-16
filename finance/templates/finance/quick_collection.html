@@ -109,9 +109,21 @@
                                 <label class="form-label text-success fw-bold">المبلغ المحصل:</label>
                                 <input type="number" name="amount" id="id_amount" class="form-control bg-dark text-success fw-bold border-secondary fs-5" placeholder="0" step="1" required>
                             </div>
-                        </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-warning fw-bold">كود الخصم (إن وجد):</label>
+                                <div class="input-group">
+                                    <input type="text" name="coupon_code" id="coupon_code" class="form-control" placeholder="أدخل كود الخصم">
+                                    <button class="btn btn-outline-warning" type="button" onclick="applyCoupon()" id="btnApplyCoupon">
+                                        <i class="bi bi-check2-circle"></i> تطبيق
+                                    </button>
+                                </div>
+                                <small id="coupon_message" class="d-block mt-2 fw-bold"></small>
+                                
+                                <input type="hidden" name="hidden_discount_value" id="hidden_discount_value" value="0">
+                                <input type="hidden" name="hidden_discount_type" id="hidden_discount_type" value="">
+                            </div>
 
-                        <div class="mb-3 text-right">
+                            <div class="mb-3 text-right">
                             <label class="form-label text-info fw-bold">ملاحظات (اختياري):</label>
                             <textarea name="notes" id="id_notes" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="اكتب ملاحظاتك هنا..."></textarea>
                         </div>
@@ -258,22 +270,114 @@ $(document).ready(function() {
     $('#id_category').trigger('change');
 });
 
+function applyCoupon() {
+    // تصحيح: استخدام 'coupon_code' بدلاً من 'id_coupon_code' ليطابق الـ HTML
+    const code = $('#coupon_code').val().trim();
+    const studentId = $('#id_student').val();
+
+    if (!studentId) {
+        Swal.fire({ 
+            icon: 'warning', 
+            title: 'تنبيه', 
+            text: 'يرجى اختيار الطالب أولاً قبل تطبيق الخصم.',
+            confirmButtonText: 'حسناً'
+        });
+        return;
+    }
+    
+    if (!code) {
+        $('#coupon_message').html('<span class="text-danger small">❌ يرجى إدخال الكود</span>');
+        return;
+    }
+
+    // إظهار حالة التحميل وتعطيل الزر مؤقتاً
+    $('#btnApplyCoupon').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+    $('#coupon_message').html('<span class="text-info small">جاري التحقق...</span>');
+
+    $.ajax({
+        url: "{% url 'validate_coupon' %}", 
+        method: "GET",
+        data: {
+            'code': code,
+            'student_id': studentId
+        },
+        success: function(response) {
+            $('#btnApplyCoupon').prop('disabled', false).html('<i class="bi bi-check2-circle"></i> تطبيق');
+            
+            if (response.status === 'success') {
+                $('#coupon_message').html(`<span class="text-success small">✅ ${response.message} (${response.display_msg})</span>`);
+                $('#hidden_discount_value').val(response.discount_value);
+                $('#hidden_discount_type').val(response.discount_type);
+                
+                // تمييز الحقل بصرياً وتعطيله لضمان عدم تغيير الطالب بعد الخصم
+                $('#id_student').addClass('is-valid').css('background-color', '#1a202c').prop('disabled', true); 
+                $('#coupon_code').prop('readonly', true);
+            } else {
+                $('#coupon_message').html(`<span class="text-danger small">❌ ${response.message}</span>`);
+                $('#hidden_discount_value').val(0);
+                $('#hidden_discount_type').val('');
+            }
+        },
+        error: function() {
+            $('#btnApplyCoupon').prop('disabled', false).html('<i class="bi bi-check2-circle"></i> تطبيق');
+            $('#coupon_message').html('<span class="text-danger small">❌ خطأ في الاتصال بالنظام</span>');
+        }
+    });
+}
+
+// هام جداً: هذه الوظيفة تضمن إرسال قيمة الطالب للسيرفر عند حفظ النموذج
+function submitMainForm() {
+    // إعادة تفعيل الحقل قبل الإرسال مباشرة لكي يقرأه Django
+    $('#id_student').prop('disabled', false);
+    $('#mainPaymentForm').submit();
+}
+
 function handlePreview() {
+    // يجب فك تجميد حقل الطالب لحظة الإرسال لكي يتم إرساله في الـ POST
+    $('#id_student').prop('disabled', false); 
+    
     const sSelect = $('#id_student');
-    const amount = $('#id_amount').val();
+    const originalAmount = parseFloat($('#id_amount').val());
     const cat = $('#id_category option:selected').text();
     const notes = $('#id_notes').val();
     const receiptNum = $('#id_receipt_number').val();
 
-    if (!sSelect.val() || !amount || amount <= 0) {
-        Swal.fire({ icon: 'warning', title: 'بيانات ناقصة', text: 'يرجى اختيار الطالب وتحديد مبلغ.' });
+    if (!sSelect.val() || !originalAmount || originalAmount <= 0) {
+        Swal.fire({ icon: 'warning', title: 'بيانات ناقصة', text: 'يرجى اختيار الطالب وتحديد مبلغ السداد.' });
         return;
     }
 
+    // حساب الخصم
+    const discountValue = parseFloat($('#hidden_discount_value').val()) || 0;
+    const discountType = $('#hidden_discount_type').val();
+    
+    let discountAmount = 0;
+    let finalAmount = originalAmount;
+
+    if (discountValue > 0) {
+        if (discountType === 'percentage') {
+            discountAmount = originalAmount * (discountValue / 100);
+        } else {
+            discountAmount = discountValue;
+        }
+        finalAmount = originalAmount - discountAmount;
+        if (finalAmount < 0) finalAmount = 0; // منع المبالغ بالسالب
+    }
+
     $('#p_student').text(sSelect.find(':selected').text());
-    $('#p_amount').text(Number(amount).toLocaleString() + " ج.م");
     $('#p_category').text(cat);
     $('#p_notes').text("إيصال #" + (receiptNum || '---') + " | " + (notes || "بدون ملاحظات"));
+    
+    // عرض المبلغ بخصم وبدون خصم
+    if (discountAmount > 0) {
+        $('#p_amount').html(`
+            <del class="text-danger ms-2 fs-6">${originalAmount.toLocaleString()} ج.م</del> 
+            <span class="text-success fs-4">${finalAmount.toLocaleString()} ج.م</span>
+            <br><small class="text-warning fs-6">(تم خصم ${discountAmount.toLocaleString()} ج.م)</small>
+        `);
+    } else {
+        $('#p_amount').text(originalAmount.toLocaleString() + " ج.م");
+    }
     
     new bootstrap.Modal(document.getElementById('previewModal')).show();
 }

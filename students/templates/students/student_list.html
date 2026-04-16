@@ -198,9 +198,9 @@ opacity:.4;
 
 {% for student in students %}
 
-<tr class="student-row {% if student.calculated_previous_debt > 0 %}table-warning{% endif %}"
+<tr id="student-{{ student.id }}" 
+    class="student-row {% if student.calculated_previous_debt > 0 %}table-warning{% endif %}"
     data-search="{{ student.get_full_name }} {{ student.student_code }}">
-
     <!-- checkbox -->
     <td>
         <input type="checkbox" name="student_ids" value="{{ student.id }}" class="student-checkbox">
@@ -214,7 +214,7 @@ opacity:.4;
     <!-- name -->
     <td class="text-end pe-4">
         <div class="d-flex flex-column text-end">
-            <a href="{% url 'student_dashboard' student.id %}" class="fw-bold text-info text-decoration-none">
+            <a href="{% url 'student_dashboard' student.id %}#student-{{ student.id }}" class="fw-bold text-info text-decoration-none">
                 {{ student.get_full_name }}
             </a>
             <small class="text-muted">
@@ -228,7 +228,7 @@ opacity:.4;
     <td class="text-center" style="min-width:120px;">
         <div class="mb-2">
             {% if student.old_debt_display > 0 %}
-                <a href="{% url 'settle_old_debt' student.id %}"
+                <a href="{% url 'settle_old_debt' student.id %}#student-{{ student.id }}"
                 class="btn btn-sm btn-danger w-100 py-1">
                     <i class="bi bi-cash-stack me-1"></i> سداد
                 </a>
@@ -301,24 +301,25 @@ opacity:.4;
 <td class="text-center">
     <div class="d-flex justify-content-center gap-1">
 
-        <a href="{% url 'student_statement_print' student.id %}"
-           class="btn btn-sm btn-primary" title="كشف حساب">
-            <i class="bi bi-receipt"></i>
+        <a href="{% url 'student_statement_print' student.id %}#student-{{ student.id }}"
+            class="btn btn-sm btn-primary" 
+            title="كشف حساب"
+            target="_blank"> <i class="bi bi-receipt"></i>
         </a>
 
         {# الاعتماد على fees_display للتأكد من أن الطالب مسكن فعلياً في قاعدة البيانات #}
         {% if student.fees_display > 0 %}
-            <a href="{% url 'quick_collection' %}?student_id={{ student.id }}"
+            <a href="{% url 'quick_collection' %}?student_id={{ student.id }}#student-{{ student.id }}"
                class="btn btn-sm btn-success" title="تحصيل سريع">
                 <i class="bi bi-lightning-charge-fill"></i>
             </a>
 
-            <a href="{% url 'assign_plan_with_id' student.id %}"
+            <a href="{% url 'assign_plan_with_id' %}?student_id={{ student.id }}#student-{{ student.id }}"
                class="btn btn-sm btn-info" title="تعديل التسكين">
                 <i class="bi bi-calculator"></i>
             </a>
 
-            <a href="{% url 'student_inventory_view' student.id %}"
+            <a href="{% url 'student_inventory_view' %}?student_id={{ student.id }}#student-{{ student.id }}"
                class="btn btn-sm btn-warning" title="صرف الكتب/الزي">
                 <i class="bi bi-box-seam"></i>
             </a>
@@ -329,7 +330,7 @@ opacity:.4;
                 <i class="bi bi-lock-fill"></i>
             </button>
 
-            <a href="{% url 'assign_plan_with_id' student.id %}"
+            <a href="{% url 'assign_plan_with_id' %}?student_id={{ student.id }}#student-{{ student.id }}"
                class="btn btn-sm btn-info" title="بدء التسكين">
                 <i class="bi bi-calculator"></i>
             </a>
@@ -353,7 +354,6 @@ opacity:.4;
 
 
 <!-- pagination -->
-
 <nav aria-label="Page navigation" class="mt-5 animate__animated animate__fadeInUp">
     <ul class="pagination pagination-custom justify-content-center">
 
@@ -376,7 +376,7 @@ opacity:.4;
         {% endif %}
 
         <li class="page-item active">
-            <span class="page-link shadow-sm">
+            <span class="page-link shadow-sm bg-info border-info text-dark fw-bold">
                 {{ students.number }} من {{ students.paginator.num_pages }}
             </span>
         </li>
@@ -402,46 +402,56 @@ opacity:.4;
     </ul>
 </nav>
 
-<li class="page-item disabled">
-<span class="page-link">
-صفحة {{ students.number }} من {{ students.paginator.num_pages }}
-</span>
-</li>
-
-{% if students.has_next %}
-
-<li class="page-item">
-<a class="page-link" href="?page={{ students.next_page_number }}">التالي</a>
-</li>
-
-<li class="page-item">
-<a class="page-link" href="?page={{ students.paginator.num_pages }}">&raquo;</a>
-</li>
-
-{% endif %}
-
-</ul>
-
-</nav>
-
 </form>
 
 
 <script>
-/* 1. رسالة تأكيد الترحيل */
-document.getElementById("promoteForm").addEventListener("submit", function(e){
-    let checked = document.querySelectorAll(".student-checkbox:checked").length;
-    if(checked === 0){
-        alert("يجب اختيار طالب واحد على الأقل");
-        e.preventDefault();
-        return;
-    }
-    if(!confirm("هل أنت متأكد من ترحيل الطلاب المحددين إلى السنة الجديدة؟")){
-        e.preventDefault();
+/* 1. نظام التركيز التلقائي والوميض عند العودة للطالب */
+document.addEventListener("DOMContentLoaded", function() {
+    // التحقق إذا كان الرابط يحتوي على مرساة لطالب معين (مثل #student-15)
+    if (window.location.hash) {
+        const targetId = window.location.hash.substring(1);
+        const targetRow = document.getElementById(targetId);
+        
+        if (targetRow) {
+            // أ. النزول للطالب بسلاسة ليصبح في منتصف الشاشة
+           // أ. النزول للطالب بسلاسة ليصبح في منتصف الشاشة
+            targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // ب. تمييز السطر بوميض قوي (خلفية ذهبية خفيفة مع إطار مضيء)
+            targetRow.style.transition = "none"; // إيقاف أي ترانزيشن مؤقتاً لعمل صدمة بصرية
+            targetRow.style.backgroundColor = "rgba(255, 193, 7, 0.4)"; // لون ذهبي شفاف متناسب مع التحذيرات
+            targetRow.style.outline = "2px solid #ffc107"; // إطار أصفر حول السطر
+            targetRow.style.boxShadow = "0 0 15px rgba(255, 193, 7, 0.5)"; // تأثير توهج
+            
+            // ج. إزالة التمييز تدريجياً بعد 3 ثوانٍ
+            setTimeout(() => {
+                targetRow.style.transition = "all 1.5s ease-in-out"; // تلاشي ناعم جداً
+                targetRow.style.backgroundColor = "";
+                targetRow.style.outline = "none";
+                targetRow.style.boxShadow = "none";
+            }, 3000);
+        }
     }
 });
 
-/* 2. دالة حركة النبض (Pulse) عند تغير الأرقام */
+/* 2. رسالة تأكيد الترحيل الجماعي */
+const promoteForm = document.getElementById("promoteForm");
+if (promoteForm) {
+    promoteForm.addEventListener("submit", function(e){
+        let checked = document.querySelectorAll(".student-checkbox:checked").length;
+        if(checked === 0){
+            alert("يجب اختيار طالب واحد على الأقل");
+            e.preventDefault();
+            return;
+        }
+        if(!confirm("هل أنت متأكد من ترحيل الطلاب المحددين إلى السنة الجديدة؟")){
+            e.preventDefault();
+        }
+    });
+}
+
+/* 3. دالة حركة النبض (Pulse) عند تغير الأرقام */
 function applyPulse(id, newValue) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -459,24 +469,22 @@ function applyPulse(id, newValue) {
     }
 }
 
-/* 3. تحديث الإحصائيات (معدلة لتدعم الترقيم والبحث معاً) */
+/* 4. تحديث الإحصائيات (تدعم الترقيم والبحث معاً) */
 function updateStats() {
     let input = document.getElementById('searchInput').value.trim().toLowerCase();
     
-    // العناصر المستهدفة (أضفنا stat-assigned)
     const stats = {
         total: document.getElementById("stat-total"),
         unassigned: document.getElementById("stat-unassigned"),
-        assigned: document.getElementById("stat-assigned"), // العداد الجديد
+        assigned: document.getElementById("stat-assigned"),
         paid: document.getElementById("stat-paid"),
         debt: document.getElementById("stat-debt")
     };
 
-    // الحالة الأولى: إذا كان مربع البحث فارغاً -> استرجاع الأرقام الكلية الثابتة من السيرفر
+    // إذا كان البحث فارغاً -> استرجاع الأرقام الكلية من السيرفر
     if (input === "") {
         for (let key in stats) {
             if (stats[key]) {
-                // سحب القيمة الأصلية المخزنة في data-original (التي تشمل كل الصفحات)
                 let originalVal = stats[key].getAttribute('data-original');
                 applyPulse(stats[key].id, originalVal);
             }
@@ -484,7 +492,7 @@ function updateStats() {
         return; 
     }
 
-    // الحالة الثانية: يوجد بحث نشط -> الحساب من الجدول (للنتائج الظاهرة في الصفحة الحالية فقط)
+    // إذا وجد بحث نشط -> الحساب من الصفوف الظاهرة فقط
     let rows = document.querySelectorAll(".student-row");
     let paid = 0, debt = 0, unassigned = 0, assigned = 0, totalVisible = 0;
 
@@ -492,34 +500,33 @@ function updateStats() {
         if (row.style.display !== "none") {
             totalVisible++;
             
-            // الوصول للموقف المالي (العمود رقم 9 برمجياً هو index 8)
+            // الموقف المالي (العمود رقم 9 برمجياً index 8)
             let badge = row.cells[8].querySelector(".badge"); 
             
             if (badge) {
-                // منطق تحديد الحالة بناءً على كلاسات الـ Badge
                 if (badge.classList.contains("bg-success")) {
                     paid++;
-                    assigned++; // المسدد هو طالب مسكن بالتأكيد
+                    assigned++;
                 } 
                 else if (badge.classList.contains("bg-danger")) {
                     debt++;
-                    assigned++; // المديون هو طالب مسكن لديه خطة أقساط
+                    assigned++;
                 } 
                 else if (badge.classList.contains("bg-secondary")) {
-                    unassigned++; // غير المسكن
+                    unassigned++;
                 }
             }
         }
     });
 
-    // تحديث الأرقام في الواجهة مع تأثير النبض
     applyPulse("stat-total", totalVisible);
     applyPulse("stat-unassigned", unassigned);
     applyPulse("stat-assigned", assigned);
     applyPulse("stat-paid", paid);
     applyPulse("stat-debt", debt);
 }
-/* 4. دالة البحث المتقدمة */
+
+/* 5. دالة البحث المتقدمة (Instant Search) */
 function runSearch() {
     let input = document.getElementById('searchInput').value.toLowerCase();
     let rows = document.querySelectorAll('.student-row');
@@ -539,11 +546,10 @@ function runSearch() {
         }
     });
 
-    // تشغيل تحديث العدادات بناءً على نتائج البحث
     updateStats(); 
 }
 
-/* 5. تحديد الكل (فقط للصفوف الظاهرة) */
+/* 6. تحديد الكل (فقط للصفوف الظاهرة) */
 let selectAll = document.getElementById("selectAll");
 if(selectAll){
     selectAll.onclick = function(){
@@ -555,11 +561,5 @@ if(selectAll){
         });
     }
 }
-
-/* 6. تشغيل عند تحميل الصفحة */
-document.addEventListener("DOMContentLoaded", function(){
-    // ملاحظة: لا نستدعي updateStats هنا لأن الأرقام تأتي جاهزة من السيرفر لكل الصفحات
-    // الـ JavaScript سيتدخل فقط عندما يبدأ المستخدم في الكتابة في SearchInput
-});
 </script>
 {% endblock %}

@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}الإغلاق المالي الشهري{% endblock %}
+
+{% block content %}
+<div class="container py-5" dir="rtl">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card bg-dark text-white border-info shadow-lg animate__animated animate__fadeIn">
+                <div class="card-header border-info bg-info bg-opacity-10 py-3 text-center">
+                    <h4 class="mb-0 text-info fw-bold">
+                        <i class="bi bi-shield-lock-fill me-2"></i> نظام الإغلاق المالي الشهري
+                    </h4>
+                </div>
+
+                <div class="card-body p-4">
+                    <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning mb-4">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <strong>تنبيه هام:</strong> إغلاق الشهر سيقوم بحساب كافة الإيرادات والمصروفات المسجلة وأرشفتها. لن يكون بمقدور أي مستخدم تعديل الحسابات لهذا الشهر بعد هذه الخطوة.
+                    </div>
+
+                    <div class="row g-4 mb-4 text-center">
+                        <div class="col-6 col-md-4">
+                            <div class="p-3 bg-black rounded-3 border border-secondary shadow-sm">
+                                <small class="text-muted d-block mb-1">الشهر المستهدف</small>
+                                <span class="fs-5 fw-bold text-info">{{ suggested_month|date:"F Y" }}</span>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <div class="p-3 bg-black rounded-3 border border-secondary shadow-sm">
+                                <small class="text-muted d-block mb-1">المسؤول عن الإغلاق</small>
+                                <span class="fs-5 fw-bold">{{ user.get_full_name|default:user.username }}</span>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="p-3 bg-black rounded-3 border border-info shadow-sm">
+                                <small class="text-muted d-block mb-1">تاريخ تنفيذ العملية</small>
+                                <span class="fs-5 fw-bold text-info">{% now "Y-m-d" %}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if has_pending %}
+                        <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger mb-4 text-center rounded-3 shadow-sm">
+                            <i class="bi bi-x-octagon-fill fs-2 d-block mb-2"></i>
+                            <h5 class="fw-bold">عذراً، لا يمكن إغلاق الشهر لوجود حركات مالية معلقة!</h5>
+                            <div class="mt-3">
+                                {% if pending_revenues_count > 0 %}
+                                    <span class="badge bg-danger fs-6 mx-1 mb-2"><i class="bi bi-arrow-down-circle me-1"></i> {{ pending_revenues_count }} إيراد معلق</span>
+                                {% endif %}
+                                {% if pending_expenses_count > 0 %}
+                                    <span class="badge bg-danger fs-6 mx-1 mb-2"><i class="bi bi-arrow-up-circle me-1"></i> {{ pending_expenses_count }} مصروف معلق</span>
+                                {% endif %}
+                            </div>
+                            <hr class="border-danger opacity-25">
+                            <p class="mb-0">يرجى مراجعة الخزينة وتقفيل هذه الحركات في الجرد اليومي لتتمكن من إغلاق الشهر.</p>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button disabled class="btn btn-secondary btn-lg fw-bold py-3 shadow-sm opacity-50" style="cursor: not-allowed;">
+                                <i class="bi bi-lock-fill me-2"></i> الإغلاق غير متاح حالياً
+                            </button>
+                            <a href="{% url 'finance_dashboard' %}" class="btn btn-outline-secondary py-2">
+                                <i class="bi bi-arrow-return-right me-1"></i> العودة للداشبورد
+                            </a>
+                        </div>
+                    {% else %}
+                        <form method="POST">
+                            {% csrf_token %}
+                            
+                            <div class="mb-4">
+                                <label class="form-label text-info">
+                                    <i class="bi bi-chat-left-text me-1"></i> ملاحظات إدارية على التقرير:
+                                </label>
+                                <textarea name="notes" class="form-control bg-black text-white border-secondary focus-info" rows="3" placeholder="اكتب ملاحظاتك حول حالة الخزينة أو أي تسويات تمت خلال هذا الشهر..."></textarea>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-info btn-lg fw-bold py-3 shadow-sm text-dark" onclick="return confirm('هل أنت متأكد من مراجعة كافة الحركات المالية وتأكيد الإغلاق النهائي؟')">
+                                    <i class="bi bi-check-circle-fill me-2"></i> تأكيد وحفظ الإغلاق النهائي
+                                </button>
+                                <a href="{% url 'finance_dashboard' %}" class="btn btn-outline-secondary py-2">
+                                    <i class="bi bi-x-circle me-1"></i> إلغاء والعودة للداشبورد
+                                </a>
+                            </div>
+                        </form>
+                    {% endif %}
+                </div>
+
+                <div class="card-footer bg-black border-0 text-center py-3">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        يتم الآن حساب (إجمالي الإيرادات - إجمالي المصروفات) تلقائياً من قاعدة البيانات.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* تحسينات بصرية إضافية */
+    .focus-info:focus {
+        background-color: #000 !important;
+        color: #fff !important;
+        border-color: #0dcaf0 !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25);
+    }
+    .card {
+        border-radius: 15px;
+        overflow: hidden;
+    }
+</style>
+{% endblock %}

@@ -48,4 +48,8 @@ urlpatterns = [
     path('closure/<str:closure_id>/', views.closure_detail, name='closure_detail'),
     path('finance-analytics/', views.finance_analytics_view, name='finance_analytics'),
     path('my-treasury/', views.my_treasury_view, name='my_treasury'),
+    
+    path('offers/create/', views.create_offer_view, name='create_offer'),
+    path('api/validate-coupon/', views.validate_coupon_advanced, name='validate_coupon'),
+    # ... باقي الروابط
 ]
