@@ -12,71 +12,110 @@
 
 <style>
 
-.filter-card,.promote-card{
-background:#1a1d21;
-border:1px solid #333;
-border-radius:14px;
-padding:20px;
-margin-bottom:25px;
-box-shadow:0 8px 20px rgba(0,0,0,.3)
-}
+    .filter-card, .promote-card {
+        background: #1a1d21;
+        border: 1px solid #333;
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 25px;
+        box-shadow: 0 8px 20px rgba(0,0,0,.3);
+    }
 
-.stats-bar{
-display:flex;
-gap:15px;
-margin-bottom:20px;
-overflow-x:auto
-}
+    .stats-bar {
+        display: flex;
+        flex-direction: row; /* يضمن بقاء العناصر بجوار بعضها بالعرض */
+        justify-content: space-between;
+        gap: 15px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+    }
 
-.stat-item{
-background:#24282e;
-padding:12px 20px;
-border-radius:12px;
-border-right:4px solid #0dcaf0;
-min-width:160px
-}
+    .stat-item {
+        background: #24282e;
+        padding: 15px 20px; /* زيادة بسيطة في الحشوة الداخلية لتبدو أريح للعين */
+        border-radius: 12px;
+        border-right: 4px solid #0dcaf0;
+        min-width: 150px;
+        flex: 1; /* مهم جداً: يجعل كل العدادات تأخذ مساحة متساوية وتملأ الشاشة */
+        text-align: center; /* توسيط النص والرقم داخل المربع */
+        transition: all 0.3s ease; /* لتنعيم حركة الماوس وتغيير الألوان */
+    }
 
-#studentTable th{
-background:#000;
-color:#0dcaf0;
-padding:14px;
-font-size:.85rem;
-text-align:center
-}
+    /* تعديل لون اسم العداد ليكون مقروءاً ومتجاوزاً للون text-muted */
+    .stat-item .small.text-muted {
+        color: #e9ecef !important; /* لون أبيض مائل للرمادي الفاتح مريح للعين */
+        font-weight: 600; /* زيادة سمك الخط ليكون مقروءاً أكثر */
+        font-size: 0.95rem;
+        display: block;
+        margin-bottom: 8px; /* مسافة بسيطة بين الاسم والرقم */
+    }
 
-#studentTable td{
-padding:10px 6px;
-vertical-align:middle
-}
+    #studentTable th {
+        background: #000;
+        color: #0dcaf0;
+        padding: 14px;
+        font-size: .85rem;
+        text-align: center;
+    }
 
-.table-warning{
-background:rgba(255,193,7,.1)
-}
+    #studentTable td {
+        padding: 10px 6px;
+        vertical-align: middle;
+    }
 
-.disabled-btn{
-pointer-events:none;
-opacity:.4;
-}
-.stat-item {
-    /* ... خصائصك القديمة ... */
-    transition: all 0.3s ease; /* لتنعيم حركة الماوس وتغيير الألوان */
-}
+    .table-warning {
+        background: rgba(255,193,7,.1);
+    }
 
-/* حركة النبض التي تظهر عند تغير الأرقام */
-.pulse-update {
-    animation: pulse 0.5s;
-}
+    .disabled-btn {
+        pointer-events: none;
+        opacity: .4;
+    }
 
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); border-color: #0dcaf0; }
-    100% { transform: scale(1); }
-}
+    /* حركة النبض التي تظهر عند تغير الأرقام */
+    .pulse-update {
+        animation: pulse 0.5s;
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); border-color: #0dcaf0; }
+        100% { transform: scale(1); }
+    }
+    .pagination-custom .page-link {
+        background-color: #212529; /* لون خلفية داكن */
+        border-color: #343a40;
+        color: #0dcaf0; /* لون الـ Info ليتماشى مع أزرارك */
+        transition: all 0.3s ease;
+        margin: 0 3px;
+        border-radius: 8px; /* حواف عصرية دائرية قليلاً */
+        font-weight: 500;
+    }
+    .pagination-custom .page-link:hover {
+        background-color: #0dcaf0;
+        color: #212529;
+        transform: translateY(-2px); /* حركة خفيفة للأعلى */
+        box-shadow: 0 4px 8px rgba(13, 202, 240, 0.2);
+    }
+    .pagination-custom .page-item.active .page-link {
+        background-color: #0dcaf0;
+        border-color: #0dcaf0;
+        color: #212529;
+        font-weight: bold;
+        box-shadow: 0 4px 8px rgba(13, 202, 240, 0.4);
+    }
+    .pagination-custom .page-item.disabled .page-link {
+        background-color: #1a1d20;
+        border-color: #212529;
+        color: #6c757d;
+        transform: none;
+        box-shadow: none;
+    }
 </style>
 
 
     <div class="stats-bar px-2 animate__animated animate__fadeIn">
-        <div class="stat-item">
+        <div class="stat-item"> 
             <div class="small text-muted">إجمالي الطلاب</div>
             <div id="stat-total" class="fw-bold text-info fs-5" data-original="{{ total_count }}">{{ total_count }}</div>
         </div> 
@@ -307,30 +346,29 @@ opacity:.4;
             target="_blank"> <i class="bi bi-receipt"></i>
         </a>
 
-        {# الاعتماد على fees_display للتأكد من أن الطالب مسكن فعلياً في قاعدة البيانات #}
+                {# الاعتماد على fees_display للتأكد من أن الطالب مسكن فعلياً في قاعدة البيانات #}
         {% if student.fees_display > 0 %}
             <a href="{% url 'quick_collection' %}?student_id={{ student.id }}#student-{{ student.id }}"
                class="btn btn-sm btn-success" title="تحصيل سريع">
                 <i class="bi bi-lightning-charge-fill"></i>
             </a>
 
-            <a href="{% url 'assign_plan_with_id' %}?student_id={{ student.id }}#student-{{ student.id }}"
+            <a href="{% url 'assign_plan_with_id' student.id %}#student-{{ student.id }}"
                class="btn btn-sm btn-info" title="تعديل التسكين">
                 <i class="bi bi-calculator"></i>
             </a>
 
-            <a href="{% url 'student_inventory_view' %}?student_id={{ student.id }}#student-{{ student.id }}"
-               class="btn btn-sm btn-warning" title="صرف الكتب/الزي">
-                <i class="bi bi-box-seam"></i>
+            <a href="{% url 'student_inventory_view' student.id %}#student-{{ student.id }}"
+                class="btn btn-sm btn-warning" title="صرف الكتب/الزي">
+                    <i class="bi bi-box-seam"></i>
             </a>
-
         {% else %}
             {# في حالة عدم التسكين (المطلوب 0) #}
             <button class="btn btn-sm btn-secondary" disabled title="يجب التسكين أولاً">
                 <i class="bi bi-lock-fill"></i>
             </button>
 
-            <a href="{% url 'assign_plan_with_id' %}?student_id={{ student.id }}#student-{{ student.id }}"
+            <a href="{% url 'assign_plan_with_id' student.id %}#student-{{ student.id }}"
                class="btn btn-sm btn-info" title="بدء التسكين">
                 <i class="bi bi-calculator"></i>
             </a>
@@ -339,6 +377,7 @@ opacity:.4;
                 <i class="bi bi-lock-fill"></i>
             </button>
         {% endif %}
+<!-- ... existing code ... -->
 
     </div>
 </td>
@@ -355,47 +394,57 @@ opacity:.4;
 
 <!-- pagination -->
 <nav aria-label="Page navigation" class="mt-5 animate__animated animate__fadeInUp">
-    <ul class="pagination pagination-custom justify-content-center">
+    <ul class="pagination pagination-custom justify-content-center flex-wrap">
 
-        {% if students.has_previous %}
+        {% if students.number > 3 %}
         <li class="page-item">
             <a class="page-link shadow-sm" href="?page=1" title="الصفحة الأولى">
-                <i class="bi bi-chevron-double-right"></i>
+                <i class="bi bi-chevron-double-right"></i> الأولى
             </a>
-        </li>
-        <li class="page-item">
-            <a class="page-link shadow-sm" href="?page={{ students.previous_page_number }}">السابق</a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
-            <span class="page-link opacity-50"><i class="bi bi-chevron-double-right"></i></span>
-        </li>
-        <li class="page-item disabled">
-            <span class="page-link opacity-50">السابق</span>
         </li>
         {% endif %}
 
-        <li class="page-item active">
-            <span class="page-link shadow-sm bg-info border-info text-dark fw-bold">
-                {{ students.number }} من {{ students.paginator.num_pages }}
-            </span>
-        </li>
-
-        {% if students.has_next %}
+        {% if students.has_previous %}
         <li class="page-item">
-            <a class="page-link shadow-sm" href="?page={{ students.next_page_number }}">التالي</a>
-        </li>
-        <li class="page-item">
-            <a class="page-link shadow-sm" href="?page={{ students.paginator.num_pages }}" title="الصفحة الأخيرة">
-                <i class="bi bi-chevron-double-left"></i>
+            <a class="page-link shadow-sm" href="?page={{ students.previous_page_number }}" title="السابق">
+                <i class="bi bi-chevron-right"></i>
             </a>
         </li>
         {% else %}
         <li class="page-item disabled">
-            <span class="page-link opacity-50">التالي</span>
+            <span class="page-link"><i class="bi bi-chevron-right"></i></span>
         </li>
+        {% endif %}
+
+        {% for i in students.paginator.page_range %}
+            {% if students.number == i %}
+                <li class="page-item active" aria-current="page">
+                    <span class="page-link shadow-sm">{{ i }}</span>
+                </li>
+            {% elif i > students.number|add:'-3' and i < students.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link shadow-sm" href="?page={{ i }}">{{ i }}</a>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if students.has_next %}
+        <li class="page-item">
+            <a class="page-link shadow-sm" href="?page={{ students.next_page_number }}" title="التالي">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% else %}
         <li class="page-item disabled">
-            <span class="page-link opacity-50"><i class="bi bi-chevron-double-left"></i></span>
+            <span class="page-link"><i class="bi bi-chevron-left"></i></span>
+        </li>
+        {% endif %}
+
+        {% if students.number < students.paginator.num_pages|add:'-2' %}
+        <li class="page-item">
+            <a class="page-link shadow-sm" href="?page={{ students.paginator.num_pages }}" title="الصفحة الأخيرة">
+                الأخيرة <i class="bi bi-chevron-double-left"></i>
+            </a>
         </li>
         {% endif %}
 

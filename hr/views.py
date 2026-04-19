@@ -4,6 +4,12 @@ from .models import Employee, DailyAttendance, LeaveRequest
 from .forms import UploadAttendanceForm, EmployeeForm, LeaveRequestForm # تأكد من مطابقة الأسماء هنا
 
 # تأكد أن اسم هذه الدالة مطابق تماماً لما في urls.py
+
+
+def hr_dashboard(request):
+    # قم بتمرير أي بيانات إحصائية تحتاجها هنا
+    return render(request, 'hr_dashboard.html')
+
 def upload_and_process_attendance(request):
     """الفيو المسؤول عن رفع ومعالجة ملف البصمة"""
     if request.method == 'POST':

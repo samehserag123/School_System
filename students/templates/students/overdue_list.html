@@ -35,8 +35,14 @@
                         <td class="fw-bold text-white text-end pe-4 student-name">
                             {{ student.get_full_name }}
                         </td>
-                        <td class="fs-5 text-info mono student-phone">
-                            {{ student.phone|default:"لا يوجد رقم" }}
+                        <td class="fs-5 text-info mono student-whatsapp">
+                            {% if student.whatsapp_number %}
+                                <a href="https://wa.me/2{{ student.whatsapp_number }}" target="_blank" class="text-info text-decoration-none">
+                                    {{ student.whatsapp_number }}
+                                </a>
+                            {% else %}
+                                <span class="text-muted">لا يوجد رقم</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}

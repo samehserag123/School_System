@@ -440,43 +440,32 @@ class Payment(models.Model):
                 raise ValidationError("🚨 خطأ أمني: هذا الإيصال تم إغلاقه في الخزينة، لا يمكن تعديله.")
 
     def save(self, *args, **kwargs):
-        # 1. تجهيز البيانات قبل الحفظ
         is_new = not self.pk
         if self.student and not self.academic_year:
             self.academic_year = self.student.academic_year
 
-        # 2. عملية الحفظ داخل Transaction لضمان سلامة البيانات المالية
         with transaction.atomic():
-            # الحفظ الأساسي للإيصال
             super(Payment, self).save(*args, **kwargs)
             
             if self.student:
-                # التحقق من فئة الإيراد
                 category = self.revenue_category
                 is_educational_fee = False
                 if category:
                     if "المصروفات" in category.name or (category.parent and "المصروفات" in category.parent.name):
                         is_educational_fee = True
                 
-                # أ- إذا كان الإيصال مربوطاً بقسط محدد يدوياً
-                if self.installment:
-                    inst = self.installment
-                    total = Payment.objects.filter(installment=inst).aggregate(models.Sum('amount_paid'))['amount_paid__sum'] or 0
-                    inst.paid_amount = total
-                    inst.status = 'Paid' if inst.paid_amount >= inst.amount_due else 'Partial'
-                    inst.save()
-
-                # ب- الخصم التلقائي (فقط للإيصالات الجديدة التابعة للمصروفات)
-                elif is_new and is_educational_fee:
+                # 1. التوزيع التلقائي الذكي (إذا لم يتم ربط الإيصال يدوياً بقسط محدد)
+                if is_new and is_educational_fee and not self.installment:
                     open_installments = StudentInstallment.objects.filter(
                         student=self.student,
                         academic_year=self.academic_year
-                    ).exclude(status='Paid').order_by('due_date')
+                    ).order_by('due_date')
 
                     remaining = self.amount_paid
                     last_inst = None
                     
-                    for inst in open_installments:
+                    # تسديد الأقساط غير المدفوعة
+                    for inst in open_installments.exclude(status='Paid'):
                         if remaining <= 0: break
                         needed = inst.amount_due - inst.paid_amount
                         if remaining >= needed:
@@ -489,12 +478,27 @@ class Payment(models.Model):
                             remaining = 0
                         inst.save()
                         last_inst = inst
+                        
+                    # 🔴 معالجة الدفع المقدم (Overpayment): 
+                    # لو الطالب دفع مقدم بزيادة عن المطلوب في كل الأقساط، نضع الزيادة في آخر قسط
+                    if remaining > 0:
+                        last_inst = open_installments.last()
+                        if last_inst:
+                            last_inst.paid_amount += remaining
+                            last_inst.status = 'Paid'
+                            last_inst.save()
                     
-                    # ربط الإيصال بآخر قسط تم السداد فيه (بدون استدعاء save الموديل مرة أخرى)
+                    # ربط الإيصال بآخر قسط تأثر بالدفع للتوثيق
                     if last_inst:
                         Payment.objects.filter(pk=self.pk).update(installment=last_inst)
 
-        # 🛑 تم حذف return True لأنه يسبب مشاكل في استجابة الـ View
+                # 2. التحديث اليدوي (لو تم ربط الإيصال بقسط معين من شاشة الإدارة)
+                elif self.installment:
+                    inst = self.installment
+                    total = Payment.objects.filter(installment=inst).aggregate(models.Sum('amount_paid'))['amount_paid__sum'] or 0
+                    inst.paid_amount = total
+                    inst.status = 'Paid' if inst.paid_amount >= inst.amount_due else 'Partial'
+                    inst.save()
 
 class Expense(models.Model):
     # إضافة خيارات نوع المصروف

@@ -191,17 +191,17 @@ class BusSubscriptionForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # يمكنك هنا إضافة فلاتر مخصصة، مثلاً:
         # self.fields['route'].queryset = BusRoute.objects.filter(capacity__gt=0)             
-        
+ 
 class StudentForm(forms.ModelForm):
     class Meta:
         model = Student
-        # 1. إضافة كل الحقول الجديدة إلى القائمة
+        # 1. تم إزالة المسافة الزائدة من 'whatsapp_number'
         fields = [
             'academic_year', 'first_name', 'last_name', 'image',
             'national_id', 'nationality', 'gender', 'religion', 
-            'date_of_birth', 'address', 'phone', 'mother_name','father_job',
+            'date_of_birth', 'address', 'phone', 'whatsapp_number', 'mother_name', 'father_job',
             'grade', 'classroom', 'specialization', 'enrollment_status',
-            'registration_number', 'integration_status'
+            'registration_number', 'integration_status' 
         ]
         
         # 2. تعريف الـ Widgets لضمان مظهر الـ Dark Theme
@@ -216,7 +216,6 @@ class StudentForm(forms.ModelForm):
                 'inputmode': 'numeric',
                 'oninput': "this.value = this.value.replace(/[^0-9]/g, '').slice(0, 14)",
             }),
-            # الحقول الجديدة
             'image': forms.FileInput(attrs={'class': 'form-control'}),
             'nationality': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'مثال: مصري'}),
             'gender': forms.Select(attrs={'class': 'form-select'}),
@@ -224,6 +223,13 @@ class StudentForm(forms.ModelForm):
             'date_of_birth': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'العنوان بالتفصيل', 'rows': 1}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'رقم التليفون'}),
+            # تم إضافة حقل الواتساب هنا
+            'whatsapp_number': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'رقم الواتساب',
+                'inputmode': 'numeric',
+                'oninput': "this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)"
+            }),
             'father_job': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'أدخل وظيفة الأب (اختياري)'}),
             'mother_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'اسم الأم بالكامل'}),
             'classroom': forms.Select(attrs={'class': 'form-control'}),
@@ -246,6 +252,7 @@ class StudentForm(forms.ModelForm):
             'date_of_birth': 'تاريخ الميلاد',
             'address': 'العنوان',
             'phone': 'رقم التليفون',
+            'whatsapp_number': 'رقم الواتساب', # تم إضافة التسمية هنا
             'mother_name': 'اسم الأم',
             'classroom': 'الفصل',
             'specialization': 'التخصص',
@@ -269,3 +276,14 @@ class StudentForm(forms.ModelForm):
         for field_name in self.fields:
             if field_name not in ['first_name', 'last_name', 'academic_year', 'grade']:
                 self.fields[field_name].required = False
+                
+                
+    def clean_whatsapp_number(self):
+        number = self.cleaned_data.get('whatsapp_number')
+
+        # تحسين التحقق ليشمل الأرقام فقط والتأكد من الطول (11 رقم)
+        if number:
+            if not number.startswith('01') or not number.isdigit() or len(number) != 11:
+                raise forms.ValidationError("برجاء إدخال رقم واتساب مصري صحيح (11 رقم يبدأ بـ 01)")
+
+        return number

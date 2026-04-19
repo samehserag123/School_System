@@ -61,6 +61,11 @@ class Student(models.Model):
         ("General", "شعبة عامة"), ("Restaurant", "مطعم"), ("Kitchen", "مطبخ"),
         ("Guidance", "ارشاد"), ("Internal", "اشراف داخلي"), ("Computer", "حاسب الي"),
     ]
+    
+    phone_validator = RegexValidator(
+        regex=r'^01[0-9]{9}$',
+        message="يجب إدخال رقم موبايل مصري صحيح مكون من 11 رقم"
+    )
 
     # --- البيانات الأساسية ---
     image = models.ImageField("صورة الطالب", upload_to="students/", null=True, blank=True)
@@ -104,6 +109,13 @@ class Student(models.Model):
 
     mother_name = models.CharField("اسم الأم", max_length=150, null=True, blank=True)
     phone = models.CharField("رقم التليفون", max_length=40, null=True, blank=True)
+    whatsapp_number = models.CharField(
+        max_length=11,
+        validators=[phone_validator],
+        verbose_name="رقم الواتساب",
+        blank=True,
+        null=True
+    )
     father_job = models.CharField(max_length=100, verbose_name="وظيفة الأب", blank=True, null=True)
     # --- الحالة الأكاديمية ---
     # جعل حالة القيد اختيارية

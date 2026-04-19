@@ -25,10 +25,12 @@ urlpatterns = [
     # محمية بـ login_required: إذا حاول شخص دخولها بدون لوجن سيتم تحويله لصفحة /login/
     path('', login_required(views.home), name='home'),
     
+
     # 5. روابط التطبيقات (HTML)
     path('students/', include('students.urls')),
     path('finance/', include('finance.urls')),
     path('treasury/', include('treasury.urls')),
+    
     path('hr/', include('hr.urls')),
 
     # 6. روابط الـ API (REST Framework)

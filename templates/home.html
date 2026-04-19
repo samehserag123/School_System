@@ -188,20 +188,58 @@
     </style>
 </head>
 <body>
-
 <nav class="navbar navbar-expand-lg navbar-dark fixed-top navbar-glass">
     <div class="container-fluid px-4">
-        
         <a class="navbar-brand d-flex align-items-center gap-2" href="#">
             <i class="bi bi-mortarboard-fill text-info"></i>
             نظام إدارة المدرسة
         </a>
-        
         <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar">
             <span class="navbar-toggler-icon"></span>
         </button>
+       
+      <div class="collapse navbar-collapse" id="mainNavbar">
+    <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-1">
 
-        
+        {% if user.is_superuser or "HR_Access" in user.groups.all.0.name %}
+        <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                <i class="bi bi-briefcase-fill me-1"></i> الموارد البشرية
+            </a>
+
+            <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
+
+                <li>
+                    <a class="dropdown-item" href="{% url 'hr:hr_dashboard' %}">
+                        <i class="bi bi-speedometer2 text-primary"></i> لوحة تحكم الموارد
+                    </a>
+                </li>
+
+                <li>
+                    <a class="dropdown-item" href="{% url 'hr:employee_list' %}">
+                        <i class="bi bi-person-badge text-success"></i> دليل الموظفين
+                    </a>
+                </li>
+
+                <li>
+                    <a class="dropdown-item" href="{% url 'hr:attendance_list' %}">
+                        <i class="bi bi-clock-history text-warning"></i> الحضور والانصراف
+                    </a>
+                </li>
+
+                <li>
+                    <a class="dropdown-item" href="{% url 'hr:leave_list' %}">
+                        <i class="bi bi-calendar2-check text-info"></i> إدارة الإجازات
+                    </a>
+                </li>
+
+            </ul>
+        </li>
+        {% endif %}
+
+    </ul>
+</div>      <!-- نهاية قائمة الموارد البشرية -->
+  
       <div class="collapse navbar-collapse" id="mainNavbar">
     <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-1">
         

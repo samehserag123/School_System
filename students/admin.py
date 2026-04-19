@@ -331,21 +331,24 @@ class ClassroomAdmin(admin.ModelAdmin):
     list_filter = ['grade']
     search_fields = ['name']
 
+
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
     # قائمة الأعمدة التي ستظهر في الجدول
     list_display = (
         'student_code',
         'get_full_name', 
+        'whatsapp_number', # تمت إضافة رقم الواتساب ليظهر في الجدول
         'current_year_fees_display', 
         'total_paid_display', 
         'final_remaining_display',
         'old_debt_display'
     )
     
-    search_fields = ['first_name', 'last_name', 'student_code']
+    # إضافة أرقام الهواتف والواتساب لتسهيل البحث عن طالب معين برقم هاتفه
+    search_fields = ['first_name', 'last_name', 'student_code', 'whatsapp_number', 'phone']
+    
     list_filter = ['grade', 'classroom', 'academic_year']
-
     # 1. إجمالي المطلوب (حالي + قديم)
     def current_year_fees_display(self, obj):
         # الاسم من الموديل عندك: total_required_amount
