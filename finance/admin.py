@@ -20,27 +20,46 @@ from django.utils.html import format_html
 from .models import ReceiptBook
 
 from django.utils.safestring import mark_safe
-from .models import Expense
+
+from .models import Expense, ExpenseItem # تأكد من استيراد الموديلات
+
+# تسجيل قائمة بنود المصروفات
+admin.site.register(ExpenseItem)
 
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
-    list_display = ('title', 'amount_styled', 'expense_type', 'expense_date', 'spent_by', 'is_closed_status')
-    list_filter = ('expense_type', 'is_closed', 'expense_date', 'spent_by')
-    search_fields = ('title', 'notes')
+    # 👇 تم التعديل: استخدام دالة get_expense_name بدلاً من title، وإضافة invoice_number
+    list_display = ('get_expense_name', 'invoice_number', 'amount_styled', 'expense_type', 'expense_date', 'spent_by', 'is_closed_status')
+    
+    # 👇 تم التعديل: إضافة expense_item للفلترة الجانبية
+    list_filter = ('expense_type', 'is_closed', 'expense_date', 'spent_by', 'expense_item')
+    
+    # 👇 تم التعديل: إضافة البحث برقم الفاتورة واسم البند المسجل مسبقاً
+    search_fields = ('title', 'notes', 'invoice_number', 'expense_item__name')
     raw_id_fields = ('spent_by', 'closure')
 
-    # 1. تصحيح عرض المبلغ (تمرير القيمة كـ argument)
+    # --- دوال العرض المخصصة ---
+
+    # 1. دالة جديدة ذكية لعرض اسم المصروف (تدمج بين القائمة والكتابة اليدوية)
+    def get_expense_name(self, obj):
+        if obj.expense_item:
+            return obj.expense_item.name
+        return obj.title or "بدون بيان"
+    get_expense_name.short_description = "بيان الصرف"
+
+    # 2. تصحيح عرض المبلغ
     def amount_styled(self, obj):
-        # هنا نضع {} ونمرر obj.amount بعدها مباشرة
         return format_html('<b style="color: #d9534f;">{} ج.م</b>', obj.amount)
     amount_styled.short_description = "المبلغ"
 
-    # 2. تصحيح حالة الإغلاق (استخدام mark_safe لأن النص ثابت ولا يحتوي على {})
+    # 3. تصحيح حالة الإغلاق
     def is_closed_status(self, obj):
         if obj.is_closed:
             return mark_safe('<span style="color: green; font-weight: bold;">✔ مغلق</span>')
         return mark_safe('<span style="color: orange; font-weight: bold;">⏳ مفتوح</span>')
     is_closed_status.short_description = "حالة الجرد"
+
+    # --- حماية البيانات والأتمتة ---
 
     # حماية البيانات: منع تعديل المصروف إذا تم إغلاقه
     def get_readonly_fields(self, request, obj=None):
@@ -53,7 +72,6 @@ class ExpenseAdmin(admin.ModelAdmin):
         if not obj.spent_by:
             obj.spent_by = request.user
         super().save_model(request, obj, form, change)
-        
             
 @admin.register(ReceiptBook)
 class ReceiptBookAdmin(admin.ModelAdmin):
@@ -126,20 +144,57 @@ class RevenueCategoryAdmin(admin.ModelAdmin):
 class PlanItemInline(admin.TabularInline):
     model = PlanItem
     extra = 1
+    fields = ('name', 'amount', 'due_date', 'order')
+    ordering = ('order',)
 
 @admin.register(InstallmentPlan)
 class InstallmentPlanAdmin(admin.ModelAdmin):
-    list_display = ['name', 'total_amount', 'number_of_installments']
+    list_display = ('name', 'academic_year', 'total_amount', 'administrative_fee')
+    list_editable = ('administrative_fee',) # لتسهيل تعديلها من الخارج مباشرة
+    search_fields = ('name',)
     inlines = [PlanItemInline]
+    # تنسيق شكل عرض الحقول داخل صفحة الإضافة/التعديل
+    fieldsets = (
+        ('البيانات الأساسية', {
+            'fields': ('name', 'academic_year', 'number_of_installments')
+        }),
+        ('المبالغ والأقساط (تدخل في المديونية)', {
+            'fields': ('total_amount', 'interest_value')
+        }),
+        ('إيرادات حرة (لا تدخل في المديونية)', {
+            'fields': ('administrative_fee',),
+            'description': 'هذه الرسوم تُدفع كإيراد منفصل ولا تُضاف لأقساط الطالب.'
+        }),
+    )
+    
 
-# 5. حسابات الطلاب (Accounts)
 @admin.register(StudentAccount)
 class StudentAccountAdmin(admin.ModelAdmin):
-    list_display = ['student', 'installment_plan', 'total_fees', 'net_fees_display', 'total_paid_display', 'total_remaining_display']
-    list_select_related = ('student', 'installment_plan')
+    # 1. الأعمدة المعروضة في الجدول
+    list_display = [
+        'student', 
+        'academic_year', # أضفنا السنة هنا للوضوح
+        'installment_plan', 
+        'total_fees', 
+        'discount',
+        'net_fees_display', 
+        'total_paid_display', 
+        'total_remaining_display'
+    ]
+    
+    # 2. الفلاتر الجانبية (تمكنك من اختيار 2024/2025 بضغطة واحدة)
+    list_filter = ('academic_year', 'installment_plan', 'revenue_category')
+    
+    # 3. تحسين الأداء عبر جلب البيانات المرتبطة دفعة واحدة
+    list_select_related = ('student', 'installment_plan', 'academic_year')
+    
     readonly_fields = ['total_fees']
     search_fields = ['student__first_name', 'student__last_name', 'student__student_code']
-    # تحويل الخصائص (Properties) إلى أعمدة قابلة للعرض
+
+    # 4. إضافة إجراءات جماعية (Actions) للحذف أو التعديل السريع
+    actions = ['delete_selected_accounts', 'reset_discounts']
+
+    # --- وظائف العرض (Displays) ---
     def net_fees_display(self, obj):
         return obj.net_fees
     net_fees_display.short_description = "صافي المصروفات"
@@ -149,51 +204,95 @@ class StudentAccountAdmin(admin.ModelAdmin):
     total_paid_display.short_description = "إجمالي المدفوع"
 
     def total_remaining_display(self, obj):
-        # يعرض المتبقي مع تلوينه بالأحمر إذا كان هناك مستحقات
         val = obj.total_remaining
         if val > 0:
             return format_html('<span style="color: red; font-weight: bold;">{} ج.م</span>', val)
         return f"{val} ج.م"
     total_remaining_display.short_description = "المتبقي"
 
+    # --- الإجراءات الجماعية (Actions) ---
+    @admin.action(description="حذف حسابات الطلاب المختارة نهائياً")
+    def delete_selected_accounts(self, request, queryset):
+        """حذف الحسابات والمديونيات المرتبطة بالسنة المختارة"""
+        with transaction.atomic():
+            count = queryset.count()
+            queryset.delete()
+            self.message_user(request, f"تم حذف {count} حساب طالب بنجاح.")
+
+    @admin.action(description="تصفير الخصومات للحسابات المختارة")
+    def reset_discounts(self, request, queryset):
+        updated = queryset.update(discount=0)
+        self.message_user(request, f"تم تصفير الخصم لـ {updated} حساب.")
+
+
+from django.db import transaction
+
 @admin.register(StudentInstallment)
 class StudentInstallmentAdmin(admin.ModelAdmin):
-    # إظهار الحقول الأساسية + حقل "المتبقي" الذي سنحسبه حياً
-    list_display = ('student', 'academic_year', 'amount_due', 'paid_amount', 'get_remaining_balance', 'status')
+    # 1. الحقول المعروضة في الجدول
+    list_display = ('student', 'academic_year', 'installment_number', 'amount_due', 'paid_amount', 'get_remaining_balance', 'status')
     
-    # منع التعديل اليدوي على المدفوع لضمان دقة الربط مع الإيصالات
+    # 2. الفلاتر الجانبية (هنا تختار السنة الدراسية 2024/2025)
+    list_filter = ('academic_year', 'status', 'installment_plan')
+    
+    # 3. إمكانية البحث باسم الطالب
+    search_fields = ('student__first_name', 'student__last_name', 'student__student_code')
+    
     readonly_fields = ('paid_amount',)
 
-    def get_remaining_balance(self, obj):
-        # هذه الدالة تجبر الصفحة على سحب القيمة الحقيقية من قاعدة البيانات في كل مرة تفتح فيها الصفحة
-        return obj.amount_due - obj.paid_amount
-    
-    get_remaining_balance.short_description = "المبلغ المتبقي الحقيقي"
+    # 4. إضافة إجراءات جماعية (Actions)
+    actions = ['delete_selected_installments', 'reset_paid_amount']
 
-    # إضافة هذه الدالة لضمان تحديث البيانات عند العرض
+    def get_remaining_balance(self, obj):
+        return obj.amount_due - obj.paid_amount
+    get_remaining_balance.short_description = "المبلغ المتبقي"
+
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('student')
-    
-    
+        # استخدام select_related لتحسين الأداء كما في لوحة الفحص
+        return super().get_queryset(request).select_related('student', 'academic_year')
+
+    # إجراء مخصص لحذف الأقساط المحددة (آمن)
+    @admin.action(description="حذف الأقساط المختارة نهائياً")
+    def delete_selected_installments(self, request, queryset):
+        with transaction.atomic():
+            count = queryset.count()
+            queryset.delete()
+            self.message_user(request, f"تم حذف {count} قسط بنجاح.")
+
+    # إجراء لتصفير المديونية (اختياري بدلاً من الحذف)
+    @admin.action(description="تصفير مبالغ الأقساط المختارة")
+    def reset_paid_amount(self, request, queryset):
+        updated = queryset.update(paid_amount=0, status='Pending')
+        self.message_user(request, f"تم إعادة ضبط {updated} قسط إلى 'قيد الانتظار'.")
+        
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ['get_student_name', 'revenue_category', 'amount_paid', 'payment_date']
-    list_filter = ['academic_year', 'revenue_category', 'payment_date']
+    # 1. عرض الحقول الأساسية
+    list_display = ['id', 'get_student_name', 'revenue_category', 'amount_paid', 'payment_date']
     
-    # إضافة هذا السطر لجلب البيانات المرتبطة بـ "استعلام واحد" (SQL JOIN)
-    # نستخدم 'student' و 'installment__student' لأن installment مرتبطة بـ student
-    list_select_related = ('student', 'installment__student') 
+    # 2. منع تحميل 1700 طالب في الذاكرة (ممتاز للسرعة)
+    raw_id_fields = ['student', 'installment']
     
+    # 3. جلب البيانات المرتبطة في استعلام SQL واحد (JOIN) لتقليل الـ 1750 استعلام
+    list_select_related = ('student', 'revenue_category')
+    
+    # 4. تقليل عدد السجلات في الصفحة لسرعة العرض
+    list_per_page = 20
+
+    # 5. التصحيح: البحث بالحقول الفعلية (First & Last Name) بدلاً من full_name
+    search_fields = ['student__first_name', 'student__last_name', 'id']
+    
+    # 6. فلترة خفيفة
+    list_filter = ['payment_date', 'academic_year']
+
+    # تحسين عرض الاسم في القائمة
     def get_student_name(self, obj):
-        # الكود الخاص بك سيعمل الآن بسرعة أكبر بفضل list_select_related
         if obj.student:
-            return f"{obj.student}"
-        if obj.installment:
-            return f"{obj.installment.student}"
+            # استخدام الحقول المباشرة بدلاً من Property لو كانت تسبب بطئاً
+            return f"{obj.student.first_name} {obj.student.last_name}"
         return "غير محدد"
     get_student_name.short_description = 'اسم الطالب'
-# 7. الموديلات الإدارية والجرد
+    
 @admin.register(AcademicYear)
 class AcademicYearAdmin(admin.ModelAdmin):
     list_display = ['name', 'is_active']

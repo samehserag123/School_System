@@ -115,19 +115,32 @@ class GradePriceList(models.Model):
 
     def __str__(self):
         return f"{self.revenue_category.name} - {self.grade.name} ({self.price} ج.م)"
+from django.db import models
+from decimal import Decimal
 
 class InstallmentPlan(models.Model):
     name = models.CharField("اسم الخطة الدراسية", max_length=100)
     # أضفنا السنة الدراسية هنا لربطها في شاشة التسكين
     academic_year = models.ForeignKey('AcademicYear', on_delete=models.CASCADE, verbose_name="السنة الدراسية", null=True)
-    total_amount = models.DecimalField("إجمالي مبلغ الخطة", max_digits=10, decimal_places=2, default=0)
+    
+    # --- المبالغ التي يتم تقسيطها على الطالب ---
+    total_amount = models.DecimalField("إجمالي مبلغ الخطة (يُقسط)", max_digits=10, decimal_places=2, default=0)
     number_of_installments = models.PositiveIntegerField("عدد الأقساط")
     interest_value = models.DecimalField(
-        "قيمة الفائدة الإضافية",
+        "رسوم فتح الملف",
         max_digits=10,
         decimal_places=2,
         default=0,
-        help_text="قيمة فائدة ثابتة تضاف لإجمالي الخطة"
+        help_text="تحصل مباشره من الخزينه"
+    )
+
+    # --- 💡 الحقل الجديد: رسوم إدارية منفصلة تماماً عن المديونية ---
+    administrative_fee = models.DecimalField(
+        "رسوم إدارية (غرامه تاخير)",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="قيمة ثابتة تُحدد من الإدارة. لا تدخل ضمن أقساط الطالب أو مديونيته، وتُطالب بها الخزينة كإيراد منفصل."
     )
 
     class Meta:
@@ -135,14 +148,17 @@ class InstallmentPlan(models.Model):
         verbose_name_plural = "خطط المصروفات"
 
     def update_total(self):
-        """تحديث إجمالي مبلغ الخطة بناءً على مجموع البنود"""
+        """
+        تحديث إجمالي مبلغ الخطة بناءً على مجموع البنود + الفائدة.
+        🚨 تم العزل: الرسوم الإدارية (administrative_fee) لا تُجمع هنا لضمان عدم دخولها في مديونية الأقساط.
+        """
         total = self.items.aggregate(total=models.Sum('amount'))['total'] or 0
         self.total_amount = total + self.interest_value
         self.save(update_fields=['total_amount'])
 
     def __str__(self):
-        return f"{self.name} ({self.total_amount})"
-
+        return f"{self.name} (مديونية الأقساط: {self.total_amount} | الرسوم الإدارية: {self.administrative_fee})"
+    
 class PlanItem(models.Model):
     plan = models.ForeignKey('InstallmentPlan', on_delete=models.CASCADE, related_name='items')
     name = models.CharField("اسم القسط", max_length=100) # مثل: القسط الأول
@@ -189,7 +205,13 @@ class StudentInstallment(models.Model):
                 name='unique_student_installment_per_year'
             )
         ]
-
+    
+    @property
+    def total_late_fees(self):
+        # جمع كافة غرامات التأخير من الأقساط المرتبطة بهذا الطالب
+        from django.db.models import Sum
+        return self.installments.aggregate(total=Sum('late_fee'))['total'] or 0
+    
     @property
     def total_required(self):
         """إجمالي المطلوب لهذا القسط (الأصل + الغرامة)"""
@@ -306,8 +328,21 @@ class StudentAccount(models.Model):
     
     @property
     def total_remaining(self):
+        from django.db.models import Sum, F
+        from decimal import Decimal
+        
+        # 1. جلب الأقساط المسكنة لهذا الحساب (لهذا الطالب وفي هذه السنة)
+        installments = self.student.installments.filter(academic_year=self.academic_year)
+        
+        if installments.exists():
+            # 2. إذا وجد تسكين، المرجعية هي الأقساط (المطلوب - المدفوع داخل القسط)
+            data = installments.aggregate(
+                rem=Sum(F('amount_due') - F('paid_amount'))
+            )
+            return max(data['rem'] or Decimal("0.00"), Decimal("0.00"))
+        
+        # 3. إذا لم يوجد تسكين، نستخدم المعادلة التقليدية
         remaining = (self.total_fees - self.discount) - self.total_paid
-        # انظر هنا: القوس الأول لـ max والثاني لـ Decimal
         return max(remaining, Decimal("0.00"))
     
 
@@ -421,11 +456,14 @@ class Payment(models.Model):
         related_name="payments",
         verbose_name="رقم الجرد/الإغلاق"
     )
+    # ... بقية الحقول ...
     receipt_number = models.PositiveIntegerField(
         null=True, 
         blank=True, 
+        unique=True, # 🔴 هذا القفل السحري يمنع تسجيل أي إيصال مكرر نهائياً
         verbose_name="رقم الإيصال المرجعي"
     )
+    # ... بقية الحقول ...
     notes = models.TextField(null=True, blank=True, verbose_name="ملاحظات إضافية")
 
     class Meta:
@@ -439,67 +477,115 @@ class Payment(models.Model):
             if original.is_closed:
                 raise ValidationError("🚨 خطأ أمني: هذا الإيصال تم إغلاقه في الخزينة، لا يمكن تعديله.")
 
-    def save(self, *args, **kwargs):
-        is_new = not self.pk
-        if self.student and not self.academic_year:
-            self.academic_year = self.student.academic_year
+    
+    is_cancelled = models.BooleanField(default=False, verbose_name="ملغي")
+    cancelled_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name="cancelled_receipts")
+    cancellation_reason = models.TextField(null=True, blank=True, verbose_name="سبب الإلغاء")
+    cancelled_at = models.DateTimeField(null=True, blank=True)
 
+    def cancel_payment(self, admin_user, reason):
+        """دالة مخصصة لإلغاء الإيصال وعكس تأثيره على الأقساط"""
+        if self.is_closed:
+            raise ValidationError("لا يمكن إلغاء إيصال تم إغلاق خزينته.")
+        
         with transaction.atomic():
-            super(Payment, self).save(*args, **kwargs)
-            
+            # 1. إعادة المبالغ للأقساط (عكس منطق الـ save)
             if self.student:
-                category = self.revenue_category
-                is_educational_fee = False
-                if category:
-                    if "المصروفات" in category.name or (category.parent and "المصروفات" in category.parent.name):
-                        is_educational_fee = True
+                # جلب الأقساط التي تم دفعها (مرتبة عكسياً من الأحدث للأقدم)
+                # جلب الأقساط المتأخرة وتحديثها دفعة واحدة (من الأقدم للأحدث عبر كل السنوات)
+                installments = StudentInstallment.objects.filter(
+                    student=self.student
+                ).exclude(status='Paid').order_by('due_date')
+
+                remaining_to_refund = self.amount_paid
+                for inst in installments:
+                    if remaining_to_refund <= 0: break
+                    
+                    if inst.paid_amount >= remaining_to_refund:
+                        inst.paid_amount -= remaining_to_refund
+                        remaining_to_refund = 0
+                    else:
+                        remaining_to_refund -= inst.paid_amount
+                        inst.paid_amount = 0
+                    
+                    # تحديث الحالة
+                    if inst.paid_amount == 0:
+                        inst.status = 'Pending'
+                    else:
+                        inst.status = 'Partial'
+                    inst.save(update_fields=['paid_amount', 'status'])
+
+            # 2. تحديث بيانات الإيصال
+            self.amount_paid = 0
+            self.is_cancelled = True
+            self.cancelled_by = admin_user
+            self.cancellation_reason = reason
+            self.cancelled_at = timezone.now()
+            self.save(update_fields=['is_cancelled', 'cancelled_by', 'cancellation_reason', 'cancelled_at'])
+            
+            
+    def save(self, *args, **kwargs):
+        # التأكد من عدم الدخول في حلقة مفرغة
+        if getattr(self, '_saving', False):
+            return
+        self._saving = True
+
+        try:
+            is_new = not self.pk
+            if self.student and not self.academic_year:
+                self.academic_year = self.student.academic_year
+
+            with transaction.atomic():
+                # الحفظ الأساسي أولاً
+                super(Payment, self).save(*args, **kwargs)
                 
-                # 1. التوزيع التلقائي الذكي (إذا لم يتم ربط الإيصال يدوياً بقسط محدد)
-                if is_new and is_educational_fee and not self.installment:
-                    open_installments = StudentInstallment.objects.filter(
-                        student=self.student,
-                        academic_year=self.academic_year
-                    ).order_by('due_date')
-
-                    remaining = self.amount_paid
-                    last_inst = None
-                    
-                    # تسديد الأقساط غير المدفوعة
-                    for inst in open_installments.exclude(status='Paid'):
-                        if remaining <= 0: break
-                        needed = inst.amount_due - inst.paid_amount
-                        if remaining >= needed:
-                            inst.paid_amount = inst.amount_due
-                            inst.status = 'Paid'
-                            remaining -= needed
-                        else:
-                            inst.paid_amount += remaining
-                            inst.status = 'Partial'
-                            remaining = 0
-                        inst.save()
-                        last_inst = inst
+                # تنفيذ منطق الأقساط فقط إذا كان هناك طالب وبند مصروفات
+                if self.student and is_new:
+                    # التحقق من نوع الإيراد (بشكل سريع)
+                    category = self.revenue_category
+                    if category and ("المصروفات" in category.name or (category.parent and "المصروفات" in category.parent.name)):
                         
-                    # 🔴 معالجة الدفع المقدم (Overpayment): 
-                    # لو الطالب دفع مقدم بزيادة عن المطلوب في كل الأقساط، نضع الزيادة في آخر قسط
-                    if remaining > 0:
-                        last_inst = open_installments.last()
-                        if last_inst:
-                            last_inst.paid_amount += remaining
-                            last_inst.status = 'Paid'
-                            last_inst.save()
-                    
-                    # ربط الإيصال بآخر قسط تأثر بالدفع للتوثيق
-                    if last_inst:
-                        Payment.objects.filter(pk=self.pk).update(installment=last_inst)
+                        # جلب الأقساط وتحديثها دفعة واحدة
+                        installments = StudentInstallment.objects.filter(
+                            student=self.student, 
+                            academic_year=self.academic_year
+                        ).exclude(status='Paid').order_by('due_date')
 
-                # 2. التحديث اليدوي (لو تم ربط الإيصال بقسط معين من شاشة الإدارة)
-                elif self.installment:
-                    inst = self.installment
-                    total = Payment.objects.filter(installment=inst).aggregate(models.Sum('amount_paid'))['amount_paid__sum'] or 0
-                    inst.paid_amount = total
-                    inst.status = 'Paid' if inst.paid_amount >= inst.amount_due else 'Partial'
-                    inst.save()
+                        remaining = self.amount_paid
+                        for inst in installments:
+                            if remaining <= 0: break
+                            needed = inst.amount_due - inst.paid_amount
+                            if remaining >= needed:
+                                inst.paid_amount = inst.amount_due
+                                inst.status = 'Paid'
+                                remaining -= needed
+                            else:
+                                inst.paid_amount += remaining
+                                inst.status = 'Partial'
+                                remaining = 0
+                            # استخدام update_fields ضروري لسرعة الاستجابة
+                            inst.save(update_fields=['paid_amount', 'status'])
+        finally:
+            self._saving = False
 
+# 1. أضف هذا الكلاس الجديد فوق كلاس Expense
+# 1. أضف هذا الكلاس الجديد فوق كلاس Expense
+class ExpenseItem(models.Model):
+    """
+    موديل لتسجيل بنود المصروفات مسبقاً في لوحة التحكم (الآدمن)
+    لتسهيل اختيارها لاحقاً في شاشة المصروفات.
+    """
+    name = models.CharField(max_length=200, verbose_name="اسم بند المصروف (مثل: كهرباء، بوفيه، إلخ)")
+    is_active = models.BooleanField(default=True, verbose_name="نشط متاح للاستخدام")
+
+    class Meta:
+        verbose_name = "بند مصروف (قائمة)"
+        verbose_name_plural = "قائمة بنود المصروفات"
+
+    def __str__(self):
+        return self.name
+
+# 2. استبدل كلاس Expense القديم بهذا الكلاس المعدل
 class Expense(models.Model):
     # إضافة خيارات نوع المصروف
     EXPENSE_TYPES = (
@@ -507,17 +593,28 @@ class Expense(models.Model):
         ('general', 'مصروفات عمومية'),
     )
     
-    title = models.CharField(max_length=200, verbose_name="بيان الصرف")
+    # 👇 التعديل الأول: ربط المصروف بالبنود المسجلة مسبقاً (حقل اختياري) 👇
+    expense_item = models.ForeignKey(
+        ExpenseItem, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        verbose_name="اختر البند (من القائمة)"
+    )
+    
+    # 👇 التعديل الثاني: جعلنا حقل البيان اليدوي اختيارياً ليكمل الحقل السابق 👇
+    title = models.CharField(max_length=200, blank=True, null=True, verbose_name="أو اكتب بيان الصرف يدوياً")
+    
+    # 👇 التعديل الثالث: حقل رقم الفاتورة (اختياري) 👇
+    invoice_number = models.CharField(max_length=100, null=True, blank=True, verbose_name="رقم الفاتورة")
+    
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="المبلغ")
-    
-    # 👇 الحقل الجديد المطلوب لحل الخطأ وتصنيف المصروفات 👇
     expense_type = models.CharField(max_length=20, choices=EXPENSE_TYPES, default='petty', verbose_name="نوع المصروف")
-    
     expense_date = models.DateTimeField(default=timezone.now, verbose_name="تاريخ الصرف")
     
     # ربط المصروف بالموظف الذي قام بالصرف
-    #spent_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="قام بالصرف")
     spent_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    
     # ربط المصروف بالجرد اليومي (الخزينة)
     is_closed = models.BooleanField(default=False, verbose_name="تم ضمه للجرد")
     closure = models.ForeignKey(
@@ -537,16 +634,25 @@ class Expense(models.Model):
         ordering = ['-expense_date']
 
     def clean(self):
+        # التأكد من إدخال بيان الصرف (إما باختيار بند من القائمة أو بالكتابة اليدوية)
+        if not self.expense_item and not self.title:
+            from django.core.exceptions import ValidationError
+            raise ValidationError("يجب عليك إما اختيار بند من القائمة، أو كتابة بيان الصرف يدوياً.")
+
         if self.pk:
             original = Expense.objects.get(pk=self.pk)
             if original.is_closed:
-                from django.core.exceptions import ValidationError # للتأكد من استيراد دالة الخطأ
+                from django.core.exceptions import ValidationError
                 raise ValidationError("🚨 لا يمكن تعديل مصروف تم إغلاقه في الجرد.")
 
     def __str__(self):
-        return f"{self.title} - {self.amount} ج.م"
-    
-    
+        # عرض اسم البند من القائمة إذا تم اختياره، وإلا نعرض البيان المكتوب يدوياً
+        display_title = self.expense_item.name if self.expense_item else self.title
+        
+        # إضافة رقم الفاتورة في العرض إن وجد
+        invoice_info = f" (فاتورة: {self.invoice_number})" if self.invoice_number else ""
+        
+        return f"{display_title}{invoice_info} - {self.amount} ج.م"
  
 class ItemDefinition(models.Model):
     name = models.CharField("اسم الصنف (مثل: كتاب لغة عربية)", max_length=200)

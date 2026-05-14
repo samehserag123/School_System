@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>التحقق من المنتج | Shell</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        body { background-color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
+        
+        /* الهيدر العلوي طبق الصورة */
+        .shell-navbar { border-bottom: 1px solid #e0e0e0; background: #fff; position: relative; }
+        .nav-content {
+            display: flex;
+            align-items: center;
+            padding: 5px 15px;
+            direction: ltr; /* لترتيب اللوجو ثم النص بجانبه مباشرة */
+        }
+        .brand-logo { width: 45px; height: auto; margin-right: 10px; } /* تقريب اللوجو من النص */
+        .brand-text { font-weight: 700; color: #444; font-size: 15px; }
+        
+        /* الخط الأصفر أسفل الهيدر */
+        .shell-yellow-line { width: 100%; height: 4px; background-color: #fbce07; }
+
+        /* زر القائمة الجانبي (الهمبرجر) */
+        .menu-btn {
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            width: 60px;
+            border-left: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .menu-btn span { display: block; width: 25px; height: 3px; background-color: #333; margin: 2px 0; }
+
+        /* حاوية المحتوى */
+        .content-body { padding: 40px 25px; }
+
+        /* العنوان: يسار وتحت بعض وبخط عريض */
+        .title-section {
+            text-align: left;
+            direction: ltr;
+            margin-bottom: 50px;
+        }
+        .main-title { 
+            font-weight: 900; 
+            color: #444; 
+            font-size: 38px; /* حجم كبير كما في الصورة */
+            line-height: 1.1;
+            display: inline-block;
+            border-bottom: 5px solid #dd1d21; /* الخط الأحمر العريض */
+            padding-bottom: 15px;
+            width: 100%;
+        }
+        .main-title span { display: block; }
+
+        /* منطقة النتيجة (الصح الأخضر) */
+        .result-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-top: 60px;
+        }
+        .check-circle {
+            width: 120px; 
+            height: 120px; 
+            background-color: #008a44;
+            color: white; 
+            border-radius: 50%;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-size: 60px;
+            margin-bottom: 25px;
+        }
+        .result-text { 
+            font-size: 18px; 
+            color: #555; 
+            font-weight: 500; 
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- الهيدر -->
+    <nav class="shell-navbar">
+        <div class="nav-content">
+            <img src="https://upload.wikimedia.org/wikipedia/en/e/e8/Shell_logo.svg" alt="Shell" class="brand-logo">
+            <span class="brand-text">Shell Advantage Rewards</span>
+        </div>
+        <div class="menu-btn">
+            <span></span>
+            <span></span>
+        </div>
+        <div class="shell-yellow-line"></div>
+    </nav>
+
+    <!-- محتوى الصفحة -->
+    <div class="content-body">
+        
+        <!-- العنوان جهة اليسار -->
+        <div class="title-section">
+            <h1 class="main-title">
+                <span>PRODUCT</span>
+                <span>VERIFICATION</span>
+            </h1>
+        </div>
+        
+        <!-- النتيجة في المنتصف -->
+        <div class="result-section">
+            <div class="check-circle">
+                <i class="fas fa-check"></i>
+            </div>
+            <div class="result-text">
+                منتج اصلي. شكرا لشراء منتجات شل الأصلية
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

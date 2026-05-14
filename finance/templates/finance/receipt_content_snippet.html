@@ -1,68 +1,144 @@
-<div style="font-family: 'Amiri', serif; position: relative; padding: 5px; background: #fff; max-height: 14cm; overflow: hidden;">
-    <table style="width: 100%; border-bottom: 2px solid #000; margin-bottom: 10px; padding-bottom: 5px;" dir="rtl">
-        <tr>
-            <td style="text-align: right; width: 35%; vertical-align: top;">
-                <div style="font-size: 0.85rem;">محافظة القاهرة</div>
-                <div style="font-size: 0.85rem;">إدارة عين شمس التعليمية</div>
-                <div style="font-size: 1rem; font-weight: bold; margin-top: 2px;">مدرسة طلعت حرب الفندقية</div>
-            </td>
-            <td style="text-align: center; width: 30%;">
-                <div style="border: 2px solid #000; padding: 5px; background: #fff;">
-                    <h5 style="margin:0; font-weight: bold;">إيصال استلام</h5>
-                    <div style="border-top: 1px solid #000; margin-top:2px; font-weight: bold; font-size: 1.1rem;">
-                        رقم دفتري: #{{ payment.receipt_number|default:payment.id }}
-                    </div>
-                </div>
-            </td>
-            <td style="text-align: left; width: 35%;">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=Receipt:{{payment.receipt_number|default:payment.id}}|Amt:{{payment.amount_paid}}" style="width:65px;">
-            </td>
-        </tr>
-    </table>
+{% extends "base.html" %}
+{% block content %}
 
-    <div style="text-align: right; line-height: 1.8; font-size: 1.1rem;" dir="rtl">
-        <p>وصلنا من الطالب/ <strong>{{ payment.student.get_full_name }}</strong></p>
-        <p>المقيد بالصف/ <strong>{{ payment.student.grade.name }}</strong></p>
+<style>
+    /* 1. إعدادات الطباعة لضمان إيصال واحد في صفحة واحدة */
+    @page {
+        size: A4 portrait;
+        margin: 0;
+    }
+
+    @media print {
+        html, body {
+            height: 100%;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden;
+            background-color: #fff !important;
+        }
         
-        <div style="margin: 10px 0;">
-            <span>مبلغ وقدره/ </span>
-            <span style="border: 2px solid #000; padding: 3px 15px; background: #f8f9fa; font-weight: bold;">
-                {{ payment.amount_paid }} جنيهاً مصرياً لا غير
-            </span>
-        </div>
+        body * {
+            visibility: hidden;
+        }
 
-        <div style="margin-top: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
-            <span style="font-weight: bold;">وذلك قيمة/</span> 
-            <span style="font-size: 1.1rem; border: 1px solid #ccc; padding: 0 8px; background-color: #f9f9f9;">
-                {{ payment.revenue_category.name }}
-            </span>
-            
-            {% if payment.installment and payment.installment.name and payment.installment.name != "0" and payment.installment.name != "None" %}
-                 <span style="margin-right: 5px;">({{ payment.installment.name }})</span>
-            {% endif %}
-        </div>
+        #print-wrapper, #print-wrapper * {
+            visibility: visible;
+        }
 
-        <div style="margin-top: 10px; font-size: 1rem; display: flex; gap: 20px;">
-            <span>إجمالي المسدد: <strong>{{ total_paid }} ج.م</strong></span>
-            <span style="margin-right: 20px;">المتبقي الكلي: <strong style="color: red;">{{ remaining_balance }} ج.م</strong></span>
-        </div>
+        #print-wrapper {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 210mm;
+            padding: 10mm !important; /* هامش حماية علوي وجانبي */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
 
-        <p style="font-size: 0.9rem; margin-top: 5px;">
-            التاريخ: {{ payment.payment_date|date:"Y/m/d" }} | العام: {{ payment.academic_year.name }} | 
-            
-        </p>
-    </div>
+        .receipt-container {
+            width: 100%;
+            height: 130mm; /* يشغل نصف الورقة تقريباً */
+            page-break-inside: avoid;
+            border: 1px solid #000 !important;
+            padding: 10mm !important;
+            box-sizing: border-box;
+        }
 
-    <div style="margin-top: 25px;">
-        <table style="width: 100%; text-align: center; font-weight: bold;" dir="rtl">
+        .d-print-none {
+            display: none !important;
+        }
+    }
+
+    /* 2. تنسيق المعاينة على الشاشة */
+    #print-wrapper {
+        max-width: 190mm;
+        margin: 0 auto; /* كان 20px auto */
+        margin-top: 0;  /* ضمان إنه يبدأ من فوق */
+        font-family: 'Amiri', serif;
+    }
+
+    .receipt-container {
+        background: #fff;
+        color: #000;
+        border: 1px solid #ddd;
+        padding: 25px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .btn-lg {
+        border-radius: 50px;
+        padding: 12px 30px;
+        font-weight: bold;
+    }
+</style>
+
+<div id="print-wrapper">
+    <div class="receipt-container" dir="rtl">
+        <table style="width: 100%; border-bottom: 2px solid #000; margin-bottom: 20px; padding-bottom: 10px;">
             <tr>
-                <td style="width: 33%;">
-                    المحصل<br>
-                    <span style="font-size: 0.8rem; font-weight: normal; color: #555;">({{ request.user.get_full_name|default:request.user.username }})</span>
+                <td style="text-align: right; width: 35%; vertical-align: top;">
+                    <div style="font-size: 0.9rem;">محافظة القاهرة</div>
+                    <div style="font-size: 0.9rem;">إدارة عين شمس التعليمية</div>
+                    <div style="font-size: 1.1rem; font-weight: bold; margin-top: 2px;">مدرسة طلعت حرب الفندقية</div>
                 </td>
+                <td style="text-align: center; width: 30%;">
+                    <div style="border: 2px solid #000; padding: 8px; background: #fff;">
+                        <h5 style="margin:0; font-weight: bold; font-size: 1.2rem;">إيصال استلام نقدية</h5>
+                        <div style="border-top: 1px solid #000; margin-top:4px; font-weight: bold; font-size: 1.1rem;">
+                            رقم: #{{ payment.receipt_number|default:payment.id }}
+                        </div>
+                    </div>
+                </td>
+                <td style="text-align: left; width: 35%;">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=ID:{{payment.id}}|Amt:{{payment.amount_paid}}" style="width:80px;">
+                </td>
+            </tr>
+        </table>
+
+        <div style="text-align: right; line-height: 2.2; font-size: 1.3rem;">
+            <p>وصلنا من الطالب/ <strong>{{ payment.student.get_full_name }}</strong></p>
+            <p>المقيد بالصف/ <strong>{{ payment.student.grade.name }}</strong></p>
+            
+            <div style="margin: 20px 0;">
+                <span>مبلغ وقدره/ </span>
+                <span style="border: 2px solid #000; padding: 5px 25px; background: #fdfdfd; font-weight: bold; font-size: 1.5rem;">
+                    {{ payment.amount_paid }} جنيهاً مصرياً لا غير
+                </span>
+            </div>
+
+            <div style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <span>وذلك قيمة/ <strong>{{ payment.revenue_category.name }}</strong></span>
+                {% if payment.installment and payment.installment.name != "0" %}
+                     <span style="margin-right: 10px;">({{ payment.installment.name }})</span>
+                {% endif %}
+            </div>
+
+            <div style="margin-top: 15px; display: flex; gap: 40px; font-size: 1.15rem;">
+                <span>إجمالي المسدد: <strong style="color: #198754;">{{ total_paid|default:"0" }} ج.م</strong></span>
+                <span>المتبقي الكلي: <strong style="color: #dc3545;">{{ remaining_balance|default:"0" }} ج.م</strong></span>
+                <span style="margin-right: auto;">التاريخ: {{ payment.payment_date|date:"Y/m/d" }}</span>
+            </div>
+        </div>
+
+        <table style="width: 100%; text-align: center; margin-top: 50px; font-weight: bold; font-size: 1.1rem;">
+            <tr>
+                <td style="width: 33%;">المحصل: {{ request.user.username }}</td>
                 <td style="width: 33%;">شؤون الطلاب</td>
                 <td style="width: 34%;">ختم المدرسة</td>
             </tr>
         </table>
     </div>
 </div>
+
+<div class="d-print-none text-center mt-5 mb-5">
+    <button onclick="window.print();" class="btn btn-primary btn-lg shadow-sm me-3">
+        <i class="bi bi-printer-fill me-2"></i> طباعة الإيصال
+    </button>
+    <a href="{{ next_url|default:'/finance/student_list/' }}#student-{{ payment.student.id }}" 
+       class="btn btn-success btn-lg shadow-sm">
+        <i class="bi bi-arrow-right-circle-fill me-2"></i> العودة للسجل
+    </a>
+</div>
+
+{% endblock %}

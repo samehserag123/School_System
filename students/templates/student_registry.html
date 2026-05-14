@@ -388,63 +388,63 @@ const CHRISTIAN_SERVER = parseInt("{{ stats.christian|default:0 }}");
 const INTEG_SERVER = parseInt("{{ stats.integration|default:0 }}");
 
 function runFilters() {
-    let search = document.getElementById("tableSearch").value.toLowerCase();
-    let fGrade = document.getElementById("f-grade").value;
-    let fClass = document.getElementById("f-class").value;
-    let fSpec = document.getElementById("f-spec").value;
-    let fGender = document.getElementById("f-gender").value;
-    let fRelig = document.getElementById("f-religion").value;
-    let fInteg = document.getElementById("f-integ").value;
+    // 1. جلب القيم من حقول الإدخال
+    const search = document.getElementById("tableSearch").value.trim();
+    const fGrade = document.getElementById("f-grade").value;
+    const fClass = document.getElementById("f-class").value;
+    const fSpec = document.getElementById("f-spec").value;
+    const fGender = document.getElementById("f-gender").value;
+    const fRelig = document.getElementById("f-religion").value;
+    const fInteg = document.getElementById("f-integ").value;
 
-    let isFiltering = search || fGrade || fClass || fSpec || fGender || fRelig || fInteg;
-    let rows = document.querySelectorAll(".student-row");
-    let currentStats = { all: 0, male: 0, female: 0, muslim: 0, christian: 0, integ: 0 };
+    // 2. بناء رابط الطلب (URL) لإرساله للسيرفر
+    // نستخدم URLSearchParams لإضافة المعايير للرابط الحالي
+    const params = new URLSearchParams(window.location.search);
+    
+    if (search) params.set('q', search); else params.delete('q');
+    if (fGrade) params.set('grade', fGrade); else params.delete('grade');
+    if (fClass) params.set('classroom', fClass); else params.delete('classroom');
+    if (fSpec) params.set('spec', fSpec); else params.delete('spec');
+    if (fGender) params.set('gender', fGender); else params.delete('gender');
+    if (fRelig) params.set('religion', fRelig); else params.delete('religion');
+    if (fInteg) params.set('integ', fInteg); else params.delete('integ');
+    
+    // العودة دائماً للصفحة رقم 1 عند البحث لضمان ظهور النتائج
+    params.set('page', 1);
 
-    rows.forEach(row => {
-        let text = row.innerText.toLowerCase();
-        let grade = row.getAttribute("data-grade");
-        let classroom = row.getAttribute("data-class");
-        let spec = row.getAttribute("data-spec");
-        let gender = row.querySelector(".gender-val") ? row.querySelector(".gender-val").innerText.trim() : "";
-        let religion = row.querySelector(".religion-val") ? row.querySelector(".religion-val").innerText.trim() : "";
-        let integText = row.querySelector(".integ-val") ? row.querySelector(".integ-val").innerText.trim() : "";
+    // 3. طلب البيانات من السيرفر (AJAX) لفلترة كامل قاعدة البيانات
+    fetch(`${window.location.pathname}?${params.toString()}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(response => response.text())
+    .then(html => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // تحديث الجدول بالنتائج الجديدة (من كل الصفحات)
+        document.getElementById("tableBody").innerHTML = doc.getElementById("tableBody").innerHTML;
+        
+        // تحديث أرقام الإحصائيات (العدادات) بناءً على نتائج السيرفر
+        updateCounter("count-all", doc.getElementById("count-all").innerText);
+        updateCounter("count-male", doc.getElementById("count-male").innerText);
+        updateCounter("count-female", doc.getElementById("count-female").innerText);
+        updateCounter("count-muslim", doc.getElementById("count-muslim").innerText);
+        updateCounter("count-christian", doc.getElementById("count-christian").innerText);
+        updateCounter("count-integ", doc.getElementById("count-integ").innerText);
 
-        let isMatch = text.includes(search) &&
-                      (!fGrade || grade === fGrade) &&
-                      (!fClass || classroom === fClass) &&
-                      (!fSpec || spec === fSpec) &&
-                      (!fGender || gender.includes(fGender)) &&
-                      (!fRelig || religion.includes(fRelig)) &&
-                      (!fInteg || integText.includes(fInteg));
-
-        if (isMatch) {
-            row.style.display = "";
-            currentStats.all++;
-            if (gender === "بنين") currentStats.male++;
-            if (gender === "بنات") currentStats.female++;
-            if (religion === "مسلم") currentStats.muslim++;
-            if (religion === "مسيحي") currentStats.christian++;
-            if (integText.includes("دمج") || integText.includes("نعم")) currentStats.integ++;
-        } else {
-            row.style.display = "none";
+        // تحديث أزرار الترقيم (Pagination) لتناسب البحث الجديد
+        const oldPagination = document.querySelector('nav[aria-label="Page navigation"]');
+        const newPagination = doc.querySelector('nav[aria-label="Page navigation"]');
+        if (oldPagination && newPagination) {
+            oldPagination.innerHTML = newPagination.innerHTML;
         }
-    });
-
-    if (!isFiltering) {
-        updateCounter("count-all", TOTAL_SERVER);
-        updateCounter("count-male", MALE_SERVER);
-        updateCounter("count-female", FEMALE_SERVER);
-        updateCounter("count-muslim", MUSLIM_SERVER);
-        updateCounter("count-christian", CHRISTIAN_SERVER);
-        updateCounter("count-integ", INTEG_SERVER);
-    } else {
-        updateCounter("count-all", currentStats.all);
-        updateCounter("count-male", currentStats.male);
-        updateCounter("count-female", currentStats.female);
-        updateCounter("count-muslim", currentStats.muslim);
-        updateCounter("count-christian", currentStats.christian);
-        updateCounter("count-integ", currentStats.integ);
-    }
+        
+        // تحديث عدد النتائج (عرض X إلى Y)
+        const oldInfo = document.querySelector('.text-white-50.small');
+        const newInfo = doc.querySelector('.text-white-50.small');
+        if (oldInfo && newInfo) oldInfo.innerHTML = newInfo.innerHTML;
+    })
+    .catch(error => console.error('Error during filtering:', error));
 }
 
 function updateCounter(id, newValue) {

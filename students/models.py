@@ -55,11 +55,11 @@ numbers_only = RegexValidator(r'^[0-9]*$', 'يسمح بالأرقام فقط.')
 class Student(models.Model):
     # --- الخيارات (Choices) ---
     RELIGION_CHOICES = [("Muslim", "مسلم"), ("Christian", "مسيحي")]
-    STATUS_CHOICES = [("New", "مستجد"), ("Transferred", "منقول"), ("Home", "عمال"), ("Promoted", "ناجح ومنقول")]
+    STATUS_CHOICES = [("New", "مستجد"), ("Transferred", "محول"), ("Retained", "باق"), ("Promoted", "ناجح ومنقول")]
     GENDER_CHOICES = [('Male', 'بنين'), ('Female', 'بنات')]
     SPECIALIZATION_CHOICES = [
-        ("General", "شعبة عامة"), ("Restaurant", "مطعم"), ("Kitchen", "مطبخ"),
-        ("Guidance", "ارشاد"), ("Internal", "اشراف داخلي"), ("Computer", "حاسب الي"),
+        ("General", "شعبة عامة"), ("Restaurant", "فني مضيف"), ("Kitchen", "فن طاهي"),
+        ("Internal", " مشرف غرف"), 
     ]
     
     phone_validator = RegexValidator(
@@ -148,6 +148,29 @@ class Student(models.Model):
         # اعتماد الدالة الرئيسية لعرض الطالب في القوائم ولوحة التحكم
         return self.get_full_name()
 
+    @property
+    def total_absolute_remaining(self):
+        from decimal import Decimal
+        from django.db.models import Sum
+        from finance.models import Payment  # استيراد الموديل مباشرة
+        
+        # 1. المديونية القديمة
+        old_debt = Decimal(str(self.previous_debt or 0))
+
+        # 2. إجمالي كل رسوم السنوات
+        total_fees_all_years = Decimal('0.00')
+        # ملحوظة: تأكد أن الـ related_name في StudentAccount هو 'accounts'
+        for acc in self.accounts.all():
+            total_fees_all_years += (Decimal(str(acc.total_fees or 0)) - Decimal(str(acc.discount or 0)))
+
+        # 3. الحل النهائي: البحث عن المدفوعات باسم الحقل مباشرة
+        total_paid_ever = Payment.objects.filter(student=self).aggregate(Sum('amount_paid'))['amount_paid__sum'] or Decimal('0.00')
+        total_paid_ever = Decimal(str(total_paid_ever))
+
+        remaining = (old_debt + total_fees_all_years) - total_paid_ever
+        return max(remaining, Decimal('0.00'))
+    
+    
     def get_full_name(self):
         # معالجة آمنة للحقول الفارغة لمنع ظهور None
         first = self.first_name if self.first_name else ""
@@ -200,20 +223,26 @@ class Student(models.Model):
     @property
     def final_remaining(self):
         from decimal import Decimal
-        # 1. المديونية المرحلة
+        # 1. المديونية المرحلة (القديمة)
         old_debt = Decimal(str(self.previous_debt or 0))
         
-        # 2. صافي مصاريف السنة الحالية
+        # 2. صافي مصاريف السنة الحالية (المصاريف - الخصم)
         acc = self.accounts.filter(academic_year=self.academic_year).last()
         current_fees = Decimal('0.00')
         if acc:
+            # طرح الخصم من إجمالي المصاريف
             current_fees = Decimal(str(acc.total_fees or 0)) - Decimal(str(acc.discount or 0))
 
-        # 3. استخدام الدالة الموحدة للمدفوعات (التي تجمع كل بنود المصاريف)
+        # 3. إجمالي المدفوعات المسجلة للسنة الحالية
         total_paid = self.current_year_paid 
 
-        # المعادلة الموحدة
-        return (old_debt + current_fees) - total_paid
+        # المعادلة: (قديم + جديد) - مدفوع
+        remaining = (old_debt + current_fees) - total_paid
+        return max(remaining, Decimal('0.00'))
+
+    # إضافة "Alias" أو اسم مستعار للدالة ليتوافق مع الكود القديم إذا أردت
+    def calculated_remaining(self):
+        return self.final_remaining
 
         @property
         def calculated_previous_debt(self):

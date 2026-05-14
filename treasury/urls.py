@@ -16,4 +16,7 @@ urlpatterns = [
 
     # 🔥 أضف ده عشان تمسك اللينك اللي بتفتحه
     path('daily-summary/', views.daily_closure_report, name='daily_summary_debug'),
+    
+    
+    path('verify/<str:serial_number>/', views.verify_product, name='verify_product'),
 ]

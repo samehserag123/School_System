@@ -1,6 +1,7 @@
 from django.contrib import admin
-from django.db.models import Sum
+from django.db.models import Sum, F
 from django.utils.html import format_html
+
 from .models import (
     Grade, Classroom, Student, Teacher, Subject, Uniform, 
     InventoryItem, GradePackagePrice, SubjectPrice, BookSale , CourseGroup
@@ -334,46 +335,47 @@ class ClassroomAdmin(admin.ModelAdmin):
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    # قائمة الأعمدة التي ستظهر في الجدول
+    # 1. تحسين جلب البيانات المرتبطة (الأداء)
+    list_select_related = ('grade', 'classroom', 'academic_year')
+    
     list_display = (
         'student_code',
         'get_full_name', 
-        'whatsapp_number', # تمت إضافة رقم الواتساب ليظهر في الجدول
+        'whatsapp_number',
         'current_year_fees_display', 
         'total_paid_display', 
         'final_remaining_display',
         'old_debt_display'
     )
     
-    # إضافة أرقام الهواتف والواتساب لتسهيل البحث عن طالب معين برقم هاتفه
+    # ضروري جداً لعمل الـ autocomplete في شاشة الدفع
     search_fields = ['first_name', 'last_name', 'student_code', 'whatsapp_number', 'phone']
     
     list_filter = ['grade', 'classroom', 'academic_year']
-    # 1. إجمالي المطلوب (حالي + قديم)
+    
+    # 2. تحديد عدد الطلاب في الصفحة الواحدة لتقليل زمن المعالجة
+    list_per_page = 50
+
+    # 3. تعديل الدوال لتعمل بسرعة أكبر
     def current_year_fees_display(self, obj):
-        # الاسم من الموديل عندك: total_required_amount
         return f"{obj.total_required_amount} ج.م"
     current_year_fees_display.short_description = "إجمالي المطلوب"
+    current_year_fees_display.admin_order_field = 'total_required_amount'
 
-    # 2. إجمالي المحصل
     def total_paid_display(self, obj):
-        # الاسم من الموديل عندك: current_year_paid
         return f"{obj.current_year_paid} ج.م"
     total_paid_display.short_description = "إجمالي المحصل"
+    total_paid_display.admin_order_field = 'current_year_paid'
 
-    # 3. المتبقي النهائي (باللون الأحمر إذا كان أكبر من صفر)
     def final_remaining_display(self, obj):
-        # الاسم من الموديل عندك: final_remaining
         val = obj.final_remaining
         if val > 0:
             return format_html('<span style="color: red; font-weight: bold;">{} ج.م</span>', val)
         return f"{val} ج.م"
     final_remaining_display.short_description = "المتبقي النهائي"
+    final_remaining_display.admin_order_field = 'final_remaining'
 
-    # 4. المديونية القديمة (حل مشكلة AttributeError هنا)
     def old_debt_display(self, obj):
-        # في صورتك الحقل اسمه total_old_debt
-        # سنستخدم getattr للأمان في حال عدم وجود القيمة
         val = getattr(obj, 'total_old_debt', 0)
         return f"{val} ج.م"
     old_debt_display.short_description = "مديونية سابقة"

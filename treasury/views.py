@@ -94,62 +94,6 @@ def daily_closure_report(request):
         'denominations': [200, 100, 50, 20, 10, 5, 1],
     })
     
-    
-# @login_required
-# def daily_closure_report(request):
-#     today = timezone.now().date()
-
-#     # 1. الفلتر الأساسي
-#     base_qs = GeneralLedger.objects.filter(
-#         date__date=today,
-#         amount__gt=0,
-#         is_closed=False
-#     )
-
-#     # 2. 🛡️ الحل العبقري: تجميع المبالغ بناءً على رقم الإيصال الفريد
-#     # حتى لو الـ Signal سجل الإيصال 10 مرات، الكود ده هيشوفه "مرة واحدة" بمبلغ واحد
-#     unique_receipts = base_qs.values('receipt_number').annotate(
-#         actual_amount=Max('amount')
-#     )
-    
-#     # الإجمالي الصافي (ده اللي هيظهر 1 جنيه لو فيه تكرار)
-#     grand_total = sum(item['actual_amount'] for item in unique_receipts)
-
-#     # 3. تجميع بيانات الموظفين بدقة (منع التكرار عند كل موظف)
-#     summary_raw = base_qs.values('collected_by').annotate(
-#         receipts_count=Count('receipt_number', distinct=True)
-#     )
-
-#     user_summary = []
-#     for item in summary_raw:
-#         u_id = item['collected_by']
-        
-#         # حساب إجمالي الموظف بناءً على إيصالاته الفريدة فقط
-#         user_total = sum(
-#             r['amt'] for r in base_qs.filter(collected_by_id=u_id)
-#             .values('receipt_number').annotate(amt=Max('amount'))
-#         )
-        
-#         if u_id:
-#             try:
-#                 user_obj = User.objects.get(id=u_id)
-#                 display_name = user_obj.get_full_name() or user_obj.username
-#             except: display_name = "موظف غير معروف"
-#         else:
-#             display_name = "إيرادات أخرى (كتب / زي)"
-
-#         user_summary.append({
-#             'user_display': display_name,
-#             'total_collected': user_total,
-#             'receipts_count': item['receipts_count']
-#         })
-
-#     return render(request, 'treasury/daily_closure.html', {
-#         'user_summary': user_summary,
-#         'grand_total': grand_total, 
-#         'today': today,
-#         'denominations': [200, 100, 50, 20, 10, 5, 1],
-#     })
 
 def treasury_dashboard(request):
     today = timezone.now().date()
@@ -254,4 +198,29 @@ def daily_revenue_report(request):
         'grand_total': grand_total,
         'today': today
     })
-# ... existing code ...
+
+
+from .models import Product
+
+def verify_product(request, serial_number):
+    try:
+        # البحث في قاعدة البيانات عن الرقم الممرر في الرابط
+        product = Product.objects.get(serial_number=serial_number)
+        
+        # زيادة عداد المسح تلقائياً عند كل عملية دخول ناجحة
+        product.scan_count += 1
+        product.save()
+        
+        context = {
+            'status': 'success',
+            'product': product,
+            'serial': serial_number,
+        }
+    except Product.DoesNotExist:
+        # إذا كان الرقم غير موجود في قاعدة البيانات (حالة الفشل)
+        context = {
+            'status': 'fail',
+            'serial': serial_number
+        }
+    
+    return render(request, 'verify.html', context)

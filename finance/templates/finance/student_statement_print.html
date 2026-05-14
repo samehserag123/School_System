@@ -4,148 +4,184 @@
     <meta charset="UTF-8">
     <title>كشف حساب مالي - {{ student.get_full_name }}</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; background-color: #fff; line-height: 1.6; }
-        .header-print { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+        /* إعدادات الصفحة لتكون بالطول */
+        @page { size: portrait; margin: 10mm; }
+        
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; color: #333; background-color: #fff; line-height: 1.4; }
+        
+        .header-print { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
         
         .summary-container {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-bottom: 25px;
+            grid-template-columns: repeat(4, 1fr); /* تعديل لعرض 4 أعمدة */
+            gap: 10px;
+            margin-bottom: 15px;
         }
 
         .summary-box-item {
             border: 1px solid #ddd;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 10px;
+            border-radius: 6px;
             background-color: #f9f9f9;
             text-align: center;
         }
 
-        .summary-label { display: block; font-size: 0.9em; color: #555; margin-bottom: 5px; font-weight: bold; }
-        .summary-value { display: block; font-size: 1.4em; font-weight: bold; }
+        .summary-label { display: block; font-size: 0.85em; color: #555; margin-bottom: 3px; font-weight: bold; }
+        .summary-value { display: block; font-size: 1.1em; font-weight: bold; }
         
         .text-danger { color: #dc3545 !important; }
         .text-primary { color: #007bff !important; }
         .text-success { color: #28a745 !important; }
+        .text-warning { color: #856404 !important; background-color: #fff3cd; border-radius: 4px; }
 
         .total-final-box {
-            grid-column: span 3;
+            grid-column: span 4;
             background-color: #2c3e50;
             color: #fff;
-            padding: 25px;
-            border-radius: 10px;
+            padding: 12px;
+            border-radius: 8px;
             text-align: center;
-            margin-top: 15px;
-            border: 2px solid #1a252f;
+            margin-top: 5px;
+            border: 1px solid #1a252f;
         }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: center; }
+        .total-final-label { font-size: 1em; margin-bottom: 5px; }
+        .total-final-value { font-size: 1.8em; font-weight: bold; }
+        .total-final-note { font-size: 0.75em; opacity: 0.8; margin-top: 4px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85em; }
+        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: center; }
         th { background-color: #2c3e50; color: white; }
         tr:nth-child(even) { background-color: #f8f9fa; }
 
-        .no-print { margin-bottom: 20px; display: flex; gap: 10px; }
-        .btn { padding: 10px 20px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold; text-decoration: none; }
+        .section-title { border-right: 4px solid #007bff; padding-right: 10px; margin-top: 20px; margin-bottom: 5px; font-size: 1.1em; }
+
+        .no-print { margin-bottom: 20px; display: flex; gap: 10px; justify-content: center; }
+        .btn { padding: 8px 16px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold; text-decoration: none; font-family: inherit; }
         .btn-print { background-color: #28a745; color: white; }
         .btn-back { background-color: #6c757d; color: white; }
 
         @media print { 
-            .no-print { display: none; } 
-            .total-final-box { background-color: #f8f9fa !important; color: #000 !important; border: 2px solid #000; }
+            .no-print { display: none !important; } 
+            body { padding: 0; }
+            .total-final-box { background-color: #f8f9fa !important; color: #000 !important; border: 1px solid #000; }
+            .text-warning { background-color: transparent !important; border: 1px solid #856404; }
         }
     </style>
 </head>
 <body>
+
     <div class="no-print">
-        <button onclick="window.print()" class="btn btn-print">🖨️ طباعة الآن</button>
-        <a href="javascript:history.back()" class="btn btn-back">🔙 العودة</a>
+        <button type="button" onclick="window.print()" class="btn btn-print">🖨️ طباعة كشف الحساب</button>
+        <button type="button" onclick="window.history.back()" class="btn btn-back">🔙 العودة</button>
     </div>
     
     <div class="header-print">
-        <h1 style="margin: 0 0 10px 0;">كشف حساب مالي تفصيلي</h1>
-        <p style="font-size: 1.5em; margin: 0 0 10px 0;"><strong>اسم الطالب:</strong> {{ student.get_full_name }}</p>
-        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #eee;">
+        <h2 style="margin: 0 0 5px 0;">كشف حساب مالي تفصيلي شامل الغرامات</h2>
+        <p style="font-size: 1.2em; margin: 0 0 8px 0;"><strong>اسم الطالب:</strong> {{ student.get_full_name }}</p>
+        <div style="display: flex; justify-content: space-between; padding: 5px 0; border-top: 1px solid #eee; font-size: 0.9em;">
             <span><strong>كود الطالب:</strong> {{ student.student_code|default:student.id }}</span>
             <span><strong>الصف:</strong> {{ student.grade.name }}</span>
-            <span><strong>العام الدراسي:</strong> {{ student.academic_year.name }}</span>
+            <span><strong>العام الدراسي الحالي:</strong> {{ student.academic_year.name }}</span>
         </div>
-        <p style="text-align: left; font-size: 0.8em; color: #666; margin-top: 5px;">تاريخ الاستخراج: {% now "Y-m-d H:i" %}</p>
+        <p style="text-align: left; font-size: 0.7em; color: #666; margin-top: 5px;">تاريخ الاستخراج: {% now "Y-m-d H:i" %}</p>
     </div>
 
     <div class="summary-container">
         <div class="summary-box-item">
-            <span class="summary-label">مديونية سنوات سابقة</span>
-            <span class="summary-value text-danger">
-                {{ student.previous_debt|default:"0.00"|floatformat:2 }} ج.م
-            </span>
+            <span class="summary-label">مديونية سابقة</span>
+            <span class="summary-value text-danger">{{ student.previous_debt|default:"0.00"|floatformat:2 }}</span>
         </div>
 
         <div class="summary-box-item">
-            <span class="summary-label">مطلوب العام الحالي</span>
-            <span class="summary-value text-primary">
-                {{ total_required|default:"0.00"|floatformat:2 }} ج.م
-            </span>
-            {% with account=student.current_account %}
-                {% if account and account.installment_plan %}
-                    <div style="font-size: 0.7em; color: #007bff; margin-top: 5px;">نظام التسكين: {{ account.installment_plan.name }}</div>
-                {% endif %}
-            {% endwith %}
+            <span class="summary-label">أصل مصروفات العام</span>
+            <span class="summary-value text-primary">{{ total_required|default:"0.00"|floatformat:2 }}</span>
         </div>
 
         <div class="summary-box-item">
-            <span class="summary-label">إجمالي ما تم سداده</span>
-            <span class="summary-value text-success">
-                {{ total_paid_all|default:"0.00"|floatformat:2 }} ج.م
+            <span class="summary-label">إجمالي غرامات التأخير</span>
+            <span class="summary-value text-danger" style="text-decoration: underline;">
+                <!-- التعديل هنا: نستخدم late_fees مباشرة وليس student.late_fees_display -->
+                {{ late_fees|default:"0.00"|floatformat:2 }}
             </span>
+        </div>
+        <div class="summary-box-item">
+            <span class="summary-label">إجمالي المسدد</span>
+            <span class="summary-value text-success">{{ total_paid_all|default:"0.00"|floatformat:2 }}</span>
         </div>
 
         <div class="total-final-box">
-            <div style="font-size: 1.2em; margin-bottom: 10px;">صافي المتبقي المستحق دفعه</div>
-            <div style="font-size: 2.5em; font-weight: bold;">
+            <div class="total-final-label">إجمالي المتبقي المستحق (شامل الغرامات والقديم)</div>
+            <div class="total-final-value">
                 {{ remaining|default:"0.00"|floatformat:2 }} ج.م
             </div>
-            <div style="font-size: 0.9em; opacity: 0.8; margin-top: 8px;">
-                (إجمالي المطلوب + مديونية قديمة - جميع المدفوعات المسجلة بالجدول)
+            <div class="total-final-note">
+                (مديونية قديمة + أصل العام + الغرامات) - (إجمالي المدفوعات + الخصومات)
             </div>
         </div>
     </div>
 
-    <h3 style="border-right: 5px solid #007bff; padding-right: 10px; margin-top: 30px;">سجل المقبوضات النقدية التفصيلي</h3>
+    <!-- قسم الغرامات المستحقة -->
+    <h4 class="section-title">بيان غرامات التأخير المستحقة</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>تاريخ الاستحقاق</th>
+                <th style="text-align: right;">بيان القسط المتأخر</th>
+                <th>قيمة الغرامة</th>
+                <th>الحالة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for installment in student.installments.all %}
+                {% if installment.late_fee > 0 %}
+                <tr>
+                    <td>{{ installment.due_date|date:"d/m/Y" }}</td>
+                    <td style="text-align: right;">غرامة تأخير عن قسط شهر ({{ installment.due_date|date:"F Y" }})</td>
+                    <td class="text-danger fw-bold">{{ installment.late_fee|floatformat:2 }} ج.م</td>
+                    <td class="text-warning small">تضاف للمتبقي</td>
+                </tr>
+                {% endif %}
+            {% empty %}
+                <tr><td colspan="4" style="padding: 10px; color:#888;">لا توجد غرامات تأخير مسجلة.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h4 class="section-title">سجل المقبوضات النقدية (المبالغ المدفوعة)</h4>
     <table>
         <thead>
             <tr>
                 <th>التاريخ</th>
                 <th style="text-align: right;">بيان الدفع</th>
-                <th>العام الدراسي</th>
-                <th>المبلغ</th>
+                <th>رقم السند</th>
+                <th>المبلغ المسدد</th>
             </tr>
         </thead>
         <tbody>
             {% for entry in all_history %}
-                {# عرض عمليات العام الدراسي الحالي للطالب #}
-                {% if entry.academic_year == student.academic_year %}
+                {# تم إزالة شرط الـ if لعرض جميع البيانات الممررة في all_history #}
                 <tr>
                     <td>{{ entry.payment_date|date:"d/m/Y" }}</td>
                     <td style="text-align: right;">
                         {{ entry.revenue_category.name|default:"مصروفات دراسية" }}
                         {% if entry.notes %}<br><small style="color:#666">({{ entry.notes }})</small>{% endif %}
                     </td>
-                    <td>{{ entry.academic_year.name }}</td>
+                    <td>#{{ entry.id }}</td>
                     <td style="font-weight: bold;" class="text-success">
                         {{ entry.amount_paid|floatformat:2 }} ج.م
                     </td>
                 </tr>
-                {% endif %}
             {% empty %}
-                <tr><td colspan="4" style="padding: 30px; color:#888;">لا توجد دفعات مسجلة لهذا العام.</td></tr>
+                <tr><td colspan="4" style="padding: 20px; color:#888;">لا توجد دفعات مسجلة حالياً.</td></tr>
             {% endfor %}
         </tbody>
     </table>
 
-    <div style="margin-top: 70px; display: flex; justify-content: space-between; padding: 0 50px;">
-        <div style="text-align: center;"><p style="font-weight:bold;">توقيع المحاسب</p><p>....................</p></div>
-        <div style="text-align: center;"><p style="font-weight:bold;">ختم المدرسة الرسمي</p><p>....................</p></div>
+    <div style="margin-top: 50px; display: flex; justify-content: space-between; padding: 0 40px; font-size: 0.9em;">
+        <div style="text-align: center;"><p style="font-weight:bold; margin-bottom: 35px;">توقيع المحاسب</p><p>....................</p></div>
+        <div style="text-align: center;"><p style="font-weight:bold; margin-bottom: 35px;">يعتمد،، مدير المدرسة</p><p>....................</p></div>
+        <div style="text-align: center;"><p style="font-weight:bold; margin-bottom: 35px;">ختم المدرسة</p><p style="border: 1px dashed #ccc; width: 80px; height: 80px; margin: 0 auto;"></p></div>
     </div>
 </body>
 </html>

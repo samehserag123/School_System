@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=school_db
+      - POSTGRES_USER=sameh_admin
+      - POSTGRES_PASSWORD=pass_123
+    ports:
+      - "5432:5432"
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --url http://web:8000
+    restart: always
+    depends_on:
+      - web  # تأكد أن النفق لا يبدأ إلا بعد تشغيل تطبيق الويب
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+      - ./staticfiles:/app/staticfiles  # أضف هذا السطر لربط ملفات التنسيق
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgres://sameh_admin:pass_123@db:5432/school_db
+
+volumes:
+  postgres_data:
+  static_volume:

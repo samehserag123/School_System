@@ -4,6 +4,67 @@
 {% block title %}إدارة المقبوضات النقدية - نظام الإدارة{% endblock %}
 
 {% block content %}
+<style>
+    /* تكبير خط الأسماء في القائمة المنسدلة */
+    .select2-container--default .select2-selection--single {
+        height: 45px !important; /* زيادة ارتفاع الحقل */
+        line-height: 45px !important;
+        font-size: 1.1rem !important;
+        font-weight: bold !important;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 40px !important;
+        color: #fff !important; /* لون النص في الثيم المظلم */
+    }
+
+    /* تكبير خط الأسماء داخل قائمة الاختيارات */
+    .select2-results__option {
+        font-size: 1.1rem !important;
+        padding: 10px !important;
+        border-bottom: 1px solid #343a40; /* فاصل بسيط بين الأسماء */
+    }
+
+    /* تمييز كود الطالب بلون مختلف */
+    .student-code-label {
+        background: #0dcaf0;
+        color: #000;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        margin-right: 10px;
+        font-weight: bold;
+    }
+
+        /* إصلاح وضوح الأسماء في القائمة المنسدلة */
+    .select2-results__option {
+        color: #000000 !important; /* لون الخط أسود تماماً */
+        font-size: 1.2rem !important; /* تكبير الخط */
+        font-weight: bold !important;
+        padding: 12px !important;
+        background-color: #ffffff !important; /* خلفية بيضاء للخيارات */
+    }
+
+    /* لون الاسم عند الوقوف عليه بالماوس */
+    .select2-results__option--highlighted {
+        background-color: #0d6efd !important; /* لون أزرق عند الاختيار */
+        color: #ffffff !important; /* خط أبيض عند التظليل فقط */
+    }
+
+    /* تنسيق الحقل الخارجي (بعد اختيار الاسم) */
+    .select2-container--default .select2-selection--single {
+        background-color: #1a1d21 !important; /* نفس لون القالب المظلم */
+        border: 1px solid #495057 !important;
+        height: 50px !important;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: #0dcaf0 !important; /* لون الاسم المختار (لبني) */
+        line-height: 48px !important;
+        font-weight: bold;
+    }
+</style>
+
 <div class="container-fluid" dir="rtl">
     <div class="row justify-content-center">
         <div class="col-xl-10">
@@ -32,7 +93,13 @@
                             </select>
                         </div>
                         <div class="col-md-3 text-end pt-3">
-                            <a href="{% url 'quick_collection' %}" class="btn btn-outline-light w-100 btn-sm">إعادة ضبط الفلاتر</a>
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'quick_collection' %}" class="btn btn-outline-light flex-fill btn-sm">إعادة ضبط</a>
+                                
+                                <a href="{% url 'student_list' %}" id="btn-back" class="btn btn-danger btn-sm">
+                                    <i class="bi bi-x-circle"></i> إغلاق والعودة
+                                </a>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -54,14 +121,17 @@
 
                     <form method="POST" id="mainPaymentForm">
                         {% csrf_token %}
+                        <input type="hidden" name="academic_year" value="{{ request.GET.academic_year|default:selected_year }}">
                         <div class="mb-4 text-right">
                             <label class="form-label text-info fw-bold">اسم الطالب (المستلم منه):</label>
                             <select name="student" id="id_student" class="form-control" required>
-                                <option value="">-- اختر الطالب لبدء التحصيل --</option>
+                                <option value="">-- ابحث بالاسم، الكود، أو الرقم القومي --</option>
                                 {% for s in students %}
-                                    <option value="{{ s.id }}" {% if selected_student_id == s.id %}selected{% endif %}>
-                                        {{ s.get_full_name }} 
-                                        ({{ s.student_code|default:"0000" }})
+                                    <option value="{{ s.id }}" 
+                                            data-national="{{ s.national_id|default:'' }}" 
+                                            data-code="{{ s.student_code|default:'' }}"
+                                            {% if selected_student_id == s.id %}selected{% endif %}>
+                                        {{ s.get_full_name }} | كود: {{ s.student_code|default:"0000" }}
                                     </option>
                                 {% endfor %}
                             </select>
@@ -86,11 +156,35 @@
                         <div class="row text-right">
                             <div class="col-md-4 mb-3">
                                 <label class="form-label text-warning fw-bold">رقم الإيصال (مرجعي):</label>
+                                
                                 {% if active_book %}
-                                    <input type="number" name="receipt_number" id="id_receipt_number" class="form-control bg-dark text-warning fw-bold border-warning fs-5 text-center" value="{{ next_serial }}" readonly required>
+                                    <div class="input-group">
+                                        <input type="number" name="receipt_number" id="id_receipt_number" 
+                                            class="form-control bg-dark text-warning fw-bold border-warning fs-5 text-center" 
+                                            value="{{ next_serial }}" readonly required>
+                                        
+                                        {% if user.is_superuser and last_payment %}
+                                            <button type="button" class="btn btn-danger fw-bold" 
+                                                    onclick="confirmCancel('{% url 'admin_cancel_receipt' last_payment.id %}', '{{ last_payment.receipt_number }}')"
+                                                    title="إلغاء الإيصال السابق رقم {{ last_payment.receipt_number }} وتصفير قيمته">
+                                                <i class="bi bi-trash-fill"></i> إلغاء السيريال
+                                            </button>
+                                        {% endif %}
+                                    </div>
                                     <small class="text-success small"><i class="bi bi-check-circle-fill"></i> السيريال المرجعي متاح</small>
+                                    
+                                    {% if user.is_superuser and last_payment and last_payment.is_cancelled %}
+                                        <div class="mt-1">
+                                            <small class="text-danger fw-bold">
+                                                <i class="bi bi-info-circle"></i> الإيصال السابق رقم {{ last_payment.receipt_number }} تم إلغاؤه وقيمته (0).
+                                            </small>
+                                        </div>
+                                    {% endif %}
+
                                 {% else %}
-                                    <input type="text" id="id_receipt_number" class="form-control bg-dark text-danger fw-bold border-danger text-center fs-5" placeholder="لا يوجد دفتر" disabled>
+                                    <input type="text" id="id_receipt_number" 
+                                        class="form-control bg-dark text-danger fw-bold border-danger text-center fs-5" 
+                                        placeholder="لا يوجد دفتر" disabled>
                                     <small class="text-danger fw-bold small"><i class="bi bi-exclamation-triangle"></i> ليس لديك عهدة نشطة حالياً!</small>
                                 {% endif %}
                             </div>
@@ -106,7 +200,7 @@
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label text-success fw-bold">المبلغ المحصل:</label>
-                                <input type="number" name="amount" id="id_amount" class="form-control bg-dark text-success fw-bold border-secondary fs-5" placeholder="0" step="1" required>
+                                <input type="number" name="amount" id="id_amount" class="form-control bg-dark text-success fw-bold border-secondary fs-5" placeholder="0" step="1" required autofocus>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label text-warning fw-bold">كود الخصم (إن وجد):</label>
@@ -162,32 +256,118 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-$(document).ready(function() {
-    // تفعيل Select2
-    $('#id_student, #id_student_filter').select2({ dir: "rtl", width: '100%' });
 
+    function confirmCancelReceipt(url, receiptNumber) {
+    Swal.fire({
+        title: `إلغاء الإيصال رقم ${receiptNumber}`,
+        text: "هل أنت متأكد من إلغاء هذا الإيصال؟ سيتم تصفير القيمة المالية للجرد.",
+        icon: 'warning',
+        input: 'text',
+        inputPlaceholder: 'اكتب سبب الإلغاء هنا (إلزامي)...',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'نعم، قم بالإلغاء',
+        cancelButtonText: 'تراجع',
+        preConfirm: (reason) => {
+            if (!reason) {
+                Swal.showValidationMessage('يجب كتابة سبب الإلغاء للمراجعة المالية');
+            }
+            return reason;
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // إنشاء فورم وهمي لإرسال الطلب عبر POST للأمان
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = url;
+            
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}';
+            
+            const reasonInput = document.createElement('input');
+            reasonInput.type = 'hidden';
+            reasonInput.name = 'reason';
+            reasonInput.value = result.value;
+            
+            form.appendChild(csrfInput);
+            form.appendChild(reasonInput);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+// 1. دالة بناء الرابط الذكي
+function updateBackLink(studentId) {
+    const btnBack = document.getElementById('btn-back');
+    if (studentId && btnBack) {
+        let baseUrl = "{% url 'student_list' %}";
+        // نرسل الـ highlight فقط كـ "إشارة" للجافا سكريبت في الصفحة التالية
+        let newUrl = baseUrl + "?highlight=" + studentId;
+        btnBack.setAttribute('href', newUrl);
+    }
+}
+// تأكد أن زر العودة في الـ HTML لا يحتوي على onclick تمنعه من العمل
+// <a href="{% url 'student_list' %}" id="btn-back" class="btn btn-danger btn-sm">...</a>
+$(document).ready(function() {
+    // 1. تفعيل Select2 الأساسي
+    $('#id_student, #id_student_filter').select2({ dir: "rtl", width: '100%' });
+    // 💡 إضافة (أ): تحديث الرابط فور تحميل الصفحة إذا كان هناك طالب مختار
+    const initialId = $('#id_student').val();
+    if (initialId) {
+        updateBackLink(initialId);
+    }
+    // 2. البحث السريع عن الطالب عند الفلترة
     $('#id_student_filter').on('change', function() {
         if (this.value) window.location.href = '?student_id=' + this.value;
     });
 
-    // ==========================================
-    // التعديل الثاني: منع الكسور العشرية برمجياً
-    // ==========================================
+    // 3. الانتقال التلقائي لحقل المبلغ فور اختيار الطالب
+    $('#id_student').on('select2:select', function (e) {
+        setTimeout(function() {
+            $('#id_amount').focus();
+        }, 100); 
+    });
+
+    // 4. منع الكسور العشرية والرموز في حقل المبلغ
     const amountInput = $('#id_amount');
-    
-    // منع كتابة النقطة (.) أو الفاصلة (,) من لوحة المفاتيح
     amountInput.on('keydown', function(e) {
         if (e.key === '.' || e.key === ',') {
             e.preventDefault();
         }
     });
     
-    // تنظيف الحقل من أي رمز غير رقمي (في حالة النسخ واللصق)
     amountInput.on('input', function() {
         this.value = this.value.replace(/[^0-9]/g, '');
     });
-    // ==========================================
+
+    // 5. زر Enter (المرحلة الأولى) - عند كتابة المبلغ يفتح المعاينة فقط ويمنع الإرسال التلقائي
+    $('#id_amount').on('keypress', function(e) {
+        if (e.which === 13) { 
+            e.preventDefault(); // منع المتصفح من إرسال الفورم فوراً
+            if (!$('#previewModal').hasClass('show')) {
+                handlePreview(); 
+            }
+        }
+    });
+
+    // 6. زر Enter (المرحلة الثانية) - الحفظ النهائي من داخل المودال مع الحماية التامة من التكرار
+    $(document).on('keydown', function(e) {
+        if ($('#previewModal').hasClass('show') && e.which === 13) {
+            e.preventDefault();
+            const finalBtn = $('#btnSubmitFinal');
+            
+            // قفل أمان: إذا كان الزر قد تم الضغط عليه بالفعل وتم تعطيله، تجاهل أي ضغطة Enter إضافية
+            if (!finalBtn.prop('disabled')) {
+                submitMainForm(); 
+            }
+        }
+    });
 
     // دالة تطبيع للنصوص العربية لضمان تطابق الكلمات
     function normalizeArabic(text) {
@@ -200,6 +380,9 @@ $(document).ready(function() {
             .replace(/ى/g, "ي")
             .replace(/\s+/g, ""); 
     }
+
+    // 💡 الإضافة الجديدة: متغير لتخزين الرسوم الإدارية للطالب
+    let currentAdminFee = 0;
 
     function fetchStudentBalance(studentId) {
         if (!studentId) return;
@@ -217,20 +400,27 @@ $(document).ready(function() {
                 console.log("البيانات المستلمة:", data);
                 
                 if (data.success || !data.error) {
-                    // قراءة المديونية من المتغيرات اللي بيبعتها الـ View الجديد
                     let remaining = data.total_remaining || data.total_debt || 0;
                     let due = data.current_due || 0;
+                    
+                    // 💡 استلام الرسوم الإدارية من السيرفر
+                    currentAdminFee = data.admin_fee || 0;
 
                     // تحديث المربعين بالأرقام الحقيقية بدون كسور
                     $('#current_due').text(Math.round(due).toLocaleString() + " ج.م");
                     $('#total_debt').text(Math.round(remaining).toLocaleString() + " ج.م");
+                    
+                    // تفعيل حدث التغيير لضمان تطبيق الرسوم لو كان مختار فئة رسوم إدارية مسبقاً
+                    $('#id_category').trigger('change');
                 } else {
                     $('#current_due, #total_debt').text("0");
+                    currentAdminFee = 0;
                 }
             },
             error: function(xhr, status, error) {
                 console.error("خطأ في الاتصال:", error);
                 $('#current_due, #total_debt').text("0");
+                currentAdminFee = 0;
             }
         });
     }
@@ -239,38 +429,55 @@ $(document).ready(function() {
     if (preselectedStudent) fetchStudentBalance(preselectedStudent);
 
     $('#id_student').on('change', function() {
-        fetchStudentBalance($(this).val());
+        const selectedId = $(this).val();
+        fetchStudentBalance(selectedId); // جلب الرصيد
+        updateBackLink(selectedId);      // تحديث الرابط (تأكد من وجود هذا السطر)
         $('#id_category').trigger('change');
     });
 
-    // مراقبة الفئة المختارة مع توسيع القائمة لتشمل الفئات الجديدة
+    // 💡 التعديل الجديد: مراقبة الفئة المختارة للتحكم في الرسوم الإدارية
     $('#id_category').on('change', function() {
-        const rawText = $(this).find('option:selected').text();
-        const normText = normalizeArabic(rawText);
-        const hint = $('#category_hint');
+    const rawText = $(this).find('option:selected').text();
+    const normText = normalizeArabic(rawText);
+    const hint = $('#category_hint');
+    const amountField = $('#id_amount');
+    
+    // 1. نفس القائمة الموجودة في الـ Models لضمان التطابق
+    const feeKeywords = ["مصروفات", "انشطه", "أنشطة", "كتب", "زي", "دراسي", "قسط", "تعليم"];
+    
+    // 2. نفس كلمات الاستبعاد الموجودة في الـ Models
+    const excludedKeywords = ["اداريه", "إدارية", "حر", "منفصل"];
+    
+    // التحقق من المطابقة
+    const isFeeMatch = feeKeywords.some(word => normText.includes(normalizeArabic(word)));
+    const isExcluded = excludedKeywords.some(word => normText.includes(normalizeArabic(word)));
+    
+    // 3. منطق الرسوم الإدارية التلقائية (كما هو عندك)
+    const isAdminFee = (normText.includes("اداريه") || normText.includes("ادارية"));
+
+    if (isAdminFee && currentAdminFee > 0) {
+        amountField.val(currentAdminFee);
+        amountField.prop('readonly', true);
+        hint.html(`<i class="bi bi-info-circle-fill text-info"></i> رسوم إدارية إجبارية: ${currentAdminFee} ج.م`)
+            .css({'color': '#0dcaf0', 'display': 'block'});
+    } else {
+        amountField.prop('readonly', false);
         
-        // كلمات مفتاحية ذكية لتغطية أي بنود جديدة مثل "صصصص" طالما تحتوي على حروف دالة
-        const keywords = [
-            "انشطه", "نشاط", "كتب", "رسوم", "منازل", "دبلوم", "استماره", 
-            "مصروفات", "اساسيه", "تعليم", "قسط", "سداد", "صصص"
-        ];
-        
-        const isMatch = keywords.some(word => normText.includes(word));
-        
-        if (isMatch) {
-            hint.html('<i class="bi bi-check-circle-fill text-success"></i> سيتم خصم هذا البند من مديونية الطالب ✅')
+        // الشرط الذهبي: يجب أن يكون من الكلمات المسموحة وليس من المستبعدات
+        if (isFeeMatch && !isExcluded) {
+            hint.html('<i class="bi bi-check-circle-fill text-success"></i> تأكيد: سيتم خصم هذا المبلغ من أقساط الطالب ✅')
                 .css({'color': '#10b981', 'display': 'block'});
         } else {
-            hint.html('<i class="bi bi-info-circle text-warning"></i> إيراد حر (لا يؤثر على مديونية الأقساط).')
+            hint.html('<i class="bi bi-exclamation-triangle text-warning"></i> تنبيه: هذا البند "إيراد حر" ولن يقلل مديونية الطالب.')
                 .css({'color': '#fbbf24', 'display': 'block'});
         }
-    });
+    }
+});
     
     $('#id_category').trigger('change');
 });
 
 function applyCoupon() {
-    // تصحيح: استخدام 'coupon_code' بدلاً من 'id_coupon_code' ليطابق الـ HTML
     const code = $('#coupon_code').val().trim();
     const studentId = $('#id_student').val();
 
@@ -324,32 +531,59 @@ function applyCoupon() {
     });
 }
 
-// هام جداً: هذه الوظيفة تضمن إرسال قيمة الطالب للسيرفر عند حفظ النموذج
-function submitMainForm() {
-    // إعادة تفعيل الحقل قبل الإرسال مباشرة لكي يقرأه Django
-    $('#id_student').prop('disabled', false);
-    $('#mainPaymentForm').submit();
-}
 
 function handlePreview() {
-    // يجب فك تجميد حقل الطالب لحظة الإرسال لكي يتم إرساله في الـ POST
+    // 1. فك التجميد لضمان الحصول على القيم الصحيحة قبل القراءة
     $('#id_student').prop('disabled', false); 
+    $('#id_amount').prop('readonly', false);
     
     const sSelect = $('#id_student');
-    const originalAmount = parseFloat($('#id_amount').val());
+    const originalAmount = parseFloat($('#id_amount').val()) || 0;
     const cat = $('#id_category option:selected').text();
     const notes = $('#id_notes').val();
     const receiptNum = $('#id_receipt_number').val();
 
-    if (!sSelect.val() || !originalAmount || originalAmount <= 0) {
-        Swal.fire({ icon: 'warning', title: 'بيانات ناقصة', text: 'يرجى اختيار الطالب وتحديد مبلغ السداد.' });
+    // 2. جلب قيمة المديونية الحالية (تنظيف النص من الفواصل والعملة)
+    // هذا الجزء يضمن تحويل "13,000 ج.م" إلى رقم 13000
+    const totalDebtRaw = $('#total_debt').text().replace(/[^\d.]/g, ''); 
+    const currentDebt = parseFloat(totalDebtRaw) || 0;
+
+    // --- 3. التحقق من وجود مديونية من الأساس ---
+    if (currentDebt <= 0) {
+        Swal.fire({ 
+            icon: 'error', 
+            title: 'عفواً!', 
+            text: 'لا يمكن تحصيل مبالغ لهذا الطالب لأن مديونيته الحالية تظهر (0) في النظام.',
+            confirmButtonText: 'مفهوم'
+        });
         return;
     }
 
-    // حساب الخصم
+    // --- 4. التعديل المطلوب: رفض العملية إذا كان المبلغ أكبر من المتبقي ---
+    // أضفنا 0.01 لتجنب أخطاء الكسور البسيطة في البرمجة
+    if (originalAmount > (currentDebt + 0.01)) {
+        Swal.fire({ 
+            icon: 'error', 
+            title: 'تجاوز الحد المسموح', 
+            text: `لا يمكنك تحصيل مبلغ (${originalAmount.toLocaleString()} ج.م) وهو أكبر من المديونية المتبقية (${currentDebt.toLocaleString()} ج.م).`,
+            confirmButtonText: 'تعديل المبلغ'
+        });
+        return; 
+    }
+
+    // --- 5. التحقق من إدخال البيانات الأساسية ---
+    if (!sSelect.val() || originalAmount <= 0) {
+        Swal.fire({ 
+            icon: 'warning', 
+            title: 'بيانات ناقصة', 
+            text: 'يرجى اختيار الطالب وتحديد مبلغ سداد صحيح أكبر من الصفر.' 
+        });
+        return;
+    }
+
+    // --- 6. حساب الخصم (إن وجد) ---
     const discountValue = parseFloat($('#hidden_discount_value').val()) || 0;
     const discountType = $('#hidden_discount_type').val();
-    
     let discountAmount = 0;
     let finalAmount = originalAmount;
 
@@ -359,30 +593,42 @@ function handlePreview() {
         } else {
             discountAmount = discountValue;
         }
-        finalAmount = originalAmount - discountAmount;
-        if (finalAmount < 0) finalAmount = 0; // منع المبالغ بالسالب
+        finalAmount = Math.max(0, originalAmount - discountAmount);
     }
 
+    // --- 7. تحديث بيانات مودال المعاينة ---
     $('#p_student').text(sSelect.find(':selected').text());
     $('#p_category').text(cat);
     $('#p_notes').text("إيصال #" + (receiptNum || '---') + " | " + (notes || "بدون ملاحظات"));
     
-    // عرض المبلغ بخصم وبدون خصم
     if (discountAmount > 0) {
         $('#p_amount').html(`
             <del class="text-danger ms-2 fs-6">${originalAmount.toLocaleString()} ج.م</del> 
             <span class="text-success fs-4">${finalAmount.toLocaleString()} ج.م</span>
-            <br><small class="text-warning fs-6">(تم خصم ${discountAmount.toLocaleString()} ج.م)</small>
+            <br><small class="text-warning fs-6">(تم خصم مبلغ: ${discountAmount.toLocaleString()} ج.م)</small>
         `);
     } else {
         $('#p_amount').text(originalAmount.toLocaleString() + " ج.م");
     }
     
+    // إظهار نافذة التأكيد
     new bootstrap.Modal(document.getElementById('previewModal')).show();
 }
 
+// 💡 الدالة المسؤولة عن الإرسال النهائي للسيرفر
 function submitMainForm() {
-    $('#btnSubmitFinal').prop('disabled', true).text('جاري الترحيل...');
+    const finalBtn = $('#btnSubmitFinal');
+    
+    if (finalBtn.prop('disabled')) return;
+
+    // تعطيل الزر لمنع التكرار
+    finalBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> جاري الترحيل...');
+    
+    // ⚠️ هام جداً: تفعيل الحقول قبل الإرسال لكي يراها السيرفر
+    $('#id_student').prop('disabled', false);
+    $('#id_amount').prop('readonly', false);
+    
+    // إرسال الفورم
     document.getElementById('mainPaymentForm').submit();
 }
 </script>

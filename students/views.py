@@ -547,21 +547,60 @@ def collect_fee_view(request, enrollment_id):
     return render(request, 'students/collect_fee.html', {'enrollment': enrollment})
 
 
+from django.db.models import Q, Value, CharField
+from django.db.models.functions import Concat
+from django.shortcuts import render, get_object_or_404
+from django.core.paginator import Paginator
+# تأكد من استيراد النماذج (Models) الخاصة بك هنا
+
 def student_registry_view(request):
-    # 1. استقبال معرف السنة من الرابط (إذا جاء من الأرشيف)
+    # 1. تحديد السنة الدراسية (أرشيف أو حالية)
     year_id = request.GET.get('year_id')
-    
     if year_id:
-        # إذا تم اختيار سنة معينة، نجلب بيانات هذه السنة (أرشيف)
         target_year = get_object_or_404(AcademicYear, id=year_id)
-        # هنا لا نشترط is_active=True لأننا نبحث في الأرشيف
         base_query = Student.objects.filter(academic_year=target_year)
     else:
-        # الحالة الطبيعية: جلب طلاب السنة النشطة الحالية فقط
         active_year = AcademicYear.objects.filter(is_active=True).first()
         base_query = Student.objects.filter(academic_year=active_year, is_active=True)
 
-    # 2. حساب الإحصائيات بناءً على الطلاب المستخرجين (سواء أرشيف أو حالي)
+    # 2. استقبال قيم الفلاتر من الطلب (Request)
+    query = request.GET.get('q', '').strip()
+    grade = request.GET.get('grade', '')
+    classroom = request.GET.get('classroom', '')
+    spec = request.GET.get('spec', '')
+    gender = request.GET.get('gender', '')
+    religion = request.GET.get('religion', '')
+    integ = request.GET.get('integ', '')
+
+    # 3. تطبيق الفلترة المتقدمة للبحث في الأسماء [تعديل جوهري هنا]
+    if query:
+        # نقوم بدمج الاسم الأول مع اسم العائلة بمسافة بينهما للبحث في الاسم بالكامل
+        base_query = base_query.annotate(
+            full_name_db=Concat('first_name', Value(' '), 'last_name', output_field=CharField())
+        ).filter(
+            Q(first_name__icontains=query) | 
+            Q(last_name__icontains=query) | 
+            Q(full_name_db__icontains=query) | # للبحث في "الاسم الأول + الأخير" معاً
+            Q(national_id__icontains=query)    # للبحث بالرقم القومي
+        )
+    
+    # 4. بقية الفلاتر (الصفوف، الفصول، التخصص، إلخ)
+    if grade:
+        base_query = base_query.filter(grade__name=grade)
+    if classroom:
+        base_query = base_query.filter(classroom__name=classroom)
+    if spec:
+        base_query = base_query.filter(specialization=spec)
+    if gender:
+        gender_map = {'بنين': 'Male', 'بنات': 'Female'}
+        base_query = base_query.filter(gender=gender_map.get(gender))
+    if religion:
+        rel_map = {'مسلم': 'Muslim', 'مسيحي': 'Christian'}
+        base_query = base_query.filter(religion=rel_map.get(religion))
+    if integ:
+        base_query = base_query.filter(integration_status=(integ == 'نعم'))
+
+    # 5. حساب الإحصائيات بناءً على النتائج المفلترة فقط (شاملة كل الصفحات)
     stats = {
         'total': base_query.count(),
         'male': base_query.filter(gender='Male').count(),
@@ -571,26 +610,23 @@ def student_registry_view(request):
         'integration': base_query.filter(integration_status=True).count(),
     }
     
-    # 3. نظام الترقيم (Pagination)
+    # 6. نظام الترقيم (Pagination)
     student_list = base_query.order_by('first_name')
     paginator = Paginator(student_list, 20)
     page_number = request.GET.get('page')
     students_page = paginator.get_page(page_number)
     
-    # 4. جلب بيانات الفلاتر (تظل كما هي)
-    all_grades = Grade.objects.all()
-    all_classrooms = Classroom.objects.all()
-    all_specs = Student.SPECIALIZATION_CHOICES
-    
     context = {
         'students': students_page,
         'stats': stats,
-        'all_grades': all_grades,
-        'all_classrooms': all_classrooms,
-        'all_specs': all_specs,
-        'current_year': target_year if year_id else active_year, # لإظهار اسم السنة في الصفحة
-        'is_archive': True if year_id else False, # لتمييز ما إذا كنا في وضع الأرشيف
+        'all_grades': Grade.objects.all(),
+        'all_classrooms': Classroom.objects.all(),
+        'all_specs': Student.SPECIALIZATION_CHOICES,
+        'current_year': target_year if year_id else active_year,
+        'is_archive': bool(year_id),
     }
+
+    # تأكد أن اسم الملف هنا مطابق تماماً لملف الـ HTML الموجود في تطبيقك
     return render(request, 'student_registry.html', context)
 
 def get_pending_sales_api(request, student_id):
@@ -885,69 +921,6 @@ def print_receipt_view(request, sale_id):
     
     return render(request, 'books/print_receipt.html', context)
 
-        
-# def print_receipt_view(request, sale_id):
-#     # استخدام get_object_or_404 لضمان عدم حدوث خطأ إذا كان الـ ID غير صحيح
-#     sale = get_object_or_404(BookSale, id=sale_id)
-#     return render(request, 'books/print_receipt.html', {'sale': sale})
-
-# def add_book_sale(request):
-#     if request.method == 'POST':
-#         form = BookSaleForm(request.POST)
-#         if form.is_valid():
-#             sale = form.save(commit=False)
-#             inventory_item = sale.item 
-#             student = sale.student
-#             requested_qty = sale.quantity
-            
-#             # 1. جلب السعر بناءً على (الصف + السنة الدراسية للطالب)
-#             try:
-#                 package = GradePackagePrice.objects.get(
-#                     grade=student.grade, 
-#                     academic_year=student.academic_year
-#                 )
-#                 if inventory_item.item_type == 'book':
-#                     unit_price = package.books_price
-#                 else:
-#                     unit_price = package.uniform_price
-                
-#                 sale.total_amount = unit_price * requested_qty
-                
-#             except GradePackagePrice.DoesNotExist:
-#                 messages.error(request, f"⚠️ لم يتم تحديد سعر الباقة لصف {student.grade.name} في سنة {student.academic_year.name}")
-#                 return render(request, 'books/add_sale.html', {'form': form})
-
-#             # 2. التأكد من توفر الكمية في المخزن
-#             if requested_qty > inventory_item.remaining_qty:
-#                 messages.error(request, f"⚠️ المخزن غير كافٍ! المتوفر حالياً: {inventory_item.remaining_qty}")
-#                 return render(request, 'books/add_sale.html', {'form': form})
-            
-#             # 3. الربط مع الموظف الحالي (مهم جداً لعملية السداد الآلي في الموديل)
-#             sale._current_user = request.user 
-            
-#             # 4. الحفظ النهائي (سيقوم الموديل تلقائياً بإنشاء قيد الخزينة بناءً على قيمة pay_now)
-#             sale.save()
-            
-#             # 5. رسالة نجاح مخصصة حسب حالة الدفع
-#             if sale.pay_now > 0:
-#                 messages.success(request, f"✅ تم تسجيل الصرف وتوريد مبلغ {sale.pay_now} ج.م للخزينة للطالب {student.get_full_name()}.")
-#             else:
-#                 messages.warning(request, f"تم تسجيل إذن الصرف للطالب {student.get_full_name()} بدون سداد مالي.")
-            
-#             # توجيه المستخدم لصفحة الطباعة فوراً أو لقائمة المبيعات
-#             return redirect('print_book_receipt', sale_id=sale.id)
-        
-#         return render(request, 'books/add_sale.html', {'form': form})
-
-#     else:
-#         form = BookSaleForm()
-    
-#     return render(request, 'books/add_sale.html', {'form': form})
-# # هذه الدالة هي المسؤولة عن فتح الإيصال "فقط" عند الضغط على زر الطابعة في الجدول
-# def print_receipt_view(request, sale_id):
-#     sale = get_object_or_404(BookSale, id=sale_id)
-#     return render(request, 'books/print_receipt.html', {'sale': sale})
-
 
 def collect_course_fee_view(request, enrollment_id):
     # جلب بيانات الاشتراك
@@ -1043,14 +1016,37 @@ def student_dashboard(request, student_id):
     return render(request, "students/student_dashboard.html", context)
 
 
+from django.shortcuts import render, get_object_or_404
+from django.core.paginator import Paginator
+from django.db.models import Subquery, OuterRef
+# تأكد أن هذا الموديل مستورد بشكل صحيح كما يظهر في ملفك
+from finance.models import StudentInstallment, StudentAccount, AcademicYear
+# أضف هذا السطر في أعلى ملف views.py
+from django.db.models import Q, F, Value, Sum, Count, Case, When, DecimalField, Subquery, OuterRef, ExpressionWrapper, Exists
+from django.db.models.functions import Coalesce, Concat
+from django.db.models.functions import Coalesce, Concat
+from django.template.loader import render_to_string
+from django.http import JsonResponse # تأكد من استيراد JsonResponse
+
 
 def student_list(request):
-    # 1. جلب البيانات الأساسية للفلترة
+    # 1. جلب البيانات الأساسية والفلاتر
     all_years = AcademicYear.objects.all().order_by('-name')
     all_grades = Grade.objects.all().order_by('id')
+    
     selected_year_id = request.GET.get('year_id')
+    grade_id = request.GET.get('grade_id')
+    classroom_id = request.GET.get('classroom_id')
+    specialization = request.GET.get('specialization')
+    gender = request.GET.get('gender')
+    religion = request.GET.get('religion')
+    is_disability = request.GET.get('is_disability')
+    search_query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status')
+    
+    
 
-    # 2. تحديد السنة الدراسية النشطة أو المختارة
+    # 2. تحديد السنة الدراسية
     if selected_year_id:
         current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
         is_archive = not current_view_year.is_active
@@ -1059,70 +1055,160 @@ def student_list(request):
         is_archive = False
 
     if current_view_year:
-        # 3. بناء الاستعلام العملاق (Annotate) - يقوم بكل الحسابات في ضربة واحدة للقاعدة
-        # السر هنا في استخدام Filter داخل Sum لضمان جلب أقساط السنة المختارة فقط
-        students_query = Student.objects.filter(academic_year=current_view_year).select_related("grade", "classroom").annotate(
-            
-            # حساب إجمالي المطلوب (المبلغ المستحق) للسنة الحالية فقط
-            fees_display=Coalesce(
-                Sum('installments__amount_due', filter=Q(installments__academic_year=current_view_year)), 
-                Value(0, output_field=DecimalField())
-            ),
-            
-            # حساب إجمالي ما دفعه الطالب في السنة الحالية فقط
-            total_paid_display=Coalesce(
-                Sum('installments__paid_amount', filter=Q(installments__academic_year=current_view_year)), 
-                Value(0, output_field=DecimalField())
-            ),
-            
-            # جلب المديونية القديمة (المخزنة في حقل previous_debt بالموديل)
+        # --- الساب كويري للتحقق من وجود "تسكين/أقساط" ---
+        installments_exists_subquery = StudentInstallment.objects.filter(
+            student=OuterRef('pk'),
+            academic_year=current_view_year
+        )
+
+        # --- الساب كويري للمبالغ المدفوعة فعلياً ---
+        receipts_subquery = Payment.objects.filter(
+            student=OuterRef('pk'),
+            academic_year=current_view_year
+        ).values('student').annotate(
+            total_paid_actual=Sum('amount_paid')
+        ).values('total_paid_actual')
+
+        # --- الساب كويري لإجمالي الخصومات ---
+        discount_subquery = StudentAccount.objects.filter(
+            student=OuterRef('pk'),
+            academic_year=current_view_year
+        ).values('student').annotate(
+            total_discount=Sum('discount')
+        ).values('total_discount')
+
+        # --- الساب كويري لأصل الأقساط المستحقة ---
+        installments_subquery = StudentInstallment.objects.filter(
+            student=OuterRef('pk'),
+            academic_year=current_view_year
+        ).values('student').annotate(
+            total_due=Sum('amount_due')
+        ).values('total_due')
+
+        # --- [جديد] الساب كويري لإجمالي غرامات التأخير ---
+        late_fees_subquery = StudentInstallment.objects.filter(
+            student=OuterRef('pk'),
+            academic_year=current_view_year
+        ).values('student').annotate(
+            total_late=Sum('late_fee')
+        ).values('total_late')
+
+        # 3. بناء الاستعلام الأساسي مع Annotation
+        base_query = Student.objects.filter(academic_year=current_view_year)
+        
+        # تطبيق الفلاتر (Grade, Classroom, etc.)
+        if grade_id: base_query = base_query.filter(grade_id=grade_id)
+        if classroom_id: base_query = base_query.filter(classroom_id=classroom_id)
+        if specialization: base_query = base_query.filter(specialization=specialization)
+        if gender: base_query = base_query.filter(gender=gender)
+        if religion: base_query = base_query.filter(religion=religion)
+        if is_disability: base_query = base_query.filter(is_disability=(is_disability == 'true'))
+
+        students_query = base_query.select_related("grade", "classroom").annotate(
+            full_name_db=Concat('first_name', Value(' '), 'last_name'),
+            is_assigned=Exists(installments_exists_subquery), 
+            fees_display=Coalesce(Subquery(installments_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
+            # جلب الغرامات للعرض
+            late_fees_display=Coalesce(Subquery(late_fees_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
+            total_paid_display=Coalesce(Subquery(receipts_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
+            discount_display=Coalesce(Subquery(discount_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
             old_debt_display=Coalesce(F('previous_debt'), Value(0, output_field=DecimalField()))
-            
         ).annotate(
-            # المعادلة المحاسبية: (مديونية قديمة + مطلوب حالي) - مدفوع حالي
-            calculated_remaining=F('old_debt_display') + F('fees_display') - F('total_paid_display')
-        ).order_by('first_name')
+            # تعديل معادلة المتبقي لتشمل الغرامات: (قديم + أقساط + غرامات) - (مدفوع + خصم)
+            calculated_remaining=ExpressionWrapper(
+                (F('old_debt_display') + F('fees_display') + F('late_fees_display')) - (F('total_paid_display') + F('discount_display')),
+                output_field=DecimalField()
+            )
+        )
 
-        # 4. حساب الإحصائيات (Stats Bar) من الـ Queryset مباشرة دون دوران
-        total_count = students_query.count()
-        # الطالب المسكن هو من لديه مطلوب (fees_display) أكبر من صفر
-        assigned_count = students_query.filter(fees_display__gt=0).count()
-        unassigned_count = total_count - assigned_count
-        # الطالب المديون هو من صافي حسابه أكبر من صفر
-        debt_count = students_query.filter(calculated_remaining__gt=0).count()
-        # الطالب الخالص هو من لديه خطة رسوم وصافي حسابه صفر أو أقل
-        paid_count = students_query.filter(fees_display__gt=0, calculated_remaining__lte=0).count()
+        # تصفية البحث النصي
+        if search_query:
+            students_query = students_query.filter(
+                Q(full_name_db__icontains=search_query) |
+                Q(student_code__icontains=search_query) |
+                Q(national_id__icontains=search_query)
+            )
 
-        # 5. نظام الترقيم (Pagination) - سريع جداً لأنه لا يحول البيانات لـ List
+        # 4. حساب العدادات (الإحصائيات المحدثة)
+        stats = students_query.aggregate(
+            total=Count('id'),
+            assigned=Count(Case(When(is_assigned=True, then=1))),
+            debt=Count(Case(When(calculated_remaining__gt=0.01, then=1))),
+            paid=Count(Case(When(Q(is_assigned=True) & Q(calculated_remaining__lte=0.01), then=1))),
+            total_remaining_sum=Sum('calculated_remaining')
+        )
+
+        # 5. تطبيق فلتر الحالة المالي
+        if status_filter == 'debt':
+            students_query = students_query.filter(calculated_remaining__gt=0.01)
+        elif status_filter == 'paid':
+            students_query = students_query.filter(is_assigned=True, calculated_remaining__lte=0.01)
+        elif status_filter == 'assigned':
+            students_query = students_query.filter(is_assigned=True)
+        elif status_filter == 'unassigned':
+            students_query = students_query.filter(is_assigned=False)
+
+        # الترتيب والترقيم
+        students_query = students_query.order_by('first_name', 'id')
         paginator = Paginator(students_query, 20) 
-        page_number = request.GET.get('page')
-        students_page = paginator.get_page(page_number)
+        students_page = paginator.get_page(request.GET.get('page', 1))
         
     else:
         students_page = []
-        total_count = assigned_count = unassigned_count = paid_count = debt_count = 0
+        stats = {'total': 0, 'assigned': 0, 'debt': 0, 'paid': 0, 'total_remaining_sum': 0}
 
+    # 6. تجهيز السياق للقالب
     context = {
         "students": students_page, 
         "all_years": all_years, 
         "all_grades": all_grades, 
+        "all_classrooms": Classroom.objects.all(),
         "current_view_year": current_view_year,
+        "selected_grade": grade_id,
+        "selected_classroom": classroom_id,
+        "selected_specialization": specialization,
+        "selected_gender": gender,
+        "selected_religion": religion,
+        "selected_is_disability": is_disability,
         "is_archive": is_archive,
-        "total_count": total_count,
-        "assigned_count": assigned_count,
-        "unassigned_count": unassigned_count,
-        "paid_count": paid_count,
-        "debt_count": debt_count,
+        "total_count": stats.get('total') or 0,
+        "assigned_count": stats.get('assigned') or 0,
+        "unassigned_count": (stats.get('total') or 0) - (stats.get('assigned') or 0),
+        "paid_count": stats.get('paid') or 0,
+        "debt_count": stats.get('debt') or 0,
+        "remaining": stats.get('total_remaining_sum') or 0,
+        "search_query": search_query,
+        "status_filter": status_filter,
     }
     return render(request, "students/student_list.html", context)
 
+
 # def student_list(request):
-#     # 1. جلب البيانات الأساسية (كما هي)
+#     # 1. جلب البيانات الأساسية
+#     # 1. جلب البيانات الأساسية
+#     all_years = AcademicYear.objects.all().order_by('-name')
+#     all_grades = Grade.objects.all().order_by('id')
+    
+#     # الفلاتر الجديدة
+#     selected_year_id = request.GET.get('year_id')
+#     grade_id = request.GET.get('grade_id')
+#     classroom_id = request.GET.get('classroom_id')
+#     specialization = request.GET.get('specialization')
+#     gender = request.GET.get('gender')
+#     religion = request.GET.get('religion')
+#     is_disability = request.GET.get('is_disability')
+    
+#     search_query = request.GET.get('q', '').strip()
+#     status_filter = request.GET.get('status')
+    
 #     all_years = AcademicYear.objects.all().order_by('-name')
 #     all_grades = Grade.objects.all().order_by('id')
 #     selected_year_id = request.GET.get('year_id')
+#     search_query = request.GET.get('q', '').strip()
+#     status_filter = request.GET.get('status') 
+#     last_updated_id = request.GET.get('last_id') 
 
-#     # 2. تحديد السنة الدراسية (كما هي)
+#     # 2. تحديد السنة الدراسية
 #     if selected_year_id:
 #         current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
 #         is_archive = not current_view_year.is_active
@@ -1130,67 +1216,347 @@ def student_list(request):
 #         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
 #         is_archive = False
 
-#     total_count = 0
-#     assigned_count = 0
-#     unassigned_count = 0
-#     paid_count = 0 
-#     debt_count = 0 
-#     processed_students = []
-
 #     if current_view_year:
-#         students_base_query = Student.objects.filter(academic_year=current_view_year)
-#         total_count = students_base_query.count()
-        
-#         # تحسين الأداء بـ annotate واحدة
-#         assigned_count = students_base_query.annotate(
-#             inst_count=Count('installments')
-#         ).filter(inst_count__gt=0).count()
-        
-#         unassigned_count = total_count - assigned_count
+#         # --- [جديد] ساب كويري للتحقق من وجود "خطة مصروفات" بغض النظر عن قيمتها ---
+#         installments_exists_subquery = StudentInstallment.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         )
 
-#         # جلب الطلاب مع البيانات المرتبطة
-#         students_query = students_base_query.select_related("grade", "classroom").order_by('first_name')
+#         # --- الساب كويري للقيم المالية ---
+#         receipts_subquery = Payment.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_paid_actual=Sum('amount_paid')
+#         ).values('total_paid_actual')
 
-#         for student in students_query:
-#             # 1. جلب الإحصائيات مع التأكد من السنة الدراسية الحالية
-#             inst_stats = StudentInstallment.objects.filter(
-#                 student=student, 
-#                 academic_year=current_view_year
-#             ).aggregate(
-#                 real_paid=Sum('paid_amount'),
-#                 real_required=Sum('amount_due')
+#         discount_subquery = StudentAccount.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_discount=Sum('discount')
+#         ).values('total_discount')
+
+#         installments_subquery = StudentInstallment.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_due=Sum('amount_due')
+#         ).values('total_due')
+
+#         # 3. بناء الاستعلام الأساسي مع إضافة حقل is_assigned
+#         base_query = Student.objects.filter(academic_year=current_view_year)
+#         if grade_id:
+#             base_query = base_query.filter(grade_id=grade_id)
+#         if classroom_id:
+#             base_query = base_query.filter(classroom_id=classroom_id)
+#         if specialization:
+#             base_query = base_query.filter(specialization=specialization)
+#         if gender:
+#             base_query = base_query.filter(gender=gender)
+#         if religion:
+#             base_query = base_query.filter(religion=religion)
+#         if is_disability:
+#             # تحويل النص 'true'/'false' إلى قيمة منطقية
+#             base_query = base_query.filter(is_disability=(is_disability == 'true'))
+
+        
+#         students_query = base_query.select_related("grade", "classroom").annotate(
+#             full_name_db=Concat('first_name', Value(' '), 'last_name'),
+#             # التحقق من التسكين منطقياً (Exists)
+#             is_assigned=Exists(installments_exists_subquery), 
+#             fees_display=Coalesce(Subquery(installments_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
+#             total_paid_display=Coalesce(Subquery(receipts_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
+#             discount_display=Coalesce(Subquery(discount_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
+#             old_debt_display=Coalesce(F('previous_debt'), Value(0, output_field=DecimalField()))
+#         ).annotate(
+#             calculated_remaining=ExpressionWrapper(
+#                 F('old_debt_display') + F('fees_display') - (F('total_paid_display') + F('discount_display')),
+#                 output_field=DecimalField()
 #             )
-            
-#             # 2. تحويل القيم لـ Decimal لضمان دقة الحسابات
-#             current_total_paid = inst_stats['real_paid'] or Decimal('0.00')
-#             current_required = inst_stats['real_required'] or Decimal('0.00')
-#             old_debt = Decimal(str(student.previous_debt or 0))
+#         )
 
-#             # 3. المعادلة المحاسبية الشاملة
-#             total_remaining = (old_debt + current_required) - current_total_paid
+#         # تصفية البحث (تؤثر على العدادات)
+#         if search_query:
+#             students_query = students_query.filter(
+#                 Q(full_name_db__icontains=search_query) |
+#                 Q(student_code__icontains=search_query) |
+#                 Q(national_id__icontains=search_query)
+#             )
 
-#             # 4. إرسال البيانات للقالب (تأكد من مطابقة هذه المسميات مع الـ HTML)
-#             student.total_paid_display = float(current_total_paid)
-#             student.fees_display = float(current_required)
-#             student.old_debt_display = float(old_debt)
-            
-#             # هام جداً:calculated_remaining هو المحرك الأساسي للألوان والـ Badges في الـ HTML
-#             student.calculated_remaining = float(total_remaining)
+#         # 4. حساب العدادات (Stats) بناءً على المنطق الجديد
+#         stats = students_query.aggregate(
+#             total=Count('id'),
+#             # المسكنين: أي طالب له سجل في الأقساط
+#             assigned=Count(Case(When(is_assigned=True, then=1))),
+#             debt=Count(Case(When(calculated_remaining__gt=0.01, then=1))),
+#             # المسددين: مسكن ومتبقي عليه صفر
+#             paid=Count(Case(When(Q(is_assigned=True) & Q(calculated_remaining__lte=0.01), then=1))),
+#             total_remaining_sum=Sum('calculated_remaining')
+#         )
 
-#             # 5. تحديث العدادات (Stats Bar) بناءً على النتيجة الحقيقية
-#             if total_remaining > 0:
-#                 debt_count += 1
-#             elif current_required > 0 and total_remaining <= 0:
-#                 paid_count += 1
+#         # 5. تطبيق فلتر الحالة (عند الضغط على العدادات)
+#         if status_filter == 'debt':
+#             students_query = students_query.filter(calculated_remaining__gt=0.01)
+#         elif status_filter == 'paid':
+#             students_query = students_query.filter(is_assigned=True, calculated_remaining__lte=0.01)
+#         elif status_filter == 'assigned':
+#             students_query = students_query.filter(is_assigned=True)
+#         elif status_filter == 'unassigned':
+#             students_query = students_query.filter(is_assigned=False)
 
-#             processed_students.append(student)
-
-#         # 5. نظام الترقيم (Pagination)
-#         paginator = Paginator(processed_students, 20) 
-#         page_number = request.GET.get('page')
-#         students_page = paginator.get_page(page_number)
+#         # الترتيب والترقيم
+#         students_query = students_query.order_by('first_name', 'id')
+#         paginator = Paginator(students_query, 20) 
+#         students_page = paginator.get_page(request.GET.get('page', 1))
+        
 #     else:
 #         students_page = []
+#         stats = {'total': 0, 'assigned': 0, 'debt': 0, 'paid': 0, 'total_remaining_sum': 0}
+
+#     context = {
+#         "students": students_page, 
+#         "all_years": all_years, 
+#         "all_grades": all_grades, 
+#         "all_classrooms": Classroom.objects.all(),
+#         "current_view_year": current_view_year,
+#         "selected_grade": grade_id,
+#         "selected_classroom": classroom_id,
+#         "selected_specialization": specialization,
+#         "selected_gender": gender,
+#         "selected_religion": religion,
+#         "selected_is_disability": is_disability,
+#         "is_archive": is_archive,
+#         "total_count": stats.get('total') or 0,
+#         "assigned_count": stats.get('assigned') or 0,
+#         "unassigned_count": (stats.get('total') or 0) - (stats.get('assigned') or 0),
+#         "paid_count": stats.get('paid') or 0,
+#         "debt_count": stats.get('debt') or 0,
+#         "remaining": stats.get('total_remaining_sum') or 0,
+#         "search_query": search_query,
+#         "status_filter": status_filter,
+#     }
+#     return render(request, "students/student_list.html", context)
+
+# def student_list(request):
+#     # 1. جلب البيانات الأساسية
+#     all_years = AcademicYear.objects.all().order_by('-name')
+#     all_grades = Grade.objects.all().order_by('id')
+#     selected_year_id = request.GET.get('year_id')
+#     search_query = request.GET.get('q', '').strip()
+#     last_updated_id = request.GET.get('last_id') 
+
+#     # 2. تحديد السنة الدراسية
+#     if selected_year_id:
+#         current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
+#         is_archive = not current_view_year.is_active
+#     else:
+#         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
+#         is_archive = False
+
+#     if current_view_year:
+#         # --- التعديل الجوهري: حساب المدفوعات من جدول الإيصالات مباشرة ---
+#         # استبدل 'Receipt' بالاسم الحقيقي لموديل الإيصالات عندك
+#         # التعديل الصحيح داخل views.py
+#         receipts_subquery = Payment.objects.filter( # تم تغيير الاسم من Receipt إلى Payment
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_paid_actual=Sum('amount_paid') # تأكد أن اسم الحقل amount_paid كما في الموديل
+#         ).values('total_paid_actual')
+
+#         # استعلام الخصومات من جدول الحسابات
+#         discount_subquery = StudentAccount.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_discount=Sum('discount')
+#         ).values('total_discount')
+
+#         # استعلام الأقساط (نأخذ منه القيمة المطلوبة فقط)
+#         installments_subquery = StudentInstallment.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_due=Sum('amount_due')
+#         )
+
+#         # 3. بناء الاستعلام الأساسي مع الربط الجديد
+#         students_query = Student.objects.filter(
+#             academic_year=current_view_year
+#         ).select_related("grade", "classroom")
+        
+#         students_query = students_query.annotate(
+#             full_name_db=Concat('first_name', Value(' '), 'last_name'),
+#             fees_display=Coalesce(Subquery(installments_subquery.values('total_due'), output_field=DecimalField()), Value(0, output_field=DecimalField())),
+            
+#             # الربط بجدول الإيصالات لضمان التحديث عند المسح
+#             total_paid_display=Coalesce(Subquery(receipts_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
+            
+#             discount_display=Coalesce(Subquery(discount_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
+#             old_debt_display=Coalesce(F('previous_debt'), Value(0, output_field=DecimalField()))
+#         ).annotate(
+#             # الحسبة النهائية للمتبقي
+#             calculated_remaining=F('old_debt_display') + F('fees_display') - (F('total_paid_display') + F('discount_display'))
+#         )
+
+#         # فلتر البحث (Search)
+#         if search_query:
+#             students_query = students_query.filter(
+#                 Q(full_name_db__icontains=search_query) |
+#                 Q(student_code__icontains=search_query) |
+#                 Q(national_id__icontains=search_query) |
+#                 Q(registration_number__icontains=search_query)
+#             )
+
+#         # الترتيب الثابت
+#         students_query = students_query.order_by('first_name', 'id')
+
+#         # حساب الصفحة تلقائياً للطالب المستهدف
+#         page_number = request.GET.get('page', 1)
+#         if last_updated_id and not search_query and not request.GET.get('page'):
+#             try:
+#                 all_ids = list(students_query.values_list('id', flat=True))
+#                 target_id = int(last_updated_id)
+#                 if target_id in all_ids:
+#                     index = all_ids.index(target_id)
+#                     page_number = (index // 20) + 1
+#             except (ValueError, TypeError):
+#                 pass
+
+#         # 4. حساب الإحصائيات (Stats Bar) والمتبقي الكلي للصندوق العلوي
+#         stats = students_query.aggregate(
+#             total=Count('id'),
+#             assigned=Count(Case(When(fees_display__gt=0, then=1), output_field=IntegerField())),
+#             debt=Count(Case(When(calculated_remaining__gt=0, then=1), output_field=IntegerField())),
+#             paid=Count(Case(When(Q(fees_display__gt=0) & Q(calculated_remaining__lte=0), then=1), output_field=IntegerField())),
+#             total_remaining_sum=Sum('calculated_remaining') # حساب المبلغ الإجمالي للصندوق
+#         )
+
+#         # 5. الترقيم (Pagination)
+#         paginator = Paginator(students_query, 20) 
+#         students_page = paginator.get_page(page_number)
+        
+#     else:
+#         students_page = []
+#         stats = {'total': 0, 'assigned': 0, 'debt': 0, 'paid': 0, 'total_remaining_sum': 0}
+
+#     # التحضير للإرسال للقالب
+#     context = {
+#         "students": students_page, 
+#         "all_years": all_years, 
+#         "all_grades": all_grades, 
+#         "current_view_year": current_view_year,
+#         "is_archive": is_archive,
+#         "total_count": stats.get('total', 0),
+#         "assigned_count": stats.get('assigned', 0),
+#         "unassigned_count": stats.get('total', 0) - stats.get('assigned', 0),
+#         "paid_count": stats.get('paid', 0),
+#         "debt_count": stats.get('debt', 0),
+#         "remaining": stats.get('total_remaining_sum', 0), # إرسال إجمالي المتبقي للصندوق العلوي
+#         "search_query": search_query,
+#         "last_updated_id": last_updated_id, 
+#     }
+#     return render(request, "students/student_list.html", context)
+
+
+# def student_list(request):
+#     # 1. جلب البيانات الأساسية للفلترة والتمرير
+#     all_years = AcademicYear.objects.all().order_by('-name')
+#     all_grades = Grade.objects.all().order_by('id')
+#     selected_year_id = request.GET.get('year_id')
+#     search_query = request.GET.get('q', '').strip()
+    
+#     # استقبال معرف الطالب الأخير للعودة إليه بعد الدفع
+#     last_updated_id = request.GET.get('last_id') 
+
+#     # 2. تحديد السنة الدراسية النشطة أو المختارة
+#     if selected_year_id:
+#         current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
+#         is_archive = not current_view_year.is_active
+#     else:
+#         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
+#         is_archive = False
+
+#     if current_view_year:
+#         # --- استعلام فرعي للخصم (Subquery لضمان السرعة) ---
+#         discount_subquery = StudentAccount.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_discount=Sum('discount')
+#         ).values('total_discount')
+
+#         # --- استعلام فرعي للأقساط (تجنباً للـ 7415 استعلاماً السابقة) ---
+#         installments_subquery = StudentInstallment.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_due=Sum('amount_due'),
+#             total_paid=Sum('paid_amount')
+#         )
+
+#         # 3. بناء الاستعلام الأساسي مع تحسين الأداء (Annotate)
+#         students_query = Student.objects.filter(
+#             academic_year=current_view_year
+#         ).select_related("grade", "classroom")
+        
+#         students_query = students_query.annotate(
+#             full_name_db=Concat('first_name', Value(' '), 'last_name'),
+            
+#             # جلب القيم المالية بضربة واحدة في قاعدة البيانات
+#             fees_display=Coalesce(
+#                 Subquery(installments_subquery.values('total_due'), output_field=DecimalField()), 
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             total_paid_display=Coalesce(
+#                 Subquery(installments_subquery.values('total_paid'), output_field=DecimalField()), 
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             discount_display=Coalesce(
+#                 Subquery(discount_subquery, output_field=DecimalField()),
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             old_debt_display=Coalesce(F('previous_debt'), Value(0, output_field=DecimalField()))
+#         ).annotate(
+#             # الحسبة المالية النهائية لكل طالب (تظهر مباشرة في الجدول)
+#             calculated_remaining=F('old_debt_display') + F('fees_display') - (F('total_paid_display') + F('discount_display'))
+#         )
+
+#         # 🌟 فلتر البحث (Search)
+#         if search_query:
+#             students_query = students_query.filter(
+#                 Q(full_name_db__icontains=search_query) |
+#                 Q(student_code__icontains=search_query) |
+#                 Q(national_id__icontains=search_query) |
+#                 Q(registration_number__icontains=search_query)
+#             )
+
+#         students_query = students_query.order_by('first_name')
+
+#         # 4. حساب الإحصائيات للبطاقات العلوية (Stats Bar)
+#         stats = students_query.aggregate(
+#             total=Count('id'),
+#             assigned=Count(Case(When(fees_display__gt=0, then=1), output_field=IntegerField())),
+#             debt=Count(Case(When(calculated_remaining__gt=0, then=1), output_field=IntegerField())),
+#             paid=Count(Case(When(Q(fees_display__gt=0) & Q(calculated_remaining__lte=0), then=1), output_field=IntegerField()))
+#         )
+
+#         total_count = stats['total'] or 0
+#         assigned_count = stats['assigned'] or 0
+#         unassigned_count = total_count - assigned_count
+#         debt_count = stats['debt'] or 0
+#         paid_count = stats['paid'] or 0
+
+#         # 5. الترقيم (Pagination) لضمان استقرار الصفحة ومنع ERR_EMPTY_RESPONSE
+#         paginator = Paginator(students_query, 20) 
+#         page_number = request.GET.get('page')
+#         students_page = paginator.get_page(page_number)
+        
+#     else:
+#         students_page = []
+#         total_count = assigned_count = unassigned_count = paid_count = debt_count = 0
 
 #     context = {
 #         "students": students_page, 
@@ -1203,18 +1569,20 @@ def student_list(request):
 #         "unassigned_count": unassigned_count,
 #         "paid_count": paid_count,
 #         "debt_count": debt_count,
+#         "search_query": search_query,
+#         "last_updated_id": last_updated_id, # سيستخدمه JavaScript للذهاب لآخر سطر
 #     }
 #     return render(request, "students/student_list.html", context)
 
 
-
 # def student_list(request):
-#     # 1. جلب البيانات الأساسية للفلاتر
+#     # 1. جلب البيانات الأساسية للفلترة
 #     all_years = AcademicYear.objects.all().order_by('-name')
 #     all_grades = Grade.objects.all().order_by('id')
 #     selected_year_id = request.GET.get('year_id')
+#     search_query = request.GET.get('q', '').strip()
 
-#     # 2. تحديد السنة الدراسية المطلوبة
+#     # 2. تحديد السنة الدراسية النشطة أو المختارة
 #     if selected_year_id:
 #         current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
 #         is_archive = not current_view_year.is_active
@@ -1222,151 +1590,429 @@ def student_list(request):
 #         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
 #         is_archive = False
 
-#     # متغيرات الإحصائيات
-#     total_count = 0
-#     assigned_count = 0
-#     unassigned_count = 0
-#     paid_count = 0 
-#     debt_count = 0 
-#     processed_students = []
-
 #     if current_view_year:
-#         # 3. حساب الإحصائيات الكلية للسنة (قبل الترقيم لضمان الدقة)
-#         students_base_query = Student.objects.filter(academic_year=current_view_year)
-        
-#         # إجمالي الطلاب والطلاب المسكنين (من لديهم سجلات في جدول الأقساط)
-#         total_count = students_base_query.count()
-#         assigned_count = students_base_query.annotate(
-#             inst_count=Count('installments')
-#         ).filter(inst_count__gt=0).count()
-        
-#         unassigned_count = total_count - assigned_count
+#         # --- استعلام فرعي للخصم من جدول حسابات الطلاب ---
+#         discount_subquery = StudentAccount.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_discount=Sum('discount')
+#         ).values('total_discount')
 
-#         # 4. معالجة البيانات المالية لكل طالب للعرض
-#         students_query = students_base_query.select_related("grade", "classroom").order_by('first_name')
+#         # --- استعلام فرعي للأقساط (استخدام المسمى الصحيح StudentInstallment) ---
+#         installments_subquery = StudentInstallment.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_due=Sum('amount_due'),
+#             total_paid=Sum('paid_amount')
+#         )
 
-#         for student in students_query:
-#             # الحسابات المالية الدقيقة من جدول الأقساط
-#             inst_stats = StudentInstallment.objects.filter(student=student).aggregate(
-#                 real_paid=Sum('paid_amount'),
-#                 real_required=Sum('amount_due')
-#             )
+#         # 3. بناء الاستعلام الأساسي مع تحسين الأداء
+#         students_query = Student.objects.filter(
+#             academic_year=current_view_year
+#         ).select_related("grade", "classroom")
+        
+#         students_query = students_query.annotate(
+#             full_name_db=Concat('first_name', Value(' '), 'last_name'),
             
-#             current_paid = inst_stats['real_paid'] or 0
-#             current_required = inst_stats['real_required'] or 0
-#             old_debt = student.previous_debt or 0
+#             # جلب القيم المالية عبر Subqueries لتجنب البطء وتكرار النتائج
+#             fees_display=Coalesce(
+#                 Subquery(installments_subquery.values('total_due'), output_field=DecimalField()), 
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             total_paid_display=Coalesce(
+#                 Subquery(installments_subquery.values('total_paid'), output_field=DecimalField()), 
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             discount_display=Coalesce(
+#                 Subquery(discount_subquery, output_field=DecimalField()),
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             old_debt_display=Coalesce(F('previous_debt'), Value(0, output_field=DecimalField()))
+#         ).annotate(
+#             # الحسبة المالية النهائية لكل طالب
+#             calculated_remaining=F('old_debt_display') + F('fees_display') - (F('total_paid_display') + F('discount_display'))
+#         )
 
-#             # المعادلة المحاسبية الموحدة (القديم + الجديد - المحصل)
-#             total_remaining = (old_debt + current_required) - current_paid
+#         # 🌟 فلتر البحث
+#         if search_query:
+#             students_query = students_query.filter(
+#                 Q(full_name_db__icontains=search_query) |
+#                 Q(student_code__icontains=search_query) |
+#                 Q(national_id__icontains=search_query) |
+#                 Q(registration_number__icontains=search_query)
+#             )
 
-#             # تمرير البيانات للقالب (HTML)
-#             student.total_paid_display = current_paid 
-#             student.fees_display = current_required
-#             student.old_debt_display = old_debt
-#             student.calculated_remaining = total_remaining
+#         students_query = students_query.order_by('first_name')
 
-#             # تحديث عدادات الحالة المالية (المديون والخالص)
-#             if total_remaining > 0:
-#                 debt_count += 1
-#             elif current_required > 0 and total_remaining <= 0:
-#                 paid_count += 1
+#         # 4. حساب الإحصائيات للبطاقات العلوية (Stats Bar)
+#         stats = students_query.aggregate(
+#             total=Count('id'),
+#             assigned=Count(Case(When(fees_display__gt=0, then=1), output_field=IntegerField())),
+#             debt=Count(Case(When(calculated_remaining__gt=0, then=1), output_field=IntegerField())),
+#             paid=Count(Case(When(Q(fees_display__gt=0) & Q(calculated_remaining__lte=0), then=1), output_field=IntegerField()))
+#         )
 
-#             processed_students.append(student)
+#         total_count = stats['total'] or 0
+#         assigned_count = stats['assigned'] or 0
+#         unassigned_count = total_count - assigned_count
+#         debt_count = stats['debt'] or 0
+#         paid_count = stats['paid'] or 0
 
-#         # 5. نظام الترقيم (Pagination)
-#         paginator = Paginator(processed_students, 20) 
+#         # 5. الترقيم (Pagination) لضمان سرعة الصفحة
+#         paginator = Paginator(students_query, 20) 
 #         page_number = request.GET.get('page')
 #         students_page = paginator.get_page(page_number)
+        
 #     else:
 #         students_page = []
+#         total_count = assigned_count = unassigned_count = paid_count = debt_count = 0
 
-#     # 6. إرسال كافة البيانات للسياق
 #     context = {
 #         "students": students_page, 
 #         "all_years": all_years, 
 #         "all_grades": all_grades, 
 #         "current_view_year": current_view_year,
 #         "is_archive": is_archive,
-#         "total_count": total_count,          # الإجمالي الكلي
-#         "assigned_count": assigned_count,    # المسكنين كلياً
-#         "unassigned_count": unassigned_count, # غير المسكنين كلياً
-#         "paid_count": paid_count,            # الخالصين
-#         "debt_count": debt_count,            # المديونين
+#         "total_count": total_count,
+#         "assigned_count": assigned_count,
+#         "unassigned_count": unassigned_count,
+#         "paid_count": paid_count,
+#         "debt_count": debt_count,
+#         "search_query": search_query,
+#     }
+#     return render(request, "students/student_list.html", context)
+
+
+# from django.db.models import Q, Value, Sum, F, DecimalField
+# from django.db.models.functions import Concat, Coalesce
+# from django.shortcuts import render, get_object_or_404
+# from django.core.paginator import Paginator
+# from django.db.models import Subquery, OuterRef
+
+# def student_list(request):
+#     # 1. جلب البيانات الأساسية للفلترة
+#     all_years = AcademicYear.objects.all().order_by('-name')
+#     all_grades = Grade.objects.all().order_by('id')
+#     selected_year_id = request.GET.get('year_id')
+#     search_query = request.GET.get('q', '').strip()
+
+#     # 2. تحديد السنة الدراسية النشطة أو المختارة
+#     if selected_year_id:
+#         current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
+#         is_archive = not current_view_year.is_active
+#     else:
+#         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
+#         is_archive = False
+
+#     if current_view_year:
+#         # --- حل مشكلة التكرار: استعلام فرعي للخصم فقط ---
+#         # نستخدم OuterRef لربط الخصم بكل طالب على حدة دون التأثر بعدد الأقساط
+#         discount_subquery = StudentAccount.objects.filter(
+#             student=OuterRef('pk'),
+#             academic_year=current_view_year
+#         ).values('student').annotate(
+#             total_discount=Sum('discount')
+#         ).values('total_discount')
+
+#         # 3. بناء الاستعلام الأساسي
+#         students_query = Student.objects.filter(academic_year=current_view_year).select_related("grade", "classroom")
+        
+#         students_query = students_query.annotate(
+#             full_name_db=Concat('first_name', Value(' '), 'last_name'),
+            
+#             # إجمالي المطلوب والمحصل من جدول الأقساط
+#             fees_display=Coalesce(
+#                 Sum('installments__amount_due', filter=Q(installments__academic_year=current_view_year)), 
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             total_paid_display=Coalesce(
+#                 Sum('installments__paid_amount', filter=Q(installments__academic_year=current_view_year)), 
+#                 Value(0, output_field=DecimalField())
+#             ),
+            
+#             # جلب الخصم عبر الـ Subquery لمنع التضاعف (هذا هو الحل)
+#             discount_display=Coalesce(
+#                 Subquery(discount_subquery, output_field=DecimalField()),
+#                 Value(0, output_field=DecimalField())
+#             ),
+            
+#             old_debt_display=Coalesce(F('previous_debt'), Value(0, output_field=DecimalField()))
+#         ).annotate(
+#             # المتبقي = (القديم + المطلوب) - (المحصل + الخصم)
+#             calculated_remaining=F('old_debt_display') + F('fees_display') - (F('total_paid_display') + F('discount_display'))
+#         )
+
+#         # 🌟 فلتر البحث (يدعم الاسم والكود والقومي والقيد)
+#         if search_query:
+#             students_query = students_query.filter(
+#                 Q(full_name_db__icontains=search_query) |
+#                 Q(student_code__icontains=search_query) |
+#                 Q(national_id__icontains=search_query) |
+#                 Q(registration_number__icontains=search_query)
+#             )
+
+#         students_query = students_query.order_by('first_name')
+
+#         # 4. حساب الإحصائيات بناءً على النتائج المفلترة
+#         total_count = students_query.count()
+#         assigned_count = students_query.filter(fees_display__gt=0).count()
+#         unassigned_count = total_count - assigned_count
+#         debt_count = students_query.filter(calculated_remaining__gt=0).count()
+#         paid_count = students_query.filter(fees_display__gt=0, calculated_remaining__lte=0).count()
+
+#         # 5. الترقيم
+#         paginator = Paginator(students_query, 20) 
+#         page_number = request.GET.get('page')
+#         students_page = paginator.get_page(page_number)
+        
+#     else:
+#         students_page = []
+#         total_count = assigned_count = unassigned_count = paid_count = debt_count = 0
+
+#     context = {
+#         "students": students_page, 
+#         "all_years": all_years, 
+#         "all_grades": all_grades, 
+#         "current_view_year": current_view_year,
+#         "is_archive": is_archive,
+#         "total_count": total_count,
+#         "assigned_count": assigned_count,
+#         "unassigned_count": unassigned_count,
+#         "paid_count": paid_count,
+#         "debt_count": debt_count,
+#         "search_query": search_query,
 #     }
 #     return render(request, "students/student_list.html", context)
 
 # def student_list(request):
+#     # 1. جلب البيانات الأساسية للفلترة
+#     all_years = AcademicYear.objects.all().order_by('-name')
+#     all_grades = Grade.objects.all().order_by('id')
+#     selected_year_id = request.GET.get('year_id')
+#     search_query = request.GET.get('q', '').strip()
+
+#     # 2. تحديد السنة الدراسية النشطة أو المختارة
+#     if selected_year_id:
+#         current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
+#         is_archive = not current_view_year.is_active
+#     else:
+#         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
+#         is_archive = False
+
+#     if current_view_year:
+#         # 3. بناء الاستعلام مع حساباتك المالية + دمج الاسم الكامل للبحث
+#         students_query = Student.objects.filter(academic_year=current_view_year).select_related("grade", "classroom")
+        
+#         # دمج الاسم الأول والاسم الأخير في حقل واحد يسمى 'full_name_db'
+#         # ملاحظة: أضفنا مسافة Value(' ') بينهما لمحاكاة البحث الطبيعي
+#         students_query = students_query.annotate(
+#             full_name_db=Concat('first_name', Value(' '), 'last_name'),
+#             fees_display=Coalesce(
+#                 Sum('installments__amount_due', filter=Q(installments__academic_year=current_view_year)), 
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             total_paid_display=Coalesce(
+#                 Sum('installments__paid_amount', filter=Q(installments__academic_year=current_view_year)), 
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             old_debt_display=Coalesce(F('previous_debt'), Value(0, output_field=DecimalField()))
+#         ).annotate(
+#             calculated_remaining=F('old_debt_display') + F('fees_display') - F('total_paid_display')
+#         )
+
+#         # 🌟 تعديل فلتر البحث ليدعم الاسم الكامل 🌟
+#         if search_query:
+#             students_query = students_query.filter(
+#                 Q(full_name_db__icontains=search_query) |    # البحث في الاسم المدمج
+#                 Q(student_code__icontains=search_query) |    # البحث بكود الطالب
+#                 Q(national_id__icontains=search_query) |     # البحث بالرقم القومي
+#                 Q(registration_number__icontains=search_query) # البحث برقم القيد
+#             )
+
+#         # الترتيب
+#         students_query = students_query.order_by('first_name')
+
+#         # 4. حساب الإحصائيات بناءً على نتيجة البحث
+#         total_count = students_query.count()
+#         assigned_count = students_query.filter(fees_display__gt=0).count()
+#         unassigned_count = total_count - assigned_count
+#         debt_count = students_query.filter(calculated_remaining__gt=0).count()
+#         paid_count = students_query.filter(fees_display__gt=0, calculated_remaining__lte=0).count()
+
+#         # 5. الترقيم
+#         paginator = Paginator(students_query, 20) 
+#         page_number = request.GET.get('page')
+#         students_page = paginator.get_page(page_number)
+        
+#     else:
+#         students_page = []
+#         total_count = assigned_count = unassigned_count = paid_count = debt_count = 0
+
+#     context = {
+#         "students": students_page, 
+#         "all_years": all_years, 
+#         "all_grades": all_grades, 
+#         "current_view_year": current_view_year,
+#         "is_archive": is_archive,
+#         "total_count": total_count,
+#         "assigned_count": assigned_count,
+#         "unassigned_count": unassigned_count,
+#         "paid_count": paid_count,
+#         "debt_count": debt_count,
+#         "search_query": search_query,
+#     }
+#     return render(request, "students/student_list.html", context)
+
+
+# def student_list(request):
+#     # 1. جلب البيانات الأساسية للفلترة
+#     all_years = AcademicYear.objects.all().order_by('-name')
+#     all_grades = Grade.objects.all().order_by('id')
+#     selected_year_id = request.GET.get('year_id')
+    
+#     # التقاط كلمة البحث من الرابط
+#     search_query = request.GET.get('q', '').strip()
+
+#     # 2. تحديد السنة الدراسية النشطة أو المختارة
+#     if selected_year_id:
+#         current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
+#         is_archive = not current_view_year.is_active
+#     else:
+#         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
+#         is_archive = False
+
+#     if current_view_year:
+#         # 3. بناء الاستعلام العملاق (Annotate)
+#         students_query = Student.objects.filter(academic_year=current_view_year).select_related("grade", "classroom").annotate(
+#             # ... (نفس حساباتك الحالية بدون تغيير) ...
+#             fees_display=Coalesce(
+#                 Sum('installments__amount_due', filter=Q(installments__academic_year=current_view_year)), 
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             total_paid_display=Coalesce(
+#                 Sum('installments__paid_amount', filter=Q(installments__academic_year=current_view_year)), 
+#                 Value(0, output_field=DecimalField())
+#             ),
+#             old_debt_display=Coalesce(F('previous_debt'), Value(0, output_field=DecimalField()))
+#         ).annotate(
+#             calculated_remaining=F('old_debt_display') + F('fees_display') - F('total_paid_display')
+#         )
+
+#         # 🌟 الجديد: تطبيق فلتر البحث على الاستعلام إذا كانت هناك كلمة بحث 🌟
+#         if search_query:
+#             students_query = students_query.filter(
+#                 # استبدل first_name و last_name بأسماء الحقول الفعلية في موديل Student عندك
+#                 Q(first_name__icontains=search_query) | 
+#                 Q(last_name__icontains=search_query) | 
+#                 Q(student_code__icontains=search_query)
+#             )
+
+#         # الترتيب في النهاية
+#         students_query = students_query.order_by('first_name')
+
+#         # 4. حساب الإحصائيات (الآن ستتحدث تلقائياً لتظهر إحصائيات نتيجة البحث فقط!)
+#         total_count = students_query.count()
+#         assigned_count = students_query.filter(fees_display__gt=0).count()
+#         unassigned_count = total_count - assigned_count
+#         debt_count = students_query.filter(calculated_remaining__gt=0).count()
+#         paid_count = students_query.filter(fees_display__gt=0, calculated_remaining__lte=0).count()
+
+#         # 5. نظام الترقيم (Pagination)
+#         paginator = Paginator(students_query, 20) 
+#         page_number = request.GET.get('page')
+#         students_page = paginator.get_page(page_number)
+        
+#     else:
+#         students_page = []
+#         total_count = assigned_count = unassigned_count = paid_count = debt_count = 0
+
+#     context = {
+#         "students": students_page, 
+#         "all_years": all_years, 
+#         "all_grades": all_grades, 
+#         "current_view_year": current_view_year,
+#         "is_archive": is_archive,
+#         "total_count": total_count,
+#         "assigned_count": assigned_count,
+#         "unassigned_count": unassigned_count,
+#         "paid_count": paid_count,
+#         "debt_count": debt_count,
+#         "search_query": search_query, # تمرير الكلمة للقالب للاحتفاظ بها في حقل الإدخال
+#     }
+#     return render(request, "students/student_list.html", context)
+
+
+# def student_list(request):
+#     # 1. جلب البيانات الأساسية للفلترة
 #     all_years = AcademicYear.objects.all().order_by('-name')
 #     all_grades = Grade.objects.all().order_by('id')
 #     selected_year_id = request.GET.get('year_id')
 
+#     # 2. تحديد السنة الدراسية النشطة أو المختارة
 #     if selected_year_id:
-#         current_view_year = AcademicYear.objects.filter(id=selected_year_id).first()
+#         current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
+#         is_archive = not current_view_year.is_active
 #     else:
 #         current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
-
-#     total_previous_debt = 0
-#     paid_count = 0 
-#     debt_count = 0 
-#     unassigned_count = 0 
-#     processed_students = []
+#         is_archive = False
 
 #     if current_view_year:
-#         # استرجاع الطلاب للسنة المحددة
-#         students_query = Student.objects.filter(
-#             academic_year=current_view_year
-#         ).select_related("grade", "classroom").order_by('first_name')
-
-#         from django.db.models import Sum
-#         total_previous_debt = students_query.aggregate(total=Sum('previous_debt'))['total'] or 0
-        
-#         for student in students_query:
-#             # 🚀 التعديل الجوهري هنا: سحب الأرقام مباشرة من جدول الأقساط الموثوق
-#             # نحسب إجمالي ما دفعه الطالب فعلياً في كل أقساطه
-#             real_paid = StudentInstallment.objects.filter(
-#                 student=student
-#             ).aggregate(Sum('paid_amount'))['paid_amount__sum'] or 0
+#         # 3. بناء الاستعلام العملاق (Annotate) - يقوم بكل الحسابات في ضربة واحدة للقاعدة
+#         # السر هنا في استخدام Filter داخل Sum لضمان جلب أقساط السنة المختارة فقط
+#         students_query = Student.objects.filter(academic_year=current_view_year).select_related("grade", "classroom").annotate(
             
-#             # نحسب إجمالي المطلوب منه (مجموع مبالغ الأقساط الأصلية)
-#             real_required = StudentInstallment.objects.filter(
-#                 student=student
-#             ).aggregate(Sum('amount_due'))['amount_due__sum'] or 0
+#             # حساب إجمالي المطلوب (المبلغ المستحق) للسنة الحالية فقط
+#             fees_display=Coalesce(
+#                 Sum('installments__amount_due', filter=Q(installments__academic_year=current_view_year)), 
+#                 Value(0, output_field=DecimalField())
+#             ),
             
-#             # حساب المتبقي
-#             total_due = real_required - real_paid
-
-#             # تحديث الإحصائيات (Stats)
-#             if total_due <= 0:
-#                 paid_count += 1
-#             else:
-#                 debt_count += 1
-
-#             # 🎯 تمرير البيانات للـ Template لتظهر في الجدول
-#             # student.total_paid_display سيظهر الآن 3174 بدلاً من 65
-#             student.total_paid_display = real_paid 
-#             student.fees_display = real_required
-#             student.old_debt_display = student.previous_debt or 0
-#             student.calculated_remaining = total_due
-#             student.total_required_display = real_required
+#             # حساب إجمالي ما دفعه الطالب في السنة الحالية فقط
+#             total_paid_display=Coalesce(
+#                 Sum('installments__paid_amount', filter=Q(installments__academic_year=current_view_year)), 
+#                 Value(0, output_field=DecimalField())
+#             ),
             
-#             processed_students.append(student)
+#             # جلب المديونية القديمة (المخزنة في حقل previous_debt بالموديل)
+#             old_debt_display=Coalesce(F('previous_debt'), Value(0, output_field=DecimalField()))
+            
+#         ).annotate(
+#             # المعادلة المحاسبية: (مديونية قديمة + مطلوب حالي) - مدفوع حالي
+#             calculated_remaining=F('old_debt_display') + F('fees_display') - F('total_paid_display')
+#         ).order_by('first_name')
 
-#         # نظام الترقيم
-#         paginator = Paginator(processed_students, 20) 
+#         # 4. حساب الإحصائيات (Stats Bar) من الـ Queryset مباشرة دون دوران
+#         total_count = students_query.count()
+#         # الطالب المسكن هو من لديه مطلوب (fees_display) أكبر من صفر
+#         assigned_count = students_query.filter(fees_display__gt=0).count()
+#         unassigned_count = total_count - assigned_count
+#         # الطالب المديون هو من صافي حسابه أكبر من صفر
+#         debt_count = students_query.filter(calculated_remaining__gt=0).count()
+#         # الطالب الخالص هو من لديه خطة رسوم وصافي حسابه صفر أو أقل
+#         paid_count = students_query.filter(fees_display__gt=0, calculated_remaining__lte=0).count()
+
+#         # 5. نظام الترقيم (Pagination) - سريع جداً لأنه لا يحول البيانات لـ List
+#         paginator = Paginator(students_query, 20) 
 #         page_number = request.GET.get('page')
-#         students = paginator.get_page(page_number)
+#         students_page = paginator.get_page(page_number)
+        
 #     else:
-#         students = []
+#         students_page = []
+#         total_count = assigned_count = unassigned_count = paid_count = debt_count = 0
 
 #     context = {
-#         "students": students, 
+#         "students": students_page, 
 #         "all_years": all_years, 
 #         "all_grades": all_grades, 
 #         "current_view_year": current_view_year,
-#         "total_previous_debt": total_previous_debt,
+#         "is_archive": is_archive,
+#         "total_count": total_count,
+#         "assigned_count": assigned_count,
+#         "unassigned_count": unassigned_count,
 #         "paid_count": paid_count,
 #         "debt_count": debt_count,
-#         "unassigned_count": unassigned_count,
 #     }
 #     return render(request, "students/student_list.html", context)
 

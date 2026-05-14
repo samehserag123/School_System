@@ -24,6 +24,7 @@ urlpatterns = [
 
     # 🧾 التحصيل والطباعة
     path('quick-collection/', views.quick_collection, name='quick_collection'),
+    path('cancel-receipt/<int:pk>/', views.admin_cancel_receipt, name='admin_cancel_receipt'),
     path('receipt/<int:payment_id>/', views.print_receipt, name='print_receipt'),
     path('student/<int:student_id>/print-statement/', views.student_statement_print, name='student_statement_print'),
     path('student/<int:student_id>/settle-debt/', views.pay_old_debt, name='settle_old_debt'),

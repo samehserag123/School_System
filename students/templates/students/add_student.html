@@ -279,28 +279,60 @@
     }
 
     document.addEventListener("DOMContentLoaded", function() {
-        const form = document.getElementById("studentForm");
-        const isViewMode = "{{ student_admin_mode }}" === "True";
+    const form = document.getElementById("studentForm");
+    const isViewMode = "{{ student_admin_mode }}" === "True";
 
-        // إذا كنا في وضع العرض، لا نحتاج لتفعيل التنقل بـ Enter للـ Inputs المعطلة
-        if (isViewMode) return;
+    // إذا كنا في وضع العرض، لا نحتاج لتفعيل الميزات التفاعلية
+    if (isViewMode) return;
 
-        const inputs = Array.from(form.querySelectorAll("input:not([type='hidden']):not([type='file']), select, textarea, button"));
+    // --- الجزء الأول: استخراج تاريخ الميلاد من الرقم القومي ---
+    const nationalIdInput = document.querySelector('input[name="national_id"]');
+    const dobInput = document.querySelector('input[name="date_of_birth"]');
 
-        inputs.forEach((input, index) => {
-            input.addEventListener("keydown", function(e) {
-                if (e.key === "Enter") {
-                    if (e.target.tagName.toLowerCase() === "textarea") return;
-                    e.preventDefault();
-                    const nextInput = inputs[index + 1];
-                    if (nextInput) {
-                        nextInput.focus();
-                    } else if (input.type === "submit") {
-                        form.submit();
-                    }
+    if (nationalIdInput && dobInput) {
+        nationalIdInput.addEventListener("input", function() {
+            const id = this.value.trim();
+
+            // التحقق من كتابة 14 رقمًا (نظام الرقم القومي المصري)
+            if (id.length === 14 && !isNaN(id)) {
+                const centuryDigit = id.substring(0, 1); // 2 للقرن العشرين، 3 للقرن الحادي والعشرين
+                const yearPart = id.substring(1, 3);
+                const monthPart = id.substring(3, 5);
+                const dayPart = id.substring(5, 7);
+
+                // تحديد البادئة (19 أو 20)
+                let yearPrefix = (centuryDigit === "3") ? "20" : "19";
+                const fullYear = yearPrefix + yearPart;
+
+                // تنسيق التاريخ ليتناسب مع حقل Date في المتصفح (YYYY-MM-DD)
+                const formattedDate = `${fullYear}-${monthPart}-${dayPart}`;
+                
+                // تحديث قيمة حقل تاريخ الميلاد
+                dobInput.value = formattedDate;
+            }
+        });
+    }
+
+    // --- الجزء الثاني: التنقل بين الحقول باستخدام زر Enter ---
+    const inputs = Array.from(form.querySelectorAll("input:not([type='hidden']):not([type='file']), select, textarea, button"));
+
+    inputs.forEach((input, index) => {
+        input.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") {
+                // السماح لزر الـ Enter بالعمل الطبيعي داخل الـ Textarea
+                if (e.target.tagName.toLowerCase() === "textarea") return;
+                
+                e.preventDefault(); // منع إرسال النموذج فوراً
+                const nextInput = inputs[index + 1];
+                
+                if (nextInput) {
+                    nextInput.focus();
+                } else if (input.type === "submit") {
+                    form.submit();
                 }
-            });
+            }
         });
     });
+});
 </script>
 {% endblock %}

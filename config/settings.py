@@ -13,21 +13,28 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-
+import dj_database_url
 # 1. تحميل المتغيرات من ملف .env فوراً
 load_dotenv()
 
-# 2. تعريف مسار المشروع (مرة واحدة فقط)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 3. إعدادات الأمان (تقرأ من ملف .env)
 # تأكد أنك أنشأت ملف .env بجانب manage.py وضعت فيه القيم
 SECRET_KEY = os.getenv('SECRET_KEY')
-DEBUG = os.getenv('DEBUG') == 'True'
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 # 4. المضيفون المسموح لهم (سيتم تحديثها من القيم في أسفل الملف)
-ALLOWED_HOSTS = []
+# جلب النطاقات المسموحة من ملف .env (مثل: ALLOWED_HOSTS=192.168.1.10,example.com)
+allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost')
+# ALLOWED_HOSTS = allowed_hosts_env.split(',')
+ALLOWED_HOSTS = ['*']
 
+# أضف هذا الجزء للسماح لروابط Cloudflare بالتعامل مع النماذج (Forms)
+# السماح لروابط Cloudflare المتغيرة بالتعامل مع النماذج وتسجيل الدخول
+CSRF_TRUSTED_ORIGINS = ["https://*.trycloudflare.com"]
+# أو إذا أردت كتابة الـ IP الخاص بالسيرفر مباشرة (استبدل بالرقم الحقيقي):
+# ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.x.x', 'yourdomain.com']
 # --- استكمال باقي إعدادات Django (INSTALLED_APPS, MIDDLEWARE...) ---
 
 # Application definition
@@ -41,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'core',
     'rest_framework',
+    'corsheaders',
     'students',
     'finance.apps.FinanceConfig',
     'treasury.apps.TreasuryConfig',
@@ -49,19 +57,24 @@ INSTALLED_APPS = [
     'audit',
     'crispy_forms',
     'crispy_bootstrap5',
+    'debug_toolbar',
 
 ]
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 MIDDLEWARE = [
+    # 'debug_toolbar.middleware.DebugToolbarMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -96,15 +109,18 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'school_system_db',
-        'USER': 'postgres',
-        'PASSWORD': os.getenv('DB_PASSWORD'), # سيقرأ sameh_pgAdmin من ملف .env
-        'HOST': '127.0.0.1',
+        'NAME': 'school_db',
+        'USER': 'sameh_admin',
+        'PASSWORD': 'pass_123', # نفس اللي كتبناه في ملف docker-compose
+        'HOST': 'db',           # لازم كلمة db مش localhost
         'PORT': '5432',
     }
 }
 
-
+db_from_env = dj_database_url.config(conn_max_age=600)
+if db_from_env:
+    DATABASES['default'].update(db_from_env)
+    
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
@@ -185,5 +201,33 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 APPEND_SLASH = True  # يضمن أن الروابط تنتهي بـ / دائماً
 REMOVE_SLASH = False
 
-# تأكد أن ALLOWED_HOSTS في ملفك الأصلي تسمح بالدخول المحلي
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']
+CORS_ALLOW_ALL_ORIGINS = True
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# settings.py
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# كود تشغيل لوحة فحص الأداء (Debug Toolbar) مع الدوكر
+if DEBUG:
+    import socket
+    try:
+        # البحث عن IP الحاوية (Container) لضمان ظهور اللوحة
+        hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+        INTERNAL_IPS = [ip[: ip.rfind(".")] + ".1" for ip in ips] + ["127.0.0.1", "10.0.2.2"]
+    except Exception:
+        INTERNAL_IPS = ["127.0.0.1"]
+
+    # إعداد إضافي للتأكد من ظهور اللوحة في المتصفح
+    DEBUG_TOOLBAR_CONFIG = {
+        'SHOW_TOOLBAR_CALLBACK': lambda request: True,
+    }
+
+# إعدادات الأمان في حالة توقف وضع التطوير (Production)
+if not DEBUG:
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    # CSRF_COOKIE_SECURE = True
+    # SESSION_COOKIE_SECURE = True
+    # SECURE_SSL_REDIRECT = True

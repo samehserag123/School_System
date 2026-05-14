@@ -314,6 +314,12 @@
             <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-safe2-fill text-warning"></i> جرد وإغلاق الخزينة اليومي <i class="bi bi-lock-fill float-start"></i></a>
         {% endif %}
 
+        {% if user.is_superuser or "Call_Center" in user.groups.all.0.name %}
+            <div class="section-title">خدمة العملاء (Call Center)</div>
+            <a href="{% url 'overdue_calls' %}"><i class="bi bi-telephone-exclamation-fill text-warning"></i> متابعة المتأخرات</a>
+            <a href="{% url 'student_list' %}"><i class="bi bi-search text-info"></i> استعلام عن الطلاب</a>
+        {% endif %}
+
         <div class="section-title">النظام</div>
         <a href="/"><i class="bi bi-house-door text-primary"></i> الصفحة الرئيسية</a>
 
