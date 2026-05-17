@@ -177,20 +177,39 @@
                             <button onclick="switchTab('attendance', document.querySelector('[onclick*=\'attendance\']'))" class="text-sm text-primary hover:underline font-medium">عرض الكل</button>
                         </div>
                         <div class="space-y-4">
-                            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                            {% for record in latest_attendance %}
+                            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100/70 transition-colors">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold">أ.م</div>
-                                    <div><p class="font-semibold text-sm">أحمد محمد</p><p class="text-xs text-slate-500">قسم تقنية المعلومات</p></div>
+                                    <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-inner
+                                        {% if record.status == 'present' %}bg-green-100 text-green-600
+                                        {% elif record.status == 'late' %}bg-orange-100 text-orange-600
+                                        {% else %}bg-red-100 text-red-600{% endif %}">
+                                        {{ record.employee.name|slice:":2" }}
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-sm text-slate-800">{{ record.employee.name }}</p>
+                                        <p class="text-xs text-slate-500">{{ record.employee.department }}</p>
+                                    </div>
                                 </div>
-                                <div class="text-left"><p class="text-sm font-bold text-green-600">08:00 ص</p><p class="text-xs text-slate-500">حاضر</p></div>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold">س.ع</div>
-                                    <div><p class="font-semibold text-sm">سارة علي</p><p class="text-xs text-slate-500">قسم المبيعات</p></div>
+                                <div class="text-left">
+                                    <p class="text-sm font-bold font-mono 
+                                        {% if record.status == 'present' %}text-green-600
+                                        {% elif record.status == 'late' %}text-orange-500
+                                        {% else %}text-red-500{% endif %}">
+                                        {% if record.punch_in_time %}{{ record.punch_in_time|time:"I:i A" }}{% else %}--:--{% endif %}
+                                    </p>
+                                    <p class="text-xs text-slate-400 font-medium">
+                                        {% if record.status == 'present' %}حاضر
+                                        {% elif record.status == 'late' %}تأخير ({{ record.delay_minutes }} دقيقة)
+                                        {% else %}غائب{% endif %}
+                                    </p>
                                 </div>
-                                <div class="text-left"><p class="text-sm font-bold text-orange-500">08:15 ص</p><p class="text-xs text-slate-500">تأخير (15 دقيقة)</p></div>
                             </div>
+                            {% empty %}
+                            <div class="p-6 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                لا توجد تسجيلات حضور لليوم حتى الآن.
+                            </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -209,54 +228,71 @@
                     <div class="overflow-x-auto">
                         <table class="w-full text-right border-collapse">
                             <thead>
-                                <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-sm">
+                                <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-sm font-bold">
                                     <th class="p-4 font-semibold">رقم البصمة</th>
                                     <th class="p-4 font-semibold">الاسم</th>
                                     <th class="p-4 font-semibold">القسم</th>
                                     <th class="p-4 font-semibold">نظام الحضور</th>
                                     <th class="p-4 font-semibold">الراتب الأساسي</th>
+                                    <th class="p-4 font-semibold">أرصدة الإجازات المتاحة</th>
                                     <th class="p-4 font-semibold">الحالة</th>
                                     <th class="p-4 font-semibold text-center">إجراءات</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
-                                <!-- Mock Data rows -->
+                                {% for emp in employees %}
                                 <tr class="hover:bg-slate-50 transition-colors">
-                                    <td class="p-4 text-slate-600 font-medium">EMP-001</td>
-                                    <td class="p-4 font-bold text-slate-800">أحمد محمد عبدلله</td>
-                                    <td class="p-4 text-slate-600">تقنية المعلومات</td>
-                                    <td class="p-4 text-slate-600">الدوام الصباحي</td>
-                                    <td class="p-4 text-slate-600">8,500 ر.س</td>
-                                    <td class="p-4"><span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-medium bg-green-100 text-green-700"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>نشط</span></td>
-                                    <td class="p-4 text-center">
-                                        <button class="text-slate-400 hover:text-primary mx-1 transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                        <button class="text-slate-400 hover:text-red-500 mx-1 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    <td class="p-4 font-mono text-sm text-slate-500">#{{ emp.emp_id }}</td>
+                                    
+                                    <td class="p-4 font-bold text-slate-800">{{ emp.name }}</td>
+                                    
+                                    <td class="p-4 text-slate-600">{{ emp.department.name|default:"بدون قسم" }}</td>
+                                    
+                                    <td class="p-4 text-slate-500">
+                                        <span class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md text-xs font-bold border border-blue-100">
+                                            {{ emp.attendance_rule.name }}
+                                        </span>
+                                    </td>
+                                    
+                                    <td class="p-4 font-bold text-slate-900">{{ emp.base_salary }} ج.م</td>
+                                    
+                                    <td class="p-4 text-xs space-y-0.5">
+                                        <span class="text-indigo-600 font-medium block">سنوية: {{ emp.annual_balance }} يوم</span>
+                                        <span class="text-purple-600 font-medium block">عارضة: {{ emp.casual_balance }} يوم</span>
+                                    </td>
+                                    
+                                    <td class="p-4">
+                                        {% if emp.is_active %}
+                                            <span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> نشط
+                                            </span>
+                                        {% else %}
+                                            <span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> موقوف
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <td class="p-4 text-center whitespace-nowrap">
+                                        <a href="{% url 'hr:employee_edit' emp.id %}" class="inline-block text-slate-400 hover:text-primary mx-1 transition-colors">
+                                            <i data-lucide="edit" class="w-4 h-4"></i>
+                                        </a>
+                                        <a href="{% url 'hr:employee_delete' emp.id %}" class="inline-block text-slate-400 hover:text-red-500 mx-1 transition-colors">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </a>
                                     </td>
                                 </tr>
-                                <tr class="hover:bg-slate-50 transition-colors">
-                                    <td class="p-4 text-slate-600 font-medium">EMP-002</td>
-                                    <td class="p-4 font-bold text-slate-800">سارة علي خالد</td>
-                                    <td class="p-4 text-slate-600">المبيعات</td>
-                                    <td class="p-4 text-slate-600">الدوام المرن</td>
-                                    <td class="p-4 text-slate-600">6,200 ر.س</td>
-                                    <td class="p-4"><span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-medium bg-green-100 text-green-700"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>نشط</span></td>
-                                    <td class="p-4 text-center">
-                                        <button class="text-slate-400 hover:text-primary mx-1 transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                        <button class="text-slate-400 hover:text-red-500 mx-1 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="py-12 text-center text-slate-500">
+                                        <div class="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <i data-lucide="users" class="w-8 h-8 text-slate-400"></i>
+                                        </div>
+                                        <p class="text-base font-bold text-slate-700">لا يوجد موظفين مسجلين حالياً</p>
+                                        <p class="text-xs text-slate-400 mt-1">قم بإضافة أول موظف لبدء الحسابات الحية.</p>
                                     </td>
                                 </tr>
-                                <tr class="hover:bg-slate-50 transition-colors bg-red-50/20">
-                                    <td class="p-4 text-slate-600 font-medium">EMP-003</td>
-                                    <td class="p-4 font-bold text-slate-800">خالد حسن محمود</td>
-                                    <td class="p-4 text-slate-600">الموارد البشرية</td>
-                                    <td class="p-4 text-slate-600">الدوام الصباحي</td>
-                                    <td class="p-4 text-slate-600">7,000 ر.س</td>
-                                    <td class="p-4"><span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-medium bg-red-100 text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>موقوف</span></td>
-                                    <td class="p-4 text-center">
-                                        <button class="text-slate-400 hover:text-primary mx-1 transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                        <button class="text-slate-400 hover:text-red-500 mx-1 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                    </td>
-                                </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
@@ -266,63 +302,94 @@
             <!-- 3. صفحة الحضور (attendance_list) -->
             <section id="attendance" class="page-section max-w-6xl mx-auto">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                    
                     <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50">
-                        <h3 class="text-lg font-bold text-slate-800">سجل الحضور اليومي</h3>
-                        <div class="flex gap-2">
-                            <input type="date" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                            <button class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">تصفية</button>
-                        </div>
+                        <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="calendar-clock" class="w-5 h-5 text-primary"></i>
+                            سجل الحضور والخصومات اليومي
+                        </h3>
+                        <form method="GET" action="" class="flex gap-2 w-full sm:w-auto">
+                            <input type="date" name="date" value="{{ current_date|date:'Y-m-d' }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent w-full sm:w-auto">
+                            <button type="submit" class="bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap">تصفية</button>
+                        </form>
                     </div>
+
                     <div class="overflow-x-auto">
                         <table class="w-full text-right border-collapse">
                             <thead>
-                                <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-sm">
+                                <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-sm font-bold">
                                     <th class="p-4 font-semibold">التاريخ</th>
                                     <th class="p-4 font-semibold">الموظف</th>
-                                    <th class="p-4 font-semibold">وقت الحضور</th>
-                                    <th class="p-4 font-semibold">وقت الانصراف</th>
+                                    <th class="p-4 font-semibold text-center">وقت الحضور</th>
+                                    <th class="p-4 font-semibold text-center">وقت الانصراف</th>
+                                    <th class="p-4 font-semibold text-center">التأخير والخصم الفعلي</th>
+                                    <th class="p-4 font-semibold text-center">الإضافي المحسوب</th>
                                     <th class="p-4 font-semibold">الحالة</th>
-                                    <th class="p-4 font-semibold">التأخير (دقيقة)</th>
-                                    <th class="p-4 font-semibold">الإضافي (ساعة)</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 text-sm">
-                                <tr class="hover:bg-slate-50 transition-colors">
-                                    <td class="p-4 text-slate-600 font-medium">2023-10-25</td>
-                                    <td class="p-4 font-bold text-slate-800">أحمد محمد عبدلله</td>
-                                    <td class="p-4 text-slate-600">08:00 ص</td>
-                                    <td class="p-4 text-slate-600">05:05 م</td>
-                                    <td class="p-4"><span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">حاضر</span></td>
-                                    <td class="p-4 text-slate-600">0</td>
-                                    <td class="p-4 text-slate-600">0.0</td>
+                                {% for record in attendance %}
+                                <tr class="hover:bg-blue-50/30 transition-colors">
+                                    <td class="p-4 text-slate-600 font-medium">{{ record.date|date:"Y-m-d" }}</td>
+                                    
+                                    <td class="p-4 font-bold text-slate-800">{{ record.employee.name }}</td>
+                                    
+                                    <td class="p-4 text-slate-600 font-bold text-center">
+                                        {{ record.check_in|time:"H:i"|default:"--:--" }}
+                                    </td>
+                                    
+                                    <td class="p-4 text-slate-600 font-bold text-center">
+                                        {{ record.check_out|time:"H:i"|default:"--:--" }}
+                                    </td>
+                                    
+                                    <td class="p-4 text-center whitespace-nowrap">
+                                        {% if record.late_minutes > 0 %}
+                                            <span class="text-amber-700 font-bold block">{{ record.late_minutes }} دقيقة</span>
+                                            <span class="text-[11px] text-slate-400 font-medium block">(خصم: {{ record.deduction_hours|floatformat:1 }} س)</span>
+                                        {% else %}
+                                            <span class="text-slate-300">-</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <td class="p-4 text-center whitespace-nowrap">
+                                        {% if record.overtime_hours > 0 %}
+                                            <span class="text-green-600 font-extrabold">+{{ record.overtime_hours|floatformat:1 }} ساعة</span>
+                                        {% else %}
+                                            <span class="text-slate-300">-</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <td class="p-4">
+                                        {% if record.status == 'present' %}
+                                            <span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> حاضر
+                                            </span>
+                                        {% elif record.status == 'absent' %}
+                                            <span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> غائب
+                                            </span>
+                                        {% elif record.status == 'leave' %}
+                                            <span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> إجازة
+                                            </span>
+                                        {% else %}
+                                            <span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> {{ record.get_status_display }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
-                                <tr class="hover:bg-slate-50 transition-colors">
-                                    <td class="p-4 text-slate-600 font-medium">2023-10-25</td>
-                                    <td class="p-4 font-bold text-slate-800">سارة علي خالد</td>
-                                    <td class="p-4 text-slate-600">08:20 ص</td>
-                                    <td class="p-4 text-slate-600">05:00 م</td>
-                                    <td class="p-4"><span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">حاضر</span></td>
-                                    <td class="p-4 text-red-500 font-bold">20</td>
-                                    <td class="p-4 text-slate-600">0.0</td>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="py-12 text-center text-slate-500">
+                                        <div class="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <i data-lucide="inbox" class="w-8 h-8 text-slate-400"></i>
+                                        </div>
+                                        <p class="text-base font-bold text-slate-700">لا توجد سجلات حضور لهذا اليوم</p>
+                                        <p class="text-xs text-slate-400 mt-1">يرجى التأكد من اختيار تاريخ صحيح أو رفع ملف بصمة جديد للسيستم.</p>
+                                    </td>
                                 </tr>
-                                <tr class="hover:bg-slate-50 transition-colors bg-red-50/30">
-                                    <td class="p-4 text-slate-600 font-medium">2023-10-25</td>
-                                    <td class="p-4 font-bold text-slate-800">خالد حسن محمود</td>
-                                    <td class="p-4 text-slate-400">--:--</td>
-                                    <td class="p-4 text-slate-400">--:--</td>
-                                    <td class="p-4"><span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">غائب</span></td>
-                                    <td class="p-4 text-slate-600">0</td>
-                                    <td class="p-4 text-slate-600">0.0</td>
-                                </tr>
-                                <tr class="hover:bg-slate-50 transition-colors bg-blue-50/30">
-                                    <td class="p-4 text-slate-600 font-medium">2023-10-25</td>
-                                    <td class="p-4 font-bold text-slate-800">منى طارق سعيد</td>
-                                    <td class="p-4 text-slate-400">--:--</td>
-                                    <td class="p-4 text-slate-400">--:--</td>
-                                    <td class="p-4"><span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">إجازة</span></td>
-                                    <td class="p-4 text-slate-600">0</td>
-                                    <td class="p-4 text-slate-600">0.0</td>
-                                </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
@@ -333,20 +400,36 @@
             <section id="upload" class="page-section max-w-3xl mx-auto">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                     <div class="p-6 border-b border-slate-100 bg-slate-50/50">
-                        <h3 class="text-lg font-bold text-slate-800">رفع ومعالجة سجلات البصمة</h3>
-                        <p class="text-sm text-slate-500 mt-1">قم برفع ملف الـ CSV أو Excel المستخرج من جهاز البصمة ليتم تحليله تلقائياً.</p>
+                        <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="cloud-upload" class="w-5 h-5 text-primary"></i>
+                            رفع ومعالجة سجلات البصمة الحقيقية
+                        </h3>
+                        <p class="text-sm text-slate-500 mt-1">قم برفع ملف الـ CSV أو Excel المستخرج من جهاز البصمة ليقوم السيستم بتحليله ومطابقته مع القواعد المرنة.</p>
                     </div>
                     
-                    <!-- Form محاكاة لـ UploadAttendanceForm -->
-                    <form id="uploadForm" class="p-8" onsubmit="handleUpload(event)">
+                    <form id="uploadForm" method="POST" action="{% url 'hr:upload_attendance' %}" enctype="multipart/form-data" class="p-8">
+                        {% csrf_token %}
                         
+                        {% if form.errors or messages %}
+                            <div class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600 space-y-1">
+                                {% for error in form.file.errors %}
+                                    <p class="font-bold">⚠️ {{ error }}</p>
+                                {% endfor %}
+                                {% for message in messages %}
+                                    {% if message.tags == 'error' %}
+                                        <p class="font-bold">⚠️ {{ message }}</p>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
                         <div class="mb-6">
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">معرف الجهاز (اختياري)</label>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">معرف الجهاز أو الفرع (اختياري)</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
                                     <i data-lucide="monitor" class="w-5 h-5"></i>
                                 </div>
-                                <input type="text" placeholder="مثلاً: جهاز الفرع الرئيسي" class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full pr-10 p-2.5 transition-colors">
+                                <input type="text" name="device_name" placeholder="مثلاً: جهاز الفرع الرئيسي" class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full pr-10 p-2.5 transition-colors">
                             </div>
                         </div>
 
@@ -356,19 +439,23 @@
                             <div class="flex items-center justify-center w-full">
                                 <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-48 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
                                     <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                        <i data-lucide="cloud-upload" class="w-12 h-12 text-slate-400 mb-3"></i>
+                                        <i data-lucide="upload-cloud" class="w-12 h-12 text-slate-400 mb-3"></i>
                                         <p class="mb-2 text-sm text-slate-500"><span class="font-semibold text-primary">اضغط لاختيار ملف</span> أو اسحب وأفلت الملف هنا</p>
-                                        <p class="text-xs text-slate-500">CSV, XLSX, XLS (الحد الأقصى 10MB)</p>
+                                        <p class="text-xs text-slate-400">CSV, XLSX, XLS (الحد الأقصى 10MB)</p>
+                                        <p class="text-[11px] text-slate-400 mt-1 bg-slate-200/60 px-2 py-0.5 rounded">يجب أن يحتوي على (رقم البصمة، التاريخ، الوقت)</p>
                                     </div>
-                                    <input id="dropzone-file" type="file" class="hidden" accept=".csv, .xlsx, .xls" required />
+                                    <input id="dropzone-file" name="file" type="file" class="hidden" accept=".csv, .xlsx, .xls" required onchange="displayFileName(this)" />
                                 </label>
                             </div>
-                            <div id="file-name-display" class="mt-2 text-sm text-primary font-medium hidden text-center"></div>
+                            <div id="file-name-display" class="mt-3 p-2.5 rounded-lg bg-blue-50 border border-blue-100 text-sm text-primary font-medium hidden text-center flex items-center justify-center gap-2">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                                <span id="file-name-text"></span>
+                            </div>
                         </div>
 
-                        <button type="submit" class="w-full text-white bg-primary hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-bold rounded-lg text-sm px-5 py-3.5 text-center flex justify-center items-center gap-2 transition-colors shadow-md">
-                            <i data-lucide="cpu" class="w-5 h-5"></i>
-                            بدء معالجة الملف
+                        <button type="submit" onclick="activateLoadingButton(this)" class="w-full text-white bg-primary hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-bold rounded-lg text-sm px-5 py-3.5 text-center flex justify-center items-center gap-2 transition-colors shadow-md">
+                            <i data-lucide="cpu" class="w-5 h-5 animate-pulse"></i>
+                            <span id="submit-btn-text">بدء معالجة وتحليل البيانات</span>
                         </button>
                     </form>
                 </div>
@@ -378,222 +465,298 @@
             <section id="leaves" class="page-section max-w-6xl mx-auto">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     
-                    <!-- فورم تقديم طلب جديد (محاكاة لـ LeaveRequestForm) -->
                     <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-100 h-fit">
                         <div class="p-5 border-b border-slate-100 bg-slate-50/50">
-                            <h3 class="text-lg font-bold text-slate-800">تقديم طلب إجازة</h3>
+                            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="file-plus" class="w-5 h-5 text-secondary"></i>
+                                تقديم طلب إجازة
+                            </h3>
                         </div>
-                        <form onsubmit="submitLeave(event)" class="p-5 space-y-4">
+                        
+                        <form method="POST" action="{% url 'hr:leave_create' %}" class="p-5 space-y-4">
+                            {% csrf_token %}
+                            
                             <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1">الموظف</label>
-                                <select class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5">
-                                    <option>أحمد محمد عبدلله</option>
-                                    <option>سارة علي خالد</option>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">الموظف <span class="text-red-500">*</span></label>
+                                <select name="employee" required class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5">
+                                    <option value="" disabled selected>-- اختر الموظف --</option>
+                                    {% for emp in employees %}
+                                        <option value="{{ emp.id }}">{{ emp.name }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
+                            
                             <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1">نوع الإجازة</label>
-                                <select class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5">
-                                    <option value="annual">سنوية</option>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">نوع الإجازة <span class="text-red-500">*</span></label>
+                                <select name="leave_type" required class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5">
+                                    <option value="annual">سنوية (من الرصيد)</option>
                                     <option value="casual">عارضة</option>
                                     <option value="sick">مرضي</option>
-                                    <option value="unpaid">بدون أجر</option>
+                                    <option value="unpaid">بدون أجر (تخصم من الراتب)</option>
                                 </select>
                             </div>
+                            
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-1">من تاريخ</label>
-                                <input type="date" required class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5">
+                                <input type="date" name="start_date" required class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5">
                             </div>
+                            
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-1">إلى تاريخ</label>
-                                <input type="date" required class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5">
+                                <input type="date" name="end_date" required class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5">
                             </div>
-                            <button type="submit" class="w-full mt-4 text-white bg-secondary hover:bg-blue-600 font-bold rounded-lg text-sm px-5 py-2.5 text-center transition-colors">
-                                تقديم الطلب
+                            
+                            <button type="submit" class="w-full mt-4 text-white bg-secondary hover:bg-blue-600 font-bold rounded-lg text-sm px-5 py-2.5 text-center transition-colors shadow-sm flex justify-center items-center gap-2">
+                                <i data-lucide="send" class="w-4 h-4"></i>
+                                إرسال الطلب للاعتماد
                             </button>
                         </form>
                     </div>
 
-                    <!-- قائمة الطلبات (محاكاة لـ leave_list) -->
                     <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                         <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                            <h3 class="text-lg font-bold text-slate-800">سجل الإجازات</h3>
+                            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="clipboard-list" class="w-5 h-5 text-slate-600"></i>
+                                سجل ومتابعة الإجازات
+                            </h3>
                         </div>
+                        
                         <div class="p-0 overflow-x-auto">
                             <table class="w-full text-right border-collapse">
                                 <thead>
-                                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-sm">
+                                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-sm font-bold">
                                         <th class="p-4 font-semibold">الموظف</th>
                                         <th class="p-4 font-semibold">النوع</th>
-                                        <th class="p-4 font-semibold">المدة</th>
+                                        <th class="p-4 font-semibold">المدة والفترة</th>
                                         <th class="p-4 font-semibold">الحالة</th>
-                                        <th class="p-4 font-semibold text-center">إجراءات</th>
+                                        <th class="p-4 font-semibold text-center">إجراءات الإدارة</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 text-sm">
-                                    <!-- قيد الانتظار -->
-                                    <tr class="hover:bg-slate-50 transition-colors">
-                                        <td class="p-4 font-bold text-slate-800">أحمد محمد عبدلله</td>
-                                        <td class="p-4 text-slate-600">سنوية</td>
-                                        <td class="p-4 text-slate-600">3 أيام <br><span class="text-xs text-slate-400">10-12 Nov</span></td>
-                                        <td class="p-4"><span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-bold">قيد الانتظار</span></td>
-                                        <td class="p-4 text-center">
-                                            <button class="bg-green-100 text-green-700 p-1.5 rounded hover:bg-green-200 mx-0.5" title="قبول"><i data-lucide="check" class="w-4 h-4"></i></button>
-                                            <button class="bg-red-100 text-red-700 p-1.5 rounded hover:bg-red-200 mx-0.5" title="رفض"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                    {% for leave in leave_requests %}
+                                    <tr class="hover:bg-slate-50/60 transition-colors">
+                                        <td class="p-4 font-bold text-slate-800">{{ leave.employee.name }}</td>
+                                        
+                                        <td class="p-4 text-slate-600">
+                                            <span class="px-2 py-0.5 bg-slate-100 rounded text-xs font-medium">
+                                                {{ leave.get_leave_type_display }}
+                                            </span>
+                                        </td>
+                                        
+                                        <td class="p-4 text-slate-600 font-medium">
+                                            <span class="text-slate-900 font-bold block">{{ leave.duration }} أيام</span>
+                                            <span class="text-xs text-slate-400 font-mono block">{{ leave.start_date|date:"Y-m-d" }} ⬅️ {{ leave.end_date|date:"Y-m-d" }}</span>
+                                        </td>
+                                        
+                                        <td class="p-4">
+                                            {% if leave.status == 'pending' %}
+                                                <span class="inline-flex items-center gap-1 py-1 px-2.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> قيد الانتظار
+                                                </span>
+                                            {% elif leave.status == 'approved' %}
+                                                <span class="inline-flex items-center gap-1 py-1 px-2.5 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> مقبولة ومخصومة
+                                                </span>
+                                            {% else %}
+                                                <span class="inline-flex items-center gap-1 py-1 px-2.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> مرفوضة
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        
+                                        <td class="p-4 text-center whitespace-nowrap">
+                                            {% if leave.status == 'pending' %}
+                                                <div class="flex justify-center gap-1.5">
+                                                    <a href="{% url 'hr:leave_approve' leave.id %}" class="bg-green-50 text-green-700 p-2 rounded-lg hover:bg-green-100 border border-green-200 transition-colors flex items-center justify-center" title="اعتماد وقبول">
+                                                        <i data-lucide="check" class="w-4 h-4"></i>
+                                                    </a>
+                                                    <a href="{% url 'hr:leave_reject' leave.id %}" class="bg-red-50 text-red-700 p-2 rounded-lg hover:bg-red-100 border border-red-200 transition-colors flex items-center justify-center" title="رفض الطلب">
+                                                        <i data-lucide="x" class="w-4 h-4"></i>
+                                                    </a>
+                                                </div>
+                                            {% else %}
+                                                <span class="text-xs text-slate-400 font-medium bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                                                    تاريخ المعالجة منتهي
+                                                </span>
+                                            {% endif %}
                                         </td>
                                     </tr>
-                                    <!-- مقبولة -->
-                                    <tr class="hover:bg-slate-50 transition-colors">
-                                        <td class="p-4 font-bold text-slate-800">سارة علي خالد</td>
-                                        <td class="p-4 text-slate-600">مرضي</td>
-                                        <td class="p-4 text-slate-600">1 يوم <br><span class="text-xs text-slate-400">05 Nov</span></td>
-                                        <td class="p-4"><span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">مقبولة</span></td>
-                                        <td class="p-4 text-center text-slate-400 text-xs">تمت المعالجة</td>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="py-12 text-center text-slate-400">
+                                            <div class="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <i data-lucide="file-x-2" class="w-8 h-8 text-slate-300"></i>
+                                            </div>
+                                            <p class="text-base font-bold text-slate-600">لا يوجد طلبات إجازة مسجلة</p>
+                                            <p class="text-xs text-slate-400 mt-1">تظهر هنا طلبات الموظفين المعلقة والتي تمت معالجتها سابقاً.</p>
+                                        </td>
                                     </tr>
-                                    <!-- مرفوضة -->
-                                    <tr class="hover:bg-slate-50 transition-colors">
-                                        <td class="p-4 font-bold text-slate-800">خالد حسن محمود</td>
-                                        <td class="p-4 text-slate-600">عارضة</td>
-                                        <td class="p-4 text-slate-600">2 يوم <br><span class="text-xs text-slate-400">01-02 Nov</span></td>
-                                        <td class="p-4"><span class="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-bold">مرفوضة</span></td>
-                                        <td class="p-4 text-center text-slate-400 text-xs">تمت المعالجة</td>
-                                    </tr>
+                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
                     </div>
+
                 </div>
             </section>
 
         </div>
     </main>
 
-    <!-- تهيئة الأيقونات وتشغيل السكربتات -->
     <script>
-        // تفعيل أيقونات Lucide
-        lucide.createIcons();
-
-        // منطق التنقل بين الصفحات (محاكاة للـ Routing)
-        const pageTitles = {
-            'dashboard': 'لوحة القيادة',
-            'employees': 'إدارة الموظفين',
-            'attendance': 'سجل الحضور والانصراف',
-            'upload': 'رفع بيانات البصمة',
-            'leaves': 'إدارة الإجازات'
-        };
-
-        function switchTab(tabId, element) {
-            // إخفاء كل الأقسام
-            document.querySelectorAll('.page-section').forEach(sec => {
-                sec.classList.remove('active');
-            });
-            // إزالة التفعيل من كل الروابط
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.classList.remove('bg-secondary', 'text-white', 'active');
-                link.classList.add('text-slate-300', 'hover:bg-slate-800', 'hover:text-white');
-            });
-
-            // إظهار القسم المطلوب
-            document.getElementById(tabId).classList.add('active');
-            
-            // تفعيل الرابط المضغوط (إذا تم تمريره)
-            if(element) {
-                element.classList.remove('text-slate-300', 'hover:bg-slate-800', 'hover:text-white');
-                element.classList.add('bg-secondary', 'text-white', 'active');
-            }
-
-            // تحديث العنوان العلوي
-            document.getElementById('page-title').innerText = pageTitles[tabId];
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. تفعيل أيقونات Lucide فور تحميل الصفحة
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
         }
 
-        // عرض اسم الملف عند اختياره
-        document.getElementById('dropzone-file').addEventListener('change', function(e) {
-            if(e.target.files.length > 0) {
-                const fileName = e.target.files[0].name;
-                const display = document.getElementById('file-name-display');
-                display.innerText = "الملف المحدد: " + fileName;
-                display.classList.remove('hidden');
+        // 2. قراءة وعرض تنبيهات Django الحية (Messages Framework) تلقائياً عند تحميل الصفحة
+        {% if messages %}
+            {% for message in messages %}
+                // استدعاء دالة الـ Toast الحية بناءً على نوع رسالة السيرفر (success, error, warning, info)
+                let msgType = 'success';
+                {% if message.tags == 'error' or message.tags == 'danger' %}
+                    msgType = 'error';
+                {% elif message.tags == 'warning' %}
+                    msgType = 'warning';
+                {% endif %}
+                
+                showToast("{{ message|escapejs }}", msgType);
+            {% endfor %}
+        {% endif %}
+
+        // 3. التحديد التلقائي لتبويب القائمة الجانبية بناءً على رابط الصفحة الحالي (Django Navigation Fix)
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const href = link.getAttribute('href');
+            if (href && currentPath.includes(href) && href !== '#') {
+                link.classList.remove('text-slate-300', 'hover:bg-slate-800', 'hover:text-white');
+                link.classList.add('bg-secondary', 'text-white', 'active');
             }
         });
+    });
 
-        // دالة لعرض رسائل التنبيه (Toast - تحاكي Django messages)
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            
-            // ألوان التنبيه بناءً على النوع
-            const bgClass = type === 'success' ? 'bg-green-500' : 'bg-red-500';
-            const icon = type === 'success' ? 'check-circle' : 'alert-circle';
-            
-            toast.className = `${bgClass} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 transform transition-all duration-300 translate-y-[-20px] opacity-0`;
-            toast.innerHTML = `
-                <i data-lucide="${icon}" class="w-5 h-5"></i>
-                <span class="font-medium text-sm">${message}</span>
-            `;
-            
-            container.appendChild(toast);
-            lucide.createIcons(); // تفعيل الأيقونة الجديدة
+    // منطق التنقل الحركي بين تبويبات لوحة التحكم (في حال استخدام نظام الـ Single HTML أو الأجزاء الحركية)
+    const pageTitles = {
+        'dashboard': 'لوحة القيادة',
+        'employees': 'إدارة الموظفين',
+        'attendance': 'سجل الحضور والانصراف',
+        'upload': 'رفع بيانات البصمة',
+        'leaves': 'إدارة الإجازات'
+    };
 
-            // إظهار بانيميشن
+    function switchTab(tabId, element) {
+        // إخفاء كل الأقسام
+        const sections = document.querySelectorAll('.page-section');
+        if (sections.length > 0) {
+            sections.forEach(sec => sec.classList.remove('active'));
+            const targetSec = document.getElementById(tabId);
+            if (targetSec) targetSec.classList.add('active');
+        }
+
+        // إزالة التفعيل من كل روابط القائمة الجانبية
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('bg-secondary', 'text-white', 'active');
+            link.classList.add('text-slate-300', 'hover:bg-slate-800', 'hover:text-white');
+        });
+
+        // تفعيل الرابط الذي تم الضغط عليه
+        if (element) {
+            element.classList.remove('text-slate-300', 'hover:bg-slate-800', 'hover:text-white');
+            element.classList.add('bg-secondary', 'text-white', 'active');
+        }
+
+        // تحديث العنوان العلوي ديناميكياً
+        const pageTitleEl = document.getElementById('page-title');
+        if (pageTitleEl && pageTitles[tabId]) {
+            pageTitleEl.innerText = pageTitles[tabId];
+        }
+    }
+
+    // عرض اسم الملف المختار ديناميكياً في الـ Dropzone (مربوط بالدالة الحية في قسم الرفع)
+    function displayFileName(input) {
+        const displayDiv = document.getElementById('file-name-display');
+        const textSpan = document.getElementById('file-name-text');
+        if (input.files && input.files.length > 0) {
+            textSpan.innerText = input.files[0].name;
+            displayDiv.classList.remove('hidden');
+        } else {
+            displayDiv.classList.add('hidden');
+        }
+    }
+
+    // دالة بناء وعرض رسائل التنبيه المنبثقة المبهرة (Toast Container)
+    function showToast(message, type = 'success') {
+        let container = document.getElementById('toast-container');
+        
+        // إذا لم يكن حاوي التوست موجوداً في الصفحة، نقوم بإنشائه حركياً لحماية الكود من الانهيار
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.className = 'fixed top-5 left-5 z-50 flex flex-col gap-3 pointer-events-none';
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        
+        // تنسيق الألوان والأيقونات بناءً على الحالات القادمة من السيرفر أو الـ Front
+        let bgClass = 'bg-green-600';
+        let icon = 'check-circle';
+        
+        if (type === 'error') {
+            bgClass = 'bg-red-600';
+            icon = 'alert-triangle';
+        } else if (type === 'warning') {
+            bgClass = 'bg-amber-500';
+            icon = 'alert-circle';
+        }
+        
+        toast.className = `${bgClass} text-white px-6 py-3.5 rounded-xl shadow-xl flex items-center gap-3 transform transition-all duration-300 translate-y-[-20px] opacity-0 pointer-events-auto min-w-[300px] border border-white/10`;
+        toast.innerHTML = `
+            <i data-lucide="${icon}" class="w-5 h-5 shrink-0"></i>
+            <span class="font-bold text-sm leading-relaxed">${message}</span>
+        `;
+        
+        container.appendChild(toast);
+        
+        // إعادة تشغيل محرك Lucide للأيقونة التي تم حقنها حركياً
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+
+        // تأثير الدخول والظهور التدريجي (Animation In)
+        setTimeout(() => {
+            toast.classList.remove('translate-y-[-20px]', 'opacity-0');
+        }, 30);
+
+        // التلاشي التلقائي والحذف النهائي بعد 4 ثوانٍ ليعطي المدير وقتاً كافياً للقراءة
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-x-[-20px]');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    // تحويل الزر لحالة الانتظار والتحميل الحقيقي لحظر تكرار النقرات (رفع البصمة / الإجازات)
+    function activateLoadingButton(btn) {
+        const form = btn.closest('form');
+        // التحقق من صحة المدخلات الأساسية في المتصفح قبل تجميد الزر
+        if (form && form.checkValidity()) {
             setTimeout(() => {
-                toast.classList.remove('translate-y-[-20px]', 'opacity-0');
+                btn.disabled = true;
+                // حقن تأثير الدوران الجمالي (Spinner) داخل الزر دون تدمير التصميم الأساسي
+                const originalText = btn.innerHTML;
+                btn.innerHTML = `
+                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>جاري معالجة البيانات الحية في قاعدة البيانات...</span>
+                `;
+                btn.classList.remove('bg-primary', 'bg-secondary', 'hover:bg-blue-800');
+                btn.classList.add('bg-slate-400', 'cursor-not-allowed');
             }, 10);
-
-            // إخفاء وحذف بعد 3 ثواني
-            setTimeout(() => {
-                toast.classList.add('opacity-0');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
         }
-
-        // محاكاة رفع الملف
-        function handleUpload(e) {
-            e.preventDefault(); // منع إعادة تحميل الصفحة
-            const fileInput = document.getElementById('dropzone-file');
-            
-            if(fileInput.files.length === 0) {
-                showToast('الرجاء اختيار ملف أولاً', 'error');
-                return;
-            }
-
-            // تغيير حالة الزر ليعطي انطباع التحميل
-            const btn = e.target.querySelector('button[type="submit"]');
-            const originalContent = btn.innerHTML;
-            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> جاري المعالجة...`;
-            btn.disabled = true;
-
-            // محاكاة تأخير الخادم (Server processing time)
-            setTimeout(() => {
-                btn.innerHTML = originalContent;
-                btn.disabled = false;
-                fileInput.value = ""; // مسح الملف
-                document.getElementById('file-name-display').classList.add('hidden');
-                
-                showToast('تم رفع الملف ومعالجته بنجاح!', 'success');
-                
-                // الانتقال تلقائياً لصفحة الحضور كما في كود جانغو
-                setTimeout(() => {
-                    switchTab('attendance', document.querySelector('[onclick*=\'attendance\']'));
-                }, 1000);
-
-            }, 2000);
-        }
-
-        // محاكاة تقديم طلب إجازة
-        function submitLeave(e) {
-            e.preventDefault();
-            const btn = e.target.querySelector('button[type="submit"]');
-            btn.innerHTML = 'جاري الإرسال...';
-            btn.disabled = true;
-
-            setTimeout(() => {
-                btn.innerHTML = 'تقديم الطلب';
-                btn.disabled = false;
-                e.target.reset();
-                showToast('تم إرسال طلب الإجازة بنجاح، في انتظار الموافقة.', 'success');
-            }, 1000);
-        }
-
-    </script>
+    }
+</script>
 </body>
 </html>

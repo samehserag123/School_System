@@ -201,23 +201,28 @@ def daily_revenue_report(request):
 
 
 from .models import Product
-
 def verify_product(request, serial_number):
     try:
-        # البحث في قاعدة البيانات عن الرقم الممرر في الرابط
         product = Product.objects.get(serial_number=serial_number)
         
-        # زيادة عداد المسح تلقائياً عند كل عملية دخول ناجحة
-        product.scan_count += 1
-        product.save()
+        # اسم مفتاح فرعي في السيشن لكل سيريال نمبر
+        session_key = f"scanned_{serial_number}"
         
+        # إذا لم يكن هذا المتصفح قد قام بمسح السيريال في هذه الجلسة
+        if not request.session.get(session_key):
+            product.scan_count += 1
+            product.save()
+            # حفظ الحالة في السيشن عشان لو عمل Refresh العداد ما يزدش
+            request.session[session_key] = True
+            # اختياري: جعل السيشن تنتهي بعد وقت قصير لو حابب
+            request.session.set_expiry(600) # 10 دقائق
+            
         context = {
             'status': 'success',
             'product': product,
             'serial': serial_number,
         }
     except Product.DoesNotExist:
-        # إذا كان الرقم غير موجود في قاعدة البيانات (حالة الفشل)
         context = {
             'status': 'fail',
             'serial': serial_number

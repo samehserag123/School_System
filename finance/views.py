@@ -1129,8 +1129,9 @@ def quick_collection(request):
                 # --- [منطق التحويل الجديد] ---
                 # إذا تم تصفير المديونية (صفر أو أقل)، يتم التحويل لشاشة الطلاب مع تمرير الـ ID للوميض
                 if remaining_after <= 0:
-                    return redirect(reverse('student_list') + f"?highlight={p_student_id}")
-                
+                    # هيرجع لنفس الصفحة اللي عمل منها الدفع بالضبط ويعمل لها Refresh
+                    return redirect(request.META.get('HTTP_REFERER', '/'))
+                                
                 # إذا لم تصفر، ابقَ في نفس الشاشة
                 redirect_url = reverse('quick_collection') + f"?student_id={p_student_id}"
                 if p_academic_year_id:

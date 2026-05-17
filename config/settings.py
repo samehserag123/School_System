@@ -22,14 +22,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # 3. إعدادات الأمان (تقرأ من ملف .env)
 # تأكد أنك أنشأت ملف .env بجانب manage.py وضعت فيه القيم
 SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-test-key-for-local-development-only')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
+# امسح السطر القديم واكتب ده مؤقتاً للكشف عن الخطأ:
+# DEBUG = True
 
 # 4. المضيفون المسموح لهم (سيتم تحديثها من القيم في أسفل الملف)
 # جلب النطاقات المسموحة من ملف .env (مثل: ALLOWED_HOSTS=192.168.1.10,example.com)
-allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost')
-# ALLOWED_HOSTS = allowed_hosts_env.split(',')
-ALLOWED_HOSTS = ['*']
+# allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost')
+# ALLOWED_HOSTS = ['*']
+allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost,sameh.pythonanywhere.com')
+ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
 
+if '.trycloudflare.com' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('.trycloudflare.com')
+    
 # أضف هذا الجزء للسماح لروابط Cloudflare بالتعامل مع النماذج (Forms)
 # السماح لروابط Cloudflare المتغيرة بالتعامل مع النماذج وتسجيل الدخول
 CSRF_TRUSTED_ORIGINS = ["https://*.trycloudflare.com"]
@@ -77,6 +84,11 @@ MIDDLEWARE = [
     
 ]
 
+if DEBUG:
+    # إضافتها في نهاية القائمة تماماً بكل أمان
+    MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
+    
+
 ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
@@ -96,6 +108,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'config.context_processors.active_academic_year',
                 'students.context_processors.admission_status',
+                'hr.context_processors.hr_notifications',
             ],
         },
     },

@@ -12,10 +12,11 @@ urlpatterns = [
     path('login/', MyLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
     path('', login_required(views.home), name='home'),
+    path('', include('treasury.urls')),
     
     path('students/', include('students.urls')),
     path('finance/', include('finance.urls')),
-    path('treasury/', include('treasury.urls')),
+    
     path('hr/', include('hr.urls')),
 
     path('api/v1/finance/', include('finance.api_urls')), 

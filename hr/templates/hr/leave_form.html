@@ -1,0 +1,73 @@
+{% extends 'hr/base_hr.html' %}
+
+{% block title %}طلب إجازة جديدة - الموارد البشرية{% endblock %}
+{% block header_title %}تقديم طلب إجازة{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+        <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+            <div class="bg-blue-50 text-primary p-2.5 rounded-xl border border-blue-100">
+                <i data-lucide="file-plus" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-slate-800">تسجيل إجازة للموظف</h3>
+                <p class="text-xs text-slate-500 mt-0.5">يرجى إدخال تفاصيل الإجازة وتحديد التواريخ بدقة ليتم خصمها تلقائياً.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="" onsubmit="activateLoadingButton(this.querySelector('button[type=\'submit\']'))" class="p-6 space-y-5">
+            {% csrf_token %}
+
+            <div class="space-y-1.5">
+                <label class="text-sm font-bold text-slate-700 block">الموظف</label>
+                <select name="employee" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-white">
+                    <option value="" disabled selected>اختر الموظف...</option>
+                    {% for emp in employees %}
+                        <option value="{{ emp.id }}">{{ emp.name }}</option>
+                    {% empty %}
+                        <option value="" disabled>لا يوجد موظفين مسجلين حالياً</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="text-sm font-bold text-slate-700 block">نوع الإجازة</label>
+                <select name="leave_type" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-white">
+                    <option value="" disabled selected>اختر النوع...</option>
+                    <option value="annual">إجازة سنوية</option>
+                    <option value="sick">إجازة مرضية</option>
+                    <option value="unpaid">إجازة غير مدفوعة الأجر</option>
+                    <option value="casual">إجازة عارضة</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label class="text-sm font-bold text-slate-700 block">تاريخ البدء</label>
+                    <input type="date" name="start_date" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm" />
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-sm font-bold text-slate-700 block">تاريخ الانتهاء</label>
+                    <input type="date" name="end_date" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm" />
+                </div>
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="text-sm font-bold text-slate-700 block">السبب / تفاصيل إضافية</label>
+                <textarea name="reason" rows="3" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm resize-none" placeholder="اكتب سبب طلب الإجازة هنا..."></textarea>
+            </div>
+
+            <div class="border-t border-slate-100 pt-4 flex justify-end gap-3">
+                <a href="{% url 'hr:leave_list' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all text-sm">
+                    إلغاء
+                </a>
+                <button type="submit" class="px-5 py-2.5 bg-primary hover:bg-blue-800 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2 text-sm">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    حفظ وتأكيد الطلب
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

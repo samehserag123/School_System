@@ -32,3 +32,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # نسخ كل ملفات مشروعك داخل الحاوية
 COPY . /app/
+# تشغيل gunicorn باستخدام مجلد الإعدادات الصحيح
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "config.wsgi:application"]

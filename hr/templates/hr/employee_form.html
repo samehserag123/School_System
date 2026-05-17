@@ -1,0 +1,76 @@
+{% extends 'hr/base_hr.html' %}
+
+{% block title %}إضافة موظف جديد - الموارد البشرية{% endblock %}
+{% block header_title %}تسجيل موظف جديد{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+        
+        <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+            <div class="bg-blue-50 text-primary p-2.5 rounded-xl border border-blue-100">
+                <i data-lucide="user-plus" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-slate-800">بيانات الموظف الأساسية</h3>
+                <p class="text-xs text-slate-500 mt-0.5">يرجى إدخال الملف التعريفي للموظف الجديد لربطه بالحسابات المالية وجهاز البصمة.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="" enctype="multipart/form-data" onsubmit="activateLoadingButton(this.querySelector('button[type=\'submit\']'))" class="p-6 space-y-5">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="p-4 mb-4 text-sm text-red-700 bg-red-50 rounded-xl border border-red-100">
+                    {% for error in form.non_field_errors %}
+                        <p class="font-bold">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% for field in form %}
+                    <div class="flex flex-col gap-1.5 {% if field.name == 'notes' or field.name == 'address' %}sm:col-span-2{% endif %}">
+                        <label class="text-sm font-bold text-slate-700">
+                            {{ field.label }}
+                            {% if field.field.required %}<span class="text-rose-500">*</span>{% endif %}
+                        </label>
+                        
+                        <div class="relative">
+                            {{ field }}
+                        </div>
+
+                        {% if field.errors %}
+                            <p class="text-xs text-rose-600 font-bold mt-0.5">{{ field.errors.0 }}</p>
+                        {% endif %}
+                        {% if field.help_text %}
+                            <p class="text-xs text-slate-400 font-medium">{{ field.help_text }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="border-t border-slate-100 pt-4 flex justify-end gap-3">
+                <a href="{% url 'hr:employee_list' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all text-sm">
+                    إلغاء
+                </a>
+                <button type="submit" class="px-5 py-2.5 bg-primary hover:bg-blue-800 text-white font-bold rounded-xl shadow-md shadow-blue-900/10 transition-all flex items-center gap-2 text-sm">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    حفظ وإدراج الموظف
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const inputs = document.querySelectorAll('form input, form select, form textarea');
+        inputs.forEach(input => {
+            if (input.type !== 'checkbox' && input.type !== 'radio') {
+                input.className = "w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-white";
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -48,7 +48,6 @@ class GeneralLedger(models.Model):
     
 
 
-from django.db import models
 import uuid
 
 class Product(models.Model):

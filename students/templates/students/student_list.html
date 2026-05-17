@@ -650,16 +650,29 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // مراقبة الفورم
+        // مراقبة الفورم
+        // ✅ الكود الجديد المطور والديناميكي:
     const promoteForm = document.getElementById("promoteForm");
     if (promoteForm) {
         promoteForm.addEventListener("submit", function(e) {
+            // تحديث قيمة الحقل المخفي قبل الإرسال للتأكد من مطابقتها للـ localStorage
             const finalIds = getStoredIds();
-            if (finalIds.length === 0) {
-                alert("❌ يجب اختيار طالب واحد على الأقل");
-                e.preventDefault();
+            const hiddenInput = document.getElementById("allSelectedIds");
+            if (hiddenInput) {
+                hiddenInput.value = finalIds.join(',');
+            }
+
+            // إذا كان هناك طلاب تم اختيارهم يدوياً عبر مربعات التحديد
+            if (finalIds.length > 0) {
+                if (!confirm(`⚠️ سيتم ترحيل ${finalIds.length} طالب تم اختيارهم يدوياً عبر الـ Checkboxes. هل أنت متأكد؟`)) {
+                    e.preventDefault();
+                }
             } else {
-                if (!confirm(`⚠️ سيتم ترحيل ${finalIds.length} طالب مختارين. هل أنت متأكد؟`)) {
+                // حل الطوارئ: إذا ضغطت ترحيل دون تحديد أي علامات صح، سيقوم البايثون بسحب كل الطلاب حسب الفلتر
+                // نأخذ عدد الطلاب الإجمالي الظاهر في شاشتك حالياً من عداد الإحصائيات
+                const totalVisibleText = document.getElementById("stat-total") ? document.getElementById("stat-total").innerText : "{{ total_count }}";
+                
+                if (!confirm(`💡 لم تقم بتحديد طلاب محددين. سيقوم النظام بترحيل جميع الطلاب الظاهرين في الفلتر الحالي وعددهم تقريباً (${totalVisibleText} طالب). هل تريد الاستمرار؟`)) {
                     e.preventDefault();
                 }
             }

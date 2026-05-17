@@ -1,0 +1,62 @@
+{% extends 'hr/base_hr.html' %}
+
+{% block title %}رفع بيانات البصمة - الموارد البشرية{% endblock %}
+
+{% block header_title %}رفع بيانات البصمة{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+        
+        <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+            <div class="bg-blue-50 text-primary p-2.5 rounded-xl border border-blue-100">
+                <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-slate-800">جهاز سحب الحضور والانصراف (الماكينة الحية)</h3>
+                <p class="text-xs text-slate-500 mt-0.5">يرجى اختيار ملف البصمة المستخرج لتتم معالجته ومطابقته مع الرواتب تلقائياً.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="" enctype="multipart/form-data" onsubmit="activateLoadingButton(this.querySelector('button[type=\'submit\']'))" class="p-6 space-y-6">
+            {% csrf_token %}
+
+            <div class="flex items-center justify-center w-full">
+                <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-60 border-2 border-slate-300 border-dashed rounded-2xl cursor-pointer bg-slate-50/50 hover:bg-slate-100/70 transition-all duration-200 group relative">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                        <div class="p-4 bg-white rounded-full shadow-sm border border-slate-100 text-slate-400 group-hover:text-primary group-hover:scale-110 transition-all duration-200 mb-3">
+                            <i data-lucide="file-text" class="w-7 h-7"></i>
+                        </div>
+                        <p class="mb-1 text-sm text-slate-700 font-bold">انقر لاختيار ملف سجلات البصمة أو اسحبه هنا</p>
+                        <p class="text-xs text-slate-400 font-medium">الامتدادات المدعومة المباشرة: CSV, XLSX, TXT</p>
+                    </div>
+                    <input id="dropzone-file" name="file" type="file" required onchange="displayFileName(this)" class="hidden" />
+                </label>
+            </div>
+
+            <div id="file-name-display" class="hidden bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex items-center justify-between animate-fade-in">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-green-100 text-green-700 rounded-xl">
+                        <i data-lucide="file-check" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <p id="file-name-text" class="text-sm font-bold text-slate-800 font-mono tracking-wide"></p>
+                        <p class="text-xs text-slate-400 mt-0.5">جاهز تماماً للإرسال والمعالجة</p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('dropzone-file').value=''; document.getElementById('file-name-display').classList.add('hidden');" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="border-t border-slate-100 pt-4 flex justify-end">
+                <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-primary hover:bg-blue-800 text-white font-bold rounded-xl shadow-md shadow-blue-900/10 hover:shadow transition-all flex items-center justify-center gap-2 text-sm">
+                    <i data-lucide="play" class="w-4 h-4"></i>
+                    بدء المعالجة وحساب الحضور
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
