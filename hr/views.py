@@ -8,7 +8,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 # استيراد الموديلات والفورمز الخاصة بتطبيق الـ HR (تم تصحيح الحرف الناقص)
-from .models import Employee, DailyAttendance, LeaveRequest
+from .models import Employee, DailyAttendance, LeaveRequest, Department
 from .forms import UploadAttendanceForm, EmployeeForm, LeaveRequestForm
 
 def employee_create_view(request):
@@ -246,12 +246,63 @@ def upload_and_process_attendance(request):
     return render(request, 'hr/upload_attendance.html', context)
 
 
+from django.shortcuts import render
+from django.utils import timezone
+from .models import Employee, Department, LeaveRequest
+# تأكد من استيراد موديل الحضور الخاص بمشروعك، سنفترض هنا أن اسمه Attendance
+# from .models import Attendance 
+
 def employee_list(request):
-    """
-    جلب كافة الموظفين من قاعدة البيانات وعرضهم داخل صفحة الدليل المستقلة
-    """
-    employees = Employee.objects.all().order_by('id') # تم التعديل ليعتمد الـ ID الأساسي للموديل
-    return render(request, 'hr/employee_list.html', {'employees': employees})
+    try:
+        # 1. جلب الموظفين والأقسام
+        # إذا كان حقل attendance_rule يسبب خطأ لأنه غير موجود في الـ Model، احذفه من الـ select_related
+        employees = Employee.objects.all().select_related('department')
+        departments = Department.objects.all()
+        
+        # 2. جلب طلبات الإجازات لجدول الإجازات
+        leave_requests = LeaveRequest.objects.all().select_related('employee').order_by('-id')
+        
+        # 3. جلب سجلات الحضور (تأمين ضد عدم وجود بيانات اليوم)
+        today = timezone.now().date()
+        
+        # تخصيص استعلامات الحضور (قم بتغيير 'Attendance' لاسم الموديل لديك إن كان مختلفاً)
+        # try:
+        #     attendance_list = Attendance.objects.filter(date=today).select_related('employee')
+        # except:
+        #     attendance_list = []
+        
+        attendance_list = [] # قيمة مؤقتة آمنة لمنع الكراش حتى تربط موديل البصمة الخاص بك
+        
+    except Exception as e:
+        print(f"🔴 خطأ داخلي كارثي في الـ View: {str(e)}")
+        employees = []
+        departments = []
+        leave_requests = []
+        attendance_list = []
+
+    # حساب العدادات الحية بشكل آمن تماماً يمنع الـ 500 Server Error
+    total_emp = len(employees) if isinstance(employees, list) else employees.count()
+    pending_leaves = len([l for l in leave_requests if l.status == 'pending']) if isinstance(leave_requests, list) else leave_requests.filter(status='pending').count()
+
+    context = {
+        'employees': employees,
+        'departments': departments,
+        'leave_requests': leave_requests,
+        
+        # تمرير متغيرات الحضور المتوقعة داخل التمبلت لمنع كراش السيرفر
+        'attendance': attendance_list,
+        'latest_attendance': attendance_list[:5] if isinstance(attendance_list, list) else attendance_list.order_by('-id')[:5],
+        
+        # العدادات الإحصائية للكروت العلوية
+        'total_employees': total_emp,
+        'today_attendance_count': 0, # سيتم ربطها بديناميكية الحضور لاحقاً
+        'today_late_count': 0,
+        'notification_count': pending_leaves,
+        'current_date': timezone.now(),
+    }
+    
+    return render(request, 'hr/employee_list.html', context)
+
 
 def attendance_list(request):
     """

@@ -33,7 +33,7 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 # جلب النطاقات المسموحة من ملف .env (مثل: ALLOWED_HOSTS=192.168.1.10,example.com)
 # allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost')
 # ALLOWED_HOSTS = ['*']
-allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost,sameh.pythonanywhere.com')
+allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost,sameh123.pythonanywhere.com')
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
 
 if '.trycloudflare.com' not in ALLOWED_HOSTS:
