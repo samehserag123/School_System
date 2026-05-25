@@ -48,17 +48,28 @@ class GeneralLedger(models.Model):
     
 
 
-import uuid
+from django.utils import timezone
 
 class Product(models.Model):
-    # الرقم المسلسل هو المفتاح الأساسي للبحث (مثل: 652435889493)
     serial_number = models.CharField(max_length=50, unique=True, verbose_name="الرقم المسلسل")
     product_name = models.CharField(max_length=100, verbose_name="اسم المنتج")
     is_original = models.BooleanField(default=True, verbose_name="أصلي؟")
     
-    # عداد المسح لحماية المنتج من التزوير المكرر
-    scan_count = models.PositiveIntegerField(default=0, verbose_name="عدد مرات المسح")
+    # حقول التعطيل المؤقت
+    is_active = models.BooleanField(default=True, verbose_name="نشط (الـ QR يعمل)")
+    disabled_until = models.DateTimeField(null=True, blank=True, verbose_name="تعطيل مؤقت حتى تاريخ")
+
+    # العداد الإجمالي
+    scan_count = models.PositiveIntegerField(default=0, verbose_name="عدد مرات المسح الإجمالية")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإضافة")
+
+    @property
+    def is_currently_disabled(self):
+        if not self.is_active:
+            return True
+        if self.disabled_until and timezone.now() < self.disabled_until:
+            return True
+        return False
 
     def __str__(self):
         return f"{self.product_name} - {self.serial_number}"
@@ -66,3 +77,20 @@ class Product(models.Model):
     class Meta:
         verbose_name = "منتج"
         verbose_name_plural = "المنتجات"
+
+
+# الجدول الجديد لتسجيل تاريخ ووقت كل مسحة بالتفصيل
+class ScanHistory(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="scans", verbose_name="المنتج")
+    scanned_at = models.DateTimeField(default=timezone.now, verbose_name="تاريخ ووقت المسح")
+    
+    # اختياري: يمكنك تسجيل الـ IP أو المتصفح إذا أردت معرفة هل هو نفس الشخص أم لا
+    ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name="عنوان الـ IP")
+
+    class Meta:
+        verbose_name = "تاريخ المسح"
+        verbose_name_plural = "تواريخ المسح للمنتجات"
+        ordering = ['-scanned_at'] # لترتيب المسحات من الأحدث للأقدم
+
+    def __str__(self):
+        return f"مسحة لـ {self.product.product_name} في {self.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}"

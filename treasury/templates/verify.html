@@ -60,7 +60,7 @@
         }
         .main-title span { display: block; }
 
-        /* منطقة النتيجة (الصح الأخضر) */
+        /* منطقة النتيجة */
         .result-section {
             display: flex;
             flex-direction: column;
@@ -68,10 +68,11 @@
             justify-content: center;
             margin-top: 60px;
         }
+        
+        /* دائرة الأيقونة بألوانها الثلاثة حسب الحالة */
         .check-circle {
             width: 120px; 
             height: 120px; 
-            background-color: #008a44;
             color: white; 
             border-radius: 50%;
             display: flex; 
@@ -80,17 +81,21 @@
             font-size: 60px;
             margin-bottom: 25px;
         }
+        .bg-success-shell { background-color: #008a44; } /* أخضر للمنتج الأصلي */
+        .bg-warning-shell { background-color: #fbce07; color: #333 !important; } /* أصفر للتعطيل المؤقت */
+        .bg-danger-shell { background-color: #dd1d21; } /* أحمر للمزور أو غير الموجود */
+
         .result-text { 
             font-size: 18px; 
             color: #555; 
             font-weight: 500; 
             text-align: center;
+            line-height: 1.6;
         }
     </style>
 </head>
 <body>
 
-    <!-- الهيدر -->
     <nav class="shell-navbar">
         <div class="nav-content">
             <img src="https://upload.wikimedia.org/wikipedia/en/e/e8/Shell_logo.svg" alt="Shell" class="brand-logo">
@@ -103,10 +108,8 @@
         <div class="shell-yellow-line"></div>
     </nav>
 
-    <!-- محتوى الصفحة -->
     <div class="content-body">
         
-        <!-- العنوان جهة اليسار -->
         <div class="title-section">
             <h1 class="main-title">
                 <span>PRODUCT</span>
@@ -114,14 +117,33 @@
             </h1>
         </div>
         
-        <!-- النتيجة في المنتصف -->
         <div class="result-section">
-            <div class="check-circle">
-                <i class="fas fa-check"></i>
-            </div>
-            <div class="result-text">
-                منتج اصلي. شكرا لشراء منتجات شل الأصلية
-            </div>
+            
+            {% if status == 'success' %}
+                <div class="check-circle bg-success-shell">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div class="result-text">
+                    منتج اصلي. شكرا لشراء منتجات شل الأصلية
+                </div>
+
+            {% elif status == 'disabled' %}
+                <div class="check-circle bg-warning-shell">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="result-text">
+                    عذراً، هذا الـ QR كود معطل مؤقتاً حالياً.
+                </div>
+
+            {% else %}
+                <div class="check-circle bg-danger-shell">
+                    <i class="fas fa-times"></i>
+                </div>
+                <div class="result-text" style="color: #dd1d21; font-weight: bold;">
+                    تحذير! هذا الرقم المسلسل غير صحيح أو غير مسجل لدينا.
+                </div>
+            {% endif %}
+
         </div>
 
     </div>

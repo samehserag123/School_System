@@ -34,6 +34,7 @@
                         <th class="py-4 px-6 font-bold">النوع</th>
                         <th class="py-4 px-6 font-bold">من - إلى</th>
                         <th class="py-4 px-6 font-bold">الحالة</th>
+                        <th class="py-4 px-6 font-bold text-center">إجراءات الإدارة</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50 text-sm">
@@ -68,10 +69,27 @@
                                 </span>
                             {% endif %}
                         </td>
+                        
+                        <td class="py-4 px-6 text-center whitespace-nowrap">
+                            {% if leave.status == 'pending' %}
+                                <div class="flex justify-center gap-2">
+                                    <a href="{% url 'hr:leave_approve' leave.id %}" class="bg-green-50 text-green-700 p-2 rounded-xl hover:bg-green-100 border border-green-200 transition-colors inline-flex items-center justify-center shadow-sm" title="اعتماد وقبول">
+                                        <i data-lucide="check" class="w-4 h-4"></i>
+                                    </a>
+                                    <a href="{% url 'hr:leave_reject' leave.id %}" class="bg-red-50 text-red-700 p-2 rounded-xl hover:bg-red-100 border border-red-200 transition-colors inline-flex items-center justify-center shadow-sm" title="رفض الطلب">
+                                        <i data-lucide="x" class="w-4 h-4"></i>
+                                    </a>
+                                </div>
+                            {% else %}
+                                <span class="text-xs text-slate-400 font-medium bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 inline-block">
+                                    تمت معالجته سابقاً
+                                </span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="py-12 text-center text-slate-500">
+                        <td colspan="5" class="py-12 text-center text-slate-500">
                             <div class="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <i data-lucide="file-x-2" class="w-10 h-10 text-slate-400"></i>
                             </div>

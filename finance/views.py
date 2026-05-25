@@ -511,42 +511,84 @@ def pay_old_debt(request, student_id):
 from django.contrib.auth.decorators import login_required
 @login_required
 def student_statement_print(request, student_id):
-    """
-    كشف حساب محدث يحسب الإجمالي شامل الغرامات المسجلة في جدول الأقساط
-    """
-    from decimal import Decimal
-    from django.db.models import Sum
-    from finance.models import Payment
-    try:
-        from finance.models import Student
-    except ImportError:
-        from students.models import Student
-
     student = get_object_or_404(Student, id=student_id)
     
-    # 1. جلب كافة الحركات المالية المسجلة للطالب
-    all_history = Payment.objects.filter(student=student).order_by('-payment_date', '-id')
+    # 1. تحديد السنة الدراسية الحالية النشطة في النظام
+    current_year = AcademicYear.objects.filter(is_active=True).first()
+    
+    # 2. حساب المديونية القديمة من السنوات السابقة فقط
+    previous_accounts = StudentAccount.objects.filter(student=student).exclude(academic_year=current_year)
+    
+    # التعديل هنا: نقوم بتجميع الحقول الأساسية المتوفرة في قاعدة البيانات
+    prev_totals = previous_accounts.aggregate(
+        total_fees_sum=Sum('total_fees'),
+        discount_sum=Sum('discount')
+    )
+    total_previous_fees = prev_totals['total_fees_sum'] or Decimal('0.00')
+    total_previous_discount = prev_totals['discount_sum'] or Decimal('0.00')
+    
+    # الصافي للسنوات السابقة = إجمالي الرسوم القديمة - الخصومات القديمة
+    net_previous_fees = total_previous_fees - total_previous_discount
+    
+    # مجموع ما تم دفعه فعلياً في السنوات السابقة
+    total_previous_paid = Payment.objects.filter(
+        student=student, 
+        is_cancelled=False
+    ).exclude(academic_year=current_year).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
+    
+    # صافي المديونية القديمة المتبقية والمرحّلة
+    previous_debt = max(Decimal('0.00'), net_previous_fees - total_previous_paid)
 
-    # 2. حساب إجمالي المدفوعات الفعلي من الجدول
-    actual_paid_from_table = all_history.aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
+    # 3. مستحقات ومطلوبات العام الحالي فقط
+    current_account = StudentAccount.objects.filter(student=student, academic_year=current_year).first()
+    if current_account:
+        # التعديل هنا: نحسب الصافي برمجياً من الحقول المتاحة للحساب الحالي
+        current_required = current_account.total_fees - current_account.discount
+    else:
+        current_required = Decimal('0.00')
+    
+    # غرامات التأخير للعام الحالي (يمكنك تركها 0 أو ربطها بالمنطق الخاص بك)
+    late_fees = Decimal('0.00') 
 
-    # 3. حساب إجمالي الغرامات من الأقساط المرتبطة بالطالب
-    # استخدمنا installments.all() لأنها العلاقة المعرفة لديك بالفعل في الموديل
-    late_fees = student.installments.aggregate(total=Sum('late_fee'))['total'] or Decimal('0.00')
+    # 4. جدول الحركات: جلب مدفوعات العام الحالي فقط غير الملغاة لتعرض في الجدول
+    all_history = Payment.objects.filter(
+        student=student, 
+        academic_year=current_year, 
+        is_cancelled=False
+    ).order_by('payment_date')
+    
+    # إجمالي المدفوع للعام الحالي فقط
+    current_paid = all_history.aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
 
-    # 4. حساب المتبقي الحقيقي (المعادلة الشاملة)
-    # (أصل العام والمديونية + الغرامات) - المدفوعات
-    total_required = student.total_required_amount
-    remaining = (total_required + late_fees) - actual_paid_from_table
+    # 5. الحساب النهائي لإجمالي المتبقي المستحق المطلوب من الطالب
+    # (القديم + مطلوب الحالي + الغرامات) - مدفوع الحالي
+    remaining_balance = (previous_debt + current_required + late_fees) - current_paid
+
+    # 6. كشوف الأقساط للعام الحالي فقط
+    installments = StudentInstallment.objects.filter(
+        student=student, 
+        academic_year=current_year
+    ).order_by('due_date')
+    
+    total_due_installments = installments.aggregate(total=Sum('amount_due'))['total'] or Decimal('0.00')
+    total_paid_installments = installments.aggregate(total=Sum('paid_amount'))['total'] or Decimal('0.00')
+    remaining_installments = total_due_installments - total_paid_installments
 
     context = {
         'student': student,
-        'all_history': all_history,
-        'total_paid_all': actual_paid_from_table,
-        'total_required': total_required, 
-        'late_fees': late_fees,
-        'remaining': remaining,  # النتيجة ستكون 15700.00 كما في طلبك
+        'all_history': all_history,              # يعرض إيصالات العام الحالي فقط بالجدول
+        'installments': installments,
+        'previous_debt': previous_debt,          # مديونية سنوات سابقة
+        'current_required': current_required,    # أصل مصروفات العام الحالي
+        'late_fees': late_fees,                  # غرامات العام الحالي
+        'current_paid': current_paid,            # إجمالي المسدد (العام الحالي)
+        'total_paid': current_paid,              # لضمان التوافق الكامل مع متغيرات الـ template
+        'remaining_balance': remaining_balance,  # إجمالي المتبقي المستحق النهائي
+        'total_due_installments': total_due_installments,
+        'total_paid_installments': total_paid_installments,
+        'remaining_installments': remaining_installments,
     }
+    
     return render(request, 'finance/student_statement_print.html', context)
 
 # @login_required

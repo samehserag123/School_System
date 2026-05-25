@@ -89,34 +89,34 @@
 
     <div class="summary-container">
         <div class="summary-box-item">
-            <span class="summary-label">مديونية سابقة</span>
-            <span class="summary-value text-danger">{{ student.previous_debt|default:"0.00"|floatformat:2 }}</span>
+            <span class="summary-label">مديونية سابقة (مرحّلة)</span>
+            <span class="summary-value text-danger">{{ previous_debt|default:"0.00"|floatformat:2 }}</span>
         </div>
 
         <div class="summary-box-item">
-            <span class="summary-label">أصل مصروفات العام</span>
-            <span class="summary-value text-primary">{{ total_required|default:"0.00"|floatformat:2 }}</span>
+            <span class="summary-label">أصل مصروفات العام الحالى</span>
+            <span class="summary-value text-primary">{{ current_required|default:"0.00"|floatformat:2 }}</span>
         </div>
 
         <div class="summary-box-item">
             <span class="summary-label">إجمالي غرامات التأخير</span>
             <span class="summary-value text-danger" style="text-decoration: underline;">
-                <!-- التعديل هنا: نستخدم late_fees مباشرة وليس student.late_fees_display -->
                 {{ late_fees|default:"0.00"|floatformat:2 }}
             </span>
         </div>
+
         <div class="summary-box-item">
-            <span class="summary-label">إجمالي المسدد</span>
-            <span class="summary-value text-success">{{ total_paid_all|default:"0.00"|floatformat:2 }}</span>
+            <span class="summary-label">إجمالي المسدد (العام الحالي)</span>
+            <span class="summary-value text-success">{{ current_paid|default:"0.00"|floatformat:2 }}</span>
         </div>
 
         <div class="total-final-box">
             <div class="total-final-label">إجمالي المتبقي المستحق (شامل الغرامات والقديم)</div>
             <div class="total-final-value">
-                {{ remaining|default:"0.00"|floatformat:2 }} ج.م
+                {{ remaining_balance|default:"0.00"|floatformat:2 }} ج.م
             </div>
             <div class="total-final-note">
-                (مديونية قديمة + أصل العام + الغرامات) - (إجمالي المدفوعات + الخصومات)
+                (مديونية قديمة + أصل العام + الغرامات) - (إجمالي مدفوعات العام الحالي)
             </div>
         </div>
     </div>

@@ -27,7 +27,7 @@ services:
     depends_on:
       - db
     environment:
-      - DEBUG=False         # تفعل الـ Debug هنا مؤقتاً
+      - DEBUG=True        # تفعل الـ Debug هنا مؤقتاً
       - SECRET_KEY=your_secret_key
       - ALLOWED_HOSTS=192.168.1.11,127.0.0.1,localhost
       - DATABASE_URL=postgres://sameh_admin:pass_123@db:5432/school_db

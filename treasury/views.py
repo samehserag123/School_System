@@ -200,27 +200,51 @@ def daily_revenue_report(request):
     })
 
 
-from .models import Product
+from .models import Product, ScanHistory
+
+def get_client_ip(request):
+    """دالة فرعية لجلب عنوان الـ IP الخاص بالزائر"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
 def verify_product(request, serial_number):
     try:
         product = Product.objects.get(serial_number=serial_number)
         
-        # اسم مفتاح فرعي في السيشن لكل سيريال نمبر
-        session_key = f"scanned_{serial_number}"
+        # 1. الفحص أولاً: هل الـ QR معطل حالياً؟
+        if product.is_currently_disabled:
+            context = {
+                'status': 'disabled',
+                'product': product,
+                'serial': serial_number,
+                'disabled_until': product.disabled_until
+            }
+            return render(request, 'verify.html', context)
         
-        # إذا لم يكن هذا المتصفح قد قام بمسح السيريال في هذه الجلسة
-        if not request.session.get(session_key):
-            product.scan_count += 1
-            product.save()
-            # حفظ الحالة في السيشن عشان لو عمل Refresh العداد ما يزدش
-            request.session[session_key] = True
-            # اختياري: جعل السيشن تنتهي بعد وقت قصير لو حابب
-            request.session.set_expiry(600) # 10 دقائق
+        # 2. تسجيل المسحة الجديدة فوراً (حتى لو تكررت من نفس التليفون)
+        client_ip = get_client_ip(request)
+        ScanHistory.objects.create(
+            product=product,
+            scanned_at=timezone.now(), # ضبط الوقت الحالي بدقة بالثواني
+            ip_address=client_ip
+        )
+        
+        # 3. تحديث العداد الإجمالي في جدول المنتج
+        product.scan_count += 1
+        product.save()
+        
+        # جلب آخر مسحة قمنا بتسجيلها لعرض توقيتها للمستخدم في الصفحة
+        latest_scan = product.scans.first()
             
         context = {
             'status': 'success',
             'product': product,
             'serial': serial_number,
+            'current_scan_time': latest_scan.scanned_at, # نرسل وقت المسحة الحالية للفرونت إند
         }
     except Product.DoesNotExist:
         context = {

@@ -14,37 +14,40 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
+
 # 1. تحميل المتغيرات من ملف .env فوراً
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-
-# 3. إعدادات الأمان (تقرأ من ملف .env)
-# تأكد أنك أنشأت ملف .env بجانب manage.py وضعت فيه القيم
 SECRET_KEY = os.getenv('SECRET_KEY')
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-test-key-for-local-development-only')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
-# امسح السطر القديم واكتب ده مؤقتاً للكشف عن الخطأ:
-# DEBUG = True
 
-# 4. المضيفون المسموح لهم (سيتم تحديثها من القيم في أسفل الملف)
-# جلب النطاقات المسموحة من ملف .env (مثل: ALLOWED_HOSTS=192.168.1.10,example.com)
-# allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost')
-# ALLOWED_HOSTS = ['*']
+# 3. إعدادات الأمان (تقرأ من ملف .env)
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-test-key-for-local-development-only')
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
+
+# 4. المضيفون المسموح لهم (بناء المصفوفة الديناميكية)
 allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost,sameh123.pythonanywhere.com')
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
 
+# إضافة روابط Cloudflare تلقائياً
 if '.trycloudflare.com' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('.trycloudflare.com')
     
-# أضف هذا الجزء للسماح لروابط Cloudflare بالتعامل مع النماذج (Forms)
+# إضافة الـ IP المحلي الحالي لتتمكن من الفتح من الموبايل
+if '192.168.147.93' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('192.168.147.93')
+
+# تأمين أخير لبيئة التطوير المحلية (يقبل أي اتصال)
+if '*' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('*')
+    
 # السماح لروابط Cloudflare المتغيرة بالتعامل مع النماذج وتسجيل الدخول
 CSRF_TRUSTED_ORIGINS = ["https://*.trycloudflare.com"]
-# أو إذا أردت كتابة الـ IP الخاص بالسيرفر مباشرة (استبدل بالرقم الحقيقي):
-# ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.x.x', 'yourdomain.com']
-# --- استكمال باقي إعدادات Django (INSTALLED_APPS, MIDDLEWARE...) ---
+
+# ❌ تم حذف السطر القديم المسبب للمشكلة من هنا تماماً لكي لا يدمر الإعدادات المذكورة أعلاه.
 
 # Application definition
 

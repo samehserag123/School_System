@@ -17,6 +17,7 @@ urlpatterns = [
     path('students/', include('students.urls')),
     path('finance/', include('finance.urls')),
     
+    # 🎯 سطر واحد فقط نظيف ومختصر لتطبيق الـ hr:
     path('hr/', include('hr.urls')),
 
     path('api/v1/finance/', include('finance.api_urls')), 

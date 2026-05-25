@@ -1,15 +1,97 @@
-from datetime import datetime, date
+from datetime import datetime, date, time, timedelta
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.db.models import Sum
-
-
+import pandas as pd
 from django.utils import timezone
-from datetime import timedelta
-
 # استيراد الموديلات والفورمز الخاصة بتطبيق الـ HR (تم تصحيح الحرف الناقص)
-from .models import Employee, DailyAttendance, LeaveRequest, Department
+from .models import Employee, DailyAttendance, LeaveRequest, Department, AttendanceRule
 from .forms import UploadAttendanceForm, EmployeeForm, LeaveRequestForm
+
+
+def monthly_payroll_report(request):
+    """
+    نسخة محسنة فائقة السرعة لكشف الرواتب المجمع (استعلام واحد للداتابيز)
+    """
+    try:
+        today = timezone.localdate()
+        year = int(request.GET.get('year', today.year))
+        month = int(request.GET.get('month', today.month))
+        
+        # 🚀 جلب الموظفين النشطين وترتيبهم
+        employees = Employee.objects.filter(is_active=True).select_related('attendance_rule').order_by('name')
+        
+        # ⚡ الضربة القاضية للبطء: جلب كل سجلات الحضور للشهر ده في استعلام واحد فقط!
+        all_attendances = DailyAttendance.objects.filter(date__year=year, date__month=month)
+        
+        # تحويل السجلات إلى قاموس مجمع في الذاكرة لتفادي ضرب الداتابيز جوه الـ Loop
+        attendance_map = {}
+        for att in all_attendances:
+            if att.employee_id not in attendance_map:
+                attendance_map[att.employee_id] = []
+            attendance_map[att.employee_id].append(att)
+
+        payroll_records = []
+        total_company_base = 0.0
+        total_company_overtime = 0.0
+        total_company_deductions = 0.0
+        total_company_net = 0.0
+
+        for employee in employees:
+            # جلب سجلات الموظف من الذاكرة مباشرة بدون أي Query جديد
+            emp_attendances = attendance_map.get(employee.id, [])
+            
+            # حساب الإجماليات في الذاكرة (سريع جداً)
+            total_overtime_hours = sum(float(a.overtime_hours or 0) for a in emp_attendances)
+            total_deduction_hours = sum(float(a.deduction_hours or 0) for a in emp_attendances)
+            total_absence_days = sum(1 for a in emp_attendances if a.status == 'absent')
+            
+            base_salary = float(employee.base_salary) if employee.base_salary else 0.0
+            hourly_rate = base_salary / 240.0
+            day_rate = base_salary / 30.0
+            
+            overtime_allowance = total_overtime_hours * hourly_rate
+            late_deduction = total_deduction_hours * hourly_rate
+            
+            absent_multiplier = 1.0
+            if employee.attendance_rule:
+                absent_multiplier = float(employee.attendance_rule.absent_deduction_days)
+                
+            absence_deduction = total_absence_days * day_rate * absent_multiplier
+            
+            total_deductions = late_deduction + absence_deduction
+            net_salary = base_salary + overtime_allowance - total_deductions
+            
+            total_company_base += base_salary
+            total_company_overtime += overtime_allowance
+            total_company_deductions += total_deductions
+            total_company_net += net_salary
+            
+            payroll_records.append({
+                'employee': employee,
+                'base_salary': base_salary,
+                'overtime_hours': total_overtime_hours,
+                'overtime_allowance': round(overtime_allowance, 2),
+                'deductions': round(total_deductions, 2),
+                'net_salary': round(net_salary, 2),
+            })
+            
+        context = {
+            'payroll_records': payroll_records,
+            'year': year,
+            'month': month,
+            'total_company_base': round(total_company_base, 2),
+            'total_company_overtime': round(total_company_overtime, 2),
+            'total_company_deductions': round(total_company_deductions, 2),
+            'total_company_net': round(total_company_net, 2),
+            'months_range': range(1, 13),
+            'years_range': range(today.year - 2, today.year + 3),
+        }
+        return render(request, 'hr/payroll_report.html', context)
+        
+    except Exception as server_err:
+        print(f"❌ خطأ كشف الرواتب المجمع السريع: {str(server_err)}")
+        raise server_err
 
 def employee_create_view(request):
     """
@@ -213,96 +295,166 @@ def process_daily_attendance_for_employee(employee, target_date, logs):
             }
         )
 
-# 3. الفيوات المسؤولة عن لوحات التحكم الإدارية (Dashboards & Lists
+
 def upload_and_process_attendance(request):
-    """
-    عرض صفحة رفع سجلات البصمة ومعالجتها حياً
-    """
-    if request.method == 'POST':
-        # إذا كنت تستخدم حقل الرفع المباشر بدون كائن Form مسبق:
-        uploaded_file = request.FILES.get('file')
+    if request.method == 'POST' and request.FILES.get('file'):
+        uploaded_file = request.FILES['file']
         
-        if not uploaded_file:
-            messages.error(request, 'لم يتم اختيار أي ملف للرفع.')
-            return redirect('hr:upload_attendance')
-            
         try:
-            # 🚀 منطق المعالجة الحية لملف البصمة (CSV / Excel) يوضع هنا
-            # ...
+            # 1. قراءة الملف بحسب الامتداد
+            if uploaded_file.name.endswith('.xlsx') or uploaded_file.name.endswith('.xls'):
+                df = pd.read_excel(uploaded_file)
+            elif uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            else:
+                messages.error(request, "صيغة الملف غير مدعومة!")
+                return redirect('hr:employee_list')
+
+            # تنظيف أسماء الأعمدة من أي مسافات زائدة
+            df.columns = df.columns.str.strip()
             
-            messages.success(request, 'تم رفع ومعالجة سجلات البصمة بنجاح حساب الرواتب!')
-            return redirect('hr:attendance_list')
+            # 2. تجميع البصمات: { (الموظف, التاريخ): [قائمة مواقيت البصمة] }
+            logs_by_emp_and_date = {}
+            distinct_dates = set()
+            
+            for index, row in df.iterrows():
+                # 🎯 تعديل ذكي: جلب كود الموظف سواء العمود مكتوب بـ (AC-No.) أو (AC.No.)
+                raw_emp_code = row.get('AC-No.', row.get('AC.No.', ''))
+                raw_emp_code = str(raw_emp_code).strip()
+                
+                date_str = str(row.get('Date', '')).strip()
+                
+                if not raw_emp_code or raw_emp_code == 'nan' or not date_str or date_str == 'nan':
+                    continue
+                
+                # تنظيف الكود من الكسر العشري لو الإكسيل قاريه Float (مثل 1.0 يحولها لـ 1)
+                emp_code = raw_emp_code.split('.')[0]
+                
+                try:
+                    ts = pd.to_datetime(date_str)
+                    parsed_date = date(ts.year, ts.month, ts.day)
+                    distinct_dates.add(parsed_date)
+                except Exception as date_err:
+                    print(f"❌ خطأ في التاريخ بالسطر {index}: {date_err}")
+                    continue
+                
+                # 🎯 تعديل ذكي للبحث عن الموظف: يبحث في الـ emp_id أو الـ id التلقائي أو رقم البصمة
+                employee = Employee.objects.filter(emp_id=emp_code, is_active=True).first()
+                if not employee:
+                    try:
+                        # تجربة البحث بالـ ID الرقمي الصافي المباشر المتوافق مع الداتابيز
+                        employee = Employee.objects.filter(id=int(emp_code), is_active=True).first()
+                    except:
+                        pass
+                
+                # إذا لم يجد الموظف بعد كل محاولات التطابقة، يتخطى السطر
+                if not employee:
+                    continue 
+
+                if str(row.get('Absent', '')).strip().lower() == 'true':
+                    continue
+                
+                clock_in_str = str(row.get('Clock In', '')).strip()
+                clock_out_str = str(row.get('Clock Out', '')).strip()
+                
+                key = (employee, parsed_date)
+                if key not in logs_by_emp_and_date:
+                    logs_by_emp_and_date[key] = []
+                
+                for time_str in [clock_in_str, clock_out_str]:
+                    if time_str and time_str != 'nan' and time_str != '':
+                        try:
+                            t_parsed = pd.to_datetime(time_str)
+                            dt_combined = datetime.combine(parsed_date, time(t_parsed.hour, t_parsed.minute, t_parsed.second))
+                            logs_by_emp_and_date[key].append(dt_combined)
+                        except:
+                            pass
+
+            # 3. تشغيل محرك المعالجة الذكي لكل موظف حضر وبصم
+            records_created = 0
+            for (employee, target_date), logs in logs_by_emp_and_date.items():
+                process_daily_attendance_for_employee(employee, target_date, logs)
+                records_created += 1
+            
+            # 4. إدراج الغياب أو الإجازات تلقائياً لباقي الموظفين الذين لم يبصموا بالملف
+            all_active_employees = Employee.objects.filter(is_active=True)
+            for target_date in distinct_dates:
+                for emp in all_active_employees:
+                    if (emp, target_date) not in logs_by_emp_and_date:
+                        process_daily_attendance_for_employee(emp, target_date, [])
+            
+            if records_created > 0:
+                messages.success(request, f"تمت معالجة وتحديث الحسابات الماليّة لـ {records_created} سجل حضور وغياب بناءً على لوائح الشركة.")
+            else:
+                messages.warning(request, "تم قراءة الملف ولكن لم يتم مطابقة أي أكواد موظفين نشطين بحساباتهم.")
             
         except Exception as e:
-            # طباعة الخطأ داخل التيرمينال لو انهار أثناء المعالجة
-            print(f"Error processing file: {str(e)}")
-            messages.error(request, f'حدث خطأ أثناء معالجة الملف: {str(e)}')
-            return redirect('hr:upload_attendance')
+            messages.error(request, f"حدث خطأ أثناء معالجة ملف البصمة: {str(e)}")
             
-    # تأمين الـ GET بنسبة 100% لمنع الـ 500 كراش
-    context = {
-        'form': None # قمنا بإلغاء إجبار الفورم لتجنب الـ NameError أو الـ AttributeError
-    }
-    return render(request, 'hr/upload_attendance.html', context)
-
-
-from django.shortcuts import render
-from django.utils import timezone
-from .models import Employee, Department, LeaveRequest
-# تأكد من استيراد موديل الحضور الخاص بمشروعك، سنفترض هنا أن اسمه Attendance
-# from .models import Attendance 
+    return redirect('hr:employee_list')
 
 def employee_list(request):
     try:
-        # 1. جلب الموظفين والأقسام
-        # إذا كان حقل attendance_rule يسبب خطأ لأنه غير موجود في الـ Model، احذفه من الـ select_related
-        employees = Employee.objects.all().select_related('department')
+        # 1. جلب الموظفين والأقسام في استعلام واحد محسن
+        employees_query = Employee.objects.all().select_related('department')
+        employees = list(employees_query)  # تثبيت في الذاكرة سريعة القراءة
         departments = Department.objects.all()
         
-        # 2. جلب طلبات الإجازات لجدول الإجازات
-        leave_requests = LeaveRequest.objects.all().select_related('employee').order_by('-id')
+        # 2. جلب طلبات الإجازات لجدول الإجازات وتثبيتها
+        leave_requests_query = LeaveRequest.objects.all().select_related('employee').order_by('-id')
+        leave_requests = list(leave_requests_query)  # تثبيت في الذاكرة
         
-        # 3. جلب سجلات الحضور (تأمين ضد عدم وجود بيانات اليوم)
-        today = timezone.now().date()
+        # 3. جلب التاريخ المراد تصفيته من الـ GET Request (تاريخ اليوم كوضع افتراضي)
+        date_param = request.GET.get('date')
+        if date_param:
+            try:
+                target_date = pd.to_datetime(date_param).date()
+            except:
+                target_date = timezone.now().date()
+        else:
+            # إذا لم يقم المستخدم بالاختيار، نأخذ تاريخ آخر سجل تم رفعه لتسهيل رؤية الداتا الحية مباشرة
+            last_record = DailyAttendance.objects.order_by('-date').first()
+            target_date = last_record.date if last_record else timezone.now().date()
         
-        # تخصيص استعلامات الحضور (قم بتغيير 'Attendance' لاسم الموديل لديك إن كان مختلفاً)
-        # try:
-        #     attendance_list = Attendance.objects.filter(date=today).select_related('employee')
-        # except:
-        #     attendance_list = []
-        
-        attendance_list = [] # قيمة مؤقتة آمنة لمنع الكراش حتى تربط موديل البصمة الخاص بك
+        # 4. تفعيل جلب السجلات الحقيقية من الموديل المعتمد DailyAttendance وتحويلها لقائمة فوراً
+        attendance_query = DailyAttendance.objects.filter(date=target_date).select_related('employee')
+        attendance_list = list(attendance_query)  # 🚀 الضربة القاضية للبطء: تحويل لقائمة بايثون لمنع ضرب الداتابيز مجدداً
         
     except Exception as e:
-        print(f"🔴 خطأ داخلي كارثي في الـ View: {str(e)}")
-        employees = []
-        departments = []
-        leave_requests = []
-        attendance_list = []
+        print(f"🔴 خطأ داخلي في الـ View: {str(e)}")
+        employees, departments, leave_requests, attendance_list = [], [], [], []
+        target_date = timezone.now().date()
 
-    # حساب العدادات الحية بشكل آمن تماماً يمنع الـ 500 Server Error
-    total_emp = len(employees) if isinstance(employees, list) else employees.count()
-    pending_leaves = len([l for l in leave_requests if l.status == 'pending']) if isinstance(leave_requests, list) else leave_requests.filter(status='pending').count()
+    # ⚡ الحساب الذكي الفائق السرعة داخل الذاكرة (0 استعلامات SQL إضافية)
+    total_emp = len(employees)
+    pending_leaves = sum(1 for l in leave_requests if l.status == 'pending')
+    
+    # حساب الحضور والتأخير لليوم من واقع القائمة المجهزة بالـ Memory
+    today_attendance_count = sum(1 for a in attendance_list if a.status in ['present', 'late'])
+    today_late_count = sum(1 for a in attendance_list if a.late_minutes > 0)
+
+    # تحديد التبويب النشط ذكياً
+    active_tab = 'dashboard'
+    if len(attendance_list) > 0 or request.GET.get('date'):
+        active_tab = 'attendance'
 
     context = {
         'employees': employees,
         'departments': departments,
         'leave_requests': leave_requests,
-        
-        # تمرير متغيرات الحضور المتوقعة داخل التمبلت لمنع كراش السيرفر
         'attendance': attendance_list,
-        'latest_attendance': attendance_list[:5] if isinstance(attendance_list, list) else attendance_list.order_by('-id')[:5],
+        'latest_attendance': attendance_list[:5], # أخذ أول 5 عناصر مباشرة من الذاكرة بسرعة فائقة
         
-        # العدادات الإحصائية للكروت العلوية
+        # العدادات الإحصائية
         'total_employees': total_emp,
-        'today_attendance_count': 0, # سيتم ربطها بديناميكية الحضور لاحقاً
-        'today_late_count': 0,
+        'today_attendance_count': today_attendance_count,
+        'today_late_count': today_late_count,
         'notification_count': pending_leaves,
-        'current_date': timezone.now(),
+        'current_date': target_date,
+        'active_tab': active_tab,
     }
     
     return render(request, 'hr/employee_list.html', context)
-
 
 def attendance_list(request):
     """
@@ -325,25 +477,60 @@ def leave_list(request):
         'notification_count': notification_count
     })
 
+
+from django.shortcuts import render, redirect, get_object_or_404
+
+from .forms import LeaveRequestForm  # تأكد من أن اسم ملف الفورم والموديل صحيح لديك
+
 def leave_request_view(request):
     """
-    تقديم طلب إجازة جديد من خلال الفورم الذكي
+    تقديم طلب إجازة جديد من خلال الفورم الذكي وملء قائمة الموظفين ديناميكياً
     """
     if request.method == 'POST':
         form = LeaveRequestForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, 'تم إرسال طلب الإجازة بنجاح وبانتظار اعتماد الإدارة!')
-            return redirect('hr:leave_list') # تم تعديل الـ namespace ليطابق نظام الراوتنج عندك (hr:leave_list)
+            return redirect('hr:leave_list') 
         else:
             messages.error(request, 'عذراً، يرجى التحقق من صحة البيانات وتواريخ الإجازة.')
     else:
         form = LeaveRequestForm()
         
-    # جلب العداد لضمان عدم اختفائه من الهيدر أو الـ Sidebar أثناء تقديم الطلب
+    # جلب الموظفين النشطين لملء القائمة المنسدلة في التمبلت المكتوب يدويًا
+    employees = Employee.objects.filter(is_active=True).order_by('name')
+    
+    # جلب العداد لتحديث الجرس والقائمة الجانبية
     notification_count = LeaveRequest.objects.filter(status='pending').count()
     
     return render(request, 'hr/leave_form.html', {
         'form': form,
+        'employees': employees,
         'notification_count': notification_count
     })
+
+def leave_approve(request, leave_id):
+    """
+    اعتماد وقبول طلب الإجازة المعلق
+    """
+    try:
+        leave = get_object_or_404(LeaveRequest, id=leave_id)
+        leave.status = 'approved'
+        leave.save()
+        messages.success(request, f"تم اعتماد وقبول إجازة الموظف {leave.employee.name} بنجاح.")
+    except Exception as e:
+        messages.error(request, f"خطأ أثناء الاعتماد: {str(e)}")
+    return redirect('hr:leave_list')
+
+def leave_reject(request, leave_id):
+    """
+    رفض طلب الإجازة المعلق
+    """
+    try:
+        leave = get_object_or_404(LeaveRequest, id=leave_id)
+        leave.status = 'rejected'
+        leave.save()
+        messages.warning(request, f"تم رفض طلب إجازة الموظف {leave.employee.name}.")
+    except Exception as e:
+        messages.error(request, f"خطأ أثناء الرفض: {str(e)}")
+    return redirect('hr:leave_list')
