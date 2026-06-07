@@ -210,90 +210,141 @@ def calculate_monthly_salary(request, employee_id, year, month):
     return render(request, 'hr/payroll_slip.html', context)
 
 
-# 2. محرك المعالجة اليومي الذكي للبصمة والربط مع القواعد المرنة
 def process_daily_attendance_for_employee(employee, target_date, logs):
     """
-    دالة ذكية تحسب حضور الموظف بناءً على قاعدته الخاصة به
-    logs: قائمة بوقائع البصمة (timestamps) الخاصة بالموظف في هذا اليوم
+    محرك فني فائق الذكاء لمعالجة حركات البصمة لليوم المستهدف بناءً على طبيعة لائحة الموظف:
+    ثابت (Fixed)، مرن (Flexible)، أو مفتوح (Open).
     """
     rule = employee.attendance_rule
     
-    # أولاً: التحقق هل اليوم هو يوم عمل رسمي للموظف بناءً على فلاتر الأيام بقاعدته
+    # 1. فحص وجود طلب إجازة معتمد ومصدق عليه في هذا اليوم مسبقاً
+    has_approved_leave = LeaveRequest.objects.filter(
+        employee=employee, 
+        start_date__lte=target_date, 
+        end_date__gte=target_date, 
+        status='approved'
+    ).exists()
+
+    # 2. إذا كان اليوم هو عطلة أو إجازة رسمية للموظف بناءً على فلاتر اللائحة الخاصة به
     if not rule.is_working_day(target_date):
-        # إذا لم يكن يوم عمل وبصم فيه الموظف، يحسب كامل الوقت كإضافي مضروباً في معامل الإضافي
         if logs:
+            # إذا بصم في يوم عطلته، تحسب ساعات تواجده بالكامل كإضافي بمضاعف العطلات الاستثنائي
             check_in = min(logs).time()
             check_out = max(logs).time()
+            start_dt = datetime.combine(target_date, check_in)
+            end_dt = datetime.combine(target_date, check_out)
             
-            # تم استخدام datetime.combine بأمان هنا لأننا استوردنا الكلاس بالكامل
-            start = datetime.combine(target_date, check_in)
-            end = datetime.combine(target_date, check_out)
-            duration_hours = (end - start).total_seconds() / 3600.0
+            actual_hours = (end_dt - start_dt).total_seconds() / 3600.0
+            overtime = actual_hours * rule.overtime_multiplier_weekend
             
             DailyAttendance.objects.update_or_create(
                 employee=employee, date=target_date,
                 defaults={
                     'check_in': check_in, 'check_out': check_out,
-                    'status': 'present', 'overtime_hours': duration_hours * rule.overtime_multiplier
+                    'status': 'holiday', 'actual_work_hours': actual_hours,
+                    'overtime_hours': round(overtime, 2), 'late_minutes': 0, 'deduction_hours': 0.0
+                }
+            )
+        else:
+            # عطلة رسمية اعتيادية بدون حضور وبدون عقوبات أو تأثير على الراتب
+            DailyAttendance.objects.update_or_create(
+                employee=employee, date=target_date,
+                defaults={'status': 'holiday', 'late_minutes': 0, 'overtime_hours': 0.0, 'deduction_hours': 0.0}
+            )
+        return
+
+    # 3. إذا كان يوم عمل رسمي ولم يبصم الموظف نهائياً
+    if not logs:
+        if has_approved_leave:
+            # غياب شرعي بسبب إجازة معتمدة ومسجلة في رصيده
+            DailyAttendance.objects.update_or_create(
+                employee=employee, date=target_date,
+                defaults={'status': 'leave', 'late_minutes': 0, 'overtime_hours': 0.0, 'deduction_hours': 0.0, 'absence_deduction_days': 0.0}
+            )
+        else:
+            # غياب غير مبرر بدون إذن مسبق (يتم تطبيق معامل جزاء خصم الغياب)
+            DailyAttendance.objects.update_or_create(
+                employee=employee, date=target_date,
+                defaults={
+                    'status': 'absent', 'late_minutes': 0, 'overtime_hours': 0.0, 'deduction_hours': 0.0,
+                    'absence_deduction_days': rule.absent_deduction_days
                 }
             )
         return
 
-    # ثانياً: إذا كان يوم عمل ولم يبصم والموظف مجبر بالبصمة
-    if not logs and rule.requires_fingerprint:
-        # فحص وجود طلب إجازة معتمد ومصدق عليه لهذا اليوم
-        has_leave = LeaveRequest.objects.filter(
-            employee=employee, start_date__lte=target_date, end_date__gte=target_date, status='approved'
-        ).exists()
-        
-        status = 'leave' if has_leave else 'absent'
-        DailyAttendance.objects.update_or_create(
-            employee=employee, date=target_date,
-            defaults={'status': status, 'late_minutes': 0, 'overtime_hours': 0}
-        )
-        return
+    # 4. إذا حضر وبصم الموظف بالفعل (بدء تفعيل فلاتر اللوائح المرنة والثابتة)
+    check_in_dt = min(logs)
+    check_out_dt = max(logs)
+    check_in = check_in_dt.time()
+    check_out = check_out_dt.time()
+    
+    actual_hours = (check_out_dt - check_in_dt).total_seconds() / 3600.0
+    
+    late_minutes = 0
+    overtime_hours = 0.0
+    deduction_hours = 0.0
+    status = 'present'
 
-    # ثالثاً: إذا حضر الموظف وبصم فعلياً
-    if logs:
-        check_in_dt = min(logs)
-        check_out_dt = max(logs)
-        
-        check_in = check_in_dt.time()
-        check_out = check_out_dt.time()
-        
+    # أ. الحالة الأولى: تطبيق نظام الدوام الصارم/الثابت (Fixed Shift)
+    if rule.shift_type == 'fixed':
         rule_start = rule.work_start_time
         rule_end = rule.work_end_time
         
-        # حساب دقائق التأخير الفعليه
-        late_minutes = 0
+        # حساب حركات التأخير الصباحية
         if check_in > rule_start:
             diff = datetime.combine(target_date, check_in) - datetime.combine(target_date, rule_start)
             late_minutes = int(diff.total_seconds() / 60)
+            # إسقاط التأخير إذا كان يقع داخل النطاق الشرعي لفترة السماح بالشركة
             if late_minutes <= rule.grace_period:
                 late_minutes = 0
-                
-        # حساب ساعات الإضافي عند تخطي نهاية موعد الدوام الرسمي بالمعامل
-        overtime_hours = 0.0
+        
+        # إذا تجاوز التأخير الحد الأقصى المسموح به بالشركة، يتم تحويل الحالة لغياب نصف يوم تلقائياً
+        if late_minutes > rule.max_late_allowed_minutes:
+            status = 'half_day_absent'
+            
+        # حساب ساعات الإضافي بعد انتهاء مواعيد الدوام الرسمي المحدد للوردية
         if check_out > rule_end:
             diff_out = datetime.combine(target_date, check_out) - datetime.combine(target_date, rule_end)
-            overtime_hours = (diff_out.total_seconds() / 3600.0) * rule.overtime_multiplier
+            overtime_hours = (diff_out.total_seconds() / 3600.0) * rule.overtime_multiplier_normal
 
-        # حساب ساعات الخصم الفعلية بناءً على معامل خصم ساعات التأخير للموظف
-        deduction_hours = 0.0
+        # تطبيق معامل الخصم على ساعات التأخير الفعلية المحتسبة
         if late_minutes > 0:
-            deduction_hours = (late_minutes / 60.0) * rule.deduction_multiplier
+            deduction_hours = (late_minutes / 60.0) * rule.late_deduction_multiplier
 
-        DailyAttendance.objects.update_or_create(
-            employee=employee, date=target_date,
-            defaults={
-                'check_in': check_in,
-                'check_out': check_out,
-                'status': 'present',
-                'late_minutes': late_minutes,
-                'overtime_hours': overtime_hours,
-                'deduction_hours': deduction_hours
-            }
-        )
+    # ب. الحالة الثانية: تطبيق نظام الدوام المرن بالكامل (Flexible Shift)
+    elif rule.shift_type == 'flexible':
+        target_hours = rule.target_work_hours
+        if actual_hours < target_hours:
+            # الموظف لم يكمل عدد ساعات الدوام المستهدفة اليوم، يحسب النقص كساعات خصم تأخير
+            deficit_hours = target_hours - actual_hours
+            deduction_hours = deficit_hours * rule.late_deduction_multiplier
+            late_minutes = int(deficit_hours * 60)
+        elif actual_hours > target_hours:
+            # الموظف تخطى الساعات المستهدفة، يتم مكافأته بحساب الساعات الزائدة كإضافي معتمد
+            surplus_hours = actual_hours - target_hours
+            overtime_hours = surplus_hours * rule.overtime_multiplier_normal
+
+    # ج. الحالة الثالثة: تطبيق نظام الدوام المفتوح (Open) للإدارة والمستشارين
+    elif rule.shift_type == 'open':
+        # لا توجد دقائق تأخير أو خصومات ساعات نهائياً، ويحسب الدوام كاملاً بشكل اعتيادي
+        late_minutes = 0
+        deduction_hours = 0.0
+        overtime_hours = 0.0
+
+    # 5. الحفظ الختامي المباشر وتحديث كشوفات الداتابيز
+    DailyAttendance.objects.update_or_create(
+        employee=employee, date=target_date,
+        defaults={
+            'check_in': check_in,
+            'check_out': check_out,
+            'status': status,
+            'actual_work_hours': round(actual_work_hours, 2),
+            'late_minutes': late_minutes,
+            'overtime_hours': round(overtime_hours, 2),
+            'deduction_hours': round(deduction_hours, 2),
+            'absence_deduction_days': 0.0 # تم إلغاؤها لأنه حضر وبصم بالفعل
+        }
+    )
 
 
 def upload_and_process_attendance(request):

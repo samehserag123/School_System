@@ -3,9 +3,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.utils.safestring import mark_safe
 from django.contrib import messages
-from django.db import transaction
-from django.db import transaction
-from django.db.models import Sum, Count, Q, F, DecimalField, Max
+from django.db import transaction, connection, IntegrityError
+from django.db.models import Sum, Count, Q, F, DecimalField, Max, Value, OuterRef, Subquery, Exists
+
+from django.urls import reverse
+
 from django.db.models.functions import TruncMonth, Coalesce
 from .models import ReceiptBook # تأكد من وجود هذا الاستيراد في أعلى الملف
 import pytz
@@ -28,8 +30,7 @@ from reportlab.pdfgen import canvas
 from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
-# 7. App Models (Finance & Students)
-# تجميع الاستيرادات بشكل نظيف (بدون تكرار)
+
 from .models import (
     AcademicYear,
     DailyClosure,
@@ -58,6 +59,7 @@ from django.utils import timezone
 from datetime import datetime, timedelta 
 
 from .models import Coupon 
+
 
 # -----------------------------------
 
@@ -591,41 +593,102 @@ def student_statement_print(request, student_id):
     
     return render(request, 'finance/student_statement_print.html', context)
 
-# @login_required
-# def student_statement_print(request, student_id):
-#     """
-#     كشف حساب يجمع كافة المدفوعات المسجلة فعلياً في الجدول
-#     ويخصمها من المديونية بغض النظر عن نوع البند
-#     """
-#     from finance.models import Payment
-#     try:
-#         from finance.models import Student
-#     except ImportError:
-#         from students.models import Student
 
-#     student = get_object_or_404(Student, id=student_id)
-    
-#     # 1. جلب كافة الحركات المالية المسجلة للطالب (التي تظهر في الجدول)
-#     all_history = Payment.objects.filter(student=student).order_by('-payment_date', '-id')
+@login_required
+def print_debts_report_view(request):
+    """
+    النسخة المستقرة والنهائية لتقرير المديونيات الجاهز للطباعة الفورية.
+    تعتمد على عزل برمي كامل ومطلق للطلاب غير المسكنين ماليًا.
+    """
+    filter_type = request.GET.get('filter', 'all')
+    year_id = request.GET.get('academic_year')
+    grade_id = request.GET.get('grade')
+    search_query = request.GET.get('q')
 
-#     # 2. حساب إجمالي المدفوعات الفعلي من الجدول مباشرة (الجمع اللحظي)
-#     # هذا السطر سيجمع الـ 4 عمليات (1+1+1+1) ويخرج 4.00 جنيه
-#     actual_paid_from_table = all_history.aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
+    if not year_id:
+        active_year = AcademicYear.objects.filter(is_active=True).first()
+        year_id = active_year.id if active_year else None
+    else:
+        active_year = AcademicYear.objects.filter(id=year_id).first()
 
-#     # 3. حساب المتبقي الحقيقي
-#     # (مطلوب العام + مديونية سابقة) - كل ما دفع في الجدول
-#     total_required = student.total_required_amount
-#     remaining = total_required - actual_paid_from_table
+    # استعلام الطلاب النشطين
+    students_qs = Student.objects.filter(is_active=True).select_related('grade', 'academic_year')
 
-#     context = {
-#         'student': student,
-#         'all_history': all_history,
-#         'total_paid_all': actual_paid_from_table, # القيمة الفعلية من الجدول
-#         'total_required': total_required, 
-#         'remaining': remaining, # النتيجة النهائية الصحيحة
-#     }
-#     return render(request, 'finance/student_statement_print.html', context)
+    if year_id:
+        students_qs = students_qs.filter(academic_year_id=year_id)
+    if grade_id:
+        students_qs = students_qs.filter(grade_id=grade_id)
+    if search_query:
+        students_qs = students_qs.filter(
+            Q(first_name__icontains=search_query) | Q(last_name__icontains=search_query)
+        )
 
+    # 🛑 جدار الحماية النهائي: إذا كان الفلتر للمسددين أو المدينين، نستبعد تماماً أي طالب ليس لديه سجل مالي حقيقي
+    if filter_type in ['cleared', 'delayed']:
+        assigned_student_ids = list(StudentAccount.objects.filter(academic_year_id=year_id).values_list('student_id', flat=True))
+        students_qs = students_qs.filter(id__in=assigned_student_ids)
+
+    # حساب المجاميع المالية داخل قاعدة البيانات دفعة واحدة لسرعة الأداء
+    account_subquery = StudentAccount.objects.filter(
+        student=OuterRef('pk'),
+        academic_year_id=year_id
+    ).values('student').annotate(
+        required=Coalesce(Sum(F('total_fees') - F('discount')), Value(0, output_field=DecimalField()))
+    ).values('required')
+
+    payments_subquery = Payment.objects.filter(
+        student=OuterRef('pk'),
+        academic_year_id=year_id,
+        is_cancelled=False
+    ).values('student').annotate(
+        paid=Coalesce(Sum('amount_paid'), Value(0, output_field=DecimalField()))
+    ).values('paid')
+
+    students_qs = students_qs.annotate(
+        current_required=Coalesce(Subquery(account_subquery), Value(0, output_field=DecimalField())),
+        total_paid=Coalesce(Subquery(payments_subquery), Value(0, output_field=DecimalField())),
+        prev_debt=Coalesce(F('previous_debt'), Value(0, output_field=DecimalField()))
+    )
+
+    report_data = []
+    total_report_debts = Decimal('0.00')
+
+    for student in students_qs:
+        remaining_balance = (student.prev_debt + student.current_required) - student.total_paid
+        if remaining_balance < 0:
+            remaining_balance = Decimal('0.00')
+
+        # الفلترة الدقيقة حسب المبالغ المالية الفعلية للطلاب المسكنين
+        if filter_type == 'delayed' and remaining_balance <= 0:
+            continue
+        elif filter_type == 'cleared' and remaining_balance > 0:
+            continue
+
+        grade_name = student.grade.name if student.grade else 'غير محدد'
+        if hasattr(student, 'specialty') and student.specialty:
+            specialty = student.specialty
+        elif "-" in grade_name:
+            specialty = grade_name.split("-")[-1].strip()
+        else:
+            specialty = "عام"
+
+        report_data.append({
+            'student_name': student.get_full_name(),
+            'specialty': specialty,
+            'grade': grade_name,
+            'remaining_balance': remaining_balance
+        })
+        total_report_debts += remaining_balance
+
+    context = {
+        'report_data': report_data,
+        'total_report_debts': total_report_debts,
+        'filter_type': filter_type,
+        'active_year': active_year,
+        'today': timezone.now().date(),
+        'students_count': len(report_data)
+    }
+    return render(request, 'finance/print_debts_report.html', context)
 
 
 
@@ -1041,164 +1104,601 @@ def admin_cancel_receipt(request, pk):
             
     return redirect(request.META.get('HTTP_REFERER', 'quick_collection'))
 
-
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.db import transaction, IntegrityError, connection
+from django.utils import timezone
 from django.urls import reverse
+from django.db.models import Q, Max
+from decimal import Decimal
 
 @login_required
-@transaction.atomic
 def quick_collection(request):
+    # 1. جلب الفئات والسنة بشكل مفهرس وخفيف جداً
     years = AcademicYear.objects.all().order_by('-is_active', '-name')
     categories = RevenueCategory.objects.all()
     
     next_url = request.GET.get('next') or request.POST.get('next')
+    current_page = request.GET.get('page_num') or request.POST.get('page_num') or '1'
     
-    default_category = categories.filter(name__icontains="اساسيه").first() or \
-                       categories.filter(name__icontains="مصروف").first()
+    # استعلام واحد مدمج بدلاً من فلاتر نصوص متعددة
+    default_category = categories.filter(
+        Q(name__icontains="اساسيه") | Q(name__icontains="أسا") | Q(name__icontains="مصروف")
+    ).first() or categories.first()
     
     selected_year = request.GET.get('academic_year')
     url_student_id_raw = request.GET.get('student_id') or request.GET.get('student')
     url_student_id = int(url_student_id_raw) if url_student_id_raw and url_student_id_raw.isdigit() else None
     
-    students_query = Student.objects.all()
-    if selected_year: 
-        students_query = students_query.filter(academic_year_id=selected_year)
-    
-    students_list = students_query.only(
-        'id', 'first_name', 'last_name', 'student_code', 'national_id'
-    ).order_by('first_name')
+    # حماية الذاكرة: لا يتم جلب أي طالب إلا بناءً على الطلب المحدد
+    students_list = Student.objects.none()
+    if url_student_id:
+        students_list = Student.objects.filter(id=url_student_id).only('id', 'first_name', 'last_name', 'student_code')
 
+    # 🎯 قراءة الدفتر النشط مرة واحدة فقط لتوظيفه في الـ GET والـ POST معاً
     active_book = ReceiptBook.objects.filter(user=request.user, is_active=True).first()
     next_serial = None
+    
     if active_book:
-        from django.db.models import Max
         max_used = Payment.objects.filter(
             collected_by=request.user, 
             receipt_number__gte=active_book.start_serial, 
             receipt_number__lte=active_book.end_serial
         ).aggregate(max=Max('receipt_number'))['max']
-        next_serial = (max_used + 1) if max_used else active_book.start_serial
+        
+        if max_used:
+            if max_used >= active_book.end_serial:
+                next_serial = active_book.end_serial
+            else:
+                next_serial = max_used + 1
+        else:
+            next_serial = active_book.start_serial
 
+    remaining_balance = Decimal('0.00')
+    total_required = Decimal('0.00')
+    total_paid = Decimal('0.00')
+    total_discount = Decimal('0.00')
+    
+    # 2. معالجة الـ GET وعرض البيانات المالية (تم توفير الكويريز المكررة)
+    if url_student_id:
+        # البحث عن السنة النشطة من الكاش المحلي للمتغير years بدون ضرب الداتابيز بكويري جديدة
+        active_year_obj = next((y for y in years if y.is_active), None)
+        year_filter = selected_year or (active_year_obj.id if active_year_obj else None)
+        
+        if year_filter:
+            st_account = StudentAccount.objects.filter(student_id=url_student_id, academic_year_id=year_filter).first()
+            if st_account:
+                # 💡 تم إزالة refresh_from_db() لأن الحساب مقروء حالاً وطازج من قاعدة البيانات
+                for field_name in ['required_amount', 'total_amount', 'required_fees', 'total_required', 'amount']:
+                    total_required = getattr(st_account, field_name, Decimal('0.00')) or Decimal('0.00')
+                    if total_required > 0: 
+                        break
+                
+                total_paid = getattr(st_account, 'paid_amount', Decimal('0.00')) or Decimal('0.00')
+                total_discount = getattr(st_account, 'discount_amount', Decimal('0.00')) or Decimal('0.00')
+                try: 
+                    remaining_balance = Decimal(str(st_account.total_remaining))
+                except AttributeError: 
+                    remaining_balance = getattr(st_account, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+
+    if remaining_balance < 0: 
+        remaining_balance = Decimal('0.00')
+
+    # 3. معالجة الـ POST الصارم والسريع عند الضغط على حفظ
     if request.method == "POST":
-        from django.db import IntegrityError, connection
-        from finance.models import StudentAccount 
+        # 💡 تم إلغاء الاستعلام المكرر عن active_book والاعتماد التام على القراءة الأولى فوق
+        if not active_book:
+            messages.error(request, "عذراً، لا يوجد دفتر إيصالات نشط حالياً!")
+            return redirect(request.META.get('HTTP_REFERER', 'quick_collection'))
 
         p_student_id = request.POST.get('student')
         category_id = request.POST.get('category')
         amount_raw = request.POST.get('amount')
         receipt_number = request.POST.get('receipt_number')
-        
         raw_year_id = request.POST.get('academic_year')
         p_academic_year_id = int(raw_year_id) if (raw_year_id and raw_year_id.isdigit()) else None
-        
         discount_amount = Decimal(request.POST.get('hidden_discount_value', '0'))
 
         if p_student_id and category_id and amount_raw:
             try:
-                category = get_object_or_404(RevenueCategory, id=category_id)
-                student = get_object_or_404(Student, id=p_student_id)
-                amount_to_pay = Decimal(amount_raw)
-                
-                from django.db.models import Sum, F
-                
-                # --- [تم تهميش شروط المنع بناءً على طلبك] ---
-                # if amount_to_pay > remaining_before:
-                #     messages.error(request, f"فشلت العملية: المبلغ أكبر من المديونية المتبقية.")
-                #     return redirect(request.META.get('HTTP_REFERER', reverse('quick_collection')))
-                # ------------------------------------------
+                # الـ atomic حكر على عملية الإدخال الفعلي والتحديث فقط لضمان سرعة الاستجابة ومنع الـ Lock
+                with transaction.atomic():
+                    category = get_object_or_404(RevenueCategory, id=category_id)
+                    student = get_object_or_404(Student, id=p_student_id)
+                    amount_to_pay = Decimal(amount_raw)
+                    final_academic_year_id = p_academic_year_id or (student.academic_year.id if student.academic_year else None)
 
-                final_academic_year_id = p_academic_year_id or (student.academic_year.id if student.academic_year else None)
-
-                category_name_clean = category.name.replace("أ", "ا").replace("إ", "ا").replace("ة", "ه")
-                final_category = category
-                if any(k in category_name_clean for k in ["اداريه", "فتح ملف", "ايراد حر"]):
-                    final_category, _ = RevenueCategory.objects.get_or_create(name="إيراد حر (رسوم إدارية)")
-
-                try:
-                    payment = Payment.objects.create(
-                        academic_year_id=final_academic_year_id,
-                        student=student,
-                        revenue_category=final_category,
-                        amount_paid=amount_to_pay,
-                        payment_date=timezone.now().date(),
-                        collected_by=request.user,
-                        receipt_number=int(receipt_number) if receipt_number else None,
-                        notes=request.POST.get('notes', '')
-                    )
-                except IntegrityError as e:
-                    if 'receipt_number' in str(e):
-                        with connection.cursor() as cursor:
-                            cursor.execute("SELECT MAX(receipt_number) FROM finance_payment")
-                            max_val = cursor.fetchone()[0] or 0
-                            new_number = max_val + 1
-                        
-                        payment = Payment.objects.create(
-                            academic_year_id=final_academic_year_id,
-                            student=student,
-                            revenue_category=final_category,
-                            amount_paid=amount_to_pay,
-                            payment_date=timezone.now().date(),
-                            collected_by=request.user,
-                            receipt_number=new_number,
-                            notes=request.POST.get('notes', '') + " (تصحيح آلي)"
-                        )
-                        receipt_number = new_number
+                    final_receipt_no = int(receipt_number) if receipt_number and receipt_number.isdigit() else None
+                    
+                    if final_receipt_no:
+                        if final_receipt_no < active_book.start_serial or final_receipt_no > active_book.end_serial:
+                            messages.error(request, f"رقم الإيصال ({final_receipt_no}) خارج نطاق دفترك المعتمد ({active_book.start_serial} - {active_book.end_serial})!")
+                            return redirect(request.META.get('HTTP_REFERER', 'quick_collection'))
                     else:
-                        raise e
+                        messages.error(request, "خطأ في رقم الإيصال.")
+                        return redirect(request.META.get('HTTP_REFERER', 'quick_collection'))
 
-                if discount_amount > 0:
-                    discount_cat, _ = RevenueCategory.objects.get_or_create(name="خصم مصروفات (كوبون)")
-                    Payment.objects.create(
-                        academic_year_id=final_academic_year_id,
-                        student=student,
-                        revenue_category=discount_cat, 
-                        amount_paid=discount_amount,
-                        payment_date=timezone.now().date(), 
-                        collected_by=request.user,
-                        receipt_number=None,
-                        notes=f"خصم تابع للإيصال رقم {receipt_number}"
-                    )
+                    try:
+                        payment = Payment.objects.create(
+                            academic_year_id=final_academic_year_id, student=student, revenue_category=category,
+                            amount_paid=amount_to_pay, payment_date=timezone.now().date(), collected_by=request.user,
+                            receipt_number=final_receipt_no, notes=request.POST.get('notes', '')
+                        )
+                    except IntegrityError as e:
+                        if 'receipt_number' in str(e):
+                            with connection.cursor() as cursor:
+                                cursor.execute("SELECT MAX(receipt_number) FROM finance_payment")
+                                max_val = cursor.fetchone()[0] or 0
+                                new_number = max_val + 1
+                            
+                            if new_number > active_book.end_serial:
+                                messages.error(request, "خطأ حرج: الرقم التسلسلي التالي يتجاوز حدود نهاية هذا الدفتر!")
+                                return redirect(request.META.get('HTTP_REFERER', 'quick_collection'))
 
-                # تحديث المتبقي النهائي للتحقق من التصفير
-                st_account = StudentAccount.objects.filter(student=student).first()
-                if st_account: 
-                    st_account.refresh_from_db()
-                    remaining_after = st_account.total_remaining
-                else:
-                    remaining_after = student.final_remaining
-                
-                messages.success(request, f"تم تحصيل {amount_to_pay} ج.م بنجاح. المتبقي: {remaining_after} ج.م")
-                
-                # --- [منطق التحويل الجديد] ---
-                # إذا تم تصفير المديونية (صفر أو أقل)، يتم التحويل لشاشة الطلاب مع تمرير الـ ID للوميض
-                if remaining_after <= 0:
-                    # هيرجع لنفس الصفحة اللي عمل منها الدفع بالضبط ويعمل لها Refresh
-                    return redirect(request.META.get('HTTP_REFERER', '/'))
-                                
-                # إذا لم تصفر، ابقَ في نفس الشاشة
-                redirect_url = reverse('quick_collection') + f"?student_id={p_student_id}"
-                if p_academic_year_id:
-                    redirect_url += f"&academic_year={p_academic_year_id}"
-                
-                return redirect(redirect_url)
+                            payment = Payment.objects.create(
+                                academic_year_id=final_academic_year_id, student=student, revenue_category=category,
+                                amount_paid=amount_to_pay, payment_date=timezone.now().date(), collected_by=request.user,
+                                receipt_number=new_number, notes=request.POST.get('notes', '') + " (تصحيح آلي)"
+                            )
+                            final_receipt_no = new_number
+                        else: 
+                            raise e
+
+                    # غلق الدفتر بكفاءة باستعلام تحديث مباشر وبدون تحميل أوبجكت كامل للميموري
+                    if final_receipt_no and final_receipt_no >= active_book.end_serial:
+                        ReceiptBook.objects.filter(id=active_book.id).update(is_active=False)
+                        messages.warning(request, "تنبيه: تم استخدام آخر إيصال وإغلاق الدفتر بنجاح.")
+
+                    if discount_amount > 0:
+                        discount_cat, _ = RevenueCategory.objects.get_or_create(name="خصم مصروفات (كوبون)")
+                        Payment.objects.create(
+                            academic_year_id=final_academic_year_id, student=student, revenue_category=discount_cat, 
+                            amount_paid=discount_amount, payment_date=timezone.now().date(), collected_by=request.user,
+                            receipt_number=None, notes=f"خصم تابع للإيصال رقم {final_receipt_no}"
+                        )
+
+                    return redirect(reverse('quick_collection') + f"?student_id={p_student_id}&page_num={current_page}")
 
             except Exception as e:
-                messages.error(request, f"خطأ غير متوقع: {str(e)}")
+                messages.error(request, f"خطأ: {str(e)}")
 
-    last_payment = Payment.objects.filter(collected_by=request.user).order_by('-id').first()
+    # جلب آخر إيصال لتقديمه في الـ Context للموظف
+    last_payment = Payment.objects.filter(collected_by=request.user).order_by('-id').only('id', 'receipt_number', 'amount_paid').first()
     
     return render(request, 'finance/quick_collection.html', {
-        'years': years, 
-        'categories': categories, 
-        'students': students_list,
-        'default_category': default_category, 
-        'selected_year': selected_year,
-        'selected_student_id': url_student_id, 
-        'active_book': active_book, 
-        'next_serial': next_serial,
-        'next_url': next_url,
-        'last_payment': last_payment
+        'years': years, 'categories': categories, 'students': students_list,
+        'default_category': default_category, 'selected_year': selected_year,
+        'selected_student_id': url_student_id, 'active_book': active_book, 'next_serial': next_serial,
+        'next_url': next_url, 'last_payment': last_payment, 'remaining_balance': remaining_balance,
+        'total_required': total_required, 'total_paid': total_paid, 'total_discount': total_discount,
+        'current_page': current_page
     })
     
+    
+# @login_required
+# @transaction.atomic
+# def quick_collection(request):
+#     # 1. جلب البيانات الأساسية بسرعة مع الترتيب المفهرس
+#     years = AcademicYear.objects.all().order_by('-is_active', '-name')
+#     categories = RevenueCategory.objects.all()
+    
+#     next_url = request.GET.get('next') or request.POST.get('next')
+#     current_page = request.GET.get('page_num') or request.POST.get('page_num') or '1'
+    
+#     # تأمين جلب الفئة الافتراضية بجميع مسمياتها
+#     default_category = categories.filter(name__icontains="اساسيه").first() or \
+#                        categories.filter(name__icontains="أسا").first() or \
+#                        categories.filter(name__icontains="مصروف").first() or \
+#                        categories.first()
+    
+#     selected_year = request.GET.get('academic_year')
+#     url_student_id_raw = request.GET.get('student_id') or request.GET.get('student')
+#     url_student_id = int(url_student_id_raw) if url_student_id_raw and url_student_id_raw.isdigit() else None
+    
+#     students_query = Student.objects.all()
+#     if selected_year: 
+#         students_query = students_query.filter(academic_year_id=selected_year)
+    
+#     students_list = students_query.only(
+#         'id', 'first_name', 'last_name', 'student_code', 'national_id'
+#     ).order_by('first_name')
+
+#     # 2. حساب المسلسل القادم لدفتر الإيصالات
+#     active_book = ReceiptBook.objects.filter(user=request.user, is_active=True).first()
+#     next_serial = None
+#     if active_book:
+#         from django.db.models import Max
+#         max_used = Payment.objects.filter(
+#             collected_by=request.user, 
+#             receipt_number__gte=active_book.start_serial, 
+#             receipt_number__lte=active_book.end_serial
+#         ).aggregate(max=Max('receipt_number'))['max']
+        
+#         if max_used:
+#             # خاصية هامة: إذا تخطى السيريال نطاق الدفتر يتم غلقه تلقائياً لحماية الموظف
+#             if max_used >= active_book.end_serial:
+#                 active_book.is_active = False
+#                 active_book.save()
+#                 active_book = None
+#                 messages.warning(request, "تنبيه: دفتر الإيصالات الحالي قد انتهى بالكامل! يرجى فتح دفتر جديد.")
+#             else:
+#                 next_serial = max_used + 1
+#         else:
+#             next_serial = active_book.start_serial
+
+#     # إعداد العدادات المالية الافتراضية السريعة O(1)
+#     remaining_balance = Decimal('0.00')
+#     total_required = Decimal('0.00')
+#     total_paid = Decimal('0.00')
+#     total_discount = Decimal('0.00')
+    
+#     # 3. معالجة طلب الـ GET وعرض بيانات الطالب المالية بأمان تام (للقراءة فقط)
+#     if url_student_id:
+#         year_filter = selected_year or (years.filter(is_active=True).first().id if years.filter(is_active=True).exists() else None)
+        
+#         if year_filter:
+#             st_account = StudentAccount.objects.filter(student_id=url_student_id, academic_year_id=year_filter).first()
+            
+#             if st_account:
+#                 st_account.refresh_from_db()
+                
+#                 for field_name in ['required_amount', 'total_amount', 'required_fees', 'total_required', 'amount']:
+#                     total_required = getattr(st_account, field_name, Decimal('0.00')) or Decimal('0.00')
+#                     if total_required > 0:
+#                         break
+                
+#                 total_paid = getattr(st_account, 'paid_amount', Decimal('0.00')) or Decimal('0.00')
+#                 total_discount = getattr(st_account, 'discount_amount', Decimal('0.00')) or Decimal('0.00')
+                
+#                 # جلب قيمة المتبقي للقراءة فقط لمنع استدعاء أي Setter خاطئ
+#                 try:
+#                     remaining_balance = Decimal(str(st_account.total_remaining))
+#                 except AttributeError:
+#                     remaining_balance = getattr(st_account, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+#             else:
+#                 student_obj = Student.objects.filter(id=url_student_id).first()
+#                 if student_obj:
+#                     total_required = getattr(student_obj, 'required_amount', Decimal('0.00')) or \
+#                                      getattr(student_obj, 'total_required', Decimal('0.00')) or Decimal('0.00')
+#                     try:
+#                         remaining_balance = Decimal(str(student_obj.absolute_remaining))
+#                     except AttributeError:
+#                         remaining_balance = getattr(student_obj, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+#                     total_paid = total_required - remaining_balance
+
+#     if remaining_balance < 0:
+#         remaining_balance = Decimal('0.00')
+
+#     # 4. معالجة طلب الـ POST وحفظ التحصيل والخصومات
+#     if request.method == "POST":
+#         p_student_id = request.POST.get('student')
+#         category_id = request.POST.get('category')
+#         amount_raw = request.POST.get('amount')
+#         receipt_number = request.POST.get('receipt_number')
+        
+#         raw_year_id = request.POST.get('academic_year')
+#         p_academic_year_id = int(raw_year_id) if (raw_year_id and raw_year_id.isdigit()) else None
+#         discount_amount = Decimal(request.POST.get('hidden_discount_value', '0'))
+
+#         if p_student_id and category_id and amount_raw:
+#             try:
+#                 category = get_object_or_404(RevenueCategory, id=category_id)
+#                 student = get_object_or_404(Student, id=p_student_id)
+#                 amount_to_pay = Decimal(amount_raw)
+                
+#                 final_academic_year_id = p_academic_year_id or (student.academic_year.id if student.academic_year else None)
+
+#                 category_name_clean = category.name.replace("أ", "ا").replace("إ", "ا").replace("ة", "ه")
+#                 final_category = category
+#                 if any(k in category_name_clean for k in ["اداريه", "فتح ملف", "ايراد حر"]):
+#                     final_category, _ = RevenueCategory.objects.get_or_create(name="إيراد حر (رسوم إدارية)")
+
+#                 # تأمين وحماية: التحقق من أن الرقم المدخل لا يتخطى حدود الدفتر النشط حالياً
+#                 final_receipt_no = int(receipt_number) if receipt_number and receipt_number.isdigit() else None
+#                 if active_book and final_receipt_no:
+#                     if final_receipt_no < active_book.start_serial or final_receipt_no > active_book.end_serial:
+#                         messages.error(request, f"خطأ: رقم الإيصال {final_receipt_no} خارج نطاق الدفتر الحالي ({active_book.start_serial} - {active_book.end_serial})")
+#                         return redirect(request.META.get('HTTP_REFERER', 'quick_collection'))
+
+#                 try:
+#                     payment = Payment.objects.create(
+#                         academic_year_id=final_academic_year_id,
+#                         student=student,
+#                         revenue_category=final_category,
+#                         amount_paid=amount_to_pay,
+#                         payment_date=timezone.now().date(),
+#                         collected_by=request.user,
+#                         receipt_number=final_receipt_no,
+#                         notes=request.POST.get('notes', '')
+#                     )
+#                 except IntegrityError as e:
+#                     if 'receipt_number' in str(e):
+#                         with connection.cursor() as cursor:
+#                             cursor.execute("SELECT MAX(receipt_number) FROM finance_payment")
+#                             max_val = cursor.fetchone()[0] or 0
+#                             new_number = max_val + 1
+                        
+#                         payment = Payment.objects.create(
+#                             academic_year_id=final_academic_year_id,
+#                             student=student,
+#                             revenue_category=final_category,
+#                             amount_paid=amount_to_pay,
+#                             payment_date=timezone.now().date(),
+#                             collected_by=request.user,
+#                             receipt_number=new_number,
+#                             notes=request.POST.get('notes', '') + " (تصحيح آلي)"
+#                         )
+#                         receipt_number = new_number
+#                     else:
+#                         raise e
+
+#                 if discount_amount > 0:
+#                     discount_cat, _ = RevenueCategory.objects.get_or_create(name="خصم مصروفات (كوبون)")
+#                     Payment.objects.create(
+#                         academic_year_id=final_academic_year_id,
+#                         student=student,
+#                         revenue_category=discount_cat, 
+#                         amount_paid=discount_amount,
+#                         payment_date=timezone.now().date(), 
+#                         collected_by=request.user,
+#                         receipt_number=None,
+#                         notes=f"خصم تابع للإيصال رقم {receipt_number}"
+#                     )
+
+#                 # 🎯 حماية مطلقة: حساب المتبقي الحقيقي بعد الحفظ مباشرة عبر الاستعلام المباشر من الداتابيز لتفادي الـ Setter تماماً
+#                 remaining_after = Decimal('0.00')
+#                 st_account_after = StudentAccount.objects.filter(student=student, academic_year_id=final_academic_year_id).first()
+#                 if st_account_after:
+#                     st_account_after.refresh_from_db()
+#                     try:
+#                         # جلب القيمة نصياً أولاً ثم تحويلها لضمان عدم تفعيل الـ property setter
+#                         remaining_after = Decimal(str(st_account_after.total_remaining))
+#                     except Exception:
+#                         remaining_after = getattr(st_account_after, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+                
+#                 if remaining_after < 0:
+#                     remaining_after = Decimal('0.00')
+
+#                 messages.success(request, f"تم تحصيل {amount_to_pay} ج.م بنجاح. رقم الإيصال: {receipt_number or 'لا يوجد'} - المتبقي الحالي: {remaining_after} ج.م")
+                
+#                 if remaining_after <= 0:
+#                     return redirect(reverse('student_list') + f'?page=1&highlight={p_student_id}')
+                                
+#                 redirect_url = reverse('quick_collection') + f"?student_id={p_student_id}&page_num={current_page}"
+#                 if p_academic_year_id:
+#                     redirect_url += f"&academic_year={p_academic_year_id}"
+                
+#                 return redirect(redirect_url)
+
+#             except Exception as e:
+#                 messages.error(request, f"خطأ غير متوقع أثناء الحفظ: {str(e)}")
+
+#     # 🎯 التأمين الشامل هنا: جلب آخر إيصال وإذا لم يوجد لا ينهار النظام
+#     last_payment = Payment.objects.filter(collected_by=request.user).order_by('-id').first()
+    
+#     return render(request, 'finance/quick_collection.html', {
+#         'years': years, 
+#         'categories': categories, 
+#         'students': students_list,
+#         'default_category': default_category, 
+#         'selected_year': selected_year,
+#         'selected_student_id': url_student_id, 
+#         'active_book': active_book, 
+#         'next_serial': next_serial,
+#         'next_url': next_url,
+#         'last_payment': last_payment, 
+#         'remaining_balance': remaining_balance,
+#         'total_required': total_required,
+#         'total_paid': total_paid,
+#         'total_discount': total_discount,
+#         'current_page': current_page
+#     })
+    
+    
+# @login_required
+# @transaction.atomic
+# def quick_collection(request):
+#     # 1. جلب البيانات الأساسية بسرعة مع الترتيب المفهرس
+#     years = AcademicYear.objects.all().order_by('-is_active', '-name')
+#     categories = RevenueCategory.objects.all()
+    
+#     next_url = request.GET.get('next') or request.POST.get('next')
+#     current_page = request.GET.get('page_num') or request.POST.get('page_num') or '1'
+    
+#     # تأمين جلب الفئة الافتراضية بجميع مسمياتها
+#     default_category = categories.filter(name__icontains="اساسيه").first() or \
+#                        categories.filter(name__icontains="أسا").first() or \
+#                        categories.filter(name__icontains="مصروف").first() or \
+#                        categories.first()
+    
+#     selected_year = request.GET.get('academic_year')
+#     url_student_id_raw = request.GET.get('student_id') or request.GET.get('student')
+#     url_student_id = int(url_student_id_raw) if url_student_id_raw and url_student_id_raw.isdigit() else None
+    
+#     students_query = Student.objects.all()
+#     if selected_year: 
+#         students_query = students_query.filter(academic_year_id=selected_year)
+    
+#     students_list = students_query.only(
+#         'id', 'first_name', 'last_name', 'student_code', 'national_id'
+#     ).order_by('first_name')
+
+#     # 2. حساب المسلسل القادم لدفتر الإيصالات
+#     active_book = ReceiptBook.objects.filter(user=request.user, is_active=True).first()
+#     next_serial = None
+#     if active_book:
+#         from django.db.models import Max
+#         max_used = Payment.objects.filter(
+#             collected_by=request.user, 
+#             receipt_number__gte=active_book.start_serial, 
+#             receipt_number__lte=active_book.end_serial
+#         ).aggregate(max=Max('receipt_number'))['max']
+#         next_serial = (max_used + 1) if max_used else active_book.start_serial
+
+#     # إعداد العدادات المالية الافتراضية السريعة O(1)
+#     remaining_balance = Decimal('0.00')
+#     total_required = Decimal('0.00')
+#     total_paid = Decimal('0.00')
+#     total_discount = Decimal('0.00')
+    
+#     # 3. معالجة طلب الـ GET وعرض بيانات الطالب المالية بأمان تام (للقراءة فقط)
+#     if url_student_id:
+#         year_filter = selected_year or (years.filter(is_active=True).first().id if years.filter(is_active=True).exists() else None)
+        
+#         if year_filter:
+#             st_account = StudentAccount.objects.filter(student_id=url_student_id, academic_year_id=year_filter).first()
+            
+#             if st_account:
+#                 st_account.refresh_from_db()
+                
+#                 for field_name in ['required_amount', 'total_amount', 'required_fees', 'total_required', 'amount']:
+#                     total_required = getattr(st_account, field_name, Decimal('0.00')) or Decimal('0.00')
+#                     if total_required > 0:
+#                         break
+                
+#                 total_paid = getattr(st_account, 'paid_amount', Decimal('0.00')) or Decimal('0.00')
+#                 total_discount = getattr(st_account, 'discount_amount', Decimal('0.00')) or Decimal('0.00')
+                
+#                 # جلب قيمة المتبقي للقراءة فقط لمنع استدعاء أي Setter خاطئ
+#                 try:
+#                     remaining_balance = Decimal(str(st_account.total_remaining))
+#                 except AttributeError:
+#                     remaining_balance = getattr(st_account, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+#             else:
+#                 student_obj = Student.objects.filter(id=url_student_id).first()
+#                 if student_obj:
+#                     total_required = getattr(student_obj, 'required_amount', Decimal('0.00')) or \
+#                                      getattr(student_obj, 'total_required', Decimal('0.00')) or Decimal('0.00')
+#                     try:
+#                         remaining_balance = Decimal(str(student_obj.absolute_remaining))
+#                     except AttributeError:
+#                         remaining_balance = getattr(student_obj, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+#                     total_paid = total_required - remaining_balance
+
+#     if remaining_balance < 0:
+#         remaining_balance = Decimal('0.00')
+
+#     # 4. معالجة طلب الـ POST وحفظ التحصيل والخصومات
+#     if request.method == "POST":
+#         p_student_id = request.POST.get('student')
+#         category_id = request.POST.get('category')
+#         amount_raw = request.POST.get('amount')
+#         receipt_number = request.POST.get('receipt_number')
+        
+#         raw_year_id = request.POST.get('academic_year')
+#         p_academic_year_id = int(raw_year_id) if (raw_year_id and raw_year_id.isdigit()) else None
+#         discount_amount = Decimal(request.POST.get('hidden_discount_value', '0'))
+
+#         if p_student_id and category_id and amount_raw:
+#             try:
+#                 category = get_object_or_404(RevenueCategory, id=category_id)
+#                 student = get_object_or_404(Student, id=p_student_id)
+#                 amount_to_pay = Decimal(amount_raw)
+                
+#                 final_academic_year_id = p_academic_year_id or (student.academic_year.id if student.academic_year else None)
+
+#                 category_name_clean = category.name.replace("أ", "ا").replace("إ", "ا").replace("ة", "ه")
+#                 final_category = category
+#                 if any(k in category_name_clean for k in ["اداريه", "فتح ملف", "ايراد حر"]):
+#                     final_category, _ = RevenueCategory.objects.get_or_create(name="إيراد حر (رسوم إدارية)")
+
+#                 try:
+#                     payment = Payment.objects.create(
+#                         academic_year_id=final_academic_year_id,
+#                         student=student,
+#                         revenue_category=final_category,
+#                         amount_paid=amount_to_pay,
+#                         payment_date=timezone.now().date(),
+#                         collected_by=request.user,
+#                         receipt_number=int(receipt_number) if receipt_number else None,
+#                         notes=request.POST.get('notes', '')
+#                     )
+#                 except IntegrityError as e:
+#                     if 'receipt_number' in str(e):
+#                         with connection.cursor() as cursor:
+#                             cursor.execute("SELECT MAX(receipt_number) FROM finance_payment")
+#                             max_val = cursor.fetchone()[0] or 0
+#                             new_number = max_val + 1
+                        
+#                         payment = Payment.objects.create(
+#                             academic_year_id=final_academic_year_id,
+#                             student=student,
+#                             revenue_category=final_category,
+#                             amount_paid=amount_to_pay,
+#                             payment_date=timezone.now().date(),
+#                             collected_by=request.user,
+#                             receipt_number=new_number,
+#                             notes=request.POST.get('notes', '') + " (تصحيح آلي)"
+#                         )
+#                         receipt_number = new_number
+#                     else:
+#                         raise e
+
+#                 if discount_amount > 0:
+#                     discount_cat, _ = RevenueCategory.objects.get_or_create(name="خصم مصروفات (كوبون)")
+#                     Payment.objects.create(
+#                         academic_year_id=final_academic_year_id,
+#                         student=student,
+#                         revenue_category=discount_cat, 
+#                         amount_paid=discount_amount,
+#                         payment_date=timezone.now().date(), 
+#                         collected_by=request.user,
+#                         receipt_number=None,
+#                         notes=f"خصم تابع للإيصال رقم {receipt_number}"
+#                     )
+
+#                 # 🎯 حماية مطلقة: حساب المتبقي الحقيقي بعد الحفظ مباشرة عبر الاستعلام المباشر من الداتابيز لتفادي الـ Setter تماماً
+#                 remaining_after = Decimal('0.00')
+#                 st_account_after = StudentAccount.objects.filter(student=student, academic_year_id=final_academic_year_id).first()
+#                 if st_account_after:
+#                     st_account_after.refresh_from_db()
+#                     try:
+#                         # جلب القيمة نصياً أولاً ثم تحويلها لضمان عدم تفعيل الـ property setter
+#                         remaining_after = Decimal(str(st_account_after.total_remaining))
+#                     except Exception:
+#                         remaining_after = getattr(st_account_after, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+                
+#                 if remaining_after < 0:
+#                     remaining_after = Decimal('0.00')
+
+#                 messages.success(request, f"تم تحصيل {amount_to_pay} ج.م بنجاح. المتبقي الحالي: {remaining_after} ج.م")
+                
+#                 if remaining_after <= 0:
+#                     return redirect(reverse('student_list') + f'?page=1&highlight={p_student_id}')
+                                
+#                 redirect_url = reverse('quick_collection') + f"?student_id={p_student_id}&page_num={current_page}"
+#                 if p_academic_year_id:
+#                     redirect_url += f"&academic_year={p_academic_year_id}"
+                
+#                 return redirect(redirect_url)
+
+#             except Exception as e:
+#                 messages.error(request, f"خطأ غير متوقع أثناء الحفظ: {str(e)}")
+
+#     # 🎯 التأمين الشامل هنا: جلب آخر إيصال وإذا لم يوجد لا ينهار النظام
+#     last_payment = Payment.objects.filter(collected_by=request.user).order_by('-id').first()
+    
+#     return render(request, 'finance/quick_collection.html', {
+#         'years': years, 
+#         'categories': categories, 
+#         'students': students_list,
+#         'default_category': default_category, 
+#         'selected_year': selected_year,
+#         'selected_student_id': url_student_id, 
+#         'active_book': active_book, 
+#         'next_serial': next_serial,
+#         'next_url': next_url,
+#         'last_payment': last_payment, 
+#         'remaining_balance': remaining_balance,
+#         'total_required': total_required,
+#         'total_paid': total_paid,
+#         'total_discount': total_discount,
+#         'current_page': current_page
+#     })
+
+
+# from django.urls import reverse
+
 # @login_required
 # @transaction.atomic
 # def quick_collection(request):
@@ -1253,35 +1753,6 @@ def quick_collection(request):
 #                 student = get_object_or_404(Student, id=p_student_id)
 #                 amount_to_pay = Decimal(amount_raw)
                 
-#                 from django.db.models import Sum, F
-                
-#                 installments = StudentInstallment.objects.filter(student=student)
-                
-#                 if installments.exists():
-#                     data = installments.aggregate(remaining=Sum(F('amount_due') - F('paid_amount')))
-#                     remaining_before = data['remaining'] or Decimal("0.00")
-#                 else:
-#                     st_account_latest = StudentAccount.objects.filter(student=student).first()
-#                     if st_account_latest:
-#                         total_fees = st_account_latest.net_fees 
-#                         actual_payments_sum = Payment.objects.filter(student=student).aggregate(Sum('amount_paid'))['amount_paid__sum'] or Decimal("0.00")
-#                         old_debt = getattr(student, 'previous_debt', Decimal("0.00")) or Decimal("0.00")
-#                         remaining_before = (total_fees + old_debt) - actual_payments_sum
-#                     else:
-#                         remaining_before = Decimal("0.00")
-
-#                 total_abs = getattr(student, 'total_absolute_remaining', Decimal("0.00"))
-#                 final_rem = getattr(student, 'final_remaining', Decimal("0.00"))
-#                 remaining_before = max(remaining_before, total_abs, final_rem)
-
-#                 if amount_to_pay > remaining_before:
-#                     messages.error(request, f"فشلت العملية: المبلغ ({amount_to_pay}) أكبر من المديونية المتبقية ({remaining_before}).")
-#                     return redirect(request.META.get('HTTP_REFERER', reverse('quick_collection')))
-
-#                 if remaining_before <= 0:
-#                     messages.error(request, f"مديونية الطالب مسددة بالكامل.")
-#                     return redirect(request.META.get('HTTP_REFERER', reverse('quick_collection')))
-
 #                 final_academic_year_id = p_academic_year_id or (student.academic_year.id if student.academic_year else None)
 
 #                 category_name_clean = category.name.replace("أ", "ا").replace("إ", "ا").replace("ة", "ه")
@@ -1334,14 +1805,25 @@ def quick_collection(request):
 #                         notes=f"خصم تابع للإيصال رقم {receipt_number}"
 #                     )
 
-#                 # تحديث المتبقي النهائي للرسالة
-#                 st_account = StudentAccount.objects.filter(student=student).first()
+#                 # 💡 التعديل الجوهري: جلب الحساب المالي للسنة الدراسية الصحيحة الخاصة بالإيصال الحالي
+#                 st_account = StudentAccount.objects.filter(
+#                     student=student, 
+#                     academic_year_id=final_academic_year_id
+#                 ).first()
+                
 #                 if st_account: 
 #                     st_account.refresh_from_db()
-#                 remaining_after = st_account.total_remaining if st_account else student.final_remaining
+#                     remaining_after = st_account.total_remaining
+#                 else:
+#                     remaining_after = getattr(student, 'final_remaining', 0)
                 
-#                 messages.success(request, f"تم تحصيل {amount_to_pay} ج.م بنجاح. المتبقي: {remaining_after} ج.م")
+#                 messages.success(request, f"تم تحصيل {amount_to_pay} ج.م بنجاح. المتبقي الحالي: {remaining_after} ج.م")
                 
+#                 # 🎯 الفحص الصارم: لا يتم الخروج والتحويل لصفحة سجل الطلاب إلا لو تصفّرت المديونية تماماً (0 أو أقل)
+#                 if remaining_after <= 0:
+#                     return redirect(reverse('student_list') + f'?page=1&success_id={p_student_id}')
+                                
+#                 # طالما لسه باقي مديونية (أكبر من 0)، يعيد تحميل نفس شاشة التحصيل السريع للاستكمال بدون أي اختفاء
 #                 redirect_url = reverse('quick_collection') + f"?student_id={p_student_id}"
 #                 if p_academic_year_id:
 #                     redirect_url += f"&academic_year={p_academic_year_id}"
@@ -1364,7 +1846,8 @@ def quick_collection(request):
 #         'next_serial': next_serial,
 #         'next_url': next_url,
 #         'last_payment': last_payment
-#     })    
+#     })
+
     
     
 @staff_member_required
@@ -2114,48 +2597,77 @@ def generate_installments_view(request, account_id):
         messages.error(request, f"❌ حدث خطأ تقني أثناء التوليد: {str(e)}")
         return redirect('finance_dashboard')    
 
+
+
+    
 def get_student_balance(request, student_id):
     try:
         from django.http import JsonResponse
         from finance.models import StudentInstallment, StudentAccount, Payment
-        from django.db.models import Sum, F
+        from django.db.models import Sum
         from students.models import Student
         from decimal import Decimal
 
         # 1. جلب بيانات الطالب
         student = Student.objects.get(id=student_id)
         
-        # 2. التحقق من وجود أقساط مسكنة للطالب
+        # جلب السنة الدراسية النشطة حالياً في النظام
+        from finance.models import AcademicYear
+        active_year = AcademicYear.objects.filter(is_active=True).first()
+        year_filter = active_year.id if active_year else None
+
+        # 2. حساب إجمالي المدفوعات الحية الحالية والخصومات من جدول الـ Payment مباشرة
+        # (هذا الجدول هو مصدر الثقة والأمان لأنه معزول عن مشاكل كاش الأقساط والحسابات)
+        payment_query = Payment.objects.filter(student_id=student_id, is_cancelled=False)
+        if year_filter:
+            payment_query = payment_query.filter(academic_year_id=year_filter)
+
+        actual_payments_sum = payment_query.exclude(
+            revenue_category__name__icontains="خصم"
+        ).aggregate(sum=Sum('amount_paid'))['sum'] or Decimal("0.00")
+
+        actual_discounts_sum = payment_query.filter(
+            revenue_category__name__icontains="خصم"
+        ).aggregate(sum=Sum('amount_paid'))['sum'] or Decimal("0.00")
+
+        # 3. التحقق من وجود أقساط مسكنة للطالب لبيان إجمالي المطلوب
         installments = StudentInstallment.objects.filter(student_id=student_id)
         
-        if installments.exists():
-            # إذا كان الطالب مسكناً، نحسب المديونية من الأقساط مباشرة
-            # المديونية = مجموع (المبلغ المطلوب - المبلغ المدفوع داخل القسط)
-            # هذا يضمن أن الرقم (13000) سيظهر كاملاً إذا لم يسدد الطالب شيئاً من الأقساط الجديدة
-            data = installments.aggregate(
-                remaining=Sum(F('amount_due') - F('paid_amount'))
-            )
-            net_remaining = data['remaining'] or Decimal("0.00")
-        else:
-            # 3. إذا لم يتم التسكين بعد، نستخدم الحساب التقليدي (الرسوم - المدفوعات)
-            student_account = StudentAccount.objects.filter(student_id=student_id).first()
-            if student_account:
-                # نعتمد على صافي الرسوم في الحساب (بعد الخصم)
-                total_fees = student_account.net_fees 
-                actual_payments_sum = Payment.objects.filter(
-                    student_id=student_id
-                ).aggregate(Sum('amount_paid'))['amount_paid__sum'] or Decimal("0.00")
-                
-                old_debt = getattr(student, 'previous_debt', Decimal("0.00")) or Decimal("0.00")
-                net_remaining = (total_fees + old_debt) - actual_payments_sum
-            else:
-                net_remaining = Decimal("0.00")
+        # جلب الحساب المالي للطالب
+        student_account = StudentAccount.objects.filter(student_id=student_id)
+        if year_filter:
+            student_account = student_account.filter(academic_year_id=year_filter)
+        student_account = student_account.first()
 
-        # 4. جلب الرسوم الإدارية من خطة الطالب
+        if installments.exists():
+            # 🔥 الحل العبقري: المطلوب هو مجموع مبالغ الأقساط المستحقة (amount_due) حياً
+            total_required = installments.aggregate(sum=Sum('amount_due'))['sum'] or Decimal("0.00")
+            
+            # المتبقي الفعلي = إجمالي الأقساط المطلوبة - المدفوعات الحية - الخصومات الحية
+            net_remaining = total_required - actual_payments_sum - actual_discounts_sum
+        else:
+            # 4. إذا لم يتم التسكين بعد، نستخدم الحساب التقليدي الحسابي من الموديل
+            if student_account:
+                # نعتمد على صافي الرسوم في الحساب (بعد الخصم إن وجد)
+                total_fees = getattr(student_account, 'net_fees', Decimal("0.00")) or \
+                             getattr(student_account, 'required_amount', Decimal("0.00")) or Decimal("0.00")
+                
+                old_debt = getattr(student, 'previous_debt', Decimal("0.00")) or \
+                           getattr(student, 'old_debt', Decimal("0.00")) or Decimal("0.00")
+                
+                net_remaining = (total_fees + old_debt) - actual_payments_sum - actual_discounts_sum
+            else:
+                # خطة الطوارئ האחيرة في حال عدم وجود أي سجل مالي
+                net_remaining = getattr(student, 'final_remaining', Decimal("0.00")) or Decimal("0.00")
+
+        # 5. جلب الرسوم الإدارية من خطة الطالب
         admin_fee = 0
-        student_account = StudentAccount.objects.filter(student_id=student_id).first()
         if student_account and student_account.installment_plan:
             admin_fee = student_account.installment_plan.administrative_fee
+
+        # تأمين ألا يرتد المتبقي بالسالب في الواجهة لأي سبب تنسيقي
+        if net_remaining < 0:
+            net_remaining = Decimal("0.00")
 
         return JsonResponse({
             "success": True,
@@ -2168,51 +2680,7 @@ def get_student_balance(request, student_id):
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)})
     
-    
-# def get_student_balance(request, student_id):
-#     try:
-#         from django.http import JsonResponse
-#         # 💡 أضفنا StudentAccount للاستيراد لكي نصل لخطة الطالب
-#         from finance.models import StudentInstallment, StudentAccount
-#         from django.db.models import Sum
-#         from students.models import Student
 
-#         # 1. جلب بيانات الطالب الأساسية
-#         student = Student.objects.get(id=student_id)
-        
-#         # 2. حساب إجمالي الأقساط (المطلوب سداده فعلياً)
-#         # إحنا هنعتمد على جدول الأقساط لأنه أدق مكان فيه الحسابات دلوقتي
-#         installments = StudentInstallment.objects.filter(student_id=student_id)
-        
-#         total_required = installments.aggregate(Sum('amount_due'))['amount_due__sum'] or 0
-#         total_paid = installments.aggregate(Sum('paid_amount'))['paid_amount__sum'] or 0
-        
-#         # 3. المديونية الصافية = (المطلوب + المديونية القديمة) - المدفوع
-#         # ملاحظة: student.previous_debt قد تكون قيمتها -2.00 كما رأينا في الـ Shell
-#         old_debt = getattr(student, 'previous_debt', 0) or 0
-#         net_remaining = (total_required + old_debt) - total_paid
-
-#         # ==========================================
-#         # 4. 💡 الإضافة الجديدة: جلب الرسوم الإدارية
-#         # ==========================================
-#         admin_fee = 0
-#         # نبحث عن الحساب المالي للطالب لمعرفة خطته الحالية
-#         student_account = StudentAccount.objects.filter(student_id=student_id).first()
-        
-#         if student_account and student_account.installment_plan:
-#             admin_fee = student_account.installment_plan.administrative_fee
-
-#         return JsonResponse({
-#             "success": True,
-#             "current_due": float(net_remaining),    # الرقم في المربع الأحمر
-#             "total_debt": float(net_remaining),     # الرقم في المربع الأزرق
-#             "total_remaining": float(net_remaining),# لضمان عمل الـ JavaScript
-#             "admin_fee": float(admin_fee)           # 👈 تمرير الرسوم الإدارية للشاشة
-#         })
-
-#     except Exception as e:
-#         from django.http import JsonResponse
-#         return JsonResponse({"success": False, "error": str(e)})    
 
 @user_passes_test(superuser_only)
 def print_receipt(request, payment_id):

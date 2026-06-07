@@ -71,8 +71,8 @@ class Student(models.Model):
     image = models.ImageField("صورة الطالب", upload_to="students/", null=True, blank=True)
     # جعلنا رقم القيد اختيارياً وغير فريد (أو فريد مع السماح بالقيم الفارغة)
     registration_number = models.CharField("رقم القيد", max_length=50, blank=True, null=True)
-    first_name = models.CharField("الاسم الأول", max_length=100)
-    last_name = models.CharField("اسم العائلة", max_length=100)
+    first_name = models.CharField("الاسم الأول", max_length=100, db_index=True)
+    last_name = models.CharField("اسم العائلة", max_length=100, db_index=True)
     
     # 1. إضافة الرقم القومي مع التحقق (14 رقم فقط)
     national_id_validator = RegexValidator(
@@ -80,11 +80,8 @@ class Student(models.Model):
         message="الرقم القومي يجب أن يتكون من 14 رقماً فقط."
     )
     national_id = models.CharField(
-        "الرقم القومي", 
-        max_length=14, 
-        validators=[national_id_validator],
-        unique=True,
-        null=True, blank=True
+        "الرقم القومي", max_length=14, validators=[national_id_validator],
+        unique=True, null=True, blank=True
     )
 
     # 2. كود الطالب (تلقائي)
@@ -95,15 +92,8 @@ class Student(models.Model):
     birth_place = models.CharField("محل الميلاد", max_length=150, blank=True, null=True)
     
     # إضافة null و blank للنوع
-    gender = models.CharField(
-        "النوع", 
-        max_length=10, 
-        choices=GENDER_CHOICES, 
-        null=True, 
-        blank=True
-    )
-    
-    religion = models.CharField("الديانة", max_length=20, choices=RELIGION_CHOICES, null=True, blank=True)
+    gender = models.CharField("النوع", max_length=10, choices=GENDER_CHOICES, null=True, blank=True, db_index=True)
+    religion = models.CharField("الديانة", max_length=20, choices=RELIGION_CHOICES, null=True, blank=True, db_index=True)
     nationality = models.CharField("الجنسية", max_length=100, default="مصري", null=True, blank=True)
     address = models.TextField("العنوان", blank=True, null=True)
 
@@ -122,10 +112,9 @@ class Student(models.Model):
     enrollment_status = models.CharField("حالة القيد", max_length=20, choices=STATUS_CHOICES, null=True, blank=True)
     
     # الدمج (BooleanField يفضل أن يكون له default لكن وضعنا null=True ليكون اختيارياً تماماً)
-    integration_status = models.BooleanField("موقف الدمج", default=False, null=True, blank=True)
+    integration_status = models.BooleanField("موقف الدمج", default=False, null=True, blank=True, db_index=True)
     
-    specialization = models.CharField("التخصص", max_length=30, choices=SPECIALIZATION_CHOICES, blank=True, null=True)
-    
+    specialization = models.CharField("التخصص", max_length=30, choices=SPECIALIZATION_CHOICES, blank=True, null=True, db_index=True)
     previous_debt = models.DecimalField("مديونية سابقة مرحلة", max_digits=10, decimal_places=2, default=0)
     last_promotion_date = models.DateField(null=True, blank=True)
     
@@ -140,6 +129,10 @@ class Student(models.Model):
         ordering = ["-created_at"]
         verbose_name = "طالب"
         verbose_name_plural = "الطلاب"
+        # الفهرس المشترك للترتيب السريع في شاشة القائمة
+        indexes = [
+            models.Index(fields=['first_name', 'id']),
+        ]
 
     # ----------------------------------------------------------------
     # 2. الدوال الأساسية (Standard Methods)

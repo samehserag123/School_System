@@ -4,6 +4,7 @@ from .models import (
     Department, AttendanceRule, Employee, 
     FingerprintLog, DailyAttendance, LeaveRequest
 )
+
 # 1. تنسيق عرض الإدارات
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
@@ -94,11 +95,18 @@ class DailyAttendanceAdmin(admin.ModelAdmin):
     status_badge.short_description = "حالة اليوم"
 
 # 6. طلبات الإجازة المربوطة بالأرصدة
+
 @admin.register(LeaveRequest)
 class LeaveRequestAdmin(admin.ModelAdmin):
-    list_display = ('employee', 'leave_type', 'start_date', 'end_date', 'duration', 'status')
+    # تم تغيير 'duration' إلى 'get_duration' لاستدعاء الدالة المخصصة بالأسفل
+    list_display = ('employee', 'leave_type', 'start_date', 'end_date', 'get_duration', 'status')
     list_filter = ('status', 'leave_type')
     actions = ['approve_leaves', 'reject_leaves']
+
+    # 💡 الدالة السحرية لحل خطأ الـ SystemCheckError بنجاح
+    @admin.display(description='مدة الإجازة (أيام)')
+    def get_duration(self, obj):
+        return obj.duration  # تقرأ الـ property المكتوبة في الموديل الخاص بك
 
     def approve_leaves(self, request, queryset):
         # باستخدام دالة الحفظ الفردية لتفعيل منطق خصم رصيد الإجازات التلقائي من موديل LeaveRequest

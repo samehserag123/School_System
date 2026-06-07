@@ -7,166 +7,158 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 <style>
-    /* تصميم كروت الإحصائيات المطور */
     .student-row {
         animation: fadeIn 0.4s ease-in-out;
     }
     .stats-grid {
-        display: flex; /* تحويل الشبكة إلى نظام مرن */
-        justify-content: space-between; /* توزيع المسافات بين الكروت بالتساوي */
-        gap: 10px; /* المسافة بين كل كارت والثاني */
+        display: flex; 
+        justify-content: space-between; 
+        gap: 10px; 
         margin-bottom: 25px;
-        flex-wrap: nowrap; /* منع الكروت من النزول لسطر جديد */
-        overflow-x: auto; /* إضافة شريط تمرير أفقي فقط في الشاشات الصغيرة جداً */
+        flex-wrap: nowrap; 
+        overflow-x: auto; 
         padding-bottom: 10px;
     }
 
     .stat-card {
-        flex: 1; /* جعل كل كارت يأخذ مساحة متساوية تماماً */
-        min-width: 120px; /* الحد الأدنى لعرض الكارت حتى لا يختفي الكلام */
-        background: linear-gradient(145deg, #1e2227, #16191d);
-        border: 1px solid #333;
+        flex: 1; 
+        min-width: 120px; 
+        background: linear-gradient(145deg, #1e2227, #252a30);
+        border: 1px solid #343a40;
         border-radius: 12px;
-        padding: 12px 5px; /* تقليل الحشو الداخلي ليناسب السطر الواحد */
+        padding: 12px 10px;
         text-align: center;
-        transition: all 0.3s ease;
-    }
-    .stat-card:hover {
-        transform: translateY(-5px);
-        border-color: #0dcaf0;
-        box-shadow: 0 5px 15px rgba(13, 202, 240, 0.2);
-    }
-    .stat-card .label { font-size: 0.8rem; color: #aaa; margin-bottom: 8px; font-weight: 500; }
-    .stat-card .value { font-size: 1.5rem; font-weight: 800; color: #fff; }
-    
-    /* أنيميشن بسيط عند تغير الرقم */
-    .number-animate { animation: pulse 0.5s; }
-
-    /* تنسيق الفلتر الجمالي */
-    .filter-section {
-        background: rgba(26, 29, 33, 0.8);
-        backdrop-filter: blur(10px);
-        border-radius: 16px;
-        padding: 20px;
-        margin-bottom: 25px;
-        border: 1px solid #334155;
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-    }
-    .filter-section input, .filter-section select {
-        background-color: #0f1113 !important;
-        border: 1px solid #334155 !important;
-        color: #fff !important;
-        border-radius: 8px !important;
-        transition: all 0.3s;
-    }
-    .filter-section input:focus, .filter-section select:focus {
-        border-color: #0dcaf0 !important;
-        box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.1) !important;
-    }
-
-    /* تنسيق الجدول */
-    .table-container {
-        border-radius: 16px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
         overflow: hidden;
-        border: 1px solid #334155;
-    }
-    #studentTable thead th {
-        background-color: #000;
-        color: #0dcaf0;
-        text-transform: uppercase;
-        font-size: 0.75rem;
-        letter-spacing: 1px;
-        border: none;
-    }
-    .student-row { transition: background 0.2s; border-bottom: 1px solid #2d3238 !important; }
-    .student-row:hover { background: rgba(13, 202, 240, 0.05) !important; }
-    
-    .student-link {
-        color: #0dcaf0;
-        text-decoration: none;
-        font-weight: 600;
-        transition: 0.3s;
-    }
-    .student-link:hover { color: #fff; }
-
-    .badge-status { font-size: 0.7rem; padding: 5px 10px; border-radius: 6px; }
-
-    /* تحسين شكل الترقيم */
-    .pagination .page-link {
-        color: #0dcaf0;
-        background-color: #1e2227;
-        border-color: #334155;
-        transition: all 0.3s;
     }
 
-    .pagination .page-item.active .page-link {
-        background-color: #0dcaf0;
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        border-color: #495057;
+    }
+
+    .stat-card .label {
+        font-size: 0.8rem;
+        color: #adb5bd;
+        margin-bottom: 5px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .stat-card .value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #ffffff;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .stat-card::after {
+        content: '';
+        position: absolute;
+        top: 0; left: -100%;
+        width: 100%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+        transition: 0.5s;
+    }
+    .stat-card:hover::after {
+        left: 100%;
+    }
+
+    .filter-section {
+        background-color: #1a1d21;
+        border: 1px solid #2d3238;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    .filter-section .form-select, .filter-section .form-control {
+        background-color: #212529;
+        border-color: #3d4349;
+        color: #fff;
+    }
+    .filter-section .form-select:focus, .filter-section .form-control:focus {
+        background-color: #252a30;
         border-color: #0dcaf0;
-        color: #000;
+        color: #fff;
+        box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25);
     }
-
-    .pagination .page-link:hover {
-        background-color: #0dcaf0;
-        color: #000;
+    .text-white-hover:hover {
+        color: #0dcaf0 !important;
+        text-decoration: underline !important;
     }
-        /* إجبار الأيقونات على الظهور داخل أزرار الإجراءات */
-    .btn-outline-danger i, .btn-outline-warning i {
-        display: inline-block !important;
-        min-width: 1rem;
-        min-height: 1rem;
-        color: inherit; /* لتأخذ لون الزر الأحمر أو الأصفر */
-    }
-
 </style>
-{% if is_archive %}
-<div class="alert alert-warning border-warning bg-dark text-warning d-flex align-items-center animate__animated animate__fadeIn">
-    <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
-    <div>
-        <strong>وضع الأرشيف:</strong> أنت الآن تتصفح بيانات الطلاب للعام الدراسي <strong>{{ current_year.name }}</strong>. 
-        (للاطلاع فقط)
+
+<!-- عنوان الصفحة والأزرار العلوية -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2 px-3 animate__animated animate__fadeIn">
+    <div class="page-title-box">
+        <h4 class="mb-0 text-white fw-bold">
+            <i class="bi bi-person-badge-fill text-info me-2"></i>
+            سجل بيانات الطلاب المطور
+            {% if is_archive %}
+                <span class="badge bg-warning text-dark fs-6 ms-2">أرشيف مغلق: {{ current_year.name }}</span>
+            {% else %}
+                <span class="badge bg-success fs-6 ms-2">العام الحالي النشط: {{ current_year.name }}</span>
+            {% endif %}
+        </h4>
+    </div>
+    <div class="d-flex gap-2">
+        {% if not is_archive %}
+            <a href="{% url 'add_student' %}" class="btn btn-info btn-sm fw-bold px-3">
+                <i class="bi bi-person-plus-fill me-1"></i> إضافة طالب جديد
+            </a>
+        {% endif %}
+        <a href="#" class="btn btn-secondary btn-sm fw-bold px-3">
+            <i class="bi bi-archive-fill me-1"></i> تصفح الأرشيف والسنوات الماضية
+        </a>
     </div>
 </div>
-{% endif %}
 
+<!-- 1. كروت العدادات الإحصائية السريعة -->
 <div class="container-fluid px-3 animate__animated animate__fadeIn">
     <div class="stats-grid" id="statsContainer">
-        <div class="stat-card" style="border-bottom: 3px solid #0dcaf0;">
+        <div class="stat-card" style="border-bottom: 3px solid #0dcaf0; cursor: pointer;" onclick="filterByQuickStat('all', '')">
             <div class="label">إجمالي الطلاب</div>
             <div class="value counter" id="count-all">{{ stats.total|default:0 }}</div>
         </div>
 
-        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #2ecc71; animation-delay: 0.1s;">
+        <div class="stat-card" style="border-bottom: 3px solid #3498db; cursor: pointer;" onclick="filterByQuickStat('gender', 'Male')">
             <div class="label">بنين</div>
             <div class="value counter" id="count-male">{{ stats.male|default:0 }}</div>
         </div>
 
-        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #f39c12; animation-delay: 0.2s;">
+        <div class="stat-card" style="border-bottom: 3px solid #e74c3c; cursor: pointer;" onclick="filterByQuickStat('gender', 'Female')">
             <div class="label">بنات</div>
             <div class="value counter" id="count-female">{{ stats.female|default:0 }}</div>
         </div>
 
-        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #3498db; animation-delay: 0.3s;">
+        <div class="stat-card" style="border-bottom: 3px solid #2ecc71; cursor: pointer;" onclick="filterByQuickStat('religion', 'Muslim')">
             <div class="label">مسلم</div>
             <div class="value counter" id="count-muslim">{{ stats.muslim|default:0 }}</div>
         </div>
 
-        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #e74c3c; animation-delay: 0.4s;">
+        <div class="stat-card" style="border-bottom: 3px solid #f1c40f; cursor: pointer;" onclick="filterByQuickStat('religion', 'Christian')">
             <div class="label">مسيحي</div>
             <div class="value counter" id="count-christian">{{ stats.christian|default:0 }}</div>
         </div>
 
-        <div class="stat-card animate__animated animate__fadeInDown" style="border-bottom: 3px solid #f1c40f; animation-delay: 0.5s;">
+        <div class="stat-card" style="border-bottom: 3px solid #f39c12; cursor: pointer;" onclick="filterByQuickStat('is_disability', 'true')">
             <div class="label">طلاب الدمج</div>
             <div class="value counter" id="count-integ">{{ stats.integration|default:0 }}</div>
         </div>
     </div>
 </div>
+
+<!-- 2. قسم الفلاتر المتقدمة والبحث اللحظي -->
+<div class="container-fluid px-3">
     <div class="filter-section animate__animated animate__fadeInUp">
         <div class="row g-3">
             <div class="col-md-3">
                 <div class="input-group">
                     <span class="input-group-text bg-transparent border-secondary text-muted"><i class="bi bi-search"></i></span>
-                    <input type="text" id="tableSearch" onkeyup="runFilters()" class="form-control" placeholder="ابحث باسم الطالب أو الرقم القومي...">
+                    <input type="text" id="tableSearch" onkeyup="runFilters()" class="form-control" placeholder="ابحث باسم الطالب أو الرقم القومي..." value="{{ search_query|default:'' }}" autofocus>
                 </div>
             </div>
             <div class="col-md-9">
@@ -174,42 +166,47 @@
                     <div class="col-md-2">
                         <select id="f-grade" onchange="runFilters()" class="form-select form-select-sm">
                             <option value="">الصف الدراسي</option>
-                            {% for grade in all_grades %}<option value="{{ grade.name }}">{{ grade.name }}</option>{% endfor %}
+                            {% for grade in all_grades %}
+                                <option value="{{ grade.id }}" {% if selected_grade == grade.id|stringformat:"i" %}selected{% endif %}>{{ grade.name }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="col-md-2">
                         <select id="f-class" onchange="runFilters()" class="form-select form-select-sm">
                             <option value="">الفصل</option>
-                            {% for classroom in all_classrooms %}<option value="{{ classroom.name }}">{{ classroom.name }}</option>{% endfor %}
+                            {% for classroom in all_classrooms %}
+                                <option value="{{ classroom.id }}" {% if selected_classroom == classroom.id|stringformat:"i" %}selected{% endif %}>{{ classroom.name }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="col-md-2">
                         <select id="f-spec" onchange="runFilters()" class="form-select form-select-sm">
                             <option value="">التخصص</option>
-                            {% for spec_code, spec_name in all_specs %}
-                                <option value="{{ spec_name }}">{{ spec_name }}</option>
-                            {% endfor %}
+                            <option value="General" {% if selected_specialization == 'General' %}selected{% endif %}>شعبة عامة</option>
+                            <option value="Restaurant" {% if selected_specialization == 'Restaurant' %}selected{% endif %}>فني مضيف</option>
+                            <option value="Kitchen" {% if selected_specialization == 'Kitchen' %}selected{% endif %}>فن طاهي</option>
+                            <option value="Internal" {% if selected_specialization == 'Internal' %}selected{% endif %}>مشرف غرف</option>
                         </select>
                     </div>
                     <div class="col-md-2">
                         <select id="f-gender" onchange="runFilters()" class="form-select form-select-sm">
                             <option value="">النوع</option>
-                            <option value="بنين">بنين</option>
-                            <option value="بنات">بنات</option>
+                            <option value="Male" {% if selected_gender == 'Male' %}selected{% endif %}>بنين</option>
+                            <option value="Female" {% if selected_gender == 'Female' %}selected{% endif %}>بنات</option>
                         </select>
                     </div>
                     <div class="col-md-2">
                         <select id="f-religion" onchange="runFilters()" class="form-select form-select-sm">
                             <option value="">الديانة</option>
-                            <option value="مسلم">مسلم</option>
-                            <option value="مسيحي">مسيحي</option>
+                            <option value="Muslim" {% if selected_religion == 'Muslim' %}selected{% endif %}>مسلم</option>
+                            <option value="Christian" {% if selected_religion == 'Christian' %}selected{% endif %}>مسيحي</option>
                         </select>
                     </div>
                     <div class="col-md-2">
                         <select id="f-integ" onchange="runFilters()" class="form-select form-select-sm">
                             <option value="">الدمج</option>
-                            <option value="نعم">دمج</option>
-                            <option value="لا">عادي</option>
+                            <option value="true" {% if selected_is_disability == 'true' %}selected{% endif %}>دمج</option>
+                            <option value="false" {% if selected_is_disability == 'false' %}selected{% endif %}>عادي</option>
                         </select>
                     </div>
                 </div>
@@ -217,157 +214,273 @@
         </div>
     </div>
 
-    <div class="table-container shadow-lg animate__animated animate__fadeInUp">
-    <table class="table table-dark table-hover text-center align-middle mb-0" id="studentTable">
-        <thead>
-            <tr class="text-info border-bottom border-secondary">
-                <th style="width: 40px;"><input type="checkbox" id="selectAllStudents" class="form-check-input"></th>
-                <th class="py-3 text-end pe-4" style="width: 30%;">البيانات الأساسية للطلاب</th>
-                <th>النوع</th>
-                <th>الديانة</th>
-                <th>حالة القيد</th>
-                <th>موقف الدمج</th>
-                <th class="text-center">إجراءات إدارية</th> 
-            </tr>
-        </thead>
-        <tbody id="tableBody">
-            {% for student in students %}
-            <tr class="student-row" data-grade="{{ student.grade.name }}" data-class="{{ student.classroom.name }}">
-                <td><input type="checkbox" class="student-checkbox form-check-input" value="{{ student.id }}"></td>
-                
-                <td class="text-end pe-3">
-                    <div style="display: block;">
-                        <a href="{% url 'add_student' %}?id={{ student.id }}" class="student-link fs-6 fw-bold text-info text-decoration-none d-block mb-1">
-                            {{ student.get_full_name }}
-                        </a>
-                        <span class="badge bg-info text-dark" style="font-size: 0.7rem;">
-                            <i class="bi bi-person-vcard me-1"></i>{{ student.national_id }}
-                        </span>
-                    </div>
-                </td>
+    <!-- 3. جدول عرض بيانات الطلاب الرئيسي المطور -->
+    <div class="card bg-dark border-secondary rounded-3 shadow animate__animated animate__fadeInUp">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0 text-center small-table">
+                    <thead class="table-secondary text-dark fw-bold">
+                        <tr>
+                            <th width="40"><input type="checkbox" id="selectAllStudents" class="form-check-input"></th>
+                            <th>كود الطالب</th>
+                            <th class="text-end">اسم الطالب بالكامل</th>
+                            <th>الصف الدراسي</th>
+                            <th>الفصل</th>
+                            <th>التخصص</th>
+                            <th>النوع</th>
+                            <th>الديانة</th>
+                            <th>حالة الدمج</th>
+                            <th>الرقم القومي</th>
+                            <th width="150">الإجراءات والعمليات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        {% for student in students %}
+                        <!-- أضفنا id فريد للسطر و style مخصص للوميض البصري عند استهدافه -->
+                        <tr id="student-{{ student.id }}" class="student-row">
+                            <td><input type="checkbox" class="form-check-input student-checkbox" value="{{ student.id }}"></td>
+                            <td class="text-info fw-bold">{{ student.student_code }}</td>
+                            <td class="text-end fw-bold text-white">
+                                <!-- تم تعديل الرابط لاستدعاء دالة javascript تقوم بتمرير الفلاتر الحالية لصفحة التعديل بأمان -->
+                                <a href="javascript:void(0)" onclick="navigateToEdit('{{ student.id }}')" class="text-decoration-none text-white text-white-hover">
+                                    {{ student.first_name }} {{ student.last_name }}
+                                </a>
+                            </td>
+                            <td><span class="badge bg-secondary px-2 py-1">{{ student.grade.name }}</span></td>
+                            <td><span class="badge bg-dark border border-secondary px-2 py-1">{{ student.classroom.name|default:"غير محدد" }}</span></td>
+                            <td>{{ student.get_specialization_display }}</td>
+                            <td>
+                                {% if student.gender == 'Male' %}
+                                    <span class="text-info"><i class="bi bi-gender-male me-1"></i>بنين</span>
+                                {% else %}
+                                    <span class="text-danger"><i class="bi bi-gender-female me-1"></i>بنات</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ student.get_religion_display }}</td>
+                            <td>
+                                {% if student.integration_status %}
+                                    <span class="badge bg-warning text-dark"><i class="bi bi-bookmark-star-fill me-1"></i>دمج</span>
+                                {% else %}
+                                    <span class="text-muted">عادي</span>
+                                {% endif %}
+                            </td>
+                            <td class="font-monospace text-muted">{{ student.national_id }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <!-- 👁️ زر لوحة التحكم الكاملة والملف المالي (student_dashboard) -->
+                                    <a href="{% url 'student_dashboard' student.id %}" class="btn btn-outline-info" title="لوحة تحكم الطالب الكاملة">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    
+                                    <!-- 📞 زر المتابعة والتحصيل والاقساط المتأخرة -->
+                                    <a href="{% url 'overdue_calls' %}?student_id={{ student.id }}" class="btn btn-outline-warning" title="قائمة المتابعة والأقساط المتأخرة">
+                                        <i class="bi bi-telephone-outbound-fill"></i>
+                                    </a>
 
-                <td class="gender-val">
-                    {% if student.get_gender_display == "بنين" %}
-                        <span class="badge bg-primary-subtle text-primary border border-primary px-2">بنين</span>
-                    {% else %}
-                        <span class="badge bg-warning-subtle text-warning border border-warning px-2">بنات</span>
-                    {% endif %}
-                </td>
-
-                <td class="religion-val">{{ student.get_religion_display }}</td>
-
-                <td><span class="badge bg-primary-subtle text-primary border border-primary">{{ student.get_enrollment_status_display }}</span></td>
-
-                <td class="integ-val">
-                    {% if student.integration_status %}<span class="badge bg-warning text-dark">دمج</span>{% else %}<span class="text-muted small">عادي</span>{% endif %}
-                </td>
-
-                <td class="text-center">
-                    <div class="d-flex justify-content-center gap-1">
-                        <a href="{% url 'add_student' %}?id={{ student.id }}" class="btn btn-sm btn-outline-warning border-0" title="تعديل">
-                            <i class="bi bi-pencil-square"></i>
-                        </a>
-
-                        <button type="button" class="btn btn-sm btn-outline-info border-0" 
-                                onclick="openRemedialModal('{{ student.id }}', '{{ student.get_full_name }}')"
-                                title="إضافة للبرنامج العلاجي">
-                            <i class="bi bi-journal-medical"></i>
-                        </button>
-
-                        <a href="{% url 'overdue_calls' %}?student_id={{ student.id }}" class="btn btn-sm btn-outline-danger border-0" title="المديونية">
-                            <i class="bi bi-bell-fill"></i>
-                        </a>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-</div>
-<div class="d-flex justify-content-between align-items-center mt-3 animate__animated animate__fadeInUp">
-    <div class="text-white-50 small">
-        عرض {{ students.start_index }} إلى {{ students.end_index }} من إجمالي {{ students.paginator.count }} طالب
-    </div>
-    
-    <nav aria-label="Page navigation">
-        <ul class="pagination pagination-sm mb-0">
-            {% if students.has_previous %}
-                <li class="page-item">
-                    <a class="page-link bg-dark border-secondary text-info" href="?page=1" aria-label="First">
-                        <span aria-hidden="true">&laquo;&laquo;</span>
-                    </a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link bg-dark border-secondary text-info" href="?page={{ students.previous_page_number }}" aria-label="Previous">
-                        <span aria-hidden="true">&laquo;</span>
-                    </a>
-                </li>
-            {% endif %}
-
-            {% for num in students.paginator.page_range %}
-                {% if students.number == num %}
-                    <li class="page-item active"><span class="page-link bg-info border-info text-dark fw-bold">{{ num }}</span></li>
-                {% elif num > students.number|add:'-3' and num < students.number|add:'3' %}
-                    <li class="page-item"><a class="page-link bg-dark border-secondary text-info" href="?page={{ num }}">{{ num }}</a></li>
-                {% endif %}
-            {% endfor %}
-
-            {% if students.has_next %}
-                <li class="page-item">
-                    <a class="page-link bg-dark border-secondary text-info" href="?page={{ students.next_page_number }}" aria-label="Next">
-                        <span aria-hidden="true">&raquo;</span>
-                    </a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link bg-dark border-secondary text-info" href="?page={{ students.paginator.num_pages }}" aria-label="Last">
-                        <span aria-hidden="true">&raquo;&raquo;</span>
-                    </a>
-                </li>
-            {% endif %}
-        </ul>
-    </nav>
-</div>
-
-<div class="modal fade" id="quickRemedialModal" tabindex="-1" aria-hidden="true" dir="rtl">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark text-white border-info shadow-lg">
-            <div class="modal-header border-secondary">
-                <h5 class="modal-title fw-bold text-info"><i class="bi bi-journal-medical me-2"></i> تسجيل برنامج علاجي</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    {% if not is_archive %}
+                                        <!-- 🩺 زر التسكين اللحظي للبرنامج العلاجي بمودال سريع -->
+                                        <button type="button" class="btn btn-outline-success" title="تسكين سريع في برنامج علاجي" onclick="openRemedialModal('{{ student.id }}', '{{ student.first_name }} {{ student.last_name }}')">
+                                            <i class="bi bi-heart-pulse-fill"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="11" class="text-center text-muted py-5">
+                                <i class="bi bi-people-fill fs-1 d-block mb-3 text-secondary"></i>
+                                لا توجد سجلات طلاب مطابقة لمعايير التصفية والبحث المحددة حالياً.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- الترقيم والملخص الأسفل -->
+        <div class="card-footer bg-transparent border-secondary d-flex justify-content-between align-items-center flex-wrap gap-2 py-3">
+            <div class="text-white-50 small">
+                عرض الطلاب من <b>{{ students.start_index }}</b> إلى <b>{{ students.end_index }}</b> من أصل <b>{{ students.paginator.count }}</b> طالب مفلتر ومسجل.
             </div>
             
-            <form id="remedialForm" method="POST">
-                {% csrf_token %}
-                <div class="modal-body text-end">
-                    <input type="hidden" name="student" id="modal_student_id">
-                    
-                    <p class="mb-3">الطالب: <strong id="modal_student_name" class="text-warning fs-5"></strong></p>
-                    
-                    <div class="mb-3">
-                        <label class="form-label small text-info">عدد المواد المتخلف عنها:</label>
-                        <input type="number" name="subjects_count" id="modal_subjects_count" class="form-control bg-black text-white border-secondary text-center fs-4" value="1" min="1" required>
-                    </div>
+            {% if students.has_other_pages %}
+            <nav aria-label="Page navigation" class="mb-0">
+                <ul class="pagination pagination-sm mb-0 justify-content-center">
+                    {% if students.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link bg-dark text-info border-secondary" href="javascript:void(0)" onclick="goToPage({{ students.previous_page_number }})" aria-label="Previous">
+                                <span aria-hidden="true">&laquo; السابق</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link bg-dark text-muted border-secondary">&laquo; السابق</span>
+                        </li>
+                    {% endif %}
 
+                    {% for i in students.paginator.page_range %}
+                        {% if students.number == i %}
+                            <li class="page-item active">
+                                <span class="page-link bg-info border-info text-dark fw-bold">{{ i }}</span>
+                            </li>
+                        {% elif i > students.number|add:-3 and i < students.number|add:3 %}
+                            <li class="page-item">
+                                <a class="page-link bg-dark text-white border-secondary" href="javascript:void(0)" onclick="goToPage({{ i }})">{{ i }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if students.has_next %}
+                        <li class="page-item">
+                            <a class="page-link bg-dark text-info border-secondary" href="javascript:void(0)" onclick="goToPage({{ students.next_page_number }})" aria-label="Next">
+                                <span aria-hidden="true">التالي &raquo;</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link bg-dark text-muted border-secondary">التالي &raquo;</span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- المودال الخاص بالبرنامج العلاجي السريع -->
+<div class="modal fade animate__animated animate__fadeIn" id="quickRemedialModal" tabindex="-1" aria-labelledby="quickRemedialModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary bg-black">
+                <h5 class="modal-title fw-bold text-success" id="quickRemedialModalLabel">
+                    <i class="bi bi-heart-pulse-fill me-2"></i>تسكين سريع في برنامج علاجي
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="remedialForm">
+                {% csrf_token %}
+                <input type="hidden" name="student_id" id="modal_student_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small d-block">اسم الطالب المستهدف</label>
+                        <h6 id="modal_student_name" class="fw-bold text-white border-bottom border-secondary pb-2"></h6>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modal_subjects_count" class="form-label fw-bold small text-info">عدد المواد المراد سدادها بالبرنامج</label>
+                        <input type="number" name="subjects_count" id="modal_subjects_count" class="form-control bg-black border-secondary text-white fw-bold font-monospace text-center" min="1" max="10" required>
+                    </div>
                     <div class="mb-2">
-                        <label class="form-label small text-muted">أسماء المواد (ملاحظات):</label>
-                        <textarea name="notes" class="form-control bg-black text-white border-secondary" rows="2" placeholder="اكتب أسماء المواد هنا..."></textarea>
+                        <label for="modal_notes" class="form-label fw-bold small text-muted">ملاحظات توضيحية إضافية</label>
+                        <textarea name="notes" id="modal_notes" class="form-control bg-black border-secondary text-white small" rows="2" placeholder="اكتب أسماء المواد أو سبب القيد هنا..."></textarea>
                     </div>
                 </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-info fw-bold">تأكيد البرنامج العلاجي</button>
+                <div class="modal-footer border-secondary bg-black d-flex justify-content-between">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء الأمر</button>
+                    <button type="submit" class="btn btn-sm btn-success px-4 fw-bold"><i class="bi bi-check-circle-fill me-1"></i>تأكيد وتسكين المديونية</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<div class="modal fade animate__animated animate__bounceIn" id="editSuccessModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-info" style="border-width: 2px;">
+            <div class="modal-header border-secondary bg-black">
+                <h5 class="modal-title fw-bold text-info">
+                    <i class="bi bi-check-circle-fill me-2 text-success"></i>تم حفظ البيانات بنجاح
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="bi bi-person-check-fill text-info animate__animated animate__pulse animate__infinite" style="font-size: 3.5rem; display: block; margin-bottom: 15px;"></i>
+                <p class="fs-5 mb-1">تمت عملية التحديث بنجاح للطالب:</p>
+                <h4 id="successModalStudentName" class="fw-bold text-warning mb-3"></h4>
+                <p class="text-muted small mb-0" id="successModalStudentInfo"></p>
+            </div>
+            <div class="modal-footer border-secondary bg-black d-flex justify-content-between">
+                <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">إغلاق التنبيه</button>
+                <button type="button" class="btn btn-sm btn-info fw-bold px-3" id="btnScrollToStudent">
+                    <i class="bi bi-geo-alt-fill me-1"></i>الانتقال لمكانه بالجدول
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-// ==========================================
-// 1. أكواد الإحصائيات والفلاتر (Counter Effect)
-// ==========================================
+
+// دالة الانتقال للتعديل مع الحفاظ على الفلاتر الحالية ورقم الصفحة في الرابط
+function navigateToEdit(studentId) {
+    const currentParams = new URLSearchParams(window.location.search);
+    currentParams.set('edit_id', studentId);
+    
+    // إذا لم يكن رقم الصفحة موجوداً في الرابط الحالي، نقوم بجلب قيمته الافتراضية
+    if (!currentParams.has('page')) {
+        currentParams.set('page', '1');
+    }
+    
+    // التوجه لصفحة إضافة طالب مع تمرير كافة معايير الفلترة الحالية كـ Query Parameters
+    window.location.href = "{% url 'add_student' %}?" + currentParams.toString();
+}
+
+// كود تفعيل الوميض والتركيز التلقائي عند العودة بعد الحفظ
+// كود الفحص الذكي وعرض مودال التحديد والوميض بعد التعديل والحفظ
+window.addEventListener("load", function() {
+    // جلب معرف الطالب المعدل من ذاكرة المتصفح
+    const lastEditedId = localStorage.getItem('last_edited_student_id');
+    
+    if (lastEditedId) {
+        // البحث عن السطر الخاص بالطالب في الجدول الحالي
+        const targetRow = document.getElementById('student-' + lastEditedId);
+        
+        if (targetRow) {
+            // 1. استخراج بيانات الطالب من السطر لعرضها داخل المودال التنبيهي
+            const studentLink = targetRow.querySelector('td.text-end a');
+            const studentName = studentLink ? studentLink.innerText.trim() : "الطالب المسجل";
+            const studentCode = targetRow.querySelector('td.text-info')?.innerText.trim() || "";
+            const studentGrade = targetRow.querySelector('td:nth-child(4) span')?.innerText.trim() || "";
+
+            // 2. تعبئة بيانات المودال التنبيهي
+            document.getElementById('successModalStudentName').innerText = studentName;
+            document.getElementById('successModalStudentInfo').innerText = `كود الطالب: ${studentCode} | الصف: ${studentGrade}`;
+            
+            // 3. إظهار المودال التنبيهي في منتصف الشاشة دون تحريك الصفحة
+            const successModal = new bootstrap.Modal(document.getElementById('editSuccessModal'));
+            successModal.show();
+            
+            // 4. تطبيق تأثير الوميض البصري على السطر في الخلفية لتمييزه
+            targetRow.style.transition = "background-color 0.4s ease-in-out";
+            targetRow.style.backgroundColor = "rgba(13, 202, 240, 0.3)"; // إضاءة زرقاء خفيفة
+            
+            // إزالة لون الوميض بعد 4 ثوانٍ ليعود الجدول لطبيعته
+            setTimeout(() => {
+                targetRow.style.backgroundColor = "";
+            }, 4000);
+
+            // 5. برمجة زر "الانتقال لمكانه بالجدول" داخل المودال عند الحاجة فقط
+            document.getElementById('btnScrollToStudent').onclick = function() {
+                successModal.hide();
+                setTimeout(() => {
+                    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // وميض إضافي تأكيدي عند النزول له
+                    targetRow.style.backgroundColor = "rgba(255, 193, 7, 0.3)"; // وميض أصفر تنبيهي
+                    setTimeout(() => targetRow.style.backgroundColor = "", 2000);
+                }, 300);
+            };
+            
+            // تنظيف الذاكرة حتى لا يظهر المودال مجدداً عند تحديث الصفحة العادي
+            localStorage.removeItem('last_edited_student_id');
+        }
+    }
+});
+
+
 function animateValue(obj, start, end, duration) {
+    if (!obj) return;
     let startTimestamp = null;
     const step = (timestamp) => {
         if (!startTimestamp) startTimestamp = timestamp;
@@ -380,15 +493,11 @@ function animateValue(obj, start, end, duration) {
     window.requestAnimationFrame(step);
 }
 
-const TOTAL_SERVER = parseInt("{{ stats.total|default:0 }}");
-const MALE_SERVER = parseInt("{{ stats.male|default:0 }}");
-const FEMALE_SERVER = parseInt("{{ stats.female|default:0 }}");
-const MUSLIM_SERVER = parseInt("{{ stats.muslim|default:0 }}");
-const CHRISTIAN_SERVER = parseInt("{{ stats.christian|default:0 }}");
-const INTEG_SERVER = parseInt("{{ stats.integration|default:0 }}");
+function goToPage(pageNumber) {
+    runFilters(pageNumber);
+}
 
-function runFilters() {
-    // 1. جلب القيم من حقول الإدخال
+function runFilters(pageNumber = 1) {
     const search = document.getElementById("tableSearch").value.trim();
     const fGrade = document.getElementById("f-grade").value;
     const fClass = document.getElementById("f-class").value;
@@ -397,23 +506,25 @@ function runFilters() {
     const fRelig = document.getElementById("f-religion").value;
     const fInteg = document.getElementById("f-integ").value;
 
-    // 2. بناء رابط الطلب (URL) لإرساله للسيرفر
-    // نستخدم URLSearchParams لإضافة المعايير للرابط الحالي
-    const params = new URLSearchParams(window.location.search);
+    // إصلاح: بناء URL نظيف تماماً بناءً على مسار الصفحة الحالي لتجنب تراكم البارامترات القديمة
+    const url = new URL(window.location.pathname, window.location.origin);
+    const params = url.searchParams;
     
-    if (search) params.set('q', search); else params.delete('q');
-    if (fGrade) params.set('grade', fGrade); else params.delete('grade');
-    if (fClass) params.set('classroom', fClass); else params.delete('classroom');
-    if (fSpec) params.set('spec', fSpec); else params.delete('spec');
-    if (fGender) params.set('gender', fGender); else params.delete('gender');
-    if (fRelig) params.set('religion', fRelig); else params.delete('religion');
-    if (fInteg) params.set('integ', fInteg); else params.delete('integ');
+    if (search) params.set('q', search);
+    if (fGrade) params.set('grade_id', fGrade);
+    if (fClass) params.set('classroom_id', fClass);
+    if (fSpec) params.set('specialization', fSpec);
+    if (fGender) params.set('gender', fGender);
+    if (fRelig) params.set('religion', fRelig);
+    if (fInteg) params.set('is_disability', fInteg);
     
-    // العودة دائماً للصفحة رقم 1 عند البحث لضمان ظهور النتائج
-    params.set('page', 1);
+    params.set('page', pageNumber);
 
-    // 3. طلب البيانات من السيرفر (AJAX) لفلترة كامل قاعدة البيانات
-    fetch(`${window.location.pathname}?${params.toString()}`, {
+    // إصلاح جوهري: تحديث شريط عنوان المتصفح بالبارامترات الجديدة لحظياً
+    // هذا يضمن أن دالة navigateToEdit ستقرأ الفلاتر الصحيحة والحديثة دائماً
+    window.history.replaceState({}, '', url.toString());
+
+    fetch(url.toString(), {
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
     .then(response => response.text())
@@ -421,39 +532,65 @@ function runFilters() {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         
-        // تحديث الجدول بالنتائج الجديدة (من كل الصفحات)
-        document.getElementById("tableBody").innerHTML = doc.getElementById("tableBody").innerHTML;
+        const currentTable = document.getElementById("tableBody");
+        const newTable = doc.getElementById("tableBody");
+        if (currentTable && newTable) currentTable.innerHTML = newTable.innerHTML;
         
-        // تحديث أرقام الإحصائيات (العدادات) بناءً على نتائج السيرفر
-        updateCounter("count-all", doc.getElementById("count-all").innerText);
-        updateCounter("count-male", doc.getElementById("count-male").innerText);
-        updateCounter("count-female", doc.getElementById("count-female").innerText);
-        updateCounter("count-muslim", doc.getElementById("count-muslim").innerText);
-        updateCounter("count-christian", doc.getElementById("count-christian").innerText);
-        updateCounter("count-integ", doc.getElementById("count-integ").innerText);
+        updateCounter("count-all", doc.getElementById("count-all")?.innerText || "0");
+        updateCounter("count-male", doc.getElementById("count-male")?.innerText || "0");
+        updateCounter("count-female", doc.getElementById("count-female")?.innerText || "0");
+        updateCounter("count-muslim", doc.getElementById("count-muslim")?.innerText || "0");
+        updateCounter("count-christian", doc.getElementById("count-christian")?.innerText || "0");
+        updateCounter("count-integ", doc.getElementById("count-integ")?.innerText || "0");
 
-        // تحديث أزرار الترقيم (Pagination) لتناسب البحث الجديد
         const oldPagination = document.querySelector('nav[aria-label="Page navigation"]');
         const newPagination = doc.querySelector('nav[aria-label="Page navigation"]');
         if (oldPagination && newPagination) {
-            oldPagination.innerHTML = newPagination.innerHTML;
+            oldPagination.innerHTML = newPagination.innerHTML || '';
+        } else if (newPagination) {
+            const footer = document.querySelector('.card-footer');
+            if (footer) {
+                const navContainer = doc.querySelector('nav[aria-label="Page navigation"]').outerHTML;
+                const existingNav = footer.querySelector('nav');
+                if (existingNav) existingNav.outerHTML = navContainer;
+                else footer.appendChild(doc.querySelector('nav[aria-label="Page navigation"]'));
+            }
+        } else if (oldPagination && !newPagination) {
+            oldPagination.remove();
         }
         
-        // تحديث عدد النتائج (عرض X إلى Y)
         const oldInfo = document.querySelector('.text-white-50.small');
         const newInfo = doc.querySelector('.text-white-50.small');
         if (oldInfo && newInfo) oldInfo.innerHTML = newInfo.innerHTML;
+
+        document.querySelector('.filter-section').scrollIntoView({ behavior: 'smooth' });
     })
-    .catch(error => console.error('Error during filtering:', error));
+    .catch(error => console.error('حدث خطأ أثناء الفلترة المزامنة:', error));
+}
+
+function filterByQuickStat(key, value) {
+    if (key === 'all') {
+        document.getElementById("f-gender").value = "";
+        document.getElementById("f-religion").value = "";
+        document.getElementById("f-integ").value = "";
+    } else if (key === 'gender') {
+        document.getElementById("f-gender").value = value;
+    } else if (key === 'religion') {
+        document.getElementById("f-religion").value = value;
+    } else if (key === 'is_disability') {
+        document.getElementById("f-integ").value = value;
+    }
+    runFilters(1);
 }
 
 function updateCounter(id, newValue) {
     const el = document.getElementById(id);
     if (!el) return;
     const oldValue = parseInt(el.innerText) || 0;
+    const parsedNew = parseInt(newValue) || 0;
     
-    if (oldValue !== newValue) {
-        animateValue(el, oldValue, newValue, 300);
+    if (oldValue !== parsedNew) {
+        animateValue(el, oldValue, parsedNew, 350);
         const card = el.closest('.stat-card');
         if (card) {
             card.classList.add('animate__animated', 'animate__pulse');
@@ -462,53 +599,37 @@ function updateCounter(id, newValue) {
     }
 }
 
-document.addEventListener("DOMContentLoaded", function() {
-    runFilters(); 
-});
-
-// ==========================================
-// 2. أكواد النافذة المنبثقة والإرسال (AJAX)
-// ==========================================
 function openRemedialModal(studentId, studentName) {
     document.getElementById('modal_student_id').value = studentId;
     document.getElementById('modal_student_name').innerText = studentName;
     document.getElementById('modal_subjects_count').value = 1;
+    document.getElementById('modal_notes').value = '';
     
     var myModal = new bootstrap.Modal(document.getElementById('quickRemedialModal'));
     myModal.show();
 }
 
-// كود إرسال البيانات بدون تحديث الصفحة
 document.addEventListener("DOMContentLoaded", function() {
     const form = document.getElementById('remedialForm');
-    
     if (form) {
         form.addEventListener('submit', function(e) {
-            e.preventDefault(); // 🚫 يمنع المتصفح من الانتقال لصفحة أخرى
-
+            e.preventDefault();
             const formData = new FormData(this);
             
-            // إرسال البيانات إلى السيرفر في الخلفية
             fetch("{% url 'save_remedial_from_registry' %}", {
                 method: 'POST',
                 body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest', // إخبار السيرفر أنه طلب AJAX
-                }
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // 1. إغلاق النافذة
                     var modalElement = document.getElementById('quickRemedialModal');
                     var modal = bootstrap.Modal.getInstance(modalElement);
                     modal.hide();
-
-                    // 2. إظهار رسالة نجاح
                     alert(data.message || 'تم تأكيد البرنامج العلاجي بنجاح!');
-                    
-                    // 3. تصفير الحقول للعملية القادمة
                     form.reset();
+                    runFilters(1);
                 } else {
                     alert("حدث خطأ: " + (data.message || 'الرجاء المحاولة مرة أخرى.'));
                 }
@@ -519,6 +640,28 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     }
+
+    const selectAllCb = document.getElementById("selectAllStudents");
+    if (selectAllCb) {
+        selectAllCb.addEventListener("change", function() {
+            document.querySelectorAll(".student-checkbox").forEach(cb => {
+                cb.checked = selectAllCb.checked;
+            });
+        });
+    }
 });
+// 🎯 كود إجبار مؤشر الكتابة على فتح قائمة البحث السريع للطلاب فوراً عند تحميل الصفحة
+setTimeout(function() {
+    // 1. فتح قائمة السلكت2 الخاصة بالطلاب تلقائياً
+    $('#student_select').select2('open');
+    
+    // 2. إجبار نظام التركيز على الانتقال لداخل حقل البحث الديناميكي المنشأ
+    setTimeout(function() {
+        const searchField = document.querySelector('.select2-search__field');
+        if (searchField) {
+            searchField.focus();
+        }
+    }, 100);
+}, 400); // تأخير 400 مللي ثانية لضمان أن المتصفح انتهى تماماً من رسم وعرض عناصر الصفحة
 </script>
 {% endblock %}

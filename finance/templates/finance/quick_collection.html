@@ -96,7 +96,7 @@
                             <div class="d-flex gap-2">
                                 <a href="{% url 'quick_collection' %}" class="btn btn-outline-light flex-fill btn-sm">إعادة ضبط</a>
                                 
-                                <a href="{% url 'student_list' %}" id="btn-back" class="btn btn-danger btn-sm">
+                               <a href="{% url 'student_list' %}" id="btn-back" class="btn btn-danger btn-sm">
                                     <i class="bi bi-x-circle"></i> إغلاق والعودة
                                 </a>
                             </div>
@@ -615,7 +615,7 @@ function handlePreview() {
     new bootstrap.Modal(document.getElementById('previewModal')).show();
 }
 
-// 💡 الدالة المسؤولة عن الإرسال النهائي للسيرفر
+// 💡 الدالة المسؤولة عن الإرسال النهائي للسيرفر (تم تعديلها لحل مشكلة CSRF)
 function submitMainForm() {
     const finalBtn = $('#btnSubmitFinal');
     
@@ -624,12 +624,12 @@ function submitMainForm() {
     // تعطيل الزر لمنع التكرار
     finalBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> جاري الترحيل...');
     
-    // ⚠️ هام جداً: تفعيل الحقول قبل الإرسال لكي يراها السيرفر
+    // ⚠️ هام جداً: تفعيل الحقول قبل الإرسال لكي يراها السيرفر ويقرأ قيمها
     $('#id_student').prop('disabled', false);
     $('#id_amount').prop('readonly', false);
     
-    // إرسال الفورم
-    document.getElementById('mainPaymentForm').submit();
+    // 🎯 الحل: الإرسال عبر jQuery لضمان تمرير الـ CSRF Token المحدث بالكامل دون مشاكل
+    $('#mainPaymentForm').trigger('submit');
 }
 </script>
 {% endblock %}
