@@ -1,198 +1,216 @@
 {% extends 'base.html' %}
 
+{% block page_title %}التحليل الإحصائي العام{% endblock %}
+
 {% block content %}
-<!-- استدعاء مكتبة الرسوم البيانية Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-    /* تنسيق كروت الإحصائيات الفاخرة */
+    /* تنسيق كروت الإحصائيات الفاخرة - Dark Mode Premium */
     .stat-card {
-        background: #000;
+        background: linear-gradient(145deg, #0f172a, #020617);
         border: 1px solid #1e293b;
         border-radius: 20px;
         padding: 25px;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        height: 100%; /* للحفاظ على تناسق الارتفاعات */
+        height: 100%;
+        position: relative;
+        overflow: hidden;
     }
+    
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 4px;
+        background: transparent;
+        transition: all 0.3s ease;
+    }
+
     .stat-card:hover { 
         transform: translateY(-5px); 
         border-color: #38bdf8; 
-        box-shadow: 0 15px 35px rgba(56, 189, 248, 0.1);
+        box-shadow: 0 15px 35px rgba(56, 189, 248, 0.15);
     }
-    /* النصوص المشعة (Neon) */
-    .neon-text-info { 
-        color: #00d4ff; 
-        text-shadow: 0 0 10px rgba(0, 212, 255, 0.3); 
-    }
-    .neon-text-success {
-        color: #39ff14;
-        text-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
-    }
-    /* أشرطة التقدم المخصصة */
+    
+    /* ألوان الكروت التفاعلية */
+    .card-primary:hover::before { background: #38bdf8; }
+    .card-success:hover::before { background: #39ff14; }
+    .card-danger:hover::before { background: #ff3131; }
+
+    /* النصوص المشعة (Neon) بدرجة احترافية وغير مزعجة */
+    .neon-text-info { color: #38bdf8; text-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
+    .neon-text-success { color: #39ff14; text-shadow: 0 0 15px rgba(57, 255, 20, 0.4); }
+    .neon-text-danger { color: #ff3131; text-shadow: 0 0 15px rgba(255, 49, 49, 0.4); }
+    
+    /* أشرطة التقدم المخصصة للجدول */
     .progress-custom { 
-        background: #0f172a; 
-        height: 12px; 
+        background: #000000; 
+        height: 10px; 
         border-radius: 10px; 
-        border: 1px solid rgba(255,255,255,0.05);
+        border: 1px solid #1e293b;
+        overflow: hidden;
     }
-    /* تنسيق التبويبات (Tabs) */
+    
+    .progress-custom .progress-bar {
+        background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+        border-radius: 10px;
+    }
+
+    /* تنسيق التبويبات (Tabs) بشكل عصري */
+    .nav-pills { background: #020617; padding: 5px; border-radius: 15px; border: 1px solid #1e293b; }
     .nav-pills .nav-link {
         color: #94a3b8;
         border-radius: 10px;
-        padding: 10px 25px;
+        padding: 10px 30px;
         transition: all 0.3s;
-        font-weight: bold;
+        font-weight: 800;
     }
+    .nav-pills .nav-link:hover { color: #e2e8f0; }
     .nav-pills .nav-link.active {
-        background-color: rgba(56, 189, 248, 0.1) !important;
-        color: #38bdf8 !important;
-        border: 1px solid #38bdf8;
-        box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+        background-color: #38bdf8 !important;
+        color: #000000 !important;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
     }
     
-    /* تأثيرات روابط الطلاب الذكية */
-    .student-link {
-        transition: all 0.2s ease;
-        display: inline-block;
-        color: #fff !important;
-        text-decoration: none !important;
+    /* الجداول الاحترافية */
+    .table-premium { --bs-table-bg: transparent; color: #e2e8f0; margin-bottom: 0; }
+    .table-premium thead th { 
+        color: #64748b; 
+        font-size: 0.9rem; 
+        border-bottom: 2px solid #1e293b; 
+        font-weight: 800;
+        padding: 15px;
     }
-    .student-link:hover {
-        color: #38bdf8 !important;
-        transform: translateX(-5px);
-        text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
-    }
+    .table-premium tbody tr { border-bottom: 1px solid #0f172a; transition: all 0.2s; }
+    .table-premium tbody tr:hover { background: rgba(56, 189, 248, 0.05); }
+    .table-premium td { padding: 15px; vertical-align: middle; }
 
-    /* زر العودة المطور */
-    .back-btn-top {
-        background: rgba(255, 255, 255, 0.05);
-        color: #94a3b8;
-        border: 1px solid #1e293b;
-        padding: 8px 24px;
-        border-radius: 50px;
+    /* روابط الطلاب */
+    .student-link {
+        color: #e2e8f0 !important;
         text-decoration: none !important;
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
         font-weight: 700;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
     }
-    .back-btn-top:hover {
-        background: #38bdf8;
-        color: #000 !important;
-        border-color: #38bdf8;
-        box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
-        transform: scale(1.05);
-    }
-    
+    .student-link:hover { color: #38bdf8 !important; }
+
     /* حاوية الرسوم البيانية */
-    .chart-container {
-        position: relative;
-        height: 300px;
-        width: 100%;
+    .chart-container { position: relative; height: 320px; width: 100%; margin-top: 20px; }
+    
+    /* زر العودة */
+    .btn-return {
+        background: transparent;
+        color: #94a3b8;
+        border: 1px solid #334155;
+        border-radius: 50px;
+        padding: 8px 25px;
+        font-weight: 700;
+        transition: 0.3s;
+        text-decoration: none;
+    }
+    .btn-return:hover {
+        background: #1e293b;
+        color: #fff;
+        border-color: #38bdf8;
     }
 </style>
 
-<div class="container-fluid py-4 text-end" dir="rtl">
+<div class="container-fluid py-4" dir="rtl">
     
-    <!-- العنوان وزر العودة -->
-    <div class="d-flex justify-content-between align-items-center mb-5 flex-row-reverse">
-        <h2 class="fw-bold text-white m-0">
-            <i class="bi bi-pie-chart-fill neon-text-info me-2"></i> لوحة تحليل بيانات الطلاب المجمعة
+    <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
+        <h2 class="fw-900 text-white m-0 d-flex align-items-center">
+            <i class="bi bi-pie-chart-fill neon-text-info me-3 fs-1"></i>
+            التحليل الإحصائي العام
         </h2>
-        <a href="{% url 'course_prices' %}" class="back-btn-top">
-            <i class="bi bi-arrow-right-circle fs-5"></i> 
-            العودة لقائمة المجموعات
+        <a href="{% url 'course_prices' %}" class="btn-return d-flex align-items-center gap-2">
+            العودة للمجموعات <i class="bi bi-arrow-left-circle fs-5"></i>
         </a>
     </div>
 
-    <!-- كروت الإحصائيات العلوية -->
-    <div class="row g-4 mb-4">
+    <div class="row g-4 mb-5">
         <div class="col-md-4">
-            <div class="stat-card text-center d-flex flex-column justify-content-center">
-                <div class="small text-secondary fw-bold mb-2">إجمالي طلاب المدرسة</div>
-                <div class="display-5 fw-bold text-white">{{ total_students }}</div>
+            <div class="stat-card card-primary text-center d-flex flex-column justify-content-center">
+                <div class="text-secondary fw-bold mb-2 fs-6">إجمالي طلاب المدرسة النشطين</div>
+                <div class="display-4 fw-900 text-white">{{ total_students }}</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stat-card text-center d-flex flex-column justify-content-center" style="border-right: 5px solid #39ff14 !important;">
-                <div class="small fw-bold mb-2 text-success">طلاب مشتركين (فعالين)</div>
-                <div class="display-5 fw-bold neon-text-success">{{ enrolled_count }}</div>
+            <div class="stat-card card-success text-center d-flex flex-column justify-content-center">
+                <div class="fw-bold mb-2 text-success fs-6"><i class="bi bi-check-circle-fill me-1"></i> طلاب لديهم اشتراكات</div>
+                <div class="display-4 fw-900 neon-text-success">{{ enrolled_count }}</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stat-card text-center d-flex flex-column justify-content-center" style="border-right: 5px solid #ff3131 !important;">
-                <div class="small fw-bold mb-2 text-danger">طلاب بدون اشتراكات</div>
-                <div class="display-5 fw-bold text-danger">{{ non_enrolled_count }}</div>
+            <div class="stat-card card-danger text-center d-flex flex-column justify-content-center">
+                <div class="fw-bold mb-2 text-danger fs-6"><i class="bi bi-exclamation-circle-fill me-1"></i> طلاب بدون أي اشتراك</div>
+                <div class="display-4 fw-900 neon-text-danger">{{ non_enrolled_count }}</div>
             </div>
         </div>
     </div>
 
-    <!-- قسم الرسوم البيانية (Charts Section) -->
-    <div class="row g-4 mb-4">
-        <!-- رسم بياني: نسبة المشتركين لغير المشتركين -->
+    <div class="row g-4 mb-5">
         <div class="col-xl-4 col-lg-5">
-            <div class="stat-card">
-                <h6 class="text-white fw-bold mb-4 text-center"><i class="bi bi-pie-chart me-2"></i> حالة الاشتراكات العامة</h6>
+            <div class="stat-card h-100">
+                <h6 class="text-white fw-bold mb-2"><i class="bi bi-bullseye text-info me-2"></i> معدل الاستحواذ العام</h6>
+                <p class="small text-secondary mb-0">نسبة الطلاب المشتركين في الدورات مقارنة بإجمالي المدرسة.</p>
                 <div class="chart-container">
                     <canvas id="enrollmentStatusChart"></canvas>
                 </div>
             </div>
         </div>
         
-        <!-- رسم بياني: إحصائيات المدرسين -->
         <div class="col-xl-8 col-lg-7">
-            <div class="stat-card">
-                <h6 class="text-white fw-bold mb-4 text-center"><i class="bi bi-bar-chart-line me-2"></i> إحصائيات المدرسين (الأكثر والأقل اشتراكاً)</h6>
+            <div class="stat-card h-100">
+                <h6 class="text-info fw-bold mb-2"><i class="bi bi-graph-up-arrow me-2"></i> المواد الدراسية الأكثر طلباً</h6>
+                <p class="small text-secondary mb-0">تحليل حي لقاعدة البيانات لأكثر المواد التي يشترك بها الطلاب.</p>
                 <div class="chart-container">
-                    <canvas id="teachersChart"></canvas>
+                    <canvas id="subjectsChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row g-4 mb-5">
-        <!-- رسم بياني: المواد مقترنة باسم المدرس -->
-        <div class="col-12">
-            <div class="stat-card">
-                <h6 class="text-info fw-bold mb-4 text-center"><i class="bi bi-graph-up-arrow me-2"></i> معدلات الاشتراك في المواد (بناءً على المدرس)</h6>
-                <div class="chart-container" style="height: 350px;">
-                    <canvas id="subjectsByTeacherChart"></canvas>
-                </div>
-            </div>
+    <div class="stat-card mb-5 p-0 overflow-hidden">
+        <div class="p-4 border-bottom border-secondary border-opacity-25 bg-dark bg-opacity-50">
+            <h5 class="text-white fw-bold m-0"><i class="bi bi-table text-info me-2"></i> تقرير كثافة الاشتراكات حسب المادة</h5>
         </div>
-    </div>
-
-    <!-- الجدول الإحصائي للمواد -->
-    <div class="stat-card mb-5">
-        <h5 class="text-info fw-bold mb-4">
-            <i class="bi bi-book me-2"></i> تحليل كثافة الاشتراكات والانتشار حسب المادة
-        </h5>
         <div class="table-responsive">
-            <table class="table table-dark table-hover border-secondary border-opacity-10 align-middle">
+            <table class="table table-premium">
                 <thead>
-                    <tr class="text-secondary small">
-                        <th>المادة الدراسية / الكورس</th>
-                        <th>عدد الطلاب المشتركين</th>
-                        <th style="width: 40%;">نسبة الإقبال الإحصائية</th>
+                    <tr>
+                        <th style="width: 5%;">#</th>
+                        <th style="width: 35%;">المادة الدراسية</th>
+                        <th style="width: 20%; text-align: center;">عدد المشتركين</th>
+                        <th style="width: 40%;">مؤشر الإقبال (نسبة مئوية)</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in subject_analysis %}
                     <tr>
-                        <td class="fw-bold text-white">{{ item.course_info__subject__name }}</td>
-                        <td>
-                            <span class="badge bg-info text-dark px-3 rounded-pill fw-bold">
+                        <td class="text-secondary fw-bold">{{ forloop.counter }}</td>
+                        <td class="fw-bold text-info fs-6">{{ item.course_info__subject__name }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-primary bg-opacity-25 border border-primary text-light px-3 py-2 rounded-pill fs-6">
                                 {{ item.total }} طالب
                             </span>
                         </td>
                         <td>
-                            <div class="progress progress-custom">
-                                <div class="progress-bar bg-info" 
-                                     style="width: {% widthratio item.total enrolled_count 100 %}%">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="progress progress-custom w-100">
+                                    <div class="progress-bar" style="width: {% widthratio item.total total_students 100 %}%"></div>
                                 </div>
+                                <span class="small fw-bold text-secondary text-nowrap">
+                                    {% widthratio item.total total_students 100 %} %
+                                </span>
                             </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-5 text-secondary">
+                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                            لا توجد بيانات اشتراكات في الكورسات حالياً.
                         </td>
                     </tr>
                     {% endfor %}
@@ -201,81 +219,84 @@
         </div>
     </div>
 
-    <!-- قوائم الطلاب (المشتركين وغير المشتركين) -->
-    <div class="stat-card">
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-row-reverse">
-            <h5 class="text-white fw-bold m-0"><i class="bi bi-people me-2"></i> قوائم الطلاب التفصيلية</h5>
-            
-            <ul class="nav nav-pills" id="studentTabs" role="tablist">
-                <li class="nav-item">
-                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#enrolledList">
-                        المشتركين
+    <div class="stat-card p-0 overflow-hidden">
+        <div class="p-4 border-bottom border-secondary border-opacity-25 d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <h5 class="text-white fw-bold m-0"><i class="bi bi-people-fill text-warning me-2"></i> السجل التحليلي للطلاب</h5>
+            <ul class="nav nav-pills m-0" id="studentTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#enrolledList" type="button" role="tab">
+                        المشتركين <span class="badge bg-dark text-white ms-1">{{ enrolled_count }}</span>
                     </button>
                 </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#nonEnrolledList">
-                        غير المشتركين
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#nonEnrolledList" type="button" role="tab">
+                        غير المشتركين <span class="badge bg-dark text-white ms-1">{{ non_enrolled_count }}</span>
                     </button>
                 </li>
             </ul>
         </div>
 
         <div class="tab-content">
-            <!-- قائمة المشتركين -->
-            <div class="tab-pane fade show active" id="enrolledList">
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle">
-                        <thead class="text-secondary small">
+            <div class="tab-pane fade show active" id="enrolledList" role="tabpanel">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-premium m-0">
+                        <thead style="position: sticky; top: 0; background: #0f172a; z-index: 1;">
                             <tr>
                                 <th>كود الطالب</th>
-                                <th>الاسم بالكامل (اضغط للتفاصيل)</th>
+                                <th>الاسم بالكامل</th>
                                 <th>المرحلة الدراسية</th>
-                                <th>السنة الدراسية</th>
+                                <th class="text-center">السنة الدراسية</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for student in enrolled_students %}
                             <tr>
-                                <td class="text-info fw-bold">{{ student.student_code }}</td>
+                                <td class="text-info fw-bold">{{ student.student_code|default:"-" }}</td>
                                 <td>
-                                    <a href="{% url 'student_analytics_detail' student.id %}" class="student-link fw-bold">
-                                        <i class="bi bi-eye text-info me-1 small"></i>
-                                        {{ student.get_full_name }}
+                                    <a href="{% url 'student_dashboard' student.id %}" class="student-link">
+                                        {{ student.first_name }} {{ student.last_name }}
                                     </a>
                                 </td>
-                                <td>{{ student.grade.name }}</td>
-                                <td><span class="badge bg-dark border border-secondary">{{ student.academic_year.name }}</span></td>
+                                <td>{{ student.grade.name|default:"غير محدد" }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-dark border border-secondary text-secondary">
+                                        {{ student.academic_year.name|default:"-" }}
+                                    </span>
+                                </td>
                             </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center py-4 text-muted">لا يوجد طلاب مشتركين.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- قائمة غير المشتركين -->
-            <div class="tab-pane fade" id="nonEnrolledList">
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle">
-                        <thead class="text-secondary small">
+            <div class="tab-pane fade" id="nonEnrolledList" role="tabpanel">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-premium m-0">
+                        <thead style="position: sticky; top: 0; background: #0f172a; z-index: 1;">
                             <tr>
+                                <th>كود الطالب</th>
                                 <th>الاسم بالكامل</th>
                                 <th>المرحلة الدراسية</th>
-                                <th>رقم الهاتف</th>
-                                <th>الإجراء</th>
+                                <th class="text-center">إجراءات المتابعة</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for student in non_enrolled_students %}
                             <tr>
-                                <td class="text-warning fw-bold">{{ student.get_full_name }}</td>
-                                <td>{{ student.grade.name }}</td>
-                                <td>{{ student.phone }}</td>
-                                <td>
+                                <td class="text-warning fw-bold">{{ student.student_code|default:"-" }}</td>
+                                <td>{{ student.first_name }} {{ student.last_name }}</td>
+                                <td>{{ student.grade.name|default:"غير محدد" }}</td>
+                                <td class="text-center">
                                     <a href="{% url 'course_prices' %}" class="btn btn-sm btn-outline-info rounded-pill px-3 fw-bold">
-                                        <i class="bi bi-plus-circle me-1"></i> تسكين بمجموعة
+                                        <i class="bi bi-telephone-plus me-1"></i> تواصل وتسكين
                                     </a>
                                 </td>
                             </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center py-4 text-muted">جميع طلاب المدرسة لديهم اشتراكات (ممتاز!).</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -285,143 +306,101 @@
     </div>
 </div>
 
-<!-- سكريبت الرسوم البيانية -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     
-    // إعدادات عامة للرسوم البيانية لتناسب الـ Dark Theme
+    // إعدادات عامة للـ Dark Theme
     Chart.defaults.color = '#94a3b8';
-    Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
-    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    Chart.defaults.font.family = "'Cairo', sans-serif";
+    Chart.defaults.font.weight = 'bold';
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(2, 6, 23, 0.9)';
     Chart.defaults.plugins.tooltip.titleColor = '#38bdf8';
     Chart.defaults.plugins.tooltip.padding = 12;
     Chart.defaults.plugins.tooltip.borderColor = '#1e293b';
     Chart.defaults.plugins.tooltip.borderWidth = 1;
 
-    // ==========================================
-    // 1. رسم بياني: المشتركين vs غير المشتركين (Doughnut)
-    // ==========================================
+    // 1. رسم الاستحواذ العام (Doughnut)
     const ctxStatus = document.getElementById('enrollmentStatusChart').getContext('2d');
     new Chart(ctxStatus, {
         type: 'doughnut',
         data: {
-            labels: ['مشتركين', 'غير مشتركين'],
+            labels: ['طلاب تم تسكينهم', 'طلاب بدون اشتراك'],
             datasets: [{
                 data: [{{ enrolled_count|default:0 }}, {{ non_enrolled_count|default:0 }}],
                 backgroundColor: [
-                    'rgba(57, 255, 20, 0.8)', // أخضر مشع
-                    'rgba(255, 49, 49, 0.8)'  // أحمر مشع
+                    'rgba(57, 255, 20, 0.8)', // أخضر نجاح
+                    'rgba(255, 49, 49, 0.8)'  // أحمر تنبيه
                 ],
-                borderColor: ['#39ff14', '#ff3131'],
-                borderWidth: 1,
-                hoverOffset: 10
+                borderColor: ['#0f172a', '#0f172a'],
+                borderWidth: 4,
+                hoverOffset: 5
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'bottom', labels: { color: '#fff' } }
+                legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 20 } }
             },
-            cutout: '70%'
+            cutout: '75%'
         }
     });
 
-    // ==========================================
-    // 2. رسم بياني: إحصائيات المدرسين (Bar Chart)
-    // ==========================================
-    // ملاحظة للمبرمج: يجب تمرير المتغيرات التالية من views.py كـ JSON (قوائم)
-    // teacher_names_list = ["أ. أحمد", "أ. محمد", ...]
-    // teacher_students_count = [150, 40, ...]
+    // 2. تجميع بيانات المواد من Django (استخراج ديناميكي من Loop)
+    const subjectLabels = [];
+    const subjectData = [];
     
-    const teacherNames = {{ teacher_names_list|safe|default:'["أ. محمود", "أ. إبراهيم", "أ. مصطفى", "أ. علي", "أ. حسن"]' }};
-    const teacherCounts = {{ teacher_students_count|safe|default:'[120, 95, 60, 30, 15]' }};
+    {% for item in subject_analysis %}
+        // الاعتماد بالكامل على الداتابيز، بدون أي أسماء وهمية
+        subjectLabels.push("{{ item.course_info__subject__name|escapejs }}");
+        subjectData.push({{ item.total }});
+    {% endfor %}
 
-    const ctxTeachers = document.getElementById('teachersChart').getContext('2d');
-    new Chart(ctxTeachers, {
-        type: 'bar',
-        data: {
-            labels: teacherNames,
-            datasets: [{
-                label: 'عدد الطلاب المشتركين',
-                data: teacherCounts,
-                backgroundColor: 'rgba(56, 189, 248, 0.6)', // أزرق سماوي نيون
-                borderColor: '#38bdf8',
-                borderWidth: 2,
-                borderRadius: 5,
-                hoverBackgroundColor: '#38bdf8'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { 
-                    beginAtZero: true, 
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#94a3b8' }
-                },
-                x: { 
-                    grid: { display: false },
-                    ticks: { color: '#fff', font: { weight: 'bold' } }
-                }
-            },
-            plugins: {
-                legend: { display: false }
-            }
-        }
-    });
-
-    // ==========================================
-    // 3. رسم بياني: المواد باسم المدرس (Horizontal Bar)
-    // ==========================================
-    // ملاحظة للمبرمج: مرر المتغيرات من الـ views
-    // subject_teacher_labels = ["فيزياء - أ. محمود", "كيمياء - أ. إبراهيم", ...]
-    // subject_teacher_counts = [100, 85, ...]
+    // 3. رسم المواد الأكثر طلباً (Horizontal Bar Chart)
+    const ctxSubjects = document.getElementById('subjectsChart').getContext('2d');
     
-    const subTeacherLabels = {{ subject_teacher_labels|safe|default:'["لغة عربية - أ. أحمد", "رياضيات - أ. محمود", "فيزياء - أ. علي", "كيمياء - أ. مصطفى"]' }};
-    const subTeacherCounts = {{ subject_teacher_counts|safe|default:'[150, 110, 80, 45]' }};
-
-    const ctxSubjects = document.getElementById('subjectsByTeacherChart').getContext('2d');
-    new Chart(ctxSubjects, {
-        type: 'bar', // لجعلها أفقية نستخدم indexAxis: 'y'
-        data: {
-            labels: subTeacherLabels,
-            datasets: [{
-                label: 'حجم الإقبال',
-                data: subTeacherCounts,
-                backgroundColor: [
-                    'rgba(177, 66, 255, 0.6)', // بنفسجي نيون
-                    'rgba(253, 224, 71, 0.6)', // أصفر
-                    'rgba(57, 255, 20, 0.6)',  // أخضر
-                    'rgba(56, 189, 248, 0.6)'  // أزرق
-                ],
-                borderColor: [
-                    '#b142ff', '#fde047', '#39ff14', '#38bdf8'
-                ],
-                borderWidth: 1,
-                borderRadius: 4
-            }]
-        },
-        options: {
-            indexAxis: 'y', // يحول الرسم البياني إلى أفقي
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: { 
-                    beginAtZero: true, 
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' } 
-                },
-                y: { 
-                    grid: { display: false },
-                    ticks: { color: '#fff', font: { size: 13 } }
-                }
+    // إذا لم تكن هناك بيانات، نعرض رسالة فارغة عبر الشارت
+    if (subjectLabels.length === 0) {
+        ctxSubjects.font = "16px Cairo";
+        ctxSubjects.fillStyle = "#64748b";
+        ctxSubjects.textAlign = "center";
+        ctxSubjects.fillText("لا توجد بيانات متاحة لعرضها حالياً.", ctxSubjects.canvas.width / 2, ctxSubjects.canvas.height / 2);
+    } else {
+        new Chart(ctxSubjects, {
+            type: 'bar', // bar + indexAxis='y' يعطي رسم أفقي احترافي
+            data: {
+                labels: subjectLabels,
+                datasets: [{
+                    label: 'عدد الطلاب',
+                    data: subjectData,
+                    backgroundColor: 'rgba(56, 189, 248, 0.7)', // أزرق شفاف
+                    borderColor: '#38bdf8',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    hoverBackgroundColor: '#0ea5e9'
+                }]
             },
-            plugins: {
-                legend: { display: false }
+            options: {
+                indexAxis: 'y', // يحول الأعمدة لتكون أفقية لسهولة قراءة أسماء المواد
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { 
+                        beginAtZero: true, 
+                        grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
+                        ticks: { stepSize: 1 } // تجنب الكسور في عدد الطلاب
+                    },
+                    y: { 
+                        grid: { display: false },
+                        ticks: { color: '#e2e8f0', font: { size: 13 } }
+                    }
+                },
+                plugins: {
+                    legend: { display: false } // إخفاء المربع العلوي لأنه لون واحد
+                }
             }
-        }
-    });
+        });
+    }
 
 });
 </script>

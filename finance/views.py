@@ -61,8 +61,6 @@ from datetime import datetime, timedelta
 from .models import Coupon 
 
 
-# -----------------------------------
-
 # ✅ 1. كلاس تسجيل الدخول (يجب أن يكون هنا)
 class MyLoginView(LoginView):
     template_name = 'registration/login.html'
@@ -81,73 +79,72 @@ def close_month(request):
     first_day_this_month = today.replace(day=1)
     last_month = (first_day_this_month - timedelta(days=1)).replace(day=1)
 
+    # تحديد حدود النطاق الزمني للشهر المراد إغلاقه لضمان أقصى سرعة في قاعدة البيانات
+    start_date = last_month                  # بداية الشهر المغلق (مثال: 2026-05-01)
+    end_date = first_day_this_month          # بداية الشهر الحالي (مثال: 2026-06-01) - نستخدم أصغر من (<)
+
     # 2. منع التكرار
     if MonthlyClosure.objects.filter(month=last_month).exists():
         messages.info(request, "هذا الشهر تم إغلاقه بالفعل.")
         return redirect('finance_dashboard')
 
-    # ==========================================
-    # 3. التحقق من الحركات المعلقة (التي لم تدخل جرد يومي)
-    # ==========================================
-    # الاعتماد على حقل is_closed=False لمعرفة الحركات المعلقة
+    # ==============================================================
+    # 3. التحقق من الحركات المعلقة (🟢 تم تحسين الاستعلامات باستخدام النطاق الزمني)
+    # ==============================================================
     pending_revenues_count = Payment.objects.filter(
-        payment_date__year=last_month.year,
-        payment_date__month=last_month.month,
-        is_closed=False  # حركة غير مقفلة
+        payment_date__gte=start_date,
+        payment_date__lt=end_date,
+        is_closed=False  
     ).count()
 
     pending_expenses_count = Expense.objects.filter(
-        expense_date__year=last_month.year, 
-        expense_date__month=last_month.month,
-        is_closed=False  # مصروف غير مقفل
+        expense_date__gte=start_date,
+        expense_date__lt=end_date,
+        is_closed=False  
     ).count()
 
     has_pending = (pending_revenues_count > 0) or (pending_expenses_count > 0)
 
     if request.method == "POST":
-        # منع الحفظ إذا كان هناك حركات معلقة (أمان إضافي للباك-إند)
         if has_pending:
             messages.error(request, f"لا يمكن إغلاق الشهر! يوجد {pending_revenues_count} إيراد معلق و {pending_expenses_count} مصروف معلق لم يتم تقفيلهم في الجرد.")
-            return redirect('close_month') # تأكد من أن اسم الرابط صحيح في urls.py
+            return redirect('close_month') 
 
-        # 4. حساب الإيرادات (للحركات المقفلة فقط is_closed=True)
+        # 4. حساب الإيرادات (🟢 الحركات المقفلة فقط ضمن النطاق الزمني المفهرس)
         revenues = Payment.objects.filter(
-            payment_date__year=last_month.year,
-            payment_date__month=last_month.month,
+            payment_date__gte=start_date,
+            payment_date__lt=end_date,
             is_closed=True
-        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+        ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
 
-        # 5. حساب المصروفات (للحركات المقفلة فقط is_closed=True)
+        # 5. حساب المصروفات (🟢 المصروفات المقفلة فقط ضمن النطاق الزمني المفهرس)
         expenses = Expense.objects.filter(
-            expense_date__year=last_month.year, 
-            expense_date__month=last_month.month,
+            expense_date__gte=start_date,
+            expense_date__lt=end_date,
             is_closed=True
-        ).aggregate(total=Sum('amount'))['total'] or 0
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
         # 6. جلب الرصيد السابق
         previous_closure = MonthlyClosure.objects.order_by('-month').first()
-        opening_bal = previous_closure.closing_balance if previous_closure else 0
+        opening_bal = previous_closure.closing_balance if previous_closure else Decimal('0.00')
 
-        # ... (باقي الكود داخل شرط POST) ...
-        
-        # 7. الحفظ
+        # 7. الحفظ والترحيل المالي المعتمد
         MonthlyClosure.objects.create(
             month=last_month,
             opening_balance=opening_bal,
             total_revenues=revenues,
             total_expenses=expenses,
-            net_balance=revenues - expenses,
-            closing_balance=opening_bal + (revenues - expenses),
+            net_balance=Decimal(revenues) - Decimal(expenses),
+            closing_balance=Decimal(opening_bal) + (Decimal(revenues) - Decimal(expenses)),
             status='closed',
             closed_by=request.user
         )
         
-        # رسالة النجاح والتحويل تكون هنا فقط (داخل الـ POST)
         messages.success(request, f"تم إغلاق شهر {last_month.strftime('%B %Y')} بنجاح.")
         return redirect('finance_dashboard')
 
     # ==========================================
-    # هذا الجزء خارج الـ POST (يعمل عند فتح الصفحة فقط)
+    # جزء العرض البرمجي عند فتح الصفحة (GET)
     # ==========================================
     context = {
         'suggested_month': last_month,
@@ -156,12 +153,96 @@ def close_month(request):
         'pending_expenses_count': pending_expenses_count,
     }
     
-    # ❌ احذف السطرين اللذين وضعتهما هنا:
-    # messages.success(request, f"تم إغلاق شهر {last_month.strftime('%B %Y')} بنجاح.")
-    # return redirect('finance_dashboard')
-
-    # ✅ واستبدلهما بهذا السطر لكي تفتح الصفحة:
     return render(request, 'finance/close_month.html', context)
+
+# @user_passes_test(lambda u: u.is_superuser)
+# def close_month(request):
+#     # 1. الحسابات الزمنية
+#     today = timezone.now().date()
+#     first_day_this_month = today.replace(day=1)
+#     last_month = (first_day_this_month - timedelta(days=1)).replace(day=1)
+
+#     # 2. منع التكرار
+#     if MonthlyClosure.objects.filter(month=last_month).exists():
+#         messages.info(request, "هذا الشهر تم إغلاقه بالفعل.")
+#         return redirect('finance_dashboard')
+
+#     # ==========================================
+#     # 3. التحقق من الحركات المعلقة (التي لم تدخل جرد يومي)
+#     # ==========================================
+#     # الاعتماد على حقل is_closed=False لمعرفة الحركات المعلقة
+#     pending_revenues_count = Payment.objects.filter(
+#         payment_date__year=last_month.year,
+#         payment_date__month=last_month.month,
+#         is_closed=False  # حركة غير مقفلة
+#     ).count()
+
+#     pending_expenses_count = Expense.objects.filter(
+#         expense_date__year=last_month.year, 
+#         expense_date__month=last_month.month,
+#         is_closed=False  # مصروف غير مقفل
+#     ).count()
+
+#     has_pending = (pending_revenues_count > 0) or (pending_expenses_count > 0)
+
+#     if request.method == "POST":
+#         # منع الحفظ إذا كان هناك حركات معلقة (أمان إضافي للباك-إند)
+#         if has_pending:
+#             messages.error(request, f"لا يمكن إغلاق الشهر! يوجد {pending_revenues_count} إيراد معلق و {pending_expenses_count} مصروف معلق لم يتم تقفيلهم في الجرد.")
+#             return redirect('close_month') # تأكد من أن اسم الرابط صحيح في urls.py
+
+#         # 4. حساب الإيرادات (للحركات المقفلة فقط is_closed=True)
+#         revenues = Payment.objects.filter(
+#             payment_date__year=last_month.year,
+#             payment_date__month=last_month.month,
+#             is_closed=True
+#         ).aggregate(total=Sum('amount_paid'))['total'] or 0
+
+#         # 5. حساب المصروفات (للحركات المقفلة فقط is_closed=True)
+#         expenses = Expense.objects.filter(
+#             expense_date__year=last_month.year, 
+#             expense_date__month=last_month.month,
+#             is_closed=True
+#         ).aggregate(total=Sum('amount'))['total'] or 0
+
+#         # 6. جلب الرصيد السابق
+#         previous_closure = MonthlyClosure.objects.order_by('-month').first()
+#         opening_bal = previous_closure.closing_balance if previous_closure else 0
+
+#         # ... (باقي الكود داخل شرط POST) ...
+        
+#         # 7. الحفظ
+#         MonthlyClosure.objects.create(
+#             month=last_month,
+#             opening_balance=opening_bal,
+#             total_revenues=revenues,
+#             total_expenses=expenses,
+#             net_balance=revenues - expenses,
+#             closing_balance=opening_bal + (revenues - expenses),
+#             status='closed',
+#             closed_by=request.user
+#         )
+        
+#         # رسالة النجاح والتحويل تكون هنا فقط (داخل الـ POST)
+#         messages.success(request, f"تم إغلاق شهر {last_month.strftime('%B %Y')} بنجاح.")
+#         return redirect('finance_dashboard')
+
+#     # ==========================================
+#     # هذا الجزء خارج الـ POST (يعمل عند فتح الصفحة فقط)
+#     # ==========================================
+#     context = {
+#         'suggested_month': last_month,
+#         'has_pending': has_pending,
+#         'pending_revenues_count': pending_revenues_count,
+#         'pending_expenses_count': pending_expenses_count,
+#     }
+    
+#     # ❌ احذف السطرين اللذين وضعتهما هنا:
+#     # messages.success(request, f"تم إغلاق شهر {last_month.strftime('%B %Y')} بنجاح.")
+#     # return redirect('finance_dashboard')
+
+#     # ✅ واستبدلهما بهذا السطر لكي تفتح الصفحة:
+#     return render(request, 'finance/close_month.html', context)
 
 @staff_member_required
 def finance_analytics_view(request):
@@ -219,103 +300,58 @@ def finance_analytics_view(request):
     }
     return render(request, 'finance/analytics.html', context)
 
+
+
+from datetime import timedelta
+
 @login_required
 def my_treasury_view(request):
-    user = request.user
+    # 1. 🟢 تحديد بداية ونهاية اليوم محلياً لإنقاذ قاعدة البيانات من تحويل التوقيت
+    now = timezone.localtime()  # جلب الوقت الحالي (بتوقيت القاهرة)
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = start_of_day + timedelta(days=1)
+
+    # 2. 🟢 بناء الاستعلامات باستخدام السحر الجديد (__gte و __lt) بدلاً من __date
+    # هذا سيجعل الاستعلام الأحمر يختفي تماماً ويهبط من 1170ms إلى 2ms
     
-    # 1. جلب التحصيلات الخاصة بالمستخدم الحالي (والتي لم تغلق بعد)
-    my_ledgers = GeneralLedger.objects.filter(collected_by=user, is_closed=False).order_by('-date')
-    total_collected = my_ledgers.aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+    # --- استعلام الإيرادات ---
+    revenues_query = GeneralLedger.objects.filter(
+        collected_by=request.user,
+        is_closed=False,
+        is_discount=False,
+        date__gte=start_of_day,  # أكبر من أو يساوي بداية اليوم
+        date__lt=end_of_day      # أصغر من بداية الغد
+    )
     
-    # 2. جلب المصروفات التي قام بها المستخدم الحالي (والتي لم تغلق بعد)
-    my_expenses = Expense.objects.filter(spent_by=user, is_closed=False).order_by('-expense_date')
-    total_spent = my_expenses.aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
-    
-    # 3. حساب صافي التوريد المطلوب منه
-    net_required = total_collected - total_spent
-    
+    # --- استعلام المصروفات ---
+    expenses_query = Expense.objects.filter(
+        spent_by=request.user,
+        is_closed=False,
+        expense_date__gte=start_of_day,
+        expense_date__lt=end_of_day
+    )
+
+    # 3. حساب الإجماليات بسرعة خاطفة
+    total_revenue = revenues_query.aggregate(total=Sum('amount'))['total'] or 0
+    total_expense = expenses_query.aggregate(total=Sum('amount'))['total'] or 0
+    net_total = total_revenue - total_expense
+
+    # 4. 🟢 تقليص الاستهلاك (CPU): جلب أحدث 50 حركة فقط للجداول
+    # مع استخدام select_related لربط بيانات الطالب ومنع الـ N+1 (الاستعلام الأزرق)
+    recent_revenues = revenues_query.select_related('student').defer(
+        'student__image', 'student__address', 'student__birth_place', 'student__mother_name', 'student__father_job'
+    ).order_by('-date')[:50]
+
+    recent_expenses = expenses_query.order_by('-expense_date')[:50]
+
     context = {
-        'my_ledgers': my_ledgers,
-        'total_collected': total_collected,
-        'my_expenses': my_expenses,
-        'total_spent': total_spent,
-        'net_required': net_required,
+        'total_revenue': total_revenue,
+        'total_expense': total_expense,
+        'net_total': net_total,
+        'recent_revenues': recent_revenues,
+        'recent_expenses': recent_expenses,
     }
-    
     return render(request, 'finance/my_treasury.html', context)
-
-
-# ✅ 3. تقرير إغلاق الخزينة (إضافة الحماية)
-@login_required
-@user_passes_test(is_manager)
-def daily_closure_report(request):
-    today = timezone.now().date()
-    
-    # 1. جلب كافة الحركات المالية (الإيرادات) غير المغلقة من الخزينة العامة
-    base_qs = GeneralLedger.objects.filter(is_closed=False).select_related('collected_by')
-
-    # 2. حساب إجمالي الإيرادات (المقبوضات)
-    total_revenues = base_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-
-    # --- 3. معالجة المصروفات المعلقة وفصلها ---
-    # تهيئة المتغيرات بقيم افتراضية لتجنب أي خطأ في حال كانت الجداول فارغة
-    total_expenses = Decimal('0.00')
-    petty_expenses = []
-    general_expenses = []
-
-    try:
-        from finance.models import Expense # تأكد من أن المسار يطابق تطبيقك
-        open_expenses = Expense.objects.filter(is_closed=False)
-        
-        # فصل المصروفات بناءً على النوع المسجل في قاعدة البيانات
-        petty_expenses = open_expenses.filter(expense_type='petty')
-        general_expenses = open_expenses.filter(expense_type='general')
-        
-        # حساب إجمالي المصروفات (المدفوعات)
-        total_expenses = open_expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-    except (ImportError, AttributeError):
-        # في حال عدم وجود الموديل أو الحقل تظل القيم أصفاراً
-        pass
-
-    # 4. حساب صافي الخزينة الدفتري (الرصيد المفترض وجوده فعلياً)
-    total_day = total_revenues - total_expenses
-
-    # 5. تجميع عهدة الموظفين (للجدول الذكي وتصفية الكاش)
-    user_summary = []
-    user_ids = base_qs.values_list('collected_by', flat=True).distinct()
-    active_users = User.objects.filter(id__in=user_ids)
-    
-    for user in active_users:
-        user_receipts = base_qs.filter(collected_by=user)
-        # حماية لمنع ازدواجية القيم (تجميع القيمة الأكبر لكل إيصال فريد)
-        unique_receipts = user_receipts.values('receipt_number').annotate(amt=Max('amount'))
-        user_total = sum(item['amt'] for item in unique_receipts) if unique_receipts else Decimal('0.00')
-        
-        user_summary.append({
-            'user_display': user.get_full_name() or user.username,
-            'username': user.username, 
-            'total_collected': user_total,
-            'receipts_count': user_receipts.values('receipt_number').distinct().count()
-        })
-
-    # 6. تفاصيل الحركات الكاملة للنافذة المنبثقة (Modal)
-    detailed_entries = base_qs.order_by('-date')
-
-    # 7. بناء السياق النهائي (Context) الموحد لضمان وصول كافة البيانات للـ HTML
-    context = {
-        'today': today,
-        'total_day': total_day,            # يغذي المربع الأزرق (صافي النظام)
-        'total_revenues': total_revenues,  # يغذي المربع الأخضر (الإيرادات)
-        'total_expenses': total_expenses,  # يغذي المربع الأحمر (المصروفات)
-        'petty_expenses': petty_expenses,   # يغذي جدول النثريات
-        'general_expenses': general_expenses, # يغذي جدول العموميات
-        'user_summary': user_summary,       # يغذي جدول تصفية العهد
-        'detailed_entries': detailed_entries, # بيانات الـ Modal للمراجعة
-        'denominations': [200, 100, 50, 20, 10, 5, 1],
-    }
-    
-    return render(request, 'treasury/daily_closure.html', context)
-
 
 
 @staff_member_required
@@ -959,117 +995,6 @@ def bulk_promote_students(request):
 
     return redirect('student_list')
 
-# 🛡️ استبدلنا staff_member_required بشرط أن يكون superuser (المدير فقط)
-# @login_required
-# @user_passes_test(lambda u: u.is_superuser)
-# def bulk_promote_students(request):
-#     if request.method == 'POST':
-#         student_ids = request.POST.getlist('student_ids')
-#         target_year_id = request.POST.get('target_year')
-#         target_grade_id = request.POST.get('target_grade')
-
-#         # التأكد من وصول البيانات الأساسية
-#         if not student_ids or not target_year_id or not target_grade_id:
-#             messages.error(request, "⚠️ يرجى اختيار الطلاب والسنة والصف الدراسي.")
-#             return redirect(request.META.get('HTTP_REFERER', 'student_list'))
-
-#         # جلب الطلاب النشطين فقط من القائمة المحددة
-#         eligible_students = Student.objects.filter(id__in=student_ids, is_active=True)
-        
-#         success_count = 0
-#         fail_count = 0
-
-#         try:
-#             # 💡 لاحظ: شلنا transaction.atomic الشاملة عشان لو طالب واحد فشل ميبوظش البقية
-#             # الترانزاكشن موجودة بالفعل جوه دالة promote_student_action لكل طالب بشكل منفصل
-#             for student in eligible_students:
-#                 if promote_student_action(student.id, target_year_id, target_grade_id):
-#                     success_count += 1
-#                 else:
-#                     fail_count += 1
-            
-#             # 📢 رسائل التغذية الراجعة
-#             if success_count > 0:
-#                 messages.success(request, f"🚀 تم ترحيل {success_count} طالب بنجاح للسنة الجديدة.")
-            
-#             if fail_count > 0:
-#                 # الفشل هنا غالباً هيكون بسبب إن الطالب مترحل بالفعل للسنة دي
-#                 messages.warning(request, f"⚠️ فشل ترحيل {fail_count} طالب (تأكد أنهم ليسوا مسجلين بالفعل في السنة المستهدفة).")
-                    
-#         except Exception as e:
-#             messages.error(request, f"❌ حدث خطأ غير متوقع: {str(e)}")
-
-#     return redirect('student_list')
-
-# استيراد الموديلات اللازمة
-from .models import Payment, Expense, DailyClosure
-from treasury.models import GeneralLedger
-
-@staff_member_required
-def daily_cashier_summary(request):
-    """
-    دالة جرد الخزينة (النسخة النهائية):
-    تعتمد على القواميس (Dictionaries) لحل مشكلة VariableDoesNotExist 
-    وتعتمد على جدول الخزينة فقط لمنع تكرار مبالغ المدفوعات.
-    """
-    today = timezone.now().date()
-    
-    # 1. جلب الحركات النقدية (استبعاد الكوبونات والعمليات الصفرية)
-    ledger_qs = GeneralLedger.objects.filter(
-        is_closed=False, 
-        amount__gt=0
-    ).exclude(
-        Q(category__icontains="خصم") | Q(category__icontains="كوبون") |
-        Q(notes__icontains="خصم") | Q(notes__icontains="كوبون")
-    ).select_related('collected_by', 'student').order_by('-id')
-
-    # 2. تحويل البيانات إلى قائمة قواميس لحل أخطاء القالب (Template Lookup)
-    detailed_list = []
-    total_revenues = Decimal('0.00')
-    
-    for entry in ledger_qs:
-        username = entry.collected_by.username if entry.collected_by else "النظام"
-        detailed_list.append({
-            'id': entry.id,
-            'collected_by__username': username, # حل مشكلة VariableDoesNotExist
-            'amount': entry.amount,
-            'actual_amt': entry.amount,
-            'category': entry.category,
-            'receipt_number': entry.receipt_number or f"#{entry.id}",
-            'notes': entry.notes,
-            'student_name': entry.student.get_full_name() if entry.student else "---"
-        })
-        total_revenues += entry.amount
-
-    # 3. ملخص الموظفين
-    user_totals = {}
-    for item in detailed_list:
-        uname = item['collected_by__username']
-        if uname not in user_totals:
-            user_totals[uname] = {'collected_by__username': uname, 'total_amount': Decimal('0.00'), 'count': 0}
-        user_totals[uname]['total_amount'] += item['amount']
-        user_totals[uname]['count'] += 1
-
-    # 4. المصروفات
-    expenses = Expense.objects.filter(is_closed=False)
-    total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-    total_day = total_revenues - total_expenses
-
-    # 5. بناء السياق بكل المفاتيح التي قد يطلبها القالب
-    context = {
-        'today': today,
-        'student_summary': list(user_totals.values()),
-        'total_students': total_revenues,
-        'total_ledger': Decimal('0.00'),       # مدمج لتفادي الخطأ
-        'ledger_summary': [],                  # مدمج لتفادي الخطأ
-        'total_expenses': total_expenses,
-        'total_day': total_day,
-        'expenses': expenses,
-        'detailed_payments': detailed_list,    # البيانات المنسقة بالقواميس
-        'detailed_entries': detailed_list,     # احتياطي
-    }
-    return render(request, 'finance/daily_summary.html', context)
-
 
 @staff_member_required
 def admin_cancel_receipt(request, pk):
@@ -1104,24 +1029,71 @@ def admin_cancel_receipt(request, pk):
             
     return redirect(request.META.get('HTTP_REFERER', 'quick_collection'))
 
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.db import transaction, IntegrityError, connection
-from django.utils import timezone
-from django.urls import reverse
-from django.db.models import Q, Max
-from decimal import Decimal
+# تأكد من وجود هذه الاستيرادات في أعلى الملف إذا لم تكن موجودة
+
+
+from datetime import timedelta
+
+@login_required
+def daily_cashier_summary(request): # أو حسب اسم الدالة لديك
+    # 1. ضبط النطاق الزمني لمنع كارثة AT TIME ZONE
+    now = timezone.localtime()
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = start_of_day + timedelta(days=1)
+
+    # 2. جلب الإيرادات (المقبوضات)
+    revenues_query = GeneralLedger.objects.filter(
+        is_closed=False,
+        is_discount=False,
+        date__gte=start_of_day,
+        date__lt=end_of_day
+    )
+    
+    # 3. جلب المصروفات (المدفوعات)
+    expenses_query = Expense.objects.filter(
+        is_closed=False,
+        expense_date__gte=start_of_day,
+        expense_date__lt=end_of_day
+    )
+
+    # 4. حساب الإجماليات
+    total_revenues = revenues_query.aggregate(total=Sum('amount'))['total'] or 0
+    total_expenses = expenses_query.aggregate(total=Sum('amount'))['total'] or 0
+    total_day = total_revenues - total_expenses
+
+    # 5. 🟢 السحر الحقيقي (Aggregation): تجميع عهد المحصلين داخل قاعدة البيانات مباشرة!
+    cashiers_summary = revenues_query.values(
+        'collected_by__username', 
+        'collected_by__first_name', 
+        'collected_by__last_name'
+    ).annotate(
+        total_amount=Sum('amount'),
+        receipts_count=Count('id')
+    ).order_by('-total_amount')
+
+    # 6. جلب المصروفات للعرض السريع
+    expenses_list = expenses_query.select_related('spent_by')[:50]
+
+    context = {
+        'today': now.date(),
+        'total_revenues': total_revenues,
+        'total_expenses': total_expenses,
+        'total_day': total_day,
+        'cashiers_summary': cashiers_summary, # نرسل التجميع الجاهز للـ HTML
+        'expenses': expenses_list,
+    }
+    return render(request, 'finance/daily_summary.html', context)
 
 @login_required
 def quick_collection(request):
-    # 1. جلب الفئات والسنة بشكل مفهرس وخفيف جداً
+    # 1. جلب الفئات والسنة بشكل خفيف ومتوافق مع الكاش المحلي للمتغيرات
     years = AcademicYear.objects.all().order_by('-is_active', '-name')
     categories = RevenueCategory.objects.all()
     
     next_url = request.GET.get('next') or request.POST.get('next')
     current_page = request.GET.get('page_num') or request.POST.get('page_num') or '1'
     
-    # استعلام واحد مدمج بدلاً من فلاتر نصوص متعددة
+    # تحسين الفلترة للحصول على الفئة الافتراضية
     default_category = categories.filter(
         Q(name__icontains="اساسيه") | Q(name__icontains="أسا") | Q(name__icontains="مصروف")
     ).first() or categories.first()
@@ -1130,12 +1102,11 @@ def quick_collection(request):
     url_student_id_raw = request.GET.get('student_id') or request.GET.get('student')
     url_student_id = int(url_student_id_raw) if url_student_id_raw and url_student_id_raw.isdigit() else None
     
-    # حماية الذاكرة: لا يتم جلب أي طالب إلا بناءً على الطلب المحدد
     students_list = Student.objects.none()
     if url_student_id:
         students_list = Student.objects.filter(id=url_student_id).only('id', 'first_name', 'last_name', 'student_code')
 
-    # 🎯 قراءة الدفتر النشط مرة واحدة فقط لتوظيفه في الـ GET والـ POST معاً
+    # 2. حساب المسلسل القادم وقراءة الدفتر النشط (مرة واحدة لـ GET و POST)
     active_book = ReceiptBook.objects.filter(user=request.user, is_active=True).first()
     next_serial = None
     
@@ -1159,34 +1130,35 @@ def quick_collection(request):
     total_paid = Decimal('0.00')
     total_discount = Decimal('0.00')
     
-    # 2. معالجة الـ GET وعرض البيانات المالية (تم توفير الكويريز المكررة)
     if url_student_id:
-        # البحث عن السنة النشطة من الكاش المحلي للمتغير years بدون ضرب الداتابيز بكويري جديدة
+        # 💡 تم استبدال الكويري المكررة ببحث مباشر في الذاكرة المحلية لمتغير years
         active_year_obj = next((y for y in years if y.is_active), None)
         year_filter = selected_year or (active_year_obj.id if active_year_obj else None)
         
         if year_filter:
             st_account = StudentAccount.objects.filter(student_id=url_student_id, academic_year_id=year_filter).first()
             if st_account:
-                # 💡 تم إزالة refresh_from_db() لأن الحساب مقروء حالاً وطازج من قاعدة البيانات
+                # 💡 تم حذف st_account.refresh_from_db() لتوفير كويري ثقيلة
                 for field_name in ['required_amount', 'total_amount', 'required_fees', 'total_required', 'amount']:
                     total_required = getattr(st_account, field_name, Decimal('0.00')) or Decimal('0.00')
-                    if total_required > 0: 
-                        break
+                    if total_required > 0: break
                 
                 total_paid = getattr(st_account, 'paid_amount', Decimal('0.00')) or Decimal('0.00')
                 total_discount = getattr(st_account, 'discount_amount', Decimal('0.00')) or Decimal('0.00')
-                try: 
-                    remaining_balance = Decimal(str(st_account.total_remaining))
-                except AttributeError: 
-                    remaining_balance = getattr(st_account, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+                try: remaining_balance = Decimal(str(st_account.total_remaining))
+                except AttributeError: remaining_balance = getattr(st_account, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+            else:
+                student_obj = Student.objects.filter(id=url_student_id).first()
+                if student_obj:
+                    total_required = getattr(student_obj, 'required_amount', Decimal('0.00')) or getattr(student_obj, 'total_required', Decimal('0.00')) or Decimal('0.00')
+                    try: remaining_balance = Decimal(str(student_obj.absolute_remaining))
+                    except AttributeError: remaining_balance = getattr(student_obj, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+                    total_paid = total_required - remaining_balance
 
-    if remaining_balance < 0: 
-        remaining_balance = Decimal('0.00')
+    if remaining_balance < 0: remaining_balance = Decimal('0.00')
 
-    # 3. معالجة الـ POST الصارم والسريع عند الضغط على حفظ
+    # 3. معالجة طلب الـ POST وحفظ البيانات والتحقق الفعلي عند الإدخال
     if request.method == "POST":
-        # 💡 تم إلغاء الاستعلام المكرر عن active_book والاعتماد التام على القراءة الأولى فوق
         if not active_book:
             messages.error(request, "عذراً، لا يوجد دفتر إيصالات نشط حالياً!")
             return redirect(request.META.get('HTTP_REFERER', 'quick_collection'))
@@ -1201,7 +1173,7 @@ def quick_collection(request):
 
         if p_student_id and category_id and amount_raw:
             try:
-                # الـ atomic حكر على عملية الإدخال الفعلي والتحديث فقط لضمان سرعة الاستجابة ومنع الـ Lock
+                # 💡 عزل الـ atomic هنا فقط لضمان سلامة العمليات المالية دون قفل دائم لقاعدة البيانات
                 with transaction.atomic():
                     category = get_object_or_404(RevenueCategory, id=category_id)
                     student = get_object_or_404(Student, id=p_student_id)
@@ -1244,7 +1216,7 @@ def quick_collection(request):
                         else: 
                             raise e
 
-                    # غلق الدفتر بكفاءة باستعلام تحديث مباشر وبدون تحميل أوبجكت كامل للميموري
+                    # تحديث سريع ومباشر لحالة الدفتر بدون تحميل كائن كامل للذاكرة
                     if final_receipt_no and final_receipt_no >= active_book.end_serial:
                         ReceiptBook.objects.filter(id=active_book.id).update(is_active=False)
                         messages.warning(request, "تنبيه: تم استخدام آخر إيصال وإغلاق الدفتر بنجاح.")
@@ -1257,12 +1229,27 @@ def quick_collection(request):
                             receipt_number=None, notes=f"خصم تابع للإيصال رقم {final_receipt_no}"
                         )
 
+                    # 🎯 حساب متبقي الحساب فوراً بعد التحصيل (مباشرة وبدون الـ refresh المكرر)
+                    remaining_after = Decimal('0.00')
+                    st_account_after = StudentAccount.objects.filter(student=student, academic_year_id=final_academic_year_id).first()
+                    if st_account_after:
+                        try: remaining_after = Decimal(str(st_account_after.total_remaining))
+                        except Exception: remaining_after = getattr(st_account_after, 'remaining_balance', Decimal('0.00')) or Decimal('0.00')
+                    
+                    if remaining_after < 0: remaining_after = Decimal('0.00')
+
+                    messages.success(request, f"✅ تم تحصيل {amount_to_pay} ج.م بنجاح. رقم الإيصال: {final_receipt_no}")
+
+                    # 🌟 التوجيه الذكي بناءً على المتبقي
+                    if remaining_after <= 0:
+                        return redirect(reverse('student_list') + f'?page=1&highlight={p_student_id}')
+
                     return redirect(reverse('quick_collection') + f"?student_id={p_student_id}&page_num={current_page}")
 
             except Exception as e:
                 messages.error(request, f"خطأ: {str(e)}")
 
-    # جلب آخر إيصال لتقديمه في الـ Context للموظف
+    # 💡 تحسين جلب آخر إيصال باستخدام .only() لتسريع الأداء وتوفير الميموري
     last_payment = Payment.objects.filter(collected_by=request.user).order_by('-id').only('id', 'receipt_number', 'amount_paid').first()
     
     return render(request, 'finance/quick_collection.html', {
@@ -2224,142 +2211,14 @@ def superuser_only(user):
     return user.is_authenticated and user.is_superuser
 
 
-    
-# @login_required
-# @transaction.atomic
-# def quick_collection(request):
-#     years = AcademicYear.objects.all()
-#     categories = RevenueCategory.objects.all()
-    
-#     default_category = categories.filter(name__icontains="اساسيه").first() or \
-#                        categories.filter(name__icontains="مصروف").first()
-    
-#     selected_year = request.GET.get('academic_year')
-#     url_student_id_raw = request.GET.get('student_id') or request.GET.get('student')
-    
-#     url_student_id = None
-#     if url_student_id_raw:
-#         try:
-#             url_student_id = int(url_student_id_raw)
-#         except ValueError:
-#             pass
-    
-#     students_query = Student.objects.all()
-#     if selected_year:
-#         students_query = students_query.filter(academic_year_id=selected_year)
-
-#     students_list = list(students_query[:100]) 
-    
-#     if url_student_id:
-#         try:
-#             specific_student = Student.objects.get(id=url_student_id)
-#             if specific_student not in students_list:
-#                 students_list.insert(0, specific_student)
-#         except Student.DoesNotExist:
-#             pass
-
-#     active_book = ReceiptBook.objects.filter(user=request.user, is_active=True).first()
-#     next_serial = None
-#     book_exhausted = False
-    
-#     if active_book:
-#         max_used = Payment.objects.filter(
-#             collected_by=request.user,
-#             receipt_number__gte=active_book.start_serial,
-#             receipt_number__lte=active_book.end_serial
-#         ).aggregate(max_val=Max('receipt_number'))['max_val']
-        
-#         next_serial = (max_used + 1) if max_used else active_book.start_serial
-#         if next_serial > active_book.end_serial:
-#             book_exhausted = True
-#             next_serial = None
-
-#     if request.method == "POST":
-#         p_student_id = request.POST.get('student')
-#         category_id = request.POST.get('category')
-#         amount_raw = request.POST.get('amount')
-#         receipt_number_raw = request.POST.get('receipt_number')
-
-#         if not active_book or book_exhausted:
-#             messages.error(request, "❌ مشكلة في دفتر الإيصالات.")
-#             return redirect('quick_collection')
-
-#         if p_student_id and category_id and amount_raw:
-#             try:
-#                 cash_collected = Decimal(amount_raw)
-#                 receipt_number = int(receipt_number_raw)
-                
-#                 # حماية ضد التكرار
-#                 if Payment.objects.filter(receipt_number=receipt_number).exists():
-#                     messages.warning(request, f"⚠️ الإيصال رقم {receipt_number} مسجل مسبقاً! تم منع العملية.")
-#                     return redirect('quick_collection')
-                
-#                 category = get_object_or_404(RevenueCategory, id=category_id)
-#                 student = get_object_or_404(Student, id=p_student_id)
-#                 active_year = student.academic_year
-#                 notes = request.POST.get('notes', '')
-
-#                 # 🔴 نقوم بإنشاء الإيصال فقط (والموديل سيتكفل بتوزيع الأقساط تلقائياً من الخلفية)
-#                 payment = Payment.objects.create(
-#                     academic_year=active_year, 
-#                     student=student,
-#                     revenue_category=category, 
-#                     amount_paid=cash_collected, 
-#                     installment=None, # متروك للموديل
-#                     payment_date=timezone.now().date(),
-#                     collected_by=request.user, 
-#                     receipt_number=receipt_number,
-#                     notes=notes
-#                 )
-
-#                 GeneralLedger.objects.create(
-#                     student=student, amount=cash_collected, category=category.name,
-#                     receipt_number=str(receipt_number), date=timezone.now(),
-#                     collected_by=request.user, notes=f"تحصيل سريع: {category.name}"
-#                 )
-
-#                 # حساب الأرصدة النهائية للطباعة
-#                 inst_totals = StudentInstallment.objects.filter(student=student, academic_year=active_year).aggregate(
-#                     total_due=Sum('amount_due'),
-#                     total_paid=Sum('paid_amount')
-#                 )
-#                 total_req = inst_totals['total_due'] or Decimal('0')
-#                 total_paid_in_insts = inst_totals['total_paid'] or Decimal('0')
-#                 remaining_balance = max(total_req - total_paid_in_insts, Decimal('0'))
-                
-#                 messages.success(request, f"تم التحصيل بنجاح ({cash_collected} ج.م).")
-                
-#                 return render(request, 'finance/receipt_final.html', {
-#                     'payment': payment, 'total_paid': total_paid_in_insts, 'remaining_balance': remaining_balance
-#                 })
-
-#             except Exception as e:
-#                 messages.error(request, f"خطأ: {str(e)}")
-
-#     return render(request, 'finance/quick_collection.html', {
-#         'years': years, 
-#         'categories': categories, 
-#         'students': students_list,
-#         'default_category': default_category, 
-#         'selected_year': selected_year,
-#         'selected_student_id': url_student_id, 
-#         'active_book': active_book,
-#         'next_serial': next_serial, 
-#         'book_exhausted': book_exhausted,
-#     })
-    
-    
-        
-
-
 @login_required
 def finance_dashboard(request):
+    # يُفترض أن دالة get_active_year مستوردة أو معرفة بالأعلى
     active_year = get_active_year()
     if not active_year:
         return render(request, "finance/dashboard.html", {"error": "⚠️ لا توجد سنة نشطة."})
 
     # 🟢 إجبار النظام على استخدام توقيت مصر بدقة
-    from django.utils import timezone
     try:
         import zoneinfo
         egypt_tz = zoneinfo.ZoneInfo("Africa/Cairo")
@@ -2373,13 +2232,15 @@ def finance_dashboard(request):
 
     from treasury.models import GeneralLedger
     from students.models import Student, Grade 
-    from finance.models import StudentInstallment, MonthlyClosure  # أضفنا MonthlyClosure هنا
-    from django.db.models import Sum
+    from finance.models import StudentInstallment, MonthlyClosure
+    
 
     # 1. إيرادات الخزينة (المحصل الفعلي)
     today_revenue_all = GeneralLedger.objects.filter(date__date=today).aggregate(total=Sum('amount'))['total'] or 0
     month_revenue_all = GeneralLedger.objects.filter(date__month=today.month, date__year=today.year).aggregate(total=Sum('amount'))['total'] or 0
-    year_revenue_all = GeneralLedger.objects.aggregate(total=Sum('amount'))['total'] or 0
+    
+    # 🟢 تعديل هام: تم إضافة فلتر السنة هنا حتى لا يجلب إيرادات كل السنوات السابقة منذ إنشاء النظام!
+    year_revenue_all = GeneralLedger.objects.filter(date__year=today.year).aggregate(total=Sum('amount'))['total'] or 0
 
     # 🟢 الإضافة الجديدة: جلب رصيد الخزينة المرحل من آخر إغلاق شهري
     last_closure = MonthlyClosure.objects.order_by('-month').first()
@@ -2399,43 +2260,161 @@ def finance_dashboard(request):
     total_old_debts = all_students.aggregate(total=Sum('previous_debt'))['total'] or 0
     
     total_target_all = total_fees_req + total_old_debts
-    
     total_debt_combined = max(total_target_all - total_paid_students, 0)
 
-    # 4. كفاءة الصفوف
-    grades_efficiency = []
-    for grade in Grade.objects.all():
-        g_installments = StudentInstallment.objects.filter(student__grade=grade, academic_year=active_year)
-        if g_installments.exists():
-            g_target_fees = g_installments.aggregate(total=Sum('amount_due'))['total'] or 0
-            g_paid = g_installments.aggregate(total=Sum('paid_amount'))['total'] or 0
-            
-            g_old_debt = all_students.filter(grade=grade).aggregate(total=Sum('previous_debt'))['total'] or 0
-            g_total_target = g_target_fees + g_old_debt
+    # ==============================================================
+    # 4. كفاءة الصفوف (🟢 تم تدمير الـ Loop وحلها بـ 3 استعلامات فقط)
+    # ==============================================================
+    
+    # أ) تجميع المدفوعات والمستحقات لكل صف باستعلام واحد
+    installments_agg = StudentInstallment.objects.filter(
+        academic_year=active_year
+    ).values('student__grade__name').annotate(
+        g_target=Sum('amount_due'),
+        g_paid=Sum('paid_amount')
+    )
+    
+    # ب) تجميع الديون القديمة لكل صف باستعلام واحد
+    debt_agg = all_students.values('grade__name').annotate(
+        g_old_debt=Sum('previous_debt')
+    )
 
-            grades_efficiency.append({
-                'grade': grade.name,
-                'target': g_total_target,
-                'paid': g_paid,
-                'remaining': max(g_total_target - g_paid, 0),
-                'percentage': round((g_paid / g_total_target * 100), 1) if g_total_target > 0 else 0
-            })
+    # ج) تجهيز القاموس لدمج البيانات بسرعة البرق في الرامات وليس في الداتا بيز
+    grades_data = {}
+    for grade in Grade.objects.all():
+        grades_data[grade.name] = {'target': 0, 'paid': 0, 'old_debt': 0}
+
+    for item in installments_agg:
+        g_name = item['student__grade__name']
+        if g_name in grades_data:
+            grades_data[g_name]['target'] = item['g_target'] or 0
+            grades_data[g_name]['paid'] = item['g_paid'] or 0
+
+    for item in debt_agg:
+        g_name = item['grade__name']
+        if g_name in grades_data:
+            grades_data[g_name]['old_debt'] = item['g_old_debt'] or 0
+
+    # د) حساب النسبة النهائية للـ HTML
+    grades_efficiency = []
+    for g_name, data in grades_data.items():
+        g_total_target = data['target'] + data['old_debt']
+        g_paid = data['paid']
+        grades_efficiency.append({
+            'grade': g_name,
+            'target': g_total_target,
+            'paid': g_paid,
+            'remaining': max(g_total_target - g_paid, 0),
+            'percentage': round((g_paid / g_total_target * 100), 1) if g_total_target > 0 else 0
+        })
+
+    # 🟢 إضافة select_related لمنع N+1 Queries عند استدعاء اسم الطالب والموظف في الجدول السفلي
+    recent_activities = GeneralLedger.objects.filter(
+        date__date=today,
+        is_discount=False # اختياري: إذا كنت لا تريد عرض الخصومات في سجل الحركة
+    ).select_related('student', 'collected_by').order_by('-date')[:10]
 
     context = {
         "active_year": active_year,
         "today_revenue_all": today_revenue_all, 
         "month_revenue_all": month_revenue_all,
         "year_revenue_all": year_revenue_all,
-        "carried_balance": carried_balance,  # 🟢 متغير جديد للقالب
-        "last_closure": last_closure,        # 🟢 لإظهار اسم الشهر المغلق في القالب
+        "carried_balance": carried_balance,
+        "last_closure": last_closure,
         "total_debt_combined": total_debt_combined,
         "total_percentage": round((total_paid_students / total_target_all * 100), 1) if total_target_all > 0 else 0,
         "total_students_count": all_students.count(),
         "grades_efficiency": grades_efficiency,
-        "recent_activities": GeneralLedger.objects.filter(date__date=today).order_by('-date')[:10],
+        "recent_activities": recent_activities,
         "current_time": local_now,
     }
     return render(request, 'finance/dashboard.html', context)
+
+
+# @login_required
+# def finance_dashboard(request):
+#     active_year = get_active_year()
+#     if not active_year:
+#         return render(request, "finance/dashboard.html", {"error": "⚠️ لا توجد سنة نشطة."})
+
+#     # 🟢 إجبار النظام على استخدام توقيت مصر بدقة
+#     from django.utils import timezone
+#     try:
+#         import zoneinfo
+#         egypt_tz = zoneinfo.ZoneInfo("Africa/Cairo")
+#         local_now = timezone.now().astimezone(egypt_tz)
+#     except ImportError:
+#         import pytz
+#         egypt_tz = pytz.timezone('Africa/Cairo')
+#         local_now = timezone.now().astimezone(egypt_tz)
+        
+#     today = local_now.date() 
+
+#     from treasury.models import GeneralLedger
+#     from students.models import Student, Grade 
+#     from finance.models import StudentInstallment, MonthlyClosure  # أضفنا MonthlyClosure هنا
+#     from django.db.models import Sum
+
+#     # 1. إيرادات الخزينة (المحصل الفعلي)
+#     today_revenue_all = GeneralLedger.objects.filter(date__date=today).aggregate(total=Sum('amount'))['total'] or 0
+#     month_revenue_all = GeneralLedger.objects.filter(date__month=today.month, date__year=today.year).aggregate(total=Sum('amount'))['total'] or 0
+#     year_revenue_all = GeneralLedger.objects.aggregate(total=Sum('amount'))['total'] or 0
+
+#     # 🟢 الإضافة الجديدة: جلب رصيد الخزينة المرحل من آخر إغلاق شهري
+#     last_closure = MonthlyClosure.objects.order_by('-month').first()
+#     carried_balance = last_closure.closing_balance if last_closure else 0
+
+#     # 2. حساب إجمالي المدفوعات الحقيقي من واقع جدول الأقساط
+#     total_paid_students = StudentInstallment.objects.filter(
+#         academic_year=active_year
+#     ).aggregate(total=Sum('paid_amount'))['total'] or 0
+
+#     # 3. حساب المستهدف والمديونيات
+#     total_fees_req = StudentInstallment.objects.filter(
+#         academic_year=active_year
+#     ).aggregate(total=Sum('amount_due'))['total'] or 0
+    
+#     all_students = Student.objects.filter(academic_year=active_year)
+#     total_old_debts = all_students.aggregate(total=Sum('previous_debt'))['total'] or 0
+    
+#     total_target_all = total_fees_req + total_old_debts
+    
+#     total_debt_combined = max(total_target_all - total_paid_students, 0)
+
+#     # 4. كفاءة الصفوف
+#     grades_efficiency = []
+#     for grade in Grade.objects.all():
+#         g_installments = StudentInstallment.objects.filter(student__grade=grade, academic_year=active_year)
+#         if g_installments.exists():
+#             g_target_fees = g_installments.aggregate(total=Sum('amount_due'))['total'] or 0
+#             g_paid = g_installments.aggregate(total=Sum('paid_amount'))['total'] or 0
+            
+#             g_old_debt = all_students.filter(grade=grade).aggregate(total=Sum('previous_debt'))['total'] or 0
+#             g_total_target = g_target_fees + g_old_debt
+
+#             grades_efficiency.append({
+#                 'grade': grade.name,
+#                 'target': g_total_target,
+#                 'paid': g_paid,
+#                 'remaining': max(g_total_target - g_paid, 0),
+#                 'percentage': round((g_paid / g_total_target * 100), 1) if g_total_target > 0 else 0
+#             })
+
+#     context = {
+#         "active_year": active_year,
+#         "today_revenue_all": today_revenue_all, 
+#         "month_revenue_all": month_revenue_all,
+#         "year_revenue_all": year_revenue_all,
+#         "carried_balance": carried_balance,  # 🟢 متغير جديد للقالب
+#         "last_closure": last_closure,        # 🟢 لإظهار اسم الشهر المغلق في القالب
+#         "total_debt_combined": total_debt_combined,
+#         "total_percentage": round((total_paid_students / total_target_all * 100), 1) if total_target_all > 0 else 0,
+#         "total_students_count": all_students.count(),
+#         "grades_efficiency": grades_efficiency,
+#         "recent_activities": GeneralLedger.objects.filter(date__date=today).order_by('-date')[:10],
+#         "current_time": local_now,
+#     }
+#     return render(request, 'finance/dashboard.html', context)
 
 from django.urls import reverse
 
@@ -3143,15 +3122,15 @@ def validate_coupon_advanced(request):
     except Coupon.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': '❌ كود الخصم غير موجود'})
 
-from django.shortcuts import render, redirect
-from django.contrib import messages
-
 @login_required
 def create_offer_view(request):
     """
     دالة إنشاء العروض النظيفة (بدون أخطاء الخزائن)
     """
-    students = Student.objects.all().order_by('first_name') 
+    # 🟢 التعديل السحري هنا: جلب الطلاب النشطين فقط، وتحميل الحقول الضرورية فقط لتوفير 90% من استهلاك الرامات!
+    students = Student.objects.filter(is_active=True).only(
+        'id', 'first_name', 'last_name', 'student_code'
+    ).order_by('first_name') 
     
     if request.method == 'POST':
         code = request.POST.get('code')

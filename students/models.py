@@ -311,7 +311,11 @@ class RemedialProgramRecord(models.Model):
     academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
     subjects_count = models.PositiveIntegerField(default=1, verbose_name="عدد المواد المتخلف عنها")
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="إجمالي الرسوم المطلوبة")
-    is_paid = models.BooleanField(default=False, verbose_name="تم السداد؟")
+    is_paid = models.BooleanField(
+        default=False, 
+        verbose_name="تم السداد؟", 
+        db_index=True  # 🟢 إضافة الفهرس هنا لتسريع فلترة المسدد وغير المسدد
+    )
     notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات")
     
     created_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, verbose_name="مسجل البيان")
@@ -478,8 +482,14 @@ class BookSale(models.Model):
     pay_now = models.DecimalField("المبلغ المدفوع الآن", max_digits=10, decimal_places=2, default=0)
     
     status = models.CharField("حالة الحركة", max_length=20, choices=STATUS_CHOICES, default='pending')
+    
     is_delivered = models.BooleanField("تم الاستلام من المخزن؟", default=False)
-    sale_date = models.DateTimeField("تاريخ الحركة", auto_now_add=True)
+    
+    sale_date = models.DateTimeField(
+        "تاريخ الحركة", 
+        auto_now_add=True,
+        db_index=True  # 🟢 إضافة الفهرس هنا لتسريع الـ ORDER BY
+    )
 
     class Meta:
         verbose_name = "إذن استلام ومبيعات"
@@ -801,7 +811,7 @@ class MiscellaneousRevenue(models.Model):
     title = models.CharField("بيان الإيراد", max_length=200)
     revenue_type = models.CharField("تصنيف الإيراد", max_length=50, choices=REVENUE_TYPES, default='other')
     amount = models.DecimalField("المبلغ المورد", max_digits=12, decimal_places=2)
-    date = models.DateTimeField("تاريخ ووقت التحصيل", auto_now_add=True)
+    date = models.DateField(auto_now_add=True, verbose_name="تاريخ الإيراد", db_index=True)
     collected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="الموظف المستلم")
     notes = models.TextField("ملاحظات إضافية", blank=True, null=True)
 

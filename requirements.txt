@@ -39,4 +39,5 @@ dj-database-url
 whitenoise
 gunicorn
 pandas
-
+qrcode
+pypdf

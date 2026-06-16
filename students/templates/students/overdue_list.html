@@ -2,54 +2,162 @@
 
 {% block title %}قائمة الاتصال بالأقساط المتأخرة{% endblock %}
 
+{% block extra_css %}
+<style>
+    .premium-card {
+        background: linear-gradient(145deg, #0f172a, #020617);
+        border: 1px solid #1e293b;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        overflow: hidden;
+    }
+    .card-header-custom {
+        background: rgba(255, 49, 49, 0.05);
+        border-bottom: 2px solid #ff3131;
+        padding: 20px;
+    }
+    .neon-text-danger {
+        color: #ff3131;
+        text-shadow: 0 0 15px rgba(255, 49, 49, 0.4);
+        font-weight: 900;
+    }
+    .table-premium {
+        --bs-table-bg: transparent;
+        color: #e2e8f0;
+        margin-bottom: 0;
+    }
+    .table-premium thead th {
+        color: #94a3b8;
+        font-size: 0.95rem;
+        border-bottom: 2px solid #1e293b;
+        font-weight: 800;
+        padding: 15px;
+        background: #000000;
+        white-space: nowrap;
+    }
+    .table-premium tbody tr { border-bottom: 1px solid #0f172a; transition: all 0.2s; }
+    .table-premium tbody tr:hover { background: rgba(255, 49, 49, 0.05); }
+    .table-premium td { padding: 15px; vertical-align: middle; }
+
+    .btn-whatsapp {
+        background: rgba(37, 211, 102, 0.1);
+        color: #25D366;
+        border: 1px solid rgba(37, 211, 102, 0.3);
+        border-radius: 50px;
+        font-weight: 700;
+        transition: all 0.3s ease;
+    }
+    .btn-whatsapp:hover {
+        background: #25D366;
+        color: #000;
+        box-shadow: 0 0 15px rgba(37, 211, 102, 0.4);
+    }
+    .phone-text {
+        font-family: monospace;
+        font-size: 1.1rem;
+        color: #e2e8f0;
+        letter-spacing: 1px;
+    }
+
+    .search-box {
+        background: #000000;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        color: #fff;
+        padding: 12px 20px;
+        font-weight: 700;
+        transition: all 0.3s;
+    }
+    .search-box:focus {
+        border-color: #ff3131;
+        box-shadow: 0 0 15px rgba(255, 49, 49, 0.2);
+        outline: none;
+    }
+
+    .pagination .page-link {
+        background-color: #000;
+        color: #94a3b8;
+        border: 1px solid #1e293b;
+        margin: 0 3px;
+        border-radius: 8px !important;
+        font-weight: 700;
+        transition: 0.3s;
+    }
+    .pagination .page-item.active .page-link {
+        background-color: #ff3131;
+        color: #fff;
+        border-color: #ff3131;
+        box-shadow: 0 0 10px rgba(255, 49, 49, 0.4);
+    }
+    .pagination .page-link:hover:not(.active) { background-color: #1e293b; color: #fff; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-4" style="direction: rtl;">
-    <div class="card bg-dark border-danger shadow-lg">
-        <div class="card-header border-danger bg-transparent d-flex justify-content-between align-items-center">
-            <h4 class="text-danger mb-0">
-                <i class="bi bi-telephone-outbound-fill me-2"></i> قائمة المتابعة والتحصيل (أقساط متأخرة)
+<div class="container-fluid py-4" dir="rtl">
+    <div class="premium-card">
+        <div class="card-header-custom d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <h4 class="neon-text-danger mb-0 d-flex align-items-center">
+                <i class="bi bi-telephone-outbound-fill me-3 fs-2"></i> 
+                سجل المتابعة والتحصيل (متأخرات مالية)
             </h4>
-            <span class="badge bg-danger" id="caseCount">إجمالي الحالات في هذه الصفحة: {{ students.object_list|length }}</span>
+            <span class="badge bg-danger fs-6 px-3 py-2 rounded-pill shadow-sm" id="caseCount">
+                معروض حالياً: {{ students.object_list|length }} حالة
+            </span>
         </div>
 
-        <div class="p-3 border-bottom border-secondary">
-            <div class="input-group">
-                <span class="input-group-text bg-danger text-white border-danger">
-                    <i class="bi bi-search"></i>
-                </span>
-                <input type="text" id="overdueSearch" onkeyup="filterOverdueTable()" class="form-control bg-dark text-white border-danger" placeholder="ابحث باسم الطالب أو رقم الهاتف في هذه الصفحة...">
+        <div class="p-4 border-bottom border-secondary border-opacity-25 bg-black">
+            <div class="position-relative">
+                <i class="bi bi-search position-absolute text-secondary fs-5" style="top: 13px; right: 15px;"></i>
+                <input type="text" id="overdueSearch" onkeyup="filterOverdueTable()" class="form-control search-box" style="padding-right: 45px;" placeholder="ابحث فورياً في قاعدة البيانات بالكامل باسم الطالب، الكود، التليفون، أو الواتساب...">
             </div>
         </div>
         
         <div class="table-responsive">
-            <table class="table table-dark table-hover mb-0 text-center align-middle" id="overdueTable">
+            <table class="table table-premium text-center" id="overdueTable">
                 <thead>
-                    <tr class="table-danger text-dark">
-                        <th class="py-3 text-end pe-4">اسم الطالب</th>
-                        <th>رقم الهاتف</th>
+                    <tr>
+                        <th class="text-start pe-4">كود / اسم الطالب</th>
+                        <th>المبلغ المتأخر المطلوب</th>
+                        <th>رقم التليفون (مكالمات)</th>
+                        <th>رقم الواتساب (مراسلة)</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for student in students %}
-                    <tr class="overdue-row">
-                        <td class="fw-bold text-white text-end pe-4 student-name">
-                            {{ student.get_full_name }}
+                    <tr>
+                        <td class="text-start pe-4">
+                            <div class="fw-bold text-white fs-6">{{ student.get_full_name }}</div>
+                            <div class="text-secondary small mt-1"><i class="bi bi-hash text-info"></i> كود: {{ student.student_code|default:"-" }}</div>
                         </td>
-                        <td class="fs-5 text-info mono student-whatsapp">
+                        <td>
+                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger px-3 py-2 fs-6 rounded-pill">
+                                {{ student.total_overdue }} ج.م
+                            </span>
+                        </td>
+                        <td class="phone-text">
+                            {% if student.phone %}
+                                <i class="bi bi-telephone-fill text-secondary me-1 small"></i> {{ student.phone }}
+                            {% else %}
+                                <span class="text-muted small">غير مسجل</span>
+                            {% endif %}
+                        </td>
+                        <td>
                             {% if student.whatsapp_number %}
-                                <a href="https://wa.me/2{{ student.whatsapp_number }}" target="_blank" class="text-info text-decoration-none">
-                                    {{ student.whatsapp_number }}
+                                <a href="https://wa.me/2{{ student.whatsapp_number }}" target="_blank" class="btn btn-sm btn-whatsapp px-3">
+                                    <i class="bi bi-whatsapp me-1"></i> {{ student.whatsapp_number }}
                                 </a>
                             {% else %}
-                                <span class="text-muted">لا يوجد رقم</span>
+                                <span class="text-muted small">غير مسجل</span>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="2" class="py-5 text-muted">
-                            <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-3"></i>
-                            لا توجد أقساط متأخرة حالياً.. جميع الأقساط محصلة!
+                        <td colspan="4" class="py-5 text-center text-muted">
+                            <i class="bi bi-shield-check text-success" style="font-size: 4rem;"></i>
+                            <h5 class="mt-3 text-white fw-bold">الخزينة نظيفة!</h5>
+                            <p>لا توجد أي أقساط متأخرة مستحقة على الطلاب.</p>
                         </td>
                     </tr>
                     {% endfor %}
@@ -57,17 +165,17 @@
             </table>
         </div>
 
-        {% if students.has_other_pages %}
-        <div class="card-footer bg-transparent border-secondary d-flex justify-content-between align-items-center py-3">
-            <div class="text-white-50 small">
-                عرض {{ students.start_index }} إلى {{ students.end_index }} من إجمالي {{ students.paginator.count }} حالة
+        <div class="p-4 bg-black border-top border-secondary border-opacity-25 d-flex justify-content-between align-items-center flex-wrap gap-3" id="pagination-container">
+            <div class="text-secondary small fw-bold">
+                إجمالي المتأخرين: <span class="text-white" id="totalCountSpan">{{ students.paginator.count }}</span> طالب
             </div>
             
+            {% if students.has_other_pages %}
             <nav aria-label="Page navigation">
-                <ul class="pagination pagination-sm mb-0">
+                <ul class="pagination pagination-sm m-0">
                     {% if students.has_previous %}
                         <li class="page-item">
-                            <a class="page-link bg-dark border-secondary text-info" href="?page=1{% if request.GET.student_id %}&student_id={{ request.GET.student_id }}{% endif %}">
+                            <a class="page-link" href="?page=1">
                                 <i class="bi bi-chevron-double-right"></i>
                             </a>
                         </li>
@@ -75,69 +183,104 @@
 
                     {% for num in students.paginator.page_range %}
                         {% if students.number == num %}
-                            <li class="page-item active">
-                                <span class="page-link bg-danger border-danger text-white fw-bold">{{ num }}</span>
-                            </li>
+                            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
                         {% elif num > students.number|add:'-3' and num < students.number|add:'3' %}
                             <li class="page-item">
-                                <a class="page-link bg-dark border-secondary text-info" href="?page={{ num }}{% if request.GET.student_id %}&student_id={{ request.GET.student_id }}{% endif %}">{{ num }}</a>
+                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
                             </li>
                         {% endif %}
                     {% endfor %}
 
                     {% if students.has_next %}
                         <li class="page-item">
-                            <a class="page-link bg-dark border-secondary text-info" href="?page={{ students.paginator.num_pages }}{% if request.GET.student_id %}&student_id={{ request.GET.student_id }}{% endif %}">
+                            <a class="page-link" href="?page={{ students.paginator.num_pages }}">
                                 <i class="bi bi-chevron-double-left"></i>
                             </a>
                         </li>
                     {% endif %}
                 </ul>
             </nav>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 </div>
 
 <script>
+let delayTimer;
 function filterOverdueTable() {
-    let input = document.getElementById("overdueSearch");
-    let filter = input.value.toLowerCase();
-    let table = document.getElementById("overdueTable");
-    let tr = table.getElementsByClassName("overdue-row");
-    let visibleCount = 0;
+    clearTimeout(delayTimer);
+    let input = document.getElementById("overdueSearch").value.trim();
+    let countBadge = document.getElementById("caseCount");
+    
+    // شارة تحميل مؤقتة
+    countBadge.innerText = "جاري البحث المتقدم...";
+    countBadge.className = "badge bg-warning text-dark fs-6 px-3 py-2 rounded-pill shadow-sm";
 
-    for (let i = 0; i < tr.length; i++) {
-        let nameElement = tr[i].getElementsByClassName("student-name")[0];
-        let phoneElement = tr[i].getElementsByClassName("student-phone")[0];
-        
-        if (nameElement && phoneElement) {
-            let name = nameElement.innerText.toLowerCase();
-            let phone = phoneElement.innerText.toLowerCase();
+    // ديباونس انتظام الكتابة لمنع إرهاق السيرفر (500 ملي ثانية)
+    delayTimer = setTimeout(function() {
+        fetch(`?q=${encodeURIComponent(input)}&ajax=1`, {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+        .then(response => response.json())
+        .then(data => {
+            let tbody = document.querySelector("#overdueTable tbody");
+            tbody.innerHTML = ""; 
             
-            if (name.includes(filter) || phone.includes(filter)) {
-                tr[i].style.display = "";
-                visibleCount++;
-            } else {
-                tr[i].style.display = "none";
+            if (data.students.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="py-5 text-center text-muted">
+                            <i class="bi bi-search text-danger" style="font-size: 3rem;"></i>
+                            <h5 class="mt-3 text-white fw-bold">لا توجد نتائج مطابقة!</h5>
+                            <p>لم نجد أي متأخرات تطابق العبارة المكتوبة في قاعدة البيانات بالكامل.</p>
+                        </td>
+                    </tr>`;
+                countBadge.innerText = "نتائج البحث: 0";
+                countBadge.className = "badge bg-danger fs-6 px-3 py-2 rounded-pill shadow-sm";
+                document.getElementById("pagination-container").style.opacity = "0.3";
+                return;
             }
-        }
-    }
-    document.getElementById("caseCount").innerText = "نتائج البحث في هذه الصفحة: " + visibleCount;
+            
+            data.students.forEach(student => {
+                let whatsappHtml = student.whatsapp_number ? 
+                    `<a href="https://wa.me/2${student.whatsapp_number}" target="_blank" class="btn btn-sm btn-whatsapp px-3">
+                        <i class="bi bi-whatsapp me-1"></i> ${student.whatsapp_number}
+                     </a>` : `<span class="text-muted small">غير مسجل</span>`;
+                     
+                let phoneHtml = student.phone ? 
+                    `<i class="bi bi-telephone-fill text-secondary me-1 small"></i> ${student.phone}` : 
+                    `<span class="text-muted small">غير مسجل</span>`;
+
+                let row = `
+                    <tr>
+                        <td class="text-start pe-4">
+                            <div class="fw-bold text-white fs-6">${student.full_name}</div>
+                            <div class="text-secondary small mt-1"><i class="bi bi-hash text-info"></i> كود: ${student.student_code}</div>
+                        </td>
+                        <td>
+                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger px-3 py-2 fs-6 rounded-pill">
+                                ${student.total_overdue} ج.م
+                            </span>
+                        </td>
+                        <td class="phone-text">${phoneHtml}</td>
+                        <td>${whatsappHtml}</td>
+                    </tr>`;
+                tbody.insertAdjacentHTML('beforeend', row);
+            });
+            
+            // تحديث العدادات العامة
+            document.getElementById("totalCountSpan").innerText = data.total_count;
+            if (input !== "") {
+                countBadge.innerText = "نتائج البحث الكلية: " + data.total_count;
+                countBadge.className = "badge bg-info text-dark fs-6 px-3 py-2 rounded-pill shadow-sm";
+                document.getElementById("pagination-container").style.visibility = "hidden"; // إخفاء الترقيم أثناء التصفية النشطة
+            } else {
+                countBadge.innerText = "معروض حالياً: " + data.students.length + " حالة";
+                countBadge.className = "badge bg-danger fs-6 px-3 py-2 rounded-pill shadow-sm";
+                document.getElementById("pagination-container").style.visibility = "visible";
+            }
+        });
+    }, 400); 
 }
 </script>
-
-<style>
-    /* تحسين شكل الترقيم ليتناسب مع التصميم الداكن */
-    .pagination .page-link {
-        transition: all 0.3s;
-        border-radius: 5px;
-        margin: 0 2px;
-    }
-    .pagination .page-link:hover {
-        background-color: #dc3545 !important;
-        color: white !important;
-        border-color: #dc3545 !important;
-    }
-</style>
 {% endblock %}

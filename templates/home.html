@@ -35,6 +35,60 @@
             100% { background-position: 0% 50%; }
         }
 
+        /* ==========================================
+           شاشة التحميل الشاملة (اللحظية) للرئيسية
+           ========================================== */
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 6, 23, 0.9);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 999999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            visibility: hidden;
+            opacity: 0;
+        }
+
+        .loader-overlay.active {
+            visibility: visible !important;
+            opacity: 1 !important;
+            transition: none !important; 
+        }
+
+        .custom-spinner {
+            width: 70px;
+            height: 70px;
+            border: 5px solid rgba(56, 189, 248, 0.15); 
+            border-top-color: #38bdf8; 
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            margin-top: 20px;
+            font-weight: 800;
+            font-size: 1.2rem;
+            color: #38bdf8;
+            letter-spacing: 0.5px;
+            animation: pulse-text 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-text {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
         /* Navbar & Dropdown Styles */
         .navbar-glass {
             background: var(--dark-glass);
@@ -188,6 +242,12 @@
     </style>
 </head>
 <body>
+
+<div id="global-loader" class="loader-overlay">
+    <div class="custom-spinner"></div>
+    <div class="loader-text">جاري المعالجة والأمان...</div>
+</div>
+
 <nav class="navbar navbar-expand-lg navbar-dark fixed-top navbar-glass">
     <div class="container-fluid px-4">
         <a class="navbar-brand d-flex align-items-center gap-2" href="#">
@@ -238,9 +298,7 @@
         {% endif %}
 
     </ul>
-</div>      <!-- نهاية قائمة الموارد البشرية -->
-  
-      <div class="collapse navbar-collapse" id="mainNavbar">
+</div>      <div class="collapse navbar-collapse" id="mainNavbar">
     <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-1">
         
         {% if user.is_authenticated %}
@@ -457,6 +515,55 @@
             setTimeout(() => toast.remove(), 400);
         }, 4000);
     }
+
+    // =========================================================
+    // 🟢 المحرك الآمن لشاشة التحميل (لن يكسر أي زرار)
+    // =========================================================
+    document.addEventListener("DOMContentLoaded", function () {
+        const loader = document.getElementById("global-loader");
+        if (!loader) return; // إذا كان اللودر غير موجود في هذه الصفحة، توقف بصمت
+
+        // أ) إظهار التحميل عند عمل ريفريش (F5)
+        window.addEventListener("beforeunload", function () {
+            loader.classList.add("active");
+        });
+
+        // ب) اصطياد النقرات بأمان تام (بدون preventDefault)
+        document.addEventListener("click", function (e) {
+            const link = e.target.closest("a");
+            if (!link) return; 
+
+            // السماح بفتح الروابط في نافذة جديدة بشكل طبيعي
+            if (e.ctrlKey || e.shiftKey || e.metaKey || (e.button && e.button !== 0)) return;
+
+            const href = link.getAttribute("href");
+            // تجاهل القوائم المنسدلة للبوتابستراب والروابط الوهمية
+            if (!href || href.startsWith("#") || href.startsWith("javascript") || link.classList.contains("locked-link") || link.getAttribute("target") === "_blank" || link.classList.contains("dropdown-toggle")) {
+                return; 
+            }
+            
+            // إظهار اللودر فقط! وترك المتصفح ينتقل بطبيعته وبدون أي تدخل
+            loader.classList.add("active");
+        });
+
+        // ج) حماية النماذج (Forms) من ضغط الحفظ مرتين
+        document.addEventListener("submit", function (e) {
+            loader.classList.add("active");
+            const submitBtn = e.target.querySelector('button[type="submit"], input[type="submit"]');
+            if (submitBtn) {
+                setTimeout(() => { submitBtn.disabled = true; }, 10);
+            }
+        });
+
+        // د) إخفاء اللودر عند الرجوع بالمتصفح
+        window.addEventListener("pageshow", function (event) {
+            if (event.persisted) {
+                loader.classList.remove("active");
+                const disabledBtns = document.querySelectorAll('button[type="submit"]:disabled, input[type="submit"]:disabled');
+                disabledBtns.forEach(btn => btn.disabled = false);
+            }
+        });
+    });
 </script>
 </body>
 </html>

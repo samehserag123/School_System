@@ -434,7 +434,16 @@ class Payment(models.Model):
     )
     payment_date = models.DateField(
         default=timezone.now, 
-        verbose_name="تاريخ الدفع"
+        verbose_name="تاريخ الدفع",
+        db_index=True  # 🟢 إضافة الفهرس لتسريع البحث بالتواريخ
+    )
+    
+    # ... (حقول أخرى) ...
+
+    is_closed = models.BooleanField(
+        default=False, 
+        verbose_name="تم تقفيل الخزينة",
+        db_index=True  # 🟢 إضافة الفهرس لتسريع فرز الحركات المعلقة
     )
     collected_by = models.ForeignKey(
         'auth.User', 
@@ -444,10 +453,7 @@ class Payment(models.Model):
         related_name="collected_payments", 
         verbose_name="المحصل (الموظف)"
     )
-    is_closed = models.BooleanField(
-        default=False, 
-        verbose_name="تم تقفيل الخزينة"
-    )
+    
     closure = models.ForeignKey(
         'DailyClosure', 
         on_delete=models.SET_NULL, 
@@ -610,13 +616,22 @@ class Expense(models.Model):
     
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="المبلغ")
     expense_type = models.CharField(max_length=20, choices=EXPENSE_TYPES, default='petty', verbose_name="نوع المصروف")
-    expense_date = models.DateTimeField(default=timezone.now, verbose_name="تاريخ الصرف")
+    expense_date = models.DateTimeField(
+        default=timezone.now, 
+        verbose_name="تاريخ الصرف",
+        db_index=True  # 🟢 إضافة الفهرس لتسريع البحث بالتواريخ
+    )
     
-    # ربط المصروف بالموظف الذي قام بالصرف
+    # ... (حقول أخرى) ...
+    
+    is_closed = models.BooleanField(
+        default=False, 
+        verbose_name="تم ضمه للجرد",
+        db_index=True  # 🟢 إضافة الفهرس لتسريع فرز المصروفات المعلقة
+    )
     spent_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     
     # ربط المصروف بالجرد اليومي (الخزينة)
-    is_closed = models.BooleanField(default=False, verbose_name="تم ضمه للجرد")
     closure = models.ForeignKey(
         'DailyClosure', 
         on_delete=models.SET_NULL, 

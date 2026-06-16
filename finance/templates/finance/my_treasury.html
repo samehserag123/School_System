@@ -3,10 +3,10 @@
 
 {% block content %}
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
 
     body { 
-        background: radial-gradient(circle at top right, #1e293b, #0f172a); 
+        background: #020617; /* أسود ليلي عميق */
         font-family: 'Cairo', sans-serif; 
         color: #f8fafc;
         min-height: 100vh;
@@ -14,34 +14,35 @@
     
     /* تخصيص شريط التمرير */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 10px; }
-    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
-    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
 
-    /* ألوان النصوص */
-    .text-emerald { color: #10b981 !important; }
-    .text-rose { color: #f43f5e !important; }
-    .text-indigo { color: #818cf8 !important; }
+    /* ألوان النصوص المضيئة */
+    .text-emerald { color: #39ff14 !important; text-shadow: 0 0 10px rgba(57, 255, 20, 0.2); }
+    .text-rose { color: #ff3131 !important; text-shadow: 0 0 10px rgba(255, 49, 49, 0.2); }
+    .text-indigo { color: #38bdf8 !important; text-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
 
-    /* البطاقات الرئيسية */
+    /* البطاقات الرئيسية وتأثير الزجاج */
     .finance-card { 
-        background: rgba(30, 41, 59, 0.6);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08); 
-        border-radius: 16px; 
-        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        background: linear-gradient(145deg, rgba(15, 23, 42, 0.8), rgba(2, 6, 23, 0.9));
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border: 1px solid rgba(56, 189, 248, 0.1); 
+        border-radius: 20px; 
+        box-shadow: 0 15px 35px rgba(0,0,0,0.5);
         overflow: hidden;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
     .finance-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 15px 35px rgba(0,0,0,0.35);
+        transform: translateY(-5px);
+        box-shadow: 0 20px 40px rgba(56, 189, 248, 0.1);
+        border-color: rgba(56, 189, 248, 0.3);
     }
     
     .card-header-custom {
-        padding: 1rem 1.25rem;
-        background: rgba(15, 23, 42, 0.7);
+        padding: 1.25rem 1.5rem;
+        background: rgba(0, 0, 0, 0.5);
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         display: flex;
         justify-content: space-between;
@@ -50,185 +51,204 @@
 
     /* مربعات الإحصائيات (الأرقام) */
     .stat-box {
-        border-radius: 16px;
-        padding: 1.5rem;
+        border-radius: 20px;
+        padding: 1.8rem;
         position: relative;
         overflow: hidden;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
         color: white;
         z-index: 1;
-        transition: transform 0.3s;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(255, 255, 255, 0.05);
     }
-    .stat-box:hover { transform: scale(1.02); }
-    .stat-box::after {
-        content: '';
-        position: absolute;
-        top: 0; right: 0; bottom: 0; left: 0;
-        background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%);
-        z-index: -1;
-    }
-    .stat-revenue { background: linear-gradient(135deg, #059669, #10b981); border: 1px solid rgba(52, 211, 153, 0.3); }
-    .stat-expense { background: linear-gradient(135deg, #e11d48, #f43f5e); border: 1px solid rgba(251, 113, 133, 0.3); }
-    .stat-net { background: linear-gradient(135deg, #4f46e5, #6366f1); border: 1px solid rgba(129, 140, 248, 0.3); }
+    .stat-box:hover { transform: translateY(-5px) scale(1.02); }
+    .stat-revenue { background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(4, 120, 87, 0.4)); border-bottom: 4px solid #39ff14; }
+    .stat-expense { background: linear-gradient(135deg, rgba(225, 29, 72, 0.2), rgba(159, 18, 57, 0.4)); border-bottom: 4px solid #ff3131; }
+    .stat-net { background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(3, 105, 161, 0.4)); border-bottom: 4px solid #38bdf8; }
 
     .stat-icon {
         position: absolute;
         top: 50%;
-        left: -10px;
+        left: -15px;
         transform: translateY(-50%);
-        font-size: 5rem;
-        opacity: 0.15;
+        font-size: 6rem;
+        opacity: 0.1;
         z-index: -1;
     }
 
     /* الجداول الاحترافية */
     .pro-table { width: 100%; margin: 0; border-collapse: separate; border-spacing: 0; }
     .pro-table th { 
-        background: rgba(15, 23, 42, 0.8); 
+        background: #000000; 
         color: #94a3b8; 
-        font-weight: 700;
+        font-weight: 800;
         font-size: 0.85rem;
-        padding: 1rem; 
-        border-bottom: 1px solid rgba(255,255,255,0.08); 
+        padding: 1.2rem 1rem; 
+        border-bottom: 2px solid #1e293b; 
         white-space: nowrap;
     }
     .pro-table td { 
-        padding: 1rem; 
+        padding: 1.2rem 1rem; 
         border-bottom: 1px solid rgba(255,255,255,0.03); 
-        color: #cbd5e1; 
+        color: #e2e8f0; 
         vertical-align: middle; 
         font-size: 0.95rem;
     }
     .pro-table tbody tr { transition: background-color 0.2s ease; }
-    .pro-table tbody tr:hover { background-color: rgba(255,255,255,0.03); }
-    .pro-table tbody tr:last-child td { border-bottom: none; }
+    .pro-table tbody tr:hover { background-color: rgba(56, 189, 248, 0.05); }
 
-    /* الأزرار */
-    .btn-expense {
-        background: linear-gradient(135deg, #e11d48, #f43f5e);
-        color: white;
-        border: none;
+    /* الأزرار والبحث */
+    .search-box {
+        background: rgba(0, 0, 0, 0.5) !important;
+        border: 1px solid #334155 !important;
+        color: #fff !important;
+        border-radius: 50px !important;
+        padding: 0.6rem 1.5rem !important;
         transition: all 0.3s ease;
     }
-    .btn-expense:hover { background: linear-gradient(135deg, #be123c, #e11d48); color: white; transform: translateY(-1px); }
+    .search-box:focus {
+        border-color: #38bdf8 !important;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.2) !important;
+    }
+
+    .btn-expense {
+        background: rgba(255, 49, 49, 0.1);
+        color: #ff3131;
+        border: 1px solid rgba(255, 49, 49, 0.3);
+        transition: all 0.3s ease;
+    }
+    .btn-expense:hover { background: #ff3131; color: #fff; box-shadow: 0 0 15px rgba(255, 49, 49, 0.4); transform: translateY(-2px); }
     
     .btn-print {
-        background: #f8fafc;
-        color: #0f172a;
-        border: none;
+        background: rgba(56, 189, 248, 0.1);
+        color: #38bdf8;
+        border: 1px solid rgba(56, 189, 248, 0.3);
         transition: all 0.3s ease;
     }
-    .btn-print:hover { background: #e2e8f0; color: #0f172a; transform: translateY(-1px); }
+    .btn-print:hover { background: #38bdf8; color: #000; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); transform: translateY(-2px); }
 
-    /* تنسيقات الطباعة */
+    /* تنسيقات الطباعة البنكية */
     @media print {
-        body { background: #fff !important; color: #000 !important; font-size: 12pt; }
+        body { background: #fff !important; color: #000 !important; font-size: 11pt; }
         .d-print-none, .navbar, .sidebar { display: none !important; }
         .main-content { margin: 0 !important; padding: 0 !important; }
-        .finance-card { border: 1px solid #ccc !important; box-shadow: none !important; background: #fff !important; margin-bottom: 20px; }
-        .card-header-custom { background: #f8f9fa !important; border-bottom: 2px solid #000 !important; }
-        .card-header-custom h6 { color: #000 !important; font-weight: bold; }
-        .stat-box { border: 1px solid #000 !important; color: #000 !important; background: #fff !important; box-shadow: none !important; }
-        .stat-box h6, .stat-box h2 { color: #000 !important; }
-        .stat-icon { display: none; }
-        .text-emerald, .text-rose, .text-indigo, .text-white, .text-white-50 { color: #000 !important; }
-        .pro-table th { background: #f1f5f9 !important; color: #000 !important; border-bottom: 2px solid #000 !important; }
-        .pro-table td { color: #000 !important; border-bottom: 1px solid #e2e8f0 !important; }
-        .badge { border: 1px solid #000; color: #000 !important; background: transparent !important; }
-        .print-header { display: block !important; text-align: center; margin-bottom: 25px; border-bottom: 2px solid #000; padding-bottom: 15px; }
+        
+        /* إخفاء مربعات الإحصائيات في الطباعة وعرضها كجدول ملخص بدلاً منها */
+        .stat-box { display: none !important; } 
+        
+        .finance-card { border: none !important; box-shadow: none !important; background: #fff !important; margin-bottom: 20px; page-break-inside: avoid; }
+        .card-header-custom { background: #fff !important; border-bottom: 2px solid #000 !important; padding: 10px 0 !important; }
+        .card-header-custom h6 { color: #000 !important; font-weight: bold; font-size: 14pt !important; }
+        .badge { border: 1px solid #000 !important; color: #000 !important; background: transparent !important; }
+        
+        .pro-table th { background: #f8f9fa !important; color: #000 !important; border: 1px solid #000 !important; font-weight: bold; }
+        .pro-table td { color: #000 !important; border: 1px solid #ddd !important; }
+        
+        .text-emerald, .text-rose, .text-indigo, .text-white, .text-white-50 { color: #000 !important; text-shadow: none !important; }
         .table-responsive { max-height: none !important; overflow: visible !important; }
+        
+        .print-header { display: block !important; text-align: center; margin-bottom: 25px; border-bottom: 3px double #000; padding-bottom: 15px; }
+        .print-summary { display: flex !important; justify-content: space-between; border: 2px solid #000; padding: 15px; margin-bottom: 20px; border-radius: 8px; font-weight: bold; }
     }
-    .print-header { display: none; }
+    .print-header, .print-summary { display: none; }
 </style>
 
-<div class="container-fluid mt-4 mb-5" dir="rtl">
+<div class="container-fluid py-4" dir="rtl">
     
-    <!-- ترويسة الطباعة -->
     <div class="print-header">
-        <h2 class="fw-bold mb-3">كشف حركة درج المحصل (قبل التوريد)</h2>
-        <h5 class="mb-2">الموظف: {{ request.user.get_full_name|default:request.user.username }}</h5>
-        <p class="mb-0 text-muted">وقت وتاريخ الطباعة: {% now "Y-m-d h:i A" %}</p>
+        <h2 class="fw-bold mb-2">كشف جرد الخزينة (الدرج النشط)</h2>
+        <h5 class="mb-2">مسؤول الخزينة: {{ request.user.get_full_name|default:request.user.username }}</h5>
+        <p class="mb-0 text-muted">وقت وتاريخ الجرد: {% now "Y-m-d h:i A" %}</p>
+    </div>
+    
+    <div class="print-summary d-none d-print-flex">
+        <div>إجمالي التحصيلات: {{ total_revenue|default:"0.00" }} ج.م</div>
+        <div>إجمالي المنصرف: {{ total_expense|default:"0.00" }} ج.م</div>
+        <div style="font-size: 1.2rem; border-right: 2px solid #000; padding-right: 15px;">صافي الدرج: {{ net_total|default:"0.00" }} ج.م</div>
     </div>
 
-    <!-- التحكم والإجراءات -->
-    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none flex-wrap gap-3">
-        <h3 class="text-white fw-bold mb-0">
-            <i class="bi bi-person-bounding-box text-indigo me-2"></i> حركة خزينتي اليومية
+    <div class="d-flex justify-content-between align-items-center mb-5 d-print-none flex-wrap gap-3">
+        <h3 class="text-white fw-900 mb-0 d-flex align-items-center">
+            <i class="bi bi-safe2-fill text-indigo me-3 fs-1"></i> إدارة عهدتي المالية
         </h3>
         
-        <div class="d-flex gap-2 flex-wrap">
-            <!-- زر تسجيل مصروف نثري فقط (مباشر بدون قائمة منسدلة) مع تمرير رابط العودة -->
-            <a href="{% url 'add_expense_view' %}?type=petty&next={% url 'my_treasury' %}" class="btn btn-expense rounded-pill px-4 shadow-sm fw-bold">
-                <i class="bi bi-cup-hot me-1"></i> تسجيل مصروف نثري
+        <div class="d-flex gap-3 flex-wrap align-items-center">
+            <div class="position-relative">
+                <i class="bi bi-search position-absolute text-secondary" style="top: 10px; right: 15px;"></i>
+                <input type="text" id="quickSearch" onkeyup="filterTables()" class="form-control search-box shadow-sm" placeholder="بحث سريع في الحركات..." style="padding-right: 40px !important; width: 250px;">
+            </div>
+
+            <a href="{% url 'add_expense_view' %}?type=petty&next={% url 'my_treasury' %}" class="btn btn-expense rounded-pill px-4 py-2 shadow-sm fw-bold d-flex align-items-center">
+                <i class="bi bi-dash-circle-fill me-2 fs-5"></i> إذن صرف نثري
             </a>
 
-            <!-- زر الطباعة -->
-            <button onclick="window.print()" class="btn btn-print rounded-pill px-4 shadow-sm fw-bold">
-                <i class="bi bi-printer-fill me-1"></i> طباعة كشف التوريد
+            <button onclick="window.print()" class="btn btn-print rounded-pill px-4 py-2 shadow-sm fw-bold d-flex align-items-center">
+                <i class="bi bi-printer-fill me-2 fs-5"></i> طباعة كشف التوريد
             </button>
         </div>
     </div>
 
-    <!-- مربعات الإحصائيات -->
-    <div class="row g-4 mb-4">
+    <div class="row g-4 mb-5">
         <div class="col-md-4">
-            <div class="stat-box stat-revenue">
-                <i class="bi bi-graph-up-arrow stat-icon"></i>
-                <h6 class="text-white-50 fw-bold mb-2">إجمالي الإيرادات (التحصيلات)</h6>
-                <h2 class="fw-bold text-white mb-0">+ {{ total_collected|default:"0.00" }} <small class="fs-6 fw-normal">ج.م</small></h2>
+            <div class="stat-box stat-revenue h-100 d-flex flex-column justify-content-center">
+                <i class="bi bi-arrow-down-circle-fill stat-icon"></i>
+                <h6 class="text-white-50 fw-bold mb-2 fs-6">إجمالي الإيرادات (التحصيلات)</h6>
+                <h2 class="fw-900 text-white mb-0">+ {{ total_revenue|default:"0.00"|floatformat:2 }} <small class="fs-6 fw-normal">ج.م</small></h2>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stat-box stat-expense">
-                <i class="bi bi-graph-down-arrow stat-icon"></i>
-                <h6 class="text-white-50 fw-bold mb-2">إجمالي المدفوعات (المصروفات)</h6>
-                <h2 class="fw-bold text-white mb-0">- {{ total_spent|default:"0.00" }} <small class="fs-6 fw-normal">ج.م</small></h2>
+            <div class="stat-box stat-expense h-100 d-flex flex-column justify-content-center">
+                <i class="bi bi-arrow-up-circle-fill stat-icon"></i>
+                <h6 class="text-white-50 fw-bold mb-2 fs-6">إجمالي المدفوعات (المصروفات)</h6>
+                <h2 class="fw-900 text-white mb-0">- {{ total_expense|default:"0.00"|floatformat:2 }} <small class="fs-6 fw-normal">ج.م</small></h2>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stat-box stat-net">
-                <i class="bi bi-safe2 stat-icon"></i>
-                <h6 class="text-white-50 fw-bold mb-2">صافي التوريد المطلوب للدرج</h6>
-                <h2 class="fw-bold text-white mb-0">{{ net_required|default:"0.00" }} <small class="fs-6 fw-normal">ج.م</small></h2>
+            <div class="stat-box stat-net h-100 d-flex flex-column justify-content-center">
+                <i class="bi bi-cash-stack stat-icon"></i>
+                <h6 class="text-white-50 fw-bold mb-2 fs-6">صافي التوريد المطلوب للدرج</h6>
+                <h2 class="fw-900 text-white mb-0">{{ net_total|default:"0.00"|floatformat:2 }} <small class="fs-6 fw-normal">ج.م</small></h2>
             </div>
         </div>
     </div>
 
-    <!-- الجداول -->
     <div class="row g-4">
-        <!-- جدول الإيرادات -->
         <div class="col-lg-7">
             <div class="finance-card h-100">
                 <div class="card-header-custom">
-                    <h6 class="mb-0 text-emerald fw-bold"><i class="bi bi-receipt me-2"></i> الإيصالات المحصلة</h6>
-                    <span class="badge bg-emerald bg-opacity-25 text-emerald border border-emerald rounded-pill px-3 py-2">{{ my_ledgers.count }} حركة</span>
+                    <h6 class="mb-0 text-emerald fw-bold fs-5"><i class="bi bi-receipt me-2"></i> الإيصالات المحصلة</h6>
+                    <span class="badge bg-emerald bg-opacity-25 text-emerald border border-emerald rounded-pill px-3 py-2 fw-bold">أحدث {{ recent_revenues|length }} حركة</span>
                 </div>
-                <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
-                    <table class="table table-borderless pro-table mb-0">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-borderless pro-table mb-0" id="revenuesTable">
                         <thead class="position-sticky top-0" style="z-index: 1;">
                             <tr>
-                                <th>الإيصال / البيان</th>
+                                <th>رقم الإيصال / الطالب</th>
+                                <th>البيان والتفاصيل</th>
                                 <th>الوقت</th>
                                 <th class="text-end">المبلغ</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for item in my_ledgers %}
-                            <tr>
+                            {% for item in recent_revenues %}
+                            <tr class="searchable-row">
                                 <td>
-                                    <div class="fw-bold text-white">حركة #{{ item.receipt_number|default:item.id }}</div>
-                                    <small class="text-muted d-block mt-1">{{ item.category }}</small>
+                                    <div class="fw-bold text-white fs-6">#{{ item.receipt_number|default:item.id }}</div>
+                                    <small class="text-info d-block mt-1 fw-bold">{{ item.student.get_full_name|default:"إيراد عام" }}</small>
                                 </td>
                                 <td>
-                                    <span class="badge bg-dark text-light border border-secondary">{{ item.date|time:"h:i A" }}</span>
+                                    <span class="text-secondary small">{{ item.notes|default:item.category|truncatechars:40 }}</span>
                                 </td>
-                                <td class="text-end fw-bold text-emerald">+{{ item.amount }} ج.م</td>
+                                <td>
+                                    <span class="badge bg-black text-light border border-secondary px-2 py-1">{{ item.date|time:"h:i A" }}</span>
+                                </td>
+                                <td class="text-end fw-bold text-emerald fs-6">+{{ item.amount }} ج.م</td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="3" class="text-center p-5">
-                                    <i class="bi bi-inbox fs-1 text-muted opacity-50 mb-3 d-block"></i>
-                                    <span class="text-muted">لم تقم بأي عمليات تحصيل حتى الآن.</span>
+                                <td colspan="4" class="text-center p-5">
+                                    <i class="bi bi-inbox fs-1 text-muted opacity-25 mb-3 d-block"></i>
+                                    <span class="text-muted fw-bold">لم تقم بأي عمليات تحصيل حتى الآن.</span>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -238,35 +258,36 @@
             </div>
         </div>
 
-        <!-- جدول المصروفات -->
         <div class="col-lg-5">
             <div class="finance-card h-100">
                 <div class="card-header-custom">
-                    <h6 class="mb-0 text-rose fw-bold"><i class="bi bi-wallet2 me-2"></i> المصروفات النثرية المنفذة</h6>
-                    <span class="badge bg-rose bg-opacity-25 text-rose border border-rose rounded-pill px-3 py-2">{{ my_expenses.count }} حركة</span>
+                    <h6 class="mb-0 text-rose fw-bold fs-5"><i class="bi bi-wallet2 me-2"></i> المصروفات النثرية</h6>
+                    <span class="badge bg-rose bg-opacity-25 text-rose border border-rose rounded-pill px-3 py-2 fw-bold">أحدث {{ recent_expenses|length }} حركة</span>
                 </div>
-                <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
-                    <table class="table table-borderless pro-table mb-0">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-borderless pro-table mb-0" id="expensesTable">
                         <thead class="position-sticky top-0" style="z-index: 1;">
                             <tr>
-                                <th>بيان الصرف</th>
+                                <th>بيان الصرف وتفاصيله</th>
                                 <th class="text-end">المبلغ</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for exp in my_expenses %}
-                            <tr>
+                            {% for exp in recent_expenses %}
+                            <tr class="searchable-row">
                                 <td>
-                                    <div class="fw-bold text-white">{{ exp.title }}</div>
-                                    <span class="badge bg-secondary bg-opacity-50 text-light mt-1" style="font-size: 0.7rem;">مصروف نثري</span>
+                                    <div class="fw-bold text-white fs-6">{{ exp.title }}</div>
+                                    <span class="badge bg-black border border-secondary text-light mt-2" style="font-size: 0.75rem;">
+                                        <i class="bi bi-clock me-1"></i> {{ exp.expense_date|time:"h:i A" }}
+                                    </span>
                                 </td>
-                                <td class="text-end fw-bold text-rose">-{{ exp.amount }} ج.م</td>
+                                <td class="text-end fw-bold text-rose fs-6 align-middle">-{{ exp.amount }} ج.م</td>
                             </tr>
                             {% empty %}
                             <tr>
                                 <td colspan="2" class="text-center p-5">
-                                    <i class="bi bi-cup-hot fs-1 text-muted opacity-50 mb-3 d-block"></i>
-                                    <span class="text-muted">لا توجد أي مصروفات مسجلة اليوم.</span>
+                                    <i class="bi bi-cup-hot fs-1 text-muted opacity-25 mb-3 d-block"></i>
+                                    <span class="text-muted fw-bold">لا توجد أي مصروفات مسجلة اليوم.</span>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -277,19 +298,41 @@
         </div>
     </div>
 
-    <!-- جزء التوقيعات (يظهر في الطباعة فقط) -->
-    <div class="d-none d-print-block mt-5 pt-5">
-        <div class="row text-center mt-4">
-            <div class="col-6">
-                <p class="fw-bold mb-5 fs-5">توقيع الموظف (المُقر بالعهدة)</p>
+    <div class="d-none d-print-block mt-5 pt-4">
+        <div class="row text-center mt-5">
+            <div class="col-4">
+                <p class="fw-bold mb-5 fs-6">توقيع المُقر بالعهدة (المستخدم)</p>
                 <p class="text-muted">.....................................................</p>
             </div>
-            <div class="col-6">
-                <p class="fw-bold mb-5 fs-5">توقيع أمين الخزينة المستلم</p>
+            <div class="col-4">
+                <p class="fw-bold mb-5 fs-6">توقيع المراجعة (الحسابات)</p>
                 <p class="text-muted">.....................................................</p>
             </div>
+            <div class="col-4">
+                <p class="fw-bold mb-5 fs-6">توقيع الاستلام (أمين الخزينة)</p>
+                <p class="text-muted">.....................................................</p>
+            </div>
+        </div>
+        <div class="text-center mt-5 pt-3 border-top border-dark">
+            <small class="text-muted">تم استخراج هذا الإيصال آلياً من نظام إدارة المدرسة الذكي.</small>
         </div>
     </div>
 
 </div>
+
+<script>
+    function filterTables() {
+        let input = document.getElementById("quickSearch").value.toLowerCase();
+        let rows = document.querySelectorAll(".searchable-row");
+        
+        rows.forEach(row => {
+            let textContent = row.textContent.toLowerCase();
+            if (textContent.includes(input)) {
+                row.style.display = "";
+            } else {
+                row.style.display = "none";
+            }
+        });
+    }
+</script>
 {% endblock %}

@@ -1,266 +1,358 @@
 {% extends 'base.html' %}
-{% load my_filters %}
 
 {% block content %}
 <style>
-    /* =========================================
-       Professional Financial Dashboard Styles
-       ========================================= */
-    :root {
-        --dark-bg: #0f172a;
-        --card-bg: #1e293b;
-        --border-color: rgba(255, 255, 255, 0.08);
-        --accent-primary: #38bdf8;
-        --accent-success: #10b981;
-        --accent-danger: #ef4444;
-        --accent-warning: #f59e0b;
-        --accent-purple: #8b5cf6;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
 
-    body {
-        background-color: var(--dark-bg);
-        font-family: 'Cairo', sans-serif;
+    body { 
+        background: #020617; 
+        font-family: 'Cairo', sans-serif; 
         color: #e2e8f0;
     }
 
-    .finance-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    /* كروت الخزينة الفاخرة */
+    .premium-card {
+        background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(2, 6, 23, 0.95));
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border: 1px solid rgba(245, 158, 11, 0.15); 
+        border-radius: 24px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
         overflow: hidden;
-        transition: transform 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .finance-card-header {
-        background: rgba(0,0,0,0.2);
-        border-bottom: 1px solid var(--border-color);
-        padding: 15px 20px;
-        font-weight: 700;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+    .card-header-premium {
+        background: rgba(0, 0, 0, 0.4);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 1.5rem;
     }
 
-    /* Summary Stats Gradients */
+    /* نصوص النيون المحاسبية */
+    .neon-text-warning { color: #f59e0b; text-shadow: 0 0 15px rgba(245, 158, 11, 0.4); font-weight: 900; }
+    .neon-text-success { color: #39ff14; text-shadow: 0 0 15px rgba(57, 255, 20, 0.4); font-weight: 900; }
+    .neon-text-danger { color: #ff3131; text-shadow: 0 0 15px rgba(255, 49, 49, 0.4); font-weight: 900; }
+
+    /* صناديق المؤشرات */
     .stat-box {
-        border-radius: 12px;
-        padding: 20px;
+        border-radius: 20px;
+        padding: 1.8rem;
         position: relative;
         overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.1);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        color: white;
     }
-    .stat-system { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
-    .stat-revenue { background: linear-gradient(135deg, #064e3b, #10b981); }
-    .stat-expense { background: linear-gradient(135deg, #7f1d1d, #ef4444); }
+    .stat-system { background: linear-gradient(135deg, rgba(30, 58, 138, 0.3), rgba(29, 78, 216, 0.4)); border-bottom: 4px solid #38bdf8; }
+    .stat-revenue { background: linear-gradient(135deg, rgba(6, 78, 59, 0.3), rgba(16, 185, 129, 0.4)); border-bottom: 4px solid #39ff14; }
+    .stat-expense { background: linear-gradient(135deg, rgba(127, 29, 29, 0.3), rgba(239, 68, 68, 0.4)); border-bottom: 4px solid #ff3131; }
 
     .stat-icon {
         position: absolute;
-        left: -10px;
-        bottom: -20px;
-        font-size: 6rem;
-        opacity: 0.1;
-        transform: rotate(-15deg);
+        left: -15px;
+        bottom: -25px;
+        font-size: 6.5rem;
+        opacity: 0.08;
+        transform: rotate(-10deg);
+        z-index: 0;
     }
 
-    /* Tables */
-    .pro-table { margin-bottom: 0; }
-    .pro-table th {
-        background-color: rgba(0,0,0,0.3);
-        color: #cbd5e1;
-        font-weight: 600;
-        border-bottom: 2px solid var(--border-color);
-        padding: 12px 15px;
+    /* الجداول الفاخرة */
+    .table-premium { width: 100%; margin: 0; }
+    .table-premium th {
+        background-color: #000000;
+        color: #94a3b8;
+        font-weight: 800;
+        font-size: 0.9rem;
+        border-bottom: 2px solid #1e293b;
+        padding: 1.2rem 1rem;
+        white-space: nowrap;
     }
-    .pro-table td {
-        padding: 12px 15px;
-        border-bottom: 1px solid var(--border-color);
+    .table-premium td {
+        padding: 1.2rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
         vertical-align: middle;
     }
-    .pro-table tbody tr:hover { background-color: rgba(255,255,255,0.02); }
+    .table-premium tbody tr:hover { background-color: rgba(56, 189, 248, 0.03); }
 
-    /* Denomination Calculator Inputs */
-    .denom-row {
-        background: rgba(15, 23, 42, 0.5);
-        border-radius: 8px;
+    /* =======================================
+       الشبكة الأفقية الصحيحة للفئات النقدية
+       ======================================= */
+    .denom-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 1.5rem;
+    }
+    .denom-box {
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 12px 8px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    .denom-box:focus-within {
+        border-color: rgba(245, 158, 11, 0.6);
+        background: rgba(0, 0, 0, 0.8);
+    }
+    .denom-box.full-width {
+        grid-column: 1 / -1; /* جعل فئة الجنيه بكامل العرض في الأسفل */
+    }
+    .denom-label {
+        font-weight: 800;
+        font-size: 1.1rem;
+        color: #cbd5e1;
         margin-bottom: 8px;
-        padding: 8px 15px;
-        border: 1px solid var(--border-color);
-        display: flex;
-        align-items: center;
+        display: block;
     }
     .denom-input {
-        background: #0f172a !important;
+        background: #000000 !important;
         border: 1px solid #334155 !important;
-        color: #fff !important;
-        font-weight: bold;
+        color: #ffffff !important;
+        font-weight: 900;
         border-radius: 8px;
         text-align: center;
-        width: 100px;
+        width: 100%;
+        font-size: 1.2rem;
+        padding: 8px;
+        transition: all 0.3s;
     }
-    .denom-label { width: 80px; font-weight: 700; font-size: 1.1rem; color: #e2e8f0; }
-    .denom-result { flex-grow: 1; text-align: left; font-weight: 800; color: var(--accent-success); font-size: 1.1rem; }
+    .denom-input:focus {
+        border-color: #f59e0b !important;
+        box-shadow: 0 0 10px rgba(245, 158, 11, 0.3) !important;
+        outline: none;
+    }
+    .denom-subtotal {
+        color: #39ff14;
+        font-weight: 800;
+        font-size: 0.9rem;
+        margin-top: 8px;
+        display: block;
+    }
 
+    /* صندوق الفارق والحالة */
     .diff-box {
-        background: #0f172a;
+        background: #000000;
         border: 2px dashed #334155;
-        border-radius: 12px;
-        padding: 15px;
+        border-radius: 16px;
+        padding: 22px;
+        box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
     }
-
-    .badge-soft { padding: 6px 12px; border-radius: 6px; font-weight: 600; letter-spacing: 0.5px; }
-    
-    .cashier-row { transition: all 0.2s; }
-    .cashier-row:hover { background: rgba(16, 185, 129, 0.1) !important; transform: scale(1.01); }
 </style>
 
-<div class="container-fluid mt-4 mb-5 animate__animated animate__fadeIn" dir="rtl">
+<div class="container-fluid py-4" dir="rtl">
     
-    <!-- رأس الصفحة -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
         <div>
-            <h3 class="fw-bold mb-0 text-white"><i class="bi bi-safe2-fill text-warning me-2"></i> لوحة جرد الخزينة اليومية</h3>
-            <p class="text-muted mb-0 mt-1">تاريخ اليوم: <span class="badge bg-secondary">{{ today }}</span></p>
+            <h2 class="fw-900 text-white m-0 d-flex align-items-center">
+                <i class="bi bi-safe2-fill neon-text-warning me-3 fs-1"></i>
+                غرفة جرد وتصفية الحسابات اليومية
+            </h2>
+            <div class="mt-2 text-secondary font-bold">
+                تاريخ الجرد الجاري: <span class="badge bg-dark border border-secondary px-3 py-2 fs-6 text-white ms-1">{{ today }}</span>
+            </div>
         </div>
     </div>
 
-    <!-- رسائل النظام -->
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} border-0 shadow-sm rounded-3" role="alert">
-                <i class="bi bi-info-circle-fill me-2"></i> {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
-
-    <!-- المؤشرات العلوية -->
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="stat-box stat-system shadow">
-                <i class="bi bi-display stat-icon"></i>
-                <h6 class="text-white-50 fw-bold mb-1">الرصيد الدفتري (إجمالي النظام)</h6>
-                <h2 class="fw-bold text-white mb-0" id="systemTotal">{{ total_day|default:"0.00" }} <small class="fs-6">ج.م</small></h2>
+    <div class="row g-4 mb-5">
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-box stat-system">
+                <i class="bi bi-wallet2 stat-icon"></i>
+                <h6 class="text-white-50 fw-bold mb-2 fs-6">الرصيد الدفتري المطلوب بالخزينة</h6>
+                <h2 class="fw-900 text-white mb-0" id="systemTotal">{{ total_day|default:"0.00"|floatformat:2 }} <small class="fs-6 fw-normal">ج.م</small></h2>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="stat-box stat-revenue shadow">
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-box stat-revenue">
                 <i class="bi bi-graph-up-arrow stat-icon"></i>
-                <h6 class="text-white-50 fw-bold mb-1">إجمالي المقبوضات (إيرادات)</h6>
-                <h2 class="fw-bold text-white mb-0">+ {% if total_revenues %}{{ total_revenues }}{% else %}{{ total_students|add:total_ledger|default:"0.00" }}{% endif %} <small class="fs-6">ج.م</small></h2>
+                <h6 class="text-white-50 fw-bold mb-2 fs-6">إجمالي المقبوضات المحصلة اليوم</h6>
+                <h2 class="fw-900 neon-text-success mb-0">+ {{ total_revenues|default:"0.00"|floatformat:2 }} <small class="fs-6 fw-normal">ج.م</small></h2>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="stat-box stat-expense shadow">
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-box stat-expense">
                 <i class="bi bi-graph-down-arrow stat-icon"></i>
-                <h6 class="text-white-50 fw-bold mb-1">إجمالي المدفوعات (المصروفات)</h6>
-                <h2 class="fw-bold text-white mb-0">- {{ total_expenses|default:"0.00" }} <small class="fs-6">ج.م</small></h2>
+                <h6 class="text-white-50 fw-bold mb-2 fs-6">إجمالي المصروفات المنفذة اليوم</h6>
+                <h2 class="fw-900 neon-text-danger mb-0">- {{ total_expenses|default:"0.00"|floatformat:2 }} <small class="fs-6 fw-normal">ج.م</small></h2>
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <!-- العمود الأيمن -->
-        <div class="col-lg-7 col-xl-8 mb-4">
+    <div class="row g-4">
+        <div class="col-lg-7 col-xl-8">
             
-            <div class="finance-card mb-4 border-top border-4 border-success shadow-lg">
-                <div class="finance-card-header bg-dark">
-                    <span class="text-success fs-5"><i class="bi bi-people-fill me-2"></i> تصفية عهدة المحصلين</span>
-                    <button class="btn btn-sm btn-outline-success" onclick="generateCashiersCustody()"><i class="bi bi-arrow-repeat"></i> تحديث</button>
+            <div class="premium-card mb-4">
+                <div class="card-header-premium d-flex justify-content-between align-items-center">
+                    <h5 class="text-white fw-bold m-0 d-flex align-items-center">
+                        <i class="bi bi-people-fill text-success me-2 fs-4"></i> 
+                        أرصدة عهد الموظفين والمحصلين
+                    </h5>
+                    <span class="badge px-4 py-2 rounded-pill fw-900 fs-6" style="background-color: #39ff14; color: #000 !important; box-shadow: 0 0 15px rgba(57, 255, 20, 0.4);">
+                        حساب العهدة
+                    </span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-borderless pro-table text-white">
+                        <table class="table table-borderless table-premium text-white m-0">
                             <thead>
                                 <tr>
-                                    <th>الموظف (المحصل)</th>
-                                    <th class="text-center">إجمالي الحركات</th>
-                                    <th class="text-start">المبلغ النقدي المطلوب</th>
-                                    <th>مراجعة وتتبع</th>
+                                    <th class="ps-4">مسؤول التحصيل</th>
+                                    <th class="text-center">حركات التحصيل</th>
+                                    <th class="text-end pe-4">النقدية المستحقة بطرف الموظف</th>
                                 </tr>
                             </thead>
-                            <tbody id="cashiersCustodyBody">
-                                <tr><td colspan="4" class="text-center p-4 text-muted"><div class="spinner-border spinner-border-sm text-success me-2"></div> جارِ حساب العهد...</td></tr>
+                            <tbody>
+                                {% for cashier in cashiers_summary %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <i class="bi bi-person-circle text-secondary fs-3"></i>
+                                            <div>
+                                                <div class="fw-bold text-white fs-6">{{ cashier.collected_by__first_name }} {{ cashier.collected_by__last_name }}</div>
+                                                <small class="text-muted">@{{ cashier.collected_by__username }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-dark border border-secondary text-light px-3 py-2 rounded-pill fw-bold fs-7">
+                                            {{ cashier.receipts_count }} إيصال
+                                        </span>
+                                    </td>
+                                    <td class="text-end pe-4 fw-bold text-success fs-5">+{{ cashier.total_amount|floatformat:2 }} ج.م</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center py-5 text-secondary">
+                                        <i class="bi bi-person-x fs-1 d-block mb-2"></i>
+                                        لم يقم أي موظف بعمليات تحصيل حتى الآن اليوم.
+                                    </td>
+                                </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- المصروفات النثرية -->
-            <div class="row">
-                <div class="col-12 mb-4">
-                    <div class="finance-card h-100 border-top border-4 border-warning">
-                        <div class="finance-card-header">
-                            <span class="text-warning"><i class="bi bi-cup-hot me-2"></i>مصروفات نثريه / عموميه</span>
-                            <a href="{% url 'add_expense_view' %}" class="btn btn-sm btn-outline-warning rounded-pill px-3">إضافة +</a>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-borderless pro-table text-white mb-0">
-                                    <tbody>
-                                        {% for exp in expenses %}
-                                        <tr>
-                                            <td>
-                                                <div class="fw-bold mb-1">{{ exp.title }}</div>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <span class="badge bg-secondary">{{ exp.spent_by.get_full_name|default:exp.spent_by.username }}</span>
-                                                    <small class="text-muted">{{ exp.expense_date|time:"H:i" }}</small>
-                                                </div>
-                                            </td>
-                                            <td class="text-end fw-bold text-danger align-middle">-{{ exp.amount }} ج.م</td>
-                                        </tr>
-                                        {% empty %}
-                                        <tr><td colspan="2" class="text-center p-4 text-muted">لا توجد مصروفات مسجلة اليوم.</td></tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+            <div class="premium-card">
+                <div class="card-header-premium d-flex justify-content-between align-items-center">
+                    <h5 class="text-white fw-bold m-0 d-flex align-items-center">
+                        <i class="bi bi-cup-hot-fill text-danger me-2 fs-4"></i> 
+                        سجل المصروفات النثرية والعمومية اليومية
+                    </h5>
+                    <a href="{% url 'add_expense_view' %}" class="btn btn-sm btn-outline-danger rounded-pill px-4 fw-bold">
+                        إضافة أمر صرف +
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                        <table class="table table-borderless table-premium text-white m-0">
+                            <tbody>
+                                {% for exp in expenses %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <div class="fw-bold text-white fs-6">{{ exp.title }}</div>
+                                        <div class="d-flex align-items-center gap-3 mt-2">
+                                            <span class="badge bg-dark border border-secondary text-secondary"><i class="bi bi-person-fill text-info me-1"></i> {{ exp.spent_by.get_full_name|default:exp.spent_by.username }}</span>
+                                            <span class="badge bg-black text-secondary"><i class="bi bi-clock me-1"></i> {{ exp.expense_date|time:"h:i A" }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-end pe-4 fw-bold text-danger fs-5 align-middle">-{{ exp.amount|floatformat:2 }} ج.م</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="2" class="text-center py-5 text-secondary">
+                                        <i class="bi bi-check-all text-success fs-1 d-block mb-2"></i>
+                                        لم يتم تسجيل أي مصروفات نقدية اليوم.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- العمود الأيسر -->
-        <div class="col-lg-5 col-xl-4 mb-4">
-            <div class="finance-card border-0 position-sticky" style="top: 100px;">
-                <div class="finance-card-header bg-gradient bg-dark text-white d-flex justify-content-center border-bottom border-secondary">
-                    <h5 class="mb-0 fw-bold"><i class="bi bi-cash-coin text-success me-2"></i> جرد الفئات وتأكيد الاستلام</h5>
+        <div class="col-lg-5 col-xl-4">
+            <div class="premium-card position-sticky shadow-2xl" style="top: 20px;">
+                <div class="card-header-premium text-center border-bottom border-secondary bg-black bg-opacity-40 py-4">
+                    <h5 class="mb-0 fw-900 text-warning d-flex align-items-center justify-content-center">
+                        <i class="bi bi-calculator-fill me-2 fs-4"></i>
+                        محرك جرد الفئات النقدية (الفعلي)
+                    </h5>
                 </div>
+                
                 <div class="card-body p-4">
                     <form method="POST" action="{% url 'close_daily_accounts_view' %}">
                         {% csrf_token %}
                         <input type="hidden" name="total_actual_hidden" id="id_total_actual_hidden" value="0">
 
-                        <div class="denominations-container mb-4">
-                            {% for val in "200,100,50,20,10,5,1"|split:"," %}
-                            <div class="denom-row">
-                                <div class="denom-label">{{ val }} ج</div>
-                                <div class="px-2 text-muted">×</div>
-                                <div><input type="number" name="denom_{{ val }}" class="form-control form-control-sm denom-input" data-unit="{{ val }}" value="0" min="0" placeholder="0"></div>
-                                <div class="px-2 text-muted">=</div>
-                                <div class="denom-result" id="total_{{ val }}">0</div>
+                        <div class="denom-grid">
+                            
+                            <div class="denom-box">
+                                <label class="denom-label">200 ج.م</label>
+                                <input type="number" name="denom_200" class="form-control form-control-sm denom-input" data-unit="200" value="0" min="0">
+                                <span class="denom-subtotal" id="total_200">0.00</span>
                             </div>
-                            {% endfor %}
+
+                            <div class="denom-box">
+                                <label class="denom-label">100 ج.م</label>
+                                <input type="number" name="denom_100" class="form-control form-control-sm denom-input" data-unit="100" value="0" min="0">
+                                <span class="denom-subtotal" id="total_100">0.00</span>
+                            </div>
+
+                            <div class="denom-box">
+                                <label class="denom-label">50 ج.م</label>
+                                <input type="number" name="denom_50" class="form-control form-control-sm denom-input" data-unit="50" value="0" min="0">
+                                <span class="denom-subtotal" id="total_50">0.00</span>
+                            </div>
+
+                            <div class="denom-box">
+                                <label class="denom-label">20 ج.م</label>
+                                <input type="number" name="denom_20" class="form-control form-control-sm denom-input" data-unit="20" value="0" min="0">
+                                <span class="denom-subtotal" id="total_20">0.00</span>
+                            </div>
+
+                            <div class="denom-box">
+                                <label class="denom-label">10 ج.م</label>
+                                <input type="number" name="denom_10" class="form-control form-control-sm denom-input" data-unit="10" value="0" min="0">
+                                <span class="denom-subtotal" id="total_10">0.00</span>
+                            </div>
+
+                            <div class="denom-box">
+                                <label class="denom-label">5 ج.م</label>
+                                <input type="number" name="denom_5" class="form-control form-control-sm denom-input" data-unit="5" value="0" min="0">
+                                <span class="denom-subtotal" id="total_5">0.00</span>
+                            </div>
+
+                            <div class="denom-box full-width">
+                                <label class="denom-label">1 ج.م (فضة/ورق)</label>
+                                <input type="number" name="denom_1" class="form-control form-control-sm denom-input" data-unit="1" value="0" min="0">
+                                <span class="denom-subtotal" id="total_1">0.00</span>
+                            </div>
+
                         </div>
 
-                        <div class="d-flex justify-content-between align-items-center mb-3 px-2">
-                            <h6 class="text-white-50 mb-0">إجمالي النقدية الفعلي:</h6>
-                            <h4 class="fw-bold text-success mb-0"><span id="grandTotal">0</span> ج.م</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-4 px-2">
+                            <h6 class="text-white-50 mb-0 fw-bold fs-6">إجمالي النقدية الفعلي بالمجرور:</h6>
+                            <h3 class="fw-900 text-success mb-0"><span id="grandTotal">0.00</span> <small class="fs-6 fw-normal">ج.م</small></h3>
                         </div>
 
                         <div class="diff-box mb-4 text-center">
-                            <span class="text-white-50 d-block mb-1 fs-6">الفارق (عجز / زيادة)</span>
-                            <strong id="diffAmount" class="fs-3 text-white">0 ج.م</strong>
+                            <span class="text-secondary fw-bold d-block mb-2 fs-7">مؤشر مطابقة الخزينة (الفارق اللحظي)</span>
+                            <strong id="diffAmount" class="fs-4 text-white fw-900">0.00 ج.م</strong>
                         </div>
 
                         <div class="mb-4">
-                            <label class="form-label text-white-50 small">ملاحظات الجرد</label>
-                            <textarea name="notes" class="form-control bg-dark border-secondary text-white" rows="2" placeholder="أدخل أسباب الفارق إن وجدت..."></textarea>
+                            <label class="form-label text-info fw-bold small mb-2">ملاحظات ومبررات التصفية الجارية:</label>
+                            <textarea name="notes" class="form-control bg-black border-secondary text-white p-3 fw-bold" rows="2" style="border-radius: 12px; resize: none;" placeholder="اكتب مبررات العجز أو الزيادة أو أي ملاحظات جردية هنا..."></textarea>
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 py-3 fw-bold fs-5 shadow" onclick="return confirm('تأكيد استلام العهد وإغلاق الخزينة؟')">
-                            <i class="bi bi-lock-fill me-2"></i> تأكيد الاستلام وإغلاق الخزينة
+                        <button type="submit" class="btn btn-success w-100 py-3 fw-bold fs-5 shadow-lg rounded-3" onclick="return confirm('هل أنت متأكد من صحة أعداد الفئات النقدية وتأكيد إغلاق اليومية الحالية؟ لا يمكن تعديل هذه البيانات لاحقاً.')">
+                            <i class="bi bi-lock-fill me-2 fs-5"></i> 
+                            اعتماد الاستلام وإغلاق اليومية
                         </button>
                     </form>
                 </div>
@@ -269,159 +361,20 @@
     </div>
 </div>
 
-<!-- Modal تفاصيل الإيصالات (مع نظام منع التكرار البرمجي) -->
-<div class="modal fade" id="receiptsDetails" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg border-0">
-        <div class="modal-content shadow-lg border-1 border-secondary" style="background-color: var(--card-bg);">
-            <div class="modal-header border-secondary" style="background: rgba(0,0,0,0.2);">
-                <h5 class="modal-title fw-bold text-info" id="receiptsModalLabel">تفاصيل الإيصالات</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-0" dir="rtl">
-                <div class="table-responsive">
-                    <table class="table table-borderless pro-table text-right mb-0 text-white">
-                        <thead class="bg-dark">
-                            <tr>
-                                <th>البيان / الفئة</th>
-                                <th class="text-start">المبلغ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="modalTableBody">
-                            <!-- 
-                                نضع كافة البيانات الممكنة هنا، 
-                                وسيقوم الجافاسكريبت بالأسفل بفلترتها ومنع تكرار أي إيصال يحمل نفس الرقم
-                            -->
-                            {% for dp in detailed_entries %}
-                            <tr class="detail-row" data-user="{{ dp.collected_by.username|default:dp.collected_by__username }}" data-receipt="{{ dp.receipt_number|default:dp.id }}" data-type="ledger">
-                                <td>
-                                    <div class="fw-bold text-muted">إيصال #{{ dp.receipt_number|default:dp.id }}</div>
-                                    <span class="badge badge-soft bg-info text-dark">{{ dp.category|default:"إيراد عام" }}</span>
-                                </td>
-                                <td class="fw-bold text-success text-start amount-cell">{{ dp.amount|default:dp.actual_amt }} ج.م</td>
-                            </tr>
-                            {% endfor %}
-
-                            {% for dp in detailed_payments %}
-                            <tr class="detail-row" data-user="{{ dp.collected_by.username }}" data-receipt="{{ dp.receipt_number|default:dp.id }}" data-type="payment">
-                                <td>
-                                    <div class="fw-bold text-muted">إيصال #{{ dp.receipt_number|default:dp.id }}</div>
-                                    <span class="badge badge-soft bg-primary">{{ dp.revenue_category.name }}</span>
-                                </td>
-                                <td class="fw-bold text-success text-start amount-cell">{{ dp.amount_paid }} ج.م</td>
-                            </tr>
-                            {% endfor %}
-
-                            {% for l in ledger_summary %}
-                            <tr class="detail-row" data-user="{{ l.collected_by__username }}" data-receipt="{{ l.receipt_number|default:l.id }}" data-type="summary">
-                                <td>
-                                    <div class="fw-bold text-muted">إيراد #{{ l.receipt_number|default:l.id }}</div>
-                                    <span class="badge badge-soft bg-info text-dark">إيرادات أخرى</span>
-                                </td>
-                                <td class="fw-bold text-success text-start amount-cell">{{ l.total_amount|default:l.amount }} ج.م</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer border-secondary">
-                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">إغلاق</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
-    /**
-     * وظيفة تصفية عهدة المحصلين الذكية:
-     * تمنع تكرار الإيصالات التي تحمل نفس الرقم لنفس المستخدم، حتى لو جاءت من جداول مختلفة.
-     */
-    function generateCashiersCustody() {
-        const cashiers = {};
-        const detailRows = document.querySelectorAll('.detail-row');
-        
-        // مجموعة لتتبع الإيصالات التي تمت معالجتها (رقم الإيصال + اسم المستخدم)
-        const processedReceipts = new Set();
-        
-        detailRows.forEach(row => {
-            let user = row.getAttribute('data-user');
-            let receiptId = row.getAttribute('data-receipt');
-            
-            if (!user || user.trim() === '') user = 'غير معروف';
-            
-            // إنشاء مفتاح فريد للإيصال (يجمع بين المستخدم ورقم الإيصال)
-            const uniqueKey = `${user}_${receiptId}`;
-            
-            // إذا كان الإيصال مسجلاً مسبقاً في هذه الدورة، نخفيه ولا نحتسبه
-            if (processedReceipts.has(uniqueKey)) {
-                row.setAttribute('data-duplicate', 'true');
-                row.style.display = 'none'; // نخفي النسخة المكررة من العرض
-                return;
-            }
-            
-            processedReceipts.add(uniqueKey);
-            row.removeAttribute('data-duplicate');
-
-            const amountCell = row.querySelector('.amount-cell');
-            if (amountCell) {
-                const amountValue = parseFloat(amountCell.innerText.replace(/[^\d.-]/g, '')) || 0;
-                if (!cashiers[user]) { cashiers[user] = { total: 0, count: 0 }; }
-                cashiers[user].total += amountValue;
-                cashiers[user].count += 1;
-            }
-        });
-
-        const custodyBody = document.getElementById('cashiersCustodyBody');
-        if (Object.keys(cashiers).length === 0) {
-            custodyBody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">لا توجد عمليات تحصيل.</td></tr>';
-            return;
-        }
-
-        let htmlContent = '';
-        for (const [user, data] of Object.entries(cashiers)) {
-            htmlContent += `
-            <tr class="cashier-row">
-                <td><i class="bi bi-person-circle text-success me-2 fs-5"></i> <span class="fw-bold">${user}</span></td>
-                <td class="text-center"><span class="badge bg-secondary rounded-pill px-3">${data.count} حركات</span></td>
-                <td class="fw-bold text-success text-start fs-5">${data.total.toLocaleString('en-US', {minimumFractionDigits: 2})} ج.م</td>
-                <td>
-                    <button type="button" class="btn btn-sm btn-outline-info rounded-pill open-user-details" data-bs-toggle="modal" data-bs-target="#receiptsDetails" data-username="${user}">
-                        <i class="bi bi-eye"></i> راجع الإيصالات
-                    </button>
-                </td>
-            </tr>`;
-        }
-        custodyBody.innerHTML = htmlContent;
-        bindDetailsButtons();
-    }
-
-    function bindDetailsButtons() {
-        document.querySelectorAll('.open-user-details').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const selectedUser = this.getAttribute('data-username');
-                document.querySelectorAll('.detail-row').forEach(row => {
-                    const isDuplicate = row.getAttribute('data-duplicate') === 'true';
-                    const isUserMatch = row.getAttribute('data-user') === selectedUser;
-                    
-                    // نظهر فقط الصفوف التي تخص المستخدم وليست مكررة
-                    if (isUserMatch && !isDuplicate) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
-                document.getElementById('receiptsModalLabel').innerText = `إيصالات المحصل: ${selectedUser}`;
-            });
-        });
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
-        generateCashiersCustody();
-        document.querySelectorAll('.denom-input').forEach(input => {
+        const inputs = document.querySelectorAll('.denom-input');
+        
+        inputs.forEach(input => {
+            // تصفير ذكي للخانة عند التركيز
+            input.addEventListener('focus', function() { if(this.value === '0') this.value = ''; });
+            input.addEventListener('blur', function() { if(this.value === '') this.value = '0'; });
+            
+            // الحساب التراكمي الفوري 
             input.addEventListener('input', function() {
                 let unit = parseFloat(this.getAttribute('data-unit'));
                 let count = parseFloat(this.value) || 0;
-                document.getElementById('total_' + unit).innerText = (unit * count).toLocaleString();
+                document.getElementById('total_' + unit).innerText = (unit * count).toLocaleString('en-US', {minimumFractionDigits: 2});
                 calculateGrandTotal();
             });
         });
@@ -431,19 +384,27 @@
             document.querySelectorAll('.denom-input').forEach(input => {
                 grand += (parseFloat(input.getAttribute('data-unit')) * (parseFloat(input.value) || 0));
             });
-            document.getElementById('grandTotal').innerText = grand.toLocaleString();
+            
+            document.getElementById('grandTotal').innerText = grand.toLocaleString('en-US', {minimumFractionDigits: 2});
             document.getElementById('id_total_actual_hidden').value = grand;
 
-            let systemTotal = parseFloat(document.getElementById('systemTotal').innerText.replace(/[^\d.-]/g, '')) || 0;
+            // حساب التباين والمطابقة في نفس اللحظة مع السيرفر
+            // نستخرج الرقم من الرصيد الدفتري في الأعلى (systemTotal) ونتجاهل أي نصوص
+            let systemText = document.getElementById('systemTotal').innerText;
+            let systemTotal = parseFloat(systemText.replace(/[^\d.-]/g, '')) || 0;
+            
             let diff = grand - systemTotal;
             let diffElement = document.getElementById('diffAmount');
             
             if (Math.abs(diff) < 0.01) {
-                diffElement.className = "fs-3 text-success fw-bold"; diffElement.innerText = "الخزينة مطابقة ✅";
+                diffElement.className = "fs-3 neon-text-success"; 
+                diffElement.innerText = "الخزينة مطابقة تماماً ✅";
             } else if (diff < 0) {
-                diffElement.className = "fs-3 text-danger fw-bold"; diffElement.innerText = "عجز (- " + Math.abs(diff).toLocaleString() + " ج.م)";
+                diffElement.className = "fs-4 neon-text-danger"; 
+                diffElement.innerText = "عجز بمقدار (- " + Math.abs(diff).toLocaleString('en-US', {minimumFractionDigits: 2}) + " ج.م)";
             } else {
-                diffElement.className = "fs-3 text-warning fw-bold"; diffElement.innerText = "زيادة (+ " + diff.toLocaleString() + " ج.م)";
+                diffElement.className = "fs-4 neon-text-warning"; 
+                diffElement.innerText = "زيادة بمقدار (+ " + diff.toLocaleString('en-US', {minimumFractionDigits: 2}) + " ج.م)";
             }
         }
     });
