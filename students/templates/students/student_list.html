@@ -478,7 +478,7 @@
                             {% endif %}
 
                             <a href="{% url 'student_inventory_view' student.id %}?next={{ request.get_full_path|urlencode }}#student-{{ student.id }}" 
-                            class="btn btn-sm btn-warning" title="صرف الكتب/الزي">
+                            class="btn btn-sm btn-warning" title=سحب ملف">
                             <i class="bi bi-box-seam"></i>
                             </a>
 
@@ -655,11 +655,12 @@ function rebindCheckboxes() {
 }
 
 /* 5. البحث الهجين (المطور ليدعم دمج كافة الفلاتر النشطة) */
+/* 5. البحث الهجين (المطور ليدعم دمج كافة الفلاتر النشطة) */
 let debounceTimer;
 function instantSearch() {
     let query = document.getElementById('searchInput').value.trim().toLowerCase();
     
-    // الفرز اللحظي في الصفحة الحالية أولاً
+    // الفرز اللحظي في الصفحة الحالية أولاً (لتسريع الاستجابة البصرية للمستخدم)
     document.querySelectorAll('.student-row').forEach(row => {
         let searchText = row.getAttribute('data-search').toLowerCase();
         row.style.display = searchText.includes(query) ? '' : 'none';
@@ -675,21 +676,34 @@ function instantSearch() {
         } else {
             url.searchParams.delete('q');
         }
-        url.searchParams.set('page', '1'); // العودة لأول صفحة عند البحث
+        url.searchParams.set('page', '1'); // العودة لأول صفحة عند البحث الجديد
 
         fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(response => response.text())
         .then(data => {
             let parser = new DOMParser();
             let doc = parser.parseFromString(data, 'text/html');
+            
+            // 1. جلب الجدول الجديد
             let newTableBody = doc.getElementById('tableBody');
+            // 2. جلب شريط الصفحات (Pagination) الجديد
+            let newPagination = doc.querySelector('.pagination-custom');
+            let currentPagination = document.querySelector('.pagination-custom');
+
             if (newTableBody) {
+                // تحديث الجدول
                 document.getElementById('tableBody').innerHTML = newTableBody.innerHTML;
+                
+                // 🚀 السر هنا: تحديث روابط الصفحات بالأسفل لكي تحمل معها كلمة البحث!
+                if (newPagination && currentPagination) {
+                    currentPagination.innerHTML = newPagination.innerHTML;
+                }
+                
                 rebindCheckboxes(); 
                 updateStats();
             }
         });
-    }, 600);
+    }, 600); // تأخير 600 ملي ثانية لمنع ضغط السيرفر أثناء الكتابة السريعة
 }
 
 /* 6. الدالة المساعدة لتغيير فلاتر الـ Select (الصف، التخصص، النوع، الديانة) */

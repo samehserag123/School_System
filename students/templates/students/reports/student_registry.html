@@ -1,0 +1,187 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* إعدادات الطباعة للسجل المدني (بالعرض) */
+        @page { size: A4 landscape; margin: 1.2cm; }
+        
+        :root { --border-color: #334155; }
+        
+        body { 
+            font-family: 'Cairo', sans-serif; background-color: #e2e8f0; 
+            color: #0f172a; margin: 0; padding: 20px; font-size: 12pt; 
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        }
+        
+        .a4-paper { 
+            background: white; width: 27.7cm; min-height: 19cm; 
+            margin: 0 auto; padding: 1.5cm 2cm; box-shadow: 0 15px 35px rgba(0,0,0,0.15); 
+            border-radius: 8px;
+        }
+        
+        /* 🔴 السحر هنا: إخفاء لوحة التحكم وتصفير الهوامش عند الطباعة */
+        @media print {
+            body { background: white; padding: 0; }
+            .a4-paper { width: 100%; box-shadow: none; border-radius: 0; padding: 0; margin: 0; }
+            .no-print { display: none !important; }
+        }
+
+        /* --- لوحة تحكم الفلترة (تظهر على الشاشة فقط) --- */
+        .controls-panel {
+            background: white; width: 27.7cm; margin: 0 auto 20px auto; padding: 15px 25px;
+            border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;
+        }
+        
+        .filter-form { display: flex; gap: 15px; align-items: flex-end; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 10pt; font-weight: 700; color: #475569; }
+        .filter-select { 
+            padding: 8px 12px; font-family: 'Cairo'; font-size: 11pt; font-weight: 600;
+            border: 1px solid #cbd5e1; border-radius: 5px; outline: none; min-width: 180px;
+        }
+        .filter-select:focus { border-color: #3b82f6; }
+
+        .btn { 
+            padding: 9px 20px; font-size: 11pt; font-weight: bold; font-family: 'Cairo'; 
+            cursor: pointer; border: none; border-radius: 5px; transition: 0.2s; 
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-filter { background: #10b981; color: white; }
+        .btn-print { background: #2563eb; color: white; }
+        .btn-back { background: #475569; color: white; }
+
+        /* --- الترويسة الرسمية --- */
+        .print-header {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 3px double var(--border-color); padding-bottom: 10px; margin-bottom: 20px;
+        }
+        .header-col { width: 33%; font-weight: 700; font-size: 11pt; line-height: 1.6; }
+        .header-center { text-align: center; }
+        .header-left { text-align: left; }
+        .school-logo { width: 85px; height: auto; }
+
+        .report-title {
+            text-align: center; font-size: 20pt; font-weight: 800; margin: 10px 0 5px 0;
+            text-decoration: underline; text-underline-offset: 8px; color: #1e3a8a;
+        }
+        
+        .report-subtitle {
+            text-align: center; font-size: 14pt; font-weight: 700; color: #b91c1c; margin-bottom: 20px;
+        }
+
+        .stats-bar {
+            text-align: left; font-weight: 700; font-size: 11pt; margin-bottom: 10px; color: #475569;
+        }
+
+        /* --- الجدول الاحترافي --- */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        th, td { border: 1px solid var(--border-color); padding: 8px; text-align: center; vertical-align: middle; }
+        th { background-color: #e2e8f0 !important; font-weight: 800; font-size: 12pt; color: #0f172a; }
+        td { font-weight: 600; }
+        .text-right { text-align: right !important; padding-right: 15px !important; }
+
+        /* --- التوقيعات --- */
+        .signatures { display: flex; justify-content: space-between; margin-top: 40px; font-weight: 700; font-size: 13pt; page-break-inside: avoid; }
+        .sign-box { text-align: center; width: 30%; }
+    </style>
+</head>
+<body>
+    
+    <div class="controls-panel no-print">
+        <form method="GET" class="filter-form">
+            <div class="filter-group">
+                <label>تصفية بالصف الدراسي:</label>
+                <select name="grade_id" class="filter-select" onchange="this.form.submit()">
+                    <option value="">-- جميع الصفوف (الكل) --</option>
+                    {% for g in all_grades %}
+                        <option value="{{ g.id }}" {% if request.GET.grade_id == g.id|stringformat:"s" %}selected{% endif %}>
+                            {{ g.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-filter">🔍 عرض البيانات</button>
+        </form>
+
+        <div>
+            <button onclick="window.print()" class="btn btn-print">🖨️ طباعة السجل الرسمي</button>
+            <button onclick="history.back()" class="btn btn-back">🔙 رجوع للخلف</button>
+        </div>
+    </div>
+    
+    <div class="a4-paper">
+        <div class="print-header">
+            <div class="header-col">
+                محافظة: القاهرة<br>
+                إدارة: عين شمس التعليمية<br>
+                مدرسة: طلعت حرب الفندقية
+            </div>
+            <div class="header-col header-center">
+                <img src="https://cdn-icons-png.flaticon.com/512/8066/8066276.png" class="school-logo" alt="شعار المدرسة">
+            </div>
+            <div class="header-col header-left">
+                العام الدراسي: {{ active_year.name }}<br>
+                تاريخ الاستخراج: {% now "Y-m-d" %}<br>
+                قسم: شئون الطلاب
+            </div>
+        </div>
+
+        <div class="report-title">
+            السجل المدني للطلاب 
+        </div>
+        <div class="report-subtitle">
+            [ {{ filter_title }} ]
+        </div>
+        
+        <div class="stats-bar">
+            إجمالي عدد الطلاب في هذا الكشف: <span style="color: #1e3a8a;">{{ total_count }} طالب</span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 5%;">م</th>
+                    <th style="width: 12%;">كود الطالب</th>
+                    <th style="width: 33%;">اسم الطالب الرباعي</th>
+                    <th style="width: 15%;">الصف الدراسي</th>
+                    <th style="width: 15%;">الفصل / التخصص</th>
+                    <th style="width: 10%;">الديانة</th>
+                    <th style="width: 10%;">النوع</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in students %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td style="font-family: monospace; font-size: 13pt;">{{ s.student_code|default:"--" }}</td>
+                    <td class="text-right">{{ s.get_full_name }}</td>
+                    <td>{{ s.grade.name }}</td>
+                    <td>{{ s.classroom.name|default:"--" }}</td>
+                    <td>{{ s.get_religion_display }}</td>
+                    <td>{{ s.get_gender_display }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="color: red; font-weight: bold; padding: 20px;">لا يوجد طلاب مطابقين للفلتر الحالي.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="signatures">
+            <div class="sign-box">مسئول شئون الطلاب<br>.............................</div>
+            <div class="sign-box">وكيل شئون الطلاب<br>.............................</div>
+            <div class="sign-box">مدير إدارة المدرسة<br>.............................</div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            --accent-color: #00b4d8;
+            --bg-light: #f8f9fa;
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+            --hover-shadow: 0 15px 35px rgba(30, 60, 114, 0.1);
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f4f6f9;
+            color: #334155;
+            padding: 30px 15px;
+        }
+
+        /* الهيدر الإبداعي الرئيسي */
+        .dashboard-header {
+            background: var(--primary-gradient);
+            border-radius: 20px;
+            padding: 35px;
+            color: white;
+            box-shadow: 0 15px 40px rgba(30, 60, 114, 0.15);
+            margin-bottom: 35px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dashboard-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -20%;
+            width: 400px;
+            height: 400px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .dashboard-title {
+            font-weight: 800;
+            font-size: 2rem;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .year-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            display: inline-block;
+        }
+
+        /* كارت الفلترة الذكي */
+        .filter-card {
+            background: white;
+            border-radius: 18px;
+            border: none;
+            box-shadow: var(--card-shadow);
+            padding: 25px;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+
+        .filter-card:hover {
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.06);
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .form-control, .form-select {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 0.95rem;
+            transition: all 0.25s ease;
+            color: #1e293b;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #2a5298;
+            box-shadow: 0 0 0 4px rgba(42, 82, 152, 0.1);
+        }
+
+        /* زر البحث والفلترة الاحترافي */
+        .btn-filter {
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 12px;
+            font-weight: 700;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(42, 82, 152, 0.2);
+        }
+
+        .btn-filter:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(42, 82, 152, 0.3);
+            color: white;
+        }
+
+        /* كارت جدول الحضور الرائع */
+        .attendance-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: var(--card-shadow);
+            padding: 30px;
+            overflow: hidden;
+        }
+
+        .table-responsive {
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .attendance-table {
+            margin-bottom: 0;
+        }
+
+        .attendance-table th {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-weight: 700;
+            padding: 18px;
+            font-size: 1rem;
+            border: none;
+        }
+
+        .attendance-table td {
+            padding: 16px 18px;
+            vertical-align: middle;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.2s ease;
+        }
+
+        .attendance-table tbody tr:hover td {
+            background-color: #f8fafc;
+        }
+
+        .student-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .student-avatar {
+            width: 42px;
+            height: 42px;
+            background: #e2e8f0;
+            color: #475569;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .student-name {
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .student-code {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin: 0;
+        }
+
+        /* أزرار الحضور التفاعلية الإبداعية (Custom Radio Buttons) */
+        .status-group {
+            display: flex;
+            background: #f1f5f9;
+            padding: 6px;
+            border-radius: 14px;
+            gap: 4px;
+            width: fit-content;
+        }
+
+        .status-btn-label {
+            padding: 8px 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.9rem;
+            transition: all 0.25s ease;
+            user-select: none;
+            margin: 0;
+            text-align: center;
+        }
+
+        .status-radio {
+            display: none;
+        }
+
+        /* تأثيرات الأزرار المحددة ديناميكياً */
+        /* حاضر */
+        /* تأثيرات الأزرار المحددة ديناميكياً (تم الإصلاح) */
+        .status-radio[value="present"]:checked + .label-present {
+            background-color: var(--success-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+        }
+        .status-radio[value="absent"]:checked + .label-absent {
+            background-color: var(--danger-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+        }
+        .status-radio[value="excused"]:checked + .label-excused {
+            background-color: var(--warning-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+        }
+        /* غائب */
+        #absent-group:checked + .label-absent {
+            background-color: var(--danger-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+        }
+        /* غياب بعذر */
+        #excused-group:checked + .label-excused {
+            background-color: var(--warning-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+        }
+
+        /* الحالات غير النشطة عند الهوفر */
+        .label-present:hover { background: rgba(16, 185, 129, 0.1); color: var(--success-color); }
+        .label-absent:hover { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); }
+        .label-excused:hover { background: rgba(245, 158, 11, 0.1); color: var(--warning-color); }
+
+        /* زر الحفظ النهائي العائم والعملاق */
+        .btn-save-attendance {
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            box-shadow: 0 8px 25px rgba(42, 82, 152, 0.25);
+            transition: all 0.3s ease;
+        }
+
+        .btn-save-attendance:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(42, 82, 152, 0.35);
+            color: white;
+        }
+
+        /* تصميم الرسائل التنبيهية */
+        .alert-custom {
+            border-radius: 14px;
+            border: none;
+            font-weight: 600;
+            padding: 16px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid max-width-1400">
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-custom alert-dismissible fade show shadow-sm" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bootstrap="dismiss" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="dashboard-header d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <h1 class="dashboard-title">{{ title }}</h1>
+            <p class="m-0 text-white-50 mb-3">نظام إدارة شئون الطلاب والكنترول المدرسي المطور</p>
+            
+            <div class="mt-2">
+                <a href="{% url 'home' %}" class="btn btn-light btn-sm fw-bold rounded-pill shadow-sm px-4" style="color: #1e293b;">
+                    <i class="bi bi-house-door-fill me-1"></i> العودة للرئيسية
+                </a>
+                <button onclick="history.back()" class="btn btn-outline-light btn-sm fw-bold rounded-pill px-4 ms-2">
+                    <i class="bi bi-arrow-right-circle me-1"></i> رجوع للخلف
+                </button>
+            </div>
+        </div>
+        
+        <div>
+            <span class="year-badge">العام الدراسي النشط: <strong>{{ active_year.name }}</strong></span>
+        </div>
+    </div>
+
+    <div class="filter-card">
+        <form method="GET" action="">
+            <div class="row align-items-end g-3">
+                <div class="col-md-3">
+                    <label class="form-label">تاريخ اليوم</label>
+                    {{ form.date }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">الصف الدراسي</label>
+                    {{ form.grade }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">الفصل</label>
+                    {{ form.classroom }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">الترم</label>
+                    {{ form.term }}
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn-filter">عرض</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if students_data %}
+    <div class="attendance-container">
+        <form method="POST" action="">
+            {% csrf_token %}
+            <input type="hidden" name="attendance_date" value="{{ request.GET.date }}">
+            <input type="hidden" name="attendance_term" value="{{ request.GET.term }}">
+            <input type="hidden" name="grade" value="{{ request.GET.grade }}">
+            <input type="hidden" name="classroom" value="{{ request.GET.classroom }}">
+
+            <div class="table-responsive">
+                <table class="table attendance-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 5%;">#</th>
+                            <th style="width: 35%;">بيانات الطالب</th>
+                            <th style="width: 35%; text-align: center;">حالة الحضور</th>
+                            <th style="width: 25%;">ملاحظات / عذر الغياب</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in students_data %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>
+                                <input type="hidden" name="student_ids" value="{{ item.student.id }}">
+                                <div class="student-info">
+                                    <div class="student-avatar">
+                                        {{ item.student.first_name|slice:":1" }}
+                                    </div>
+                                    <div>
+                                        <h6 class="student-name">{{ item.student.get_full_name }}</h6>
+                                        <p class="student-code">كود: {{ item.student.student_code|default:"--" }}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="status-group mx-auto">
+                                    <input type="radio" name="status_{{ item.student.id }}" value="present" id="present-{{ item.student.id }}" class="status-radio" {% if item.status == 'present' %}checked{% endif %}>
+                                    <label for="present-{{ item.student.id }}" class="status-btn-label label-present">حاضر</label>
+
+                                    <input type="radio" name="status_{{ item.student.id }}" value="absent" id="absent-{{ item.student.id }}" class="status-radio" {% if item.status == 'absent' %}checked{% endif %}>
+                                    <label for="absent-{{ item.student.id }}" class="status-btn-label label-absent">غائب</label>
+
+                                    <input type="radio" name="status_{{ item.student.id }}" value="excused" id="excused-{{ item.student.id }}" class="status-radio" {% if item.status == 'excused' %}checked{% endif %}>
+                                    <label for="excused-{{ item.student.id }}" class="status-btn-label label-excused">بعذر</label>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" name="notes_{{ item.student.id }}" class="form-control" placeholder="اكتب عذراً أو ملاحظة هنا..." value="{{ item.notes }}">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="text-center mt-4">
+                <input type="hidden" name="save_attendance" value="1">
+                
+                {% now "Y-m-d" as today_str %}
+                
+                {% if request.GET.date and request.GET.date < today_str %}
+                    {% if user.is_superuser %}
+                        <div class="alert alert-warning d-inline-block fw-bold shadow-sm mb-3 rounded-4" style="border: 1px solid #fcd34d;">
+                            <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i> 
+                            أنت تقوم بتعديل غياب يوم سابق (صلاحية مدير النظام فقط).
+                        </div>
+                        <br>
+                        <button type="submit" class="btn-save-attendance" style="background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%); box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);">
+                            💾 حفظ التعديلات الاستثنائية
+                        </button>
+                    {% else %}
+                        <div class="alert alert-danger d-inline-block fw-bold shadow-sm p-3 rounded-4" style="border: 1px solid #fca5a5;">
+                            <i class="bi bi-lock-fill fs-5"></i> 
+                            هذا الكشف مغلق! لا يمكن تعديل غياب الأيام السابقة بدون إذن الإدارة العليا.
+                        </div>
+                        <script>
+                            document.addEventListener("DOMContentLoaded", function() {
+                                // تعطيل أزرار الراديو وحقول الإدخال
+                                const inputs = document.querySelectorAll('.status-radio, input[name^="notes_"]');
+                                inputs.forEach(el => {
+                                    el.disabled = true;
+                                    el.style.cursor = 'not-allowed';
+                                    el.style.background = '#f1f5f9';
+                                });
+                                // بهتان الألوان لتبدو غير قابلة للنقر
+                                const labels = document.querySelectorAll('.status-btn-label');
+                                labels.forEach(el => {
+                                    el.style.opacity = '0.5';
+                                    el.style.cursor = 'not-allowed';
+                                });
+                            });
+                        </script>
+                    {% endif %}
+                {% else %}
+                    <button type="submit" class="btn-save-attendance">
+                        💾 حفظ وإرسال كشف الحضور والغياب للـسـيـسـتـم
+                    </button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    {% else %}
+        {% if request.GET.grade %}
+            <div class="alert alert-warning alert-custom text-center shadow-sm">
+                ⚠️ لا يوجد طلاب مسجلين أو نشطين في هذا الصف/الفصل حالياً لهذا العام الدراسي.
+            </div>
+        {% else %}
+            <div class="alert alert-info alert-custom text-center shadow-sm">
+                💡 يرجى اختيار (الصف الدراسي والترم) من الأعلى ثم الضغط على "عرض" لفتح كشف رصد الغياب والحضور اليومي.
+            </div>
+        {% endif %}
+    {% endif %}
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

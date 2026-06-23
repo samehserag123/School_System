@@ -11,6 +11,7 @@ urlpatterns = [
     path('dashboard/', views.finance_dashboard, name='finance_dashboard'),
     path('overdue/', views.overdue_report, name='overdue_report'),
     path('reports/debts/', views.debt_report, name='debt_report'),
+    path('withdrawn-students/', views.withdrawn_students_report, name='withdrawn_students_report'),
 
     # 💰 إدارة الخطط المالية (التسكين)
     path('assign-plan/', views.assign_plan, name='assign_plan'),

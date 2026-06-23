@@ -1,231 +1,158 @@
 {% extends 'base.html' %}
 
-{% block title %}مركز التسليم - {{ student.get_full_name }}{% endblock %}
+{% block title %}سحب ملف الطالب - {{ student.get_full_name }}{% endblock %}
 
 {% block content %}
-<div class="container py-4" dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-    
-    <div class="row mb-4 g-3">
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0" style="background: linear-gradient(45deg, #1e1e1e, #2d1a1a); border-right: 5px solid #ff4d4d !important;">
-                <div class="card-body p-3">
-                    <h6 class="text-danger mb-1 fw-bold"><i class="bi bi-cash-stack me-1"></i> إجمالي المتبقي للسداد</h6>
-                    <h2 class="fw-bold text-white mb-0">{{ total_to_pay }} <small style="font-size: 14px;">ج.م</small></h2>
+<div class="container py-5" dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            
+            <div class="card shadow-lg border-0 mb-4" style="background: linear-gradient(135deg, #1e1e1e, #2a0808); border-right: 5px solid #dc3545 !important; border-radius: 15px;">
+                <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <h3 class="text-danger fw-900 mb-2"><i class="bi bi-person-x-fill me-2"></i> إدارة سحب الملفات (للإدارة فقط)</h3>
+                        <p class="text-white-50 mb-0 fs-5 d-flex align-items-center">
+                            <i class="bi bi-person-badge me-2 text-secondary"></i> الطالب: 
+                            <span class="text-white fw-bold ms-2">{{ student.get_full_name }}</span>
+                        </p>
+                    </div>
+                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger p-2 fs-6 rounded-pill px-3 shadow-sm">
+                        <i class="bi bi-shield-lock-fill me-1"></i> منطقة خطر مالي
+                    </span>
                 </div>
             </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0" style="background: linear-gradient(45deg, #1e1e1e, #1a2d2d); border-right: 5px solid #0dcaf0 !important;">
-                <div class="card-body p-3">
-                    <h6 class="text-info mb-1 fw-bold"><i class="bi bi-calendar-event me-1"></i> السنة الدراسية</h6>
-                    <h2 class="fw-bold text-white mb-0">{{ student.academic_year.name }}</h2>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0" style="background: linear-gradient(45deg, #1e1e1e, #1a2d1a); border-right: 5px solid #198754 !important;">
-                <div class="card-body p-3">
-                    <h6 class="text-success mb-1 fw-bold"><i class="bi bi-clock-history me-1"></i> تاريخ اليوم</h6>
-                    <h2 class="fw-bold text-white mb-0">{{ today|date:"Y-m-d" }}</h2>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="card bg-black shadow-lg" style="border-radius: 20px; border: 1px solid #444;">
-        <div class="card-header border-0 p-4 d-flex justify-content-between align-items-center" style="background: #1a1d21; border-radius: 20px 20px 0 0;">
-            <div>
-                <h3 class="mb-1 text-white fw-bold">
-                    <i class="bi bi-box-seam text-primary me-2"></i> مركز تسليم العهدة
-                </h3>
-                <p class="text-light opacity-75 mb-0 fs-5">{{ student.get_full_name }}</p>
-            </div>
-            <span class="badge bg-primary px-4 py-2 fs-6 rounded-pill shadow-sm">{{ student.grade.name }}</span>
-        </div>
-        
-        <div class="card-body p-4 bg-dark">
-            <div class="row">
-                
-                <div class="col-md-6 mb-4">
-                    <div class="p-3 rounded-4 shadow-inner" style="background: #111; border: 1px solid #333;">
-                        <h5 class="text-white border-bottom border-secondary pb-3 mb-4 d-flex justify-content-between">
-                            <span class="text-info"><i class="bi bi-book-half me-2"></i> الكتب المدرسية</span>
-                            <span class="badge bg-secondary">{{ books|length }} أصناف</span>
-                        </h5>
-                        
-                        {% for book in books %}
-                        <div class="item-card d-flex justify-content-between align-items-center p-3 mb-3 rounded-3" 
-                             style="background: #1e1e1e; border: 1px solid {% if book.is_paid %}#198754{% else %}#444{% endif %};">
-                            <div class="flex-grow-1">
-                                <h6 class="fw-bold text-white fs-5 mb-1">{{ book.item_name }}</h6>
-                                <div class="mb-2">
-                                    {% if book.price <= 0 %}
-                                        <span class="badge bg-success text-white px-2 fw-bold">مجاني <i class="bi bi-gift ms-1"></i></span>
-                                    {% else %}
-                                        <span class="badge bg-black text-info border border-info border-opacity-50 px-2">السعر: {{ book.price }} ج.م</span>
-                                        
-                                        {% if book.is_paid %}
-                                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 ms-2">تم سداد كامل الثمن</span>
-                                        {% else %}
-                                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 ms-2">بانتظار استكمال السداد</span>
-                                        {% endif %}
-                                    {% endif %}
-                                </div>
-
-                                {% if book.is_delivered %}
-                                    <span class="text-success small fw-bold"><i class="bi bi-check2-all me-1"></i> تم التسليم والمخالصة</span>
-                                {% elif book.is_paid or book.price <= 0 %}
-                                    <span class="text-primary small fw-bold"><i class="bi bi-unlock-fill me-1"></i> متاح للتسليم (مدفوع)</span>
-                                {% else %}
-                                    <span class="text-warning small fw-bold"><i class="bi bi-lock-fill me-1"></i> لا يمكن التسليم قبل دفع {{ book.price }} ج.م</span>
-                                {% endif %}
-                            </div>
-
-                            <div class="ms-3 text-center" style="min-width: 120px;">
-                                {% if book.is_delivered %}
-                                    <div class="text-success border border-success rounded-3 p-2 bg-success bg-opacity-10">
-                                        <i class="bi bi-patch-check-fill d-block fs-4"></i>
-                                        <small class="fw-bold">تم التسليم</small>
-                                    </div>
-                                {% elif book.is_paid or book.price <= 0 %}
-                                    <button onclick="deliverItem({{ book.id }})" class="btn btn-primary w-100 fw-bold py-2 shadow-sm rounded-3">
-                                        تسليم الآن
-                                    </button>
-                                {% else %}
-                                    <div class="text-secondary border border-danger border-opacity-25 rounded-3 p-2 bg-danger bg-opacity-10 opacity-75">
-                                        <i class="bi bi-shield-lock d-block fs-5 text-danger"></i>
-                                        <small class="text-danger fw-bold">غير مسموح</small>
-                                    </div>
-                                {% endif %}
+            <div class="card bg-black shadow-lg border-secondary border-opacity-50" style="border-radius: 15px;">
+                <div class="card-body p-4 p-md-5 bg-dark" style="border-radius: 15px;">
+                    
+                    <div class="alert mb-4 shadow-sm" style="background: rgba(13, 202, 240, 0.05); border: 1px solid rgba(13, 202, 240, 0.2); border-radius: 12px;">
+                        <div class="d-flex align-items-center">
+                            <div class="fs-1 text-info me-3"><i class="bi bi-info-circle-fill"></i></div>
+                            <div>
+                                <h5 class="text-info fw-bold mb-1">الرصيد المالي الحالي</h5>
+                                <p class="text-light mb-0 fs-6">
+                                    إجمالي ما دفعه الطالب فعلياً هذا العام: 
+                                    <strong class="text-white fs-4 ms-1">{{ total_paid|default:"0.00" }} <small class="fs-6">ج.م</small></strong>
+                                </p>
                             </div>
                         </div>
-                        {% endfor %}
                     </div>
-                </div>
 
-                <div class="col-md-6 mb-4">
-                    <div class="p-3 rounded-4 shadow-inner" style="background: #111; border: 1px solid #333;">
-                        <h5 class="text-white border-bottom border-secondary pb-3 mb-4 d-flex justify-content-between">
-                            <span class="text-warning"><i class="bi bi-person-badge-fill me-2"></i> الزي المدرسي</span>
-                            <span class="badge bg-secondary">{{ uniform|length }} أصناف</span>
-                        </h5>
+                    <form method="POST" id="withdrawForm">
+                        {% csrf_token %}
                         
-                        {% for item in uniform %}
-                        <div class="item-card d-flex justify-content-between align-items-center p-3 mb-3 rounded-3" 
-                             style="background: #1e1e1e; border: 1px solid {% if item.is_paid %}#ffc107{% else %}#444{% endif %};">
-                            <div class="flex-grow-1">
-                                <h6 class="fw-bold text-white fs-5 mb-1">{{ item.item_name }}</h6>
-                                <div class="mb-2">
-                                    {% if item.price <= 0 %}
-                                        <span class="badge bg-success text-white px-2 fw-bold">مجاني</span>
-                                    {% else %}
-                                        <span class="badge bg-black text-warning border border-warning border-opacity-50 px-2">السعر: {{ item.price }} ج.م</span>
-                                        {% if item.is_paid %}
-                                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 ms-2">مدفوع بالكامل</span>
-                                        {% else %}
-                                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 ms-2">غير مسدد</span>
-                                        {% endif %}
-                                    {% endif %}
-                                </div>
-                                
-                                {% if item.is_delivered %}
-                                    <span class="text-success small fw-bold"><i class="bi bi-bag-check me-1"></i> خرج من العهدة</span>
-                                {% elif item.is_paid or item.price <= 0 %}
-                                    <span class="text-primary small fw-bold"><i class="bi bi-check-circle-fill me-1"></i> جاهز للخروج</span>
-                                {% else %}
-                                    <span class="text-danger small fw-bold"><i class="bi bi-x-circle me-1"></i> مطلوب دفع {{ item.price }} ج.م</span>
-                                {% endif %}
+                        <div class="mb-4">
+                            <label class="form-label text-white fw-bold fs-5 mb-3">
+                                <i class="bi bi-cash-coin text-warning me-2"></i> المبلغ المراد استرداده (رده من الخزينة)
+                            </label>
+                            <div class="input-group input-group-lg shadow-sm">
+                                <input type="number" name="refund_amount" id="refund_amount" 
+                                       class="form-control bg-black text-warning fw-bold border-secondary text-center" 
+                                       value="0" min="0" step="0.01" max="{{ total_paid|default:'0' }}" required 
+                                       style="font-size: 1.8rem; letter-spacing: 2px;">
+                                <span class="input-group-text bg-secondary text-white border-secondary fw-bold px-4">ج.م</span>
                             </div>
-
-                            <div class="ms-3 text-center" style="min-width: 120px;">
-                                {% if item.is_delivered %}
-                                    <div class="text-success border border-success rounded-3 p-2 bg-success bg-opacity-10">
-                                        <i class="bi bi-bag-check-fill d-block fs-4"></i>
-                                        <small class="fw-bold">تم الاستلام</small>
-                                    </div>
-                                {% elif item.is_paid or item.price <= 0 %}
-                                    <button onclick="deliverItem({{ item.id }})" class="btn btn-warning w-100 fw-bold py-2 shadow-sm rounded-3 text-dark">
-                                        تسليم الآن
-                                    </button>
-                                {% else %}
-                                    <div class="text-secondary border border-secondary rounded-3 p-2 bg-secondary bg-opacity-10 opacity-50">
-                                        <i class="bi bi-lock-fill d-block fs-5"></i>
-                                        <small>مغلق</small>
-                                    </div>
-                                {% endif %}
+                            <div class="form-text text-white-50 mt-2 fs-6">
+                                <i class="bi bi-lightbulb text-warning me-1"></i> 
+                                إذا لم يتم استرداد مبالغ، اترك الرقم <strong class="text-white">0</strong> وسيتم فقط إسقاط باقي الأقساط وتجميد الملف.
                             </div>
                         </div>
-                        {% endfor %}
-                    </div>
+
+                        <div class="mb-5">
+                            <label class="form-label text-white fw-bold fs-5 mb-3">
+                                <i class="bi bi-card-text text-info me-2"></i> سبب سحب الملف / الاسترداد
+                            </label>
+                            <textarea name="reason" class="form-control bg-black text-white border-secondary p-3 shadow-inner" 
+                                      rows="3" required placeholder="اكتب سبب سحب الملف بدقة للرجوع إليه في التقارير (مثال: نقل لمدرسة أخرى)...">سحب ملف نهائي وتصفية حسابات</textarea>
+                        </div>
+
+                        <div class="p-4 mb-4 rounded-4 shadow-sm" style="background: rgba(220, 53, 69, 0.05); border: 1px dashed rgba(220, 53, 69, 0.4);">
+                            <h6 class="text-danger fw-bold mb-3 fs-5"><i class="bi bi-exclamation-octagon-fill me-2"></i> الإجراءات التي سيتم تنفيذها آلياً الآن:</h6>
+                            <ul class="text-light opacity-75 mb-0 fs-6" style="line-height: 2;">
+                                <li>سيتم تحويل حالة الطالب إلى <strong class="text-danger">(غير نشط)</strong> فوراً وإخفاؤه من القوائم.</li>
+                                <li>سيتم <strong class="text-warning">تصفير وإسقاط</strong> جميع الأقساط المتبقية لعدم تراكم ديون معدومة.</li>
+                                <li>إذا تم إدخال مبلغ، سيتم خصمه فوراً كـ <strong class="text-info">(مرتجع)</strong> من جرد الخزينة اليومي.</li>
+                            </ul>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-5 pt-4 border-top border-secondary border-opacity-50">
+                            <a href="{% url 'student_list' %}" class="btn btn-outline-secondary px-4 py-2 fw-bold rounded-pill hover-scale">
+                                <i class="bi bi-arrow-right me-1"></i> تراجع وعودة للسجل
+                            </a>
+                            <button type="button" onclick="confirmWithdrawal()" class="btn btn-danger px-4 px-md-5 py-2 fw-bold rounded-pill shadow-lg hover-scale">
+                                <i class="bi bi-check2-circle me-1 d-none d-md-inline"></i> تنفيذ سحب الملف والإسقاط
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
 
 <style>
-    body { background-color: #0d0d0d; }
-    .bg-dark { background-color: #1a1d21 !important; }
-    .bg-black { background-color: #000 !important; }
-    .item-card { transition: 0.2s; border-radius: 12px !important; }
-    .item-card:hover { 
-        border-color: #0dcaf0 !important; 
-        background: #252525 !important;
-        transform: translateY(-2px);
-    }
-    .text-white { color: #ffffff !important; }
-    .btn-primary { background: #0061ff; border: none; transition: 0.3s; }
-    .btn-primary:hover { background: #0052d6; transform: scale(1.05); }
-    .btn-warning { background: #ffca2c; border: none; transition: 0.3s; }
-    .btn-warning:hover { background: #e5b627; transform: scale(1.05); }
     .shadow-inner { box-shadow: inset 0 2px 10px rgba(0,0,0,0.5); }
+    .hover-scale { transition: transform 0.2s ease-in-out; }
+    .hover-scale:hover { transform: translateY(-2px); }
+    
+    /* إخفاء أسهم الأرقام داخل الـ input number ليكون شكله أنظف */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+        -webkit-appearance: none; 
+        margin: 0; 
+    }
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-function deliverItem(itemId) {
+function confirmWithdrawal() {
+    const refundAmt = document.getElementById('refund_amount').value;
+    const isRefunding = parseFloat(refundAmt) > 0;
+    
+    let htmlContent = `<div class="text-danger fw-bold mb-3 fs-5">أنت على وشك سحب ملف الطالب وإسقاط جميع ديونه المتبقية نهائياً!</div>`;
+    
+    if (isRefunding) {
+        htmlContent += `<div class="text-white bg-black p-3 rounded-3 border border-secondary shadow-inner mt-3">
+                            سيتم رد مبلغ من الخزينة قدره: <br>
+                            <span class="text-warning fs-2 fw-bold">${refundAmt} ج.م</span>
+                        </div>`;
+    } else {
+        htmlContent += `<div class="text-white bg-black p-3 rounded-3 border border-secondary shadow-inner mt-3">
+                            <i class="bi bi-info-circle text-info me-1"></i> لن يتم رد أي مبالغ من الخزينة، سيتم الإسقاط فقط.
+                        </div>`;
+    }
+
     Swal.fire({
-        title: 'تأكيد التسليم',
-        text: "هل أنت متأكد من تسليم هذا الصنف للطالب؟",
-        icon: 'question',
+        title: 'تأكيد العملية الإدارية',
+        html: htmlContent,
+        icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#0061ff',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'نعم، تسليم',
-        cancelButtonText: 'إلغاء'
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'نعم، نفذ الإجراء',
+        cancelButtonText: 'إلغاء',
+        background: '#1a1d21',
+        color: '#fff',
+        customClass: {
+            popup: 'border border-danger border-opacity-50 rounded-4 shadow-lg'
+        }
     }).then((result) => {
         if (result.isConfirmed) {
-            // إظهار مؤشر تحميل بسيط
-            Swal.showLoading();
-            
-            const url = "{% url 'mark_item_delivered' 0 %}".replace('0', itemId);
-            
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': '{{ csrf_token }}',
-                    'Content-Type': 'application/json'
+            Swal.fire({
+                title: 'جاري التنفيذ...',
+                text: 'الرجاء الانتظار بينما يتم تسوية الحسابات وإسقاط المديونية.',
+                background: '#1a1d21',
+                color: '#fff',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
                 }
-            })
-            .then(response => response.json().then(data => ({status: response.status, body: data})))
-            .then(result => {
-                if (result.status === 200) {
-                    Swal.fire({
-                        title: 'تم التسليم!',
-                        text: result.body.message,
-                        icon: 'success',
-                        confirmButtonColor: '#198754'
-                    }).then(() => {
-                        location.reload(); // تحديث الصفحة لرؤية الحالة الجديدة
-                    });
-                } else {
-                    // عرض رسالة الخطأ القادمة من السيرفر (مثل: المديونية المتبقية)
-                    Swal.fire('تعذر التسليم!', result.body.message, 'error');
-                }
-            })
-            .catch(error => {
-                Swal.fire('خطأ!', 'حدث خطأ غير متوقع في الاتصال بالسيرفر.', 'error');
             });
+            document.getElementById('withdrawForm').submit();
         }
     });
 }

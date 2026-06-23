@@ -133,11 +133,34 @@
         }
 
         @media all and (min-width: 992px) {
-            .navbar .nav-item.dropdown:hover .dropdown-menu {
+            .navbar .nav-item.dropdown:hover > .dropdown-menu {
                 display: block; opacity: 1; visibility: visible; transform: translateY(0);
             }
             .navbar .dropdown-menu {
                 display: block; opacity: 0; visibility: hidden; transform: translateY(10px); transition: all 0.3s ease;
+            }
+        }
+
+        /* ==========================================
+           🟢 دعم القوائم المنسدلة المتداخلة للتقارير
+           ========================================== */
+        .dropdown-submenu {
+            position: relative;
+        }
+        .dropdown-submenu > .dropdown-menu {
+            top: 0;
+            right: 100%; /* تفتح لليسار في الواجهة العربية */
+            left: auto;
+            margin-top: -5px;
+            margin-right: 5px;
+            min-width: 260px;
+        }
+        @media all and (min-width: 992px) {
+            .dropdown-submenu:hover > .dropdown-menu {
+                display: block;
+                opacity: 1;
+                visibility: visible;
+                transform: translateX(0);
             }
         }
 
@@ -321,6 +344,46 @@
                 {% else %}
                     <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-card-list text-muted"></i> السجل المدني للطلاب <i class="bi bi-lock-fill ms-auto"></i></a></li>
                 {% endif %}
+
+                <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+
+                {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                    <li><a class="dropdown-item" href="{% url 'take_attendance' %}"><i class="bi bi-calendar-check-fill text-warning"></i> الغياب والحضور اليومي</a></li>
+                    <li><a class="dropdown-item" href="{% url 'manage_reenrollments' %}"><i class="bi bi-arrow-counterclockwise text-danger"></i> إعادة قيد الطلاب المفصولين</a></li>
+                {% else %}
+                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-calendar-check-fill text-muted"></i> الغياب والحضور اليومي <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-arrow-counterclockwise text-muted"></i> إعادة قيد الطلاب المفصولين <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                {% endif %}
+
+                <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+
+                {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                    <li><a class="dropdown-item" href="{% url 'record_marks' %}"><i class="bi bi-journal-text icon-student"></i> كنترول رصد الدرجات</a></li>
+                {% else %}
+                    <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-journal-text text-muted"></i> كنترول رصد الدرجات <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                {% endif %}
+
+                <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+
+                <li class="dropdown-submenu">
+                    <a class="dropdown-item dropdown-toggle fw-bold text-info" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-printer-fill text-info"></i> التقارير والسجلات (PDF)
+                    </a>
+                    <ul class="dropdown-menu border-0 shadow-lg">
+                        {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                            <li><a class="dropdown-item" href="{% url 'academic_final_report' %}"><i class="bi bi-file-earmark-bar-graph-fill text-success"></i> التقرير الأكاديمي النهائي</a></li>
+                            <li><a class="dropdown-item" href="{% url 'attendance_report' %}"><i class="bi bi-clipboard-data-fill text-warning"></i> تقرير الغياب والحضور الإحصائي</a></li>
+                            
+                            <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+                            
+                            <li><a class="dropdown-item" href="{% url 'report_class_roster' %}"><i class="bi bi-filetype-pdf text-danger"></i> طباعة كشوف الفصول (PDF)</a></li>
+                            <li><a class="dropdown-item" href="{% url 'report_student_registry' %}"><i class="bi bi-filetype-pdf text-danger"></i> طباعة السجل المدني للطلاب (PDF)</a></li>
+                            <li><a class="dropdown-item" href="{% url 'report_dismissed_students' %}"><i class="bi bi-filetype-pdf text-danger"></i> تقرير الطلاب المفصولين (PDF)</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-lock-fill text-muted"></i> لا تملك صلاحية التقارير</a></li>
+                        {% endif %}
+                    </ul>
+                </li>
             </ul>
         </li>
     <li class="nav-item dropdown">
@@ -562,6 +625,17 @@
                 const disabledBtns = document.querySelectorAll('button[type="submit"]:disabled, input[type="submit"]:disabled');
                 disabledBtns.forEach(btn => btn.disabled = false);
             }
+        });
+        
+        // 🟢 تفعيل القوائم المنسدلة المتداخلة في الموبايل
+        const dropdownSubmenus = document.querySelectorAll('.dropdown-submenu > a');
+        dropdownSubmenus.forEach(function(element) {
+            element.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                let submenu = this.nextElementSibling;
+                submenu.style.display = (submenu.style.display === 'block') ? 'none' : 'block';
+            });
         });
     });
 </script>

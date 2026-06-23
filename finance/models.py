@@ -74,9 +74,12 @@ class DailyClosure(models.Model):
             super().save(*args, **kwargs)
             
             # إغلاق كافة الإيصالات والمصروفات المفتوحة وربطها بهذا الجرد لضمان عدم تكرارها
-            from .models import Payment, Expense
+            from .models import Payment, Expense, StudentRefund
             Payment.objects.filter(is_closed=False).update(is_closed=True, closure=self)
             Expense.objects.filter(is_closed=False).update(is_closed=True, closure=self)
+            
+            # 🟢 إغلاق المرتجعات أيضاً مع الجرد
+            StudentRefund.objects.filter(is_closed=False).update(is_closed=True, closure=self)
 
     def __str__(self):
         return f"جرد رقم: {self.closure_id} - {self.closure_date.strftime('%Y-%m-%d')}"
@@ -395,7 +398,6 @@ class StudentAccount(models.Model):
                 StudentInstallment.objects.bulk_create(new_installments)
                 
 
-
 class Payment(models.Model):
     """نموذج عمليات الدفع وتحصيل الرسوم"""
     installment = models.ForeignKey(
@@ -462,19 +464,19 @@ class Payment(models.Model):
         related_name="payments",
         verbose_name="رقم الجرد/الإغلاق"
     )
-    # ... بقية الحقول ...
+    
     receipt_number = models.PositiveIntegerField(
         null=True, 
         blank=True, 
         unique=True, # 🔴 هذا القفل السحري يمنع تسجيل أي إيصال مكرر نهائياً
         verbose_name="رقم الإيصال المرجعي"
     )
-    # ... بقية الحقول ...
+    
     notes = models.TextField(null=True, blank=True, verbose_name="ملاحظات إضافية")
 
     class Meta:
-        verbose_name = "عملية دفع"
-        verbose_name_plural = "عمليات الدفع"
+        verbose_name = "عملية الدفع"
+        verbose_name_plural = "عمليات دفع"
         ordering = ['-payment_date', '-id']
 
     def clean(self):
@@ -490,20 +492,23 @@ class Payment(models.Model):
     cancelled_at = models.DateTimeField(null=True, blank=True)
 
     def cancel_payment(self, admin_user, reason):
-        """دالة مخصصة لإلغاء الإيصال وعكس تأثيره على الأقساط"""
+        """دالة مخصصة لإلغاء الإيصال وعكس تأثيره على الأقساط بسرعة البرق"""
         if self.is_closed:
             raise ValidationError("لا يمكن إلغاء إيصال تم إغلاق خزينته.")
         
         with transaction.atomic():
             # 1. إعادة المبالغ للأقساط (عكس منطق الـ save)
             if self.student:
-                # جلب الأقساط التي تم دفعها (مرتبة عكسياً من الأحدث للأقدم)
-                # جلب الأقساط المتأخرة وتحديثها دفعة واحدة (من الأقدم للأحدث عبر كل السنوات)
-                installments = StudentInstallment.objects.filter(
-                    student=self.student
-                ).exclude(status='Paid').order_by('due_date')
+                # 🚀 الصح: نجلب الأقساط التي تم دفع أي مبلغ فيها (سواء جزئي أو خالص)
+                # ونرتبها من الأحدث للأقدم (-due_date) لكي نخصم الفلوس المرتجعة من القسط الأخير أولاً
+                installments = list(StudentInstallment.objects.filter(
+                    student=self.student,
+                    paid_amount__gt=0  # جلب أي قسط مدفوع فيه أموال
+                ).order_by('-due_date'))
 
                 remaining_to_refund = self.amount_paid
+                insts_to_update = [] # 🛒 سلة التحديثات المجمعة
+
                 for inst in installments:
                     if remaining_to_refund <= 0: break
                     
@@ -519,15 +524,21 @@ class Payment(models.Model):
                         inst.status = 'Pending'
                     else:
                         inst.status = 'Partial'
-                    inst.save(update_fields=['paid_amount', 'status'])
+                    
+                    # وضع القسط في السلة بدلاً من حفظه فوراً
+                    insts_to_update.append(inst)
 
-            # 2. تحديث بيانات الإيصال
+                # 🚀 ضربة واحدة لقاعدة البيانات لحفظ كل الأقساط الملغاة
+                if insts_to_update:
+                    StudentInstallment.objects.bulk_update(insts_to_update, ['paid_amount', 'status'])
+
+            # 2. تحديث بيانات الإيصال نفسه
             self.amount_paid = 0
             self.is_cancelled = True
             self.cancelled_by = admin_user
             self.cancellation_reason = reason
             self.cancelled_at = timezone.now()
-            self.save(update_fields=['is_cancelled', 'cancelled_by', 'cancellation_reason', 'cancelled_at'])
+            self.save(update_fields=['is_cancelled', 'cancelled_by', 'cancellation_reason', 'cancelled_at', 'amount_paid'])
             
             
     def save(self, *args, **kwargs):
@@ -542,25 +553,27 @@ class Payment(models.Model):
                 self.academic_year = self.student.academic_year
 
             with transaction.atomic():
-                # الحفظ الأساسي أولاً
+                # الحفظ الأساسي للإيصال أولاً
                 super(Payment, self).save(*args, **kwargs)
                 
-                # تنفيذ منطق الأقساط فقط إذا كان هناك طالب وبند مصروفات
+                # تنفيذ منطق الأقساط فقط إذا كان هناك طالب وإيصال جديد
                 if self.student and is_new:
-                    # التحقق من نوع الإيراد (بشكل سريع)
                     category = self.revenue_category
                     if category and ("المصروفات" in category.name or (category.parent and "المصروفات" in category.parent.name)):
                         
-                        # جلب الأقساط وتحديثها دفعة واحدة
-                        installments = StudentInstallment.objects.filter(
+                        # 🚀 جلب الأقساط كسلة في الرامات بدلاً من استعلامات متكررة
+                        installments = list(StudentInstallment.objects.filter(
                             student=self.student, 
                             academic_year=self.academic_year
-                        ).exclude(status='Paid').order_by('due_date')
+                        ).exclude(status='Paid').order_by('due_date'))
 
                         remaining = self.amount_paid
+                        insts_to_update = [] # 🛒 سلة التحديثات المجمعة
+
                         for inst in installments:
                             if remaining <= 0: break
                             needed = inst.amount_due - inst.paid_amount
+                            
                             if remaining >= needed:
                                 inst.paid_amount = inst.amount_due
                                 inst.status = 'Paid'
@@ -569,13 +582,222 @@ class Payment(models.Model):
                                 inst.paid_amount += remaining
                                 inst.status = 'Partial'
                                 remaining = 0
-                            # استخدام update_fields ضروري لسرعة الاستجابة
-                            inst.save(update_fields=['paid_amount', 'status'])
+                            
+                            # وضع القسط في السلة
+                            insts_to_update.append(inst)
+                            
+                        # 🚀 تحديث جميع الأقساط المتأثرة في استعلام واحد فقط!
+                        if insts_to_update:
+                            StudentInstallment.objects.bulk_update(insts_to_update, ['paid_amount', 'status'])
         finally:
             self._saving = False
+            
+# class Payment(models.Model):
+#     """نموذج عمليات الدفع وتحصيل الرسوم"""
+#     installment = models.ForeignKey(
+#         'StudentInstallment', 
+#         on_delete=models.CASCADE, 
+#         related_name="payments",
+#         null=True, 
+#         blank=True, 
+#         help_text="اتركه فارغاً للإيرادات الحرة"
+#     )
+#     student = models.ForeignKey(
+#         "students.Student", 
+#         on_delete=models.CASCADE, 
+#         related_name="all_payments",
+#         null=True, 
+#         blank=True
+#     )
+#     revenue_category = models.ForeignKey(
+#         'RevenueCategory', 
+#         on_delete=models.PROTECT, 
+#         null=True, 
+#         blank=False,
+#         verbose_name="فئة الإيراد"
+#     )
+#     academic_year = models.ForeignKey(
+#         'AcademicYear', 
+#         on_delete=models.CASCADE, 
+#         null=True, 
+#         blank=True,
+#         verbose_name="السنة الدراسية"
+#     )
+#     amount_paid = models.DecimalField(
+#         max_digits=10, 
+#         decimal_places=2, 
+#         verbose_name="المبلغ المدفوع"
+#     )
+#     payment_date = models.DateField(
+#         default=timezone.now, 
+#         verbose_name="تاريخ الدفع",
+#         db_index=True  # 🟢 إضافة الفهرس لتسريع البحث بالتواريخ
+#     )
+    
+#     # ... (حقول أخرى) ...
 
-# 1. أضف هذا الكلاس الجديد فوق كلاس Expense
-# 1. أضف هذا الكلاس الجديد فوق كلاس Expense
+#     is_closed = models.BooleanField(
+#         default=False, 
+#         verbose_name="تم تقفيل الخزينة",
+#         db_index=True  # 🟢 إضافة الفهرس لتسريع فرز الحركات المعلقة
+#     )
+#     collected_by = models.ForeignKey(
+#         'auth.User', 
+#         on_delete=models.SET_NULL, 
+#         null=True, 
+#         blank=True, 
+#         related_name="collected_payments", 
+#         verbose_name="المحصل (الموظف)"
+#     )
+    
+#     closure = models.ForeignKey(
+#         'DailyClosure', 
+#         on_delete=models.SET_NULL, 
+#         null=True, 
+#         blank=True, 
+#         related_name="payments",
+#         verbose_name="رقم الجرد/الإغلاق"
+#     )
+#     # ... بقية الحقول ...
+#     receipt_number = models.PositiveIntegerField(
+#         null=True, 
+#         blank=True, 
+#         unique=True, # 🔴 هذا القفل السحري يمنع تسجيل أي إيصال مكرر نهائياً
+#         verbose_name="رقم الإيصال المرجعي"
+#     )
+#     # ... بقية الحقول ...
+#     notes = models.TextField(null=True, blank=True, verbose_name="ملاحظات إضافية")
+
+#     class Meta:
+#         verbose_name = "عملية دفع"
+#         verbose_name_plural = "عمليات الدفع"
+#         ordering = ['-payment_date', '-id']
+
+#     def clean(self):
+#         if self.pk:
+#             original = Payment.objects.get(pk=self.pk)
+#             if original.is_closed:
+#                 raise ValidationError("🚨 خطأ أمني: هذا الإيصال تم إغلاقه في الخزينة، لا يمكن تعديله.")
+
+    
+#     is_cancelled = models.BooleanField(default=False, verbose_name="ملغي")
+#     cancelled_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name="cancelled_receipts")
+#     cancellation_reason = models.TextField(null=True, blank=True, verbose_name="سبب الإلغاء")
+#     cancelled_at = models.DateTimeField(null=True, blank=True)
+
+#     def cancel_payment(self, admin_user, reason):
+#         """دالة مخصصة لإلغاء الإيصال وعكس تأثيره على الأقساط"""
+#         if self.is_closed:
+#             raise ValidationError("لا يمكن إلغاء إيصال تم إغلاق خزينته.")
+        
+#         with transaction.atomic():
+#             # 1. إعادة المبالغ للأقساط (عكس منطق الـ save)
+#             if self.student:
+#                 # جلب الأقساط التي تم دفعها (مرتبة عكسياً من الأحدث للأقدم)
+#                 # جلب الأقساط المتأخرة وتحديثها دفعة واحدة (من الأقدم للأحدث عبر كل السنوات)
+#                 installments = StudentInstallment.objects.filter(
+#                     student=self.student
+#                 ).exclude(status='Paid').order_by('due_date')
+
+#                 remaining_to_refund = self.amount_paid
+#                 for inst in installments:
+#                     if remaining_to_refund <= 0: break
+                    
+#                     if inst.paid_amount >= remaining_to_refund:
+#                         inst.paid_amount -= remaining_to_refund
+#                         remaining_to_refund = 0
+#                     else:
+#                         remaining_to_refund -= inst.paid_amount
+#                         inst.paid_amount = 0
+                    
+#                     # تحديث الحالة
+#                     if inst.paid_amount == 0:
+#                         inst.status = 'Pending'
+#                     else:
+#                         inst.status = 'Partial'
+#                     inst.save(update_fields=['paid_amount', 'status'])
+
+#             # 2. تحديث بيانات الإيصال
+#             self.amount_paid = 0
+#             self.is_cancelled = True
+#             self.cancelled_by = admin_user
+#             self.cancellation_reason = reason
+#             self.cancelled_at = timezone.now()
+#             self.save(update_fields=['is_cancelled', 'cancelled_by', 'cancellation_reason', 'cancelled_at'])
+            
+            
+#     def save(self, *args, **kwargs):
+#         # التأكد من عدم الدخول في حلقة مفرغة
+#         if getattr(self, '_saving', False):
+#             return
+#         self._saving = True
+
+#         try:
+#             is_new = not self.pk
+#             if self.student and not self.academic_year:
+#                 self.academic_year = self.student.academic_year
+
+#             with transaction.atomic():
+#                 # الحفظ الأساسي أولاً
+#                 super(Payment, self).save(*args, **kwargs)
+                
+#                 # تنفيذ منطق الأقساط فقط إذا كان هناك طالب وبند مصروفات
+#                 if self.student and is_new:
+#                     # التحقق من نوع الإيراد (بشكل سريع)
+#                     category = self.revenue_category
+#                     if category and ("المصروفات" in category.name or (category.parent and "المصروفات" in category.parent.name)):
+                        
+#                         # جلب الأقساط وتحديثها دفعة واحدة
+#                         installments = StudentInstallment.objects.filter(
+#                             student=self.student, 
+#                             academic_year=self.academic_year
+#                         ).exclude(status='Paid').order_by('due_date')
+
+#                         remaining = self.amount_paid
+#                         for inst in installments:
+#                             if remaining <= 0: break
+#                             needed = inst.amount_due - inst.paid_amount
+#                             if remaining >= needed:
+#                                 inst.paid_amount = inst.amount_due
+#                                 inst.status = 'Paid'
+#                                 remaining -= needed
+#                             else:
+#                                 inst.paid_amount += remaining
+#                                 inst.status = 'Partial'
+#                                 remaining = 0
+#                             # استخدام update_fields ضروري لسرعة الاستجابة
+#                             inst.save(update_fields=['paid_amount', 'status'])
+#         finally:
+#             self._saving = False
+
+# 1. أضف هذا الكلاس تحت كلاس Payment
+class StudentRefund(models.Model):
+    student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name="refunds", verbose_name="الطالب")
+    academic_year = models.ForeignKey('AcademicYear', on_delete=models.CASCADE, verbose_name="السنة الدراسية")
+    
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="المبلغ المسترد")
+    refund_date = models.DateField(default=timezone.now, verbose_name="تاريخ الاسترداد", db_index=True)
+    reason = models.TextField(verbose_name="سبب الاسترداد (مثال: سحب ملف)", default="سحب ملف")
+    
+    is_closed = models.BooleanField(default=False, verbose_name="تم تقفيل الخزينة", db_index=True)
+    closure = models.ForeignKey('DailyClosure', on_delete=models.SET_NULL, null=True, blank=True, related_name="student_refunds", verbose_name="رقم الجرد")
+    processed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="المسؤول المالي")
+
+    class Meta:
+        verbose_name = "إذن استرداد نقدي"
+        verbose_name_plural = "مرتجعات الطلاب"
+        ordering = ['-refund_date', '-id']
+
+    def clean(self):
+        if self.pk:
+            original = StudentRefund.objects.get(pk=self.pk)
+            if original.is_closed:
+                raise ValidationError("🚨 لا يمكن تعديل إذن استرداد تم إغلاقه في جرد الخزينة.")
+
+    def __str__(self):
+        return f"استرداد: {self.student.get_full_name()} - {self.amount} ج.م"
+
+
 class ExpenseItem(models.Model):
     """
     موديل لتسجيل بنود المصروفات مسبقاً في لوحة التحكم (الآدمن)

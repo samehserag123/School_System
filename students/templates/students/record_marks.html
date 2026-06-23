@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+            --bg-light: #f8fafc;
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+            --danger-color: #ef4444;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f1f5f9;
+            color: var(--text-dark);
+            padding: 30px 15px;
+        }
+
+        /* الهيدر الفاخر */
+        .dashboard-header {
+            background: var(--primary-gradient);
+            border-radius: 20px;
+            padding: 35px;
+            color: white;
+            box-shadow: 0 15px 40px rgba(79, 70, 229, 0.15);
+            margin-bottom: 35px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dashboard-title {
+            font-weight: 800;
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+
+        /* كارت الفلترة */
+        .filter-card {
+            background: white;
+            border-radius: 18px;
+            box-shadow: var(--card-shadow);
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .form-control, .form-select {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 10px 15px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .btn-filter {
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 12px;
+            font-weight: 700;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .btn-filter:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        /* جدول الرصد الأنيق */
+        .marks-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: var(--card-shadow);
+            padding: 30px;
+            overflow: hidden;
+        }
+
+        .marks-table th {
+            background-color: #f8fafc;
+            color: var(--text-dark);
+            font-weight: 700;
+            padding: 18px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .marks-table td {
+            padding: 15px 18px;
+            vertical-align: middle;
+            border-bottom: 1px solid #f1f5f9;
+            transition: all 0.3s;
+        }
+
+        .marks-table tr.row-absent td {
+            opacity: 0.6;
+            background-color: #fff1f2;
+        }
+
+        /* حقول إدخال الدرجات الخاصة (SaaS Inputs) */
+        .score-input {
+            width: 90px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #0f172a;
+            background-color: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 8px;
+            transition: all 0.2s;
+        }
+
+        .score-input:focus {
+            background-color: white;
+            border-color: #4f46e5;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+            outline: none;
+            transform: scale(1.05);
+        }
+
+        .score-input:disabled {
+            background-color: #e2e8f0;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        /* زر التبديل المخصص للغياب (Custom Toggle Switch) */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+        
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #cbd5e1;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--danger-color);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        .max-score-badge {
+            font-size: 0.75rem;
+            background: #e0e7ff;
+            color: #4338ca;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-weight: 700;
+            margin-right: 8px;
+        }
+
+        .btn-save-master {
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            padding: 16px 50px;
+            border-radius: 15px;
+            font-weight: 800;
+            font-size: 1.2rem;
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+            transition: all 0.3s;
+        }
+        .btn-save-master:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(79, 70, 229, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid max-width-1400">
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} border-0 shadow-sm rounded-4" role="alert">
+                <strong>{{ message }}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="dashboard-header d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <h1 class="dashboard-title">كنترول رصد الدرجات</h1>
+            <p class="m-0 text-white-50 mb-3">إدارة التقييمات الشهرية، الفصلية، وامتحانات الملاحق</p>
+            
+            <div class="mt-2">
+                <a href="{% url 'home' %}" class="btn btn-light btn-sm fw-bold rounded-pill shadow-sm px-4" style="color: #1e293b;">
+                    <i class="bi bi-house-door-fill me-1"></i> العودة للرئيسية
+                </a>
+                <button onclick="history.back()" class="btn btn-outline-light btn-sm fw-bold rounded-pill px-4 ms-2">
+                    <i class="bi bi-arrow-right-circle me-1"></i> رجوع للخلف
+                </button>
+            </div>
+        </div>
+        <div>
+            {% if subject_config %}
+            <div class="bg-white text-dark p-3 rounded-4 shadow-sm" style="font-weight: 700;">
+                <span class="text-primary me-2">المادة: {{ subject_config.subject.name }}</span> | 
+                <span class="text-danger ms-2">درجة النجاح: {{ subject_config.passing_score }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+            {% if subject_config %}
+            <div class="bg-white text-dark p-3 rounded-4 shadow-sm" style="font-weight: 700;">
+                <span class="text-primary me-2">المادة: {{ subject_config.subject.name }}</span> | 
+                <span class="text-danger ms-2">درجة النجاح: {{ subject_config.passing_score }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="filter-card">
+        <form method="GET" action="">
+            <div class="row align-items-end g-3">
+                <div class="col-md-2">
+                    <label class="form-label">نوع الامتحان</label>
+                    {{ form.exam_type }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">الترم</label>
+                    {{ form.term }}
+                </div>
+                <div class="col-md-2" id="month-field">
+                    <label class="form-label">الشهر</label>
+                    {{ form.month }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">الصف الدراسي</label>
+                    {{ form.grade }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">الفصل</label>
+                    {{ form.classroom }}
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">المادة</label>
+                    {{ form.subject }}
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn-filter">فتح الكشف</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if students_data %}
+    <div class="marks-container">
+        <form method="POST" action="">
+            {% csrf_token %}
+            <input type="hidden" name="exam_type" value="{{ request.GET.exam_type }}">
+            <input type="hidden" name="term" value="{{ request.GET.term }}">
+            <input type="hidden" name="month" value="{{ request.GET.month }}">
+            <input type="hidden" name="grade" value="{{ request.GET.grade }}">
+            <input type="hidden" name="classroom" value="{{ request.GET.classroom }}">
+            <input type="hidden" name="subject" value="{{ request.GET.subject }}">
+
+            <div class="table-responsive">
+                <table class="table marks-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 5%;">#</th>
+                            <th style="width: 30%;">اسم الطالب</th>
+                            <th style="width: 25%; text-align: center;">
+                                الدرجة الثقافية (نظري)
+                                {% if subject_config %}<span class="max-score-badge">عظمى: {{ subject_config.max_cultural|floatformat:0 }}</span>{% endif %}
+                            </th>
+                            <th style="width: 25%; text-align: center;">
+                                الدرجة العملية
+                                {% if subject_config %}<span class="max-score-badge">عظمى: {{ subject_config.max_practical|floatformat:0 }}</span>{% endif %}
+                            </th>
+                            <th style="width: 15%; text-align: center;">غائب؟</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for data in students_data %}
+                        <tr id="row-{{ data.student.id }}" class="{% if data.is_absent %}row-absent{% endif %}">
+                            <td>{{ forloop.counter }}</td>
+                            <td>
+                                <input type="hidden" name="post_student_ids" value="{{ data.student.id }}">
+                                <h6 class="m-0 fw-bold">{{ data.student.get_full_name }}</h6>
+                                <small class="text-muted">كود: {{ data.student.student_code|default:"--" }}</small>
+                            </td>
+                            <td class="text-center">
+                                <input type="number" step="0.01" min="0" 
+                                    max="{% if subject_config %}{{ subject_config.max_cultural }}{% endif %}" 
+                                    name="cultural_{{ data.student.id }}" 
+                                    id="cultural-{{ data.student.id }}"
+                                    class="score-input" 
+                                    value="{{ data.cultural_score|stringformat:'s'|default:'0' }}"
+                                    {% if data.is_absent %}disabled{% endif %}>
+                            </td>
+                            <td class="text-center">
+                                <input type="number" step="0.01" min="0" 
+                                    max="{% if subject_config %}{{ subject_config.max_practical }}{% endif %}" 
+                                    name="practical_{{ data.student.id }}" 
+                                    id="practical-{{ data.student.id }}"
+                                    class="score-input" 
+                                    value="{{ data.practical_score|stringformat:'s'|default:'0' }}"
+                                    {% if data.is_absent %}disabled{% endif %}>
+                            </td>
+                            <td class="text-center">
+                                <label class="switch">
+                                    <input type="checkbox" name="absent_{{ data.student.id }}" value="true" 
+                                        class="absent-toggle" data-target="{{ data.student.id }}"
+                                        {% if data.is_absent %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="text-center mt-5">
+                <button type="submit" name="save_marks" class="btn-save-master">
+                    💾 حفظ واعتماد درجات الكشف
+                </button>
+            </div>
+        </form>
+    </div>
+    {% else %}
+        <div class="alert alert-info text-center rounded-4 shadow-sm p-4">
+            <h5 class="fw-bold m-0">💡 يرجى تحديد (نوع الامتحان، الصف، المادة) ثم الضغط على "فتح الكشف" لبدء رصد الدرجات.</h5>
+        </div>
+    {% endif %}
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // 1. إظهار/إخفاء حقل "الشهر" بناءً على اختيار نوع الامتحان
+        const examTypeSelect = document.getElementById('exam_type_select');
+        const monthField = document.getElementById('month-field');
+
+        function toggleMonthField() {
+            if(examTypeSelect && examTypeSelect.value === 'month') {
+                monthField.style.display = 'block';
+            } else {
+                monthField.style.display = 'none';
+                // تصفير قيمة الشهر عند الإخفاء
+                if(monthField.querySelector('select')) {
+                    monthField.querySelector('select').value = '';
+                }
+            }
+        }
+        
+        if(examTypeSelect) {
+            examTypeSelect.addEventListener('change', toggleMonthField);
+            toggleMonthField(); // تشغيل عند تحميل الصفحة
+        }
+
+        // 2. سكريبت التفاعل الذكي مع زر الغياب
+        const toggles = document.querySelectorAll('.absent-toggle');
+        toggles.forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                const studentId = this.getAttribute('data-target');
+                const culturalInput = document.getElementById('cultural-' + studentId);
+                const practicalInput = document.getElementById('practical-' + studentId);
+                const row = document.getElementById('row-' + studentId);
+
+                if(this.checked) {
+                    // إذا غائب: تعطيل الحقول وتصفيرها وتغيير شكل الصف
+                    culturalInput.disabled = true;
+                    practicalInput.disabled = true;
+                    culturalInput.value = '0';
+                    practicalInput.value = '0';
+                    row.classList.add('row-absent');
+                } else {
+                    // إذا حاضر: تفعيل الحقول
+                    culturalInput.disabled = false;
+                    practicalInput.disabled = false;
+                    row.classList.remove('row-absent');
+                    // التركيز المباشر على الحقل الأول لتسريع العمل
+                    culturalInput.focus();
+                }
+            });
+        });
+    });
+</script>
+</body>
+</html>

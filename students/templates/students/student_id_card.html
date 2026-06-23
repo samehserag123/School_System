@@ -1,0 +1,260 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>كارنيه الطالب | {{ student.get_full_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* 🎛️ لوحة تحكم المعايرة الدقيقة لطابعات الـ PVC - غير الأصفار أدناه لحل مشكلة ترحيل الظهر */
+        :root {
+            --back-shift-x: -0.4cm; /* الإزاحة الأفقية للظهر (يمين/يسار) - مثال: 0.2cm أو -0.2cm */
+            --back-shift-y: 0cm; /* الإزاحة الرأسية للظهر (أعلى/أسفل) - مثال: 0.1cm أو -0.1cm */
+        }
+
+        body { 
+            font-family: 'Cairo', sans-serif; 
+            background: #cbd5e1; 
+            display: flex; 
+            flex-direction: column;
+            align-items: center; 
+            gap: 20px;
+            padding: 40px 0;
+            margin: 0; 
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact;
+        }
+
+        /* حجم الكارنيه القياسي (CR80) بالعرض أثناء العرض على الشاشة */
+        .id-card {
+            width: 8.6cm;
+            height: 5.4cm;
+            background: #ffffff;
+            border: 2px solid #94a3b8;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        }
+
+        /* =========================================
+           🟢 إعدادات الطباعة والمعايرة الفيزيائية للطابعة
+           ========================================= */
+        @media print {
+            body { 
+                background: white; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                display: block;
+            }
+            .id-card { 
+                box-shadow: none !important; 
+                border: none !important; /* 🔴 مسح الإطارات كلياً يمنع انزلاق الرولات الميكانيكية */
+                border-radius: 0 !important;
+                page-break-after: always; 
+                margin: 0 !important; 
+                width: 8.6cm !important;
+                height: 5.4cm !important;
+            }
+            
+            /* 🔴 تدوير الظهر 180 درجة مع تطبيق مصفوفة الإزاحة الدقيقة لمعايرة النصف سنتيمتر */
+            .back-side {
+                transform: rotate(180deg) translate(var(--back-shift-x), var(--back-shift-y));
+                transform-origin: center center;
+            }
+
+            .no-print { display: none !important; }
+            
+            @page {
+                size: 8.6cm 5.4cm; /* مطابقة كاملة لأبعاد بطاقة الـ PVC الحقيقية */
+                margin: 0;
+            }
+        }
+
+        /* =========================================
+           تصميم الوجه الأمامي (Front - بالعرض)
+           ========================================= */
+        .front-header {
+            background: #1e3a8a;
+            color: #ffffff;
+            padding: 4px 10px;
+            font-size: 10pt;
+            font-weight: 800;
+            text-align: center;
+            border-bottom: 2px solid #f59e0b;
+        }
+
+        .front-body {
+            display: flex;
+            flex-direction: row;
+            padding: 5px 10px;
+            gap: 10px;
+            flex-grow: 1;
+            align-items: center;
+        }
+
+        .photo-container {
+            width: 2.2cm;
+            height: 2.6cm;
+            border: 2px solid #2563eb;
+            border-radius: 6px;
+            padding: 2px;
+            background: #fff;
+            flex-shrink: 0;
+        }
+
+        .photo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .details-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .student-name {
+            font-size: 11pt;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 0 0 5px 0;
+            line-height: 1.2;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 9pt;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 3px;
+            border-bottom: 1px dashed #cbd5e1;
+            padding-bottom: 2px;
+        }
+
+        .info-row span.label { color: #2563eb; font-weight: 800; }
+
+        .front-footer {
+            background: #f1f5f9;
+            text-align: center;
+            padding: 3px;
+            font-size: 7pt;
+            font-weight: 700;
+            color: #64748b;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        /* =========================================
+           تصميم الوجه الخلفي (Back - بالعرض)
+           ========================================= */
+        .back-header {
+            background: #2563eb;
+            color: white;
+            padding: 6px 5px;
+            font-size: 9pt;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .back-body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+        }
+
+        .qr-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .qr-code {
+            width: 80px; 
+            height: 80px;
+        }
+
+        .qr-serial {
+            font-family: monospace;
+            font-size: 11pt;
+            font-weight: 900;
+            color: #0f172a;
+            margin-top: 3px;
+            letter-spacing: 2px;
+        }
+
+        /* =========================================
+           أزرار التحكم
+           ========================================= */
+        .controls { text-align: center; margin-bottom: 10px; }
+        .btn { padding: 10px 25px; font-size: 12pt; font-family: 'Cairo'; font-weight: bold; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+    <div class="controls no-print">
+        <button onclick="window.print()" class="btn">🖨️ طباعة الكارنيه (وش وظهر)</button>
+        <p style="font-size: 10pt; color: #475569; margin-top: 5px; font-weight: bold;">
+            💡 تأكد من اختيار "Print on both sides" أو "Two-sided" من إعدادات الطابعة
+        </p>
+    </div>
+
+    <div class="id-card">
+        <div class="front-header">
+            مدرسة طلعت حرب الفندقية
+        </div>
+        
+        <div class="front-body">
+            <div class="details-container">
+                <p class="student-name">{{ student.get_full_name }}</p>
+                <div class="info-row">
+                    <span class="label">الصف:</span>
+                    <span>{{ student.grade.name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">العام:</span>
+                    <span>{{ student.academic_year.name|default:"2025/2026" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">الديانة:</span>
+                    <span>{{ student.get_religion_display }}</span>
+                </div>
+            </div>
+
+            <div class="photo-container">
+                {% if student.image %}
+                    <img src="{{ student.image.url }}" alt="صورة الطالب">
+                {% else %}
+                    <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="صورة">
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="front-footer">
+            بطاقة هوية مدرسية - School ID Card
+        </div>
+    </div>
+
+    <div class="id-card back-side">
+        <div class="back-header">
+            العام الدراسي {{ student.academic_year.name|default:"2026" }}
+        </div>
+        
+        <div class="back-body">
+            <div class="qr-wrapper">
+                <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ student.student_code }}" alt="QR Code">
+                <div class="qr-serial">{{ student.student_code }}</div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

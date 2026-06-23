@@ -9,6 +9,19 @@ urlpatterns = [
     path('add/', views.add_student, name='add_student'),
     path('student/dashboard/<int:student_id>/', views.student_dashboard, name='student_dashboard'),
     path('students/registry/', views.student_registry_view, name='student_registry'),
+    path('attendance/take/', views.take_daily_attendance_view, name='take_attendance'),
+    # 2. رابط شاشة إعادة قيد الطلاب المفصولين (أكاديمياً)
+    path('attendance/re-enroll/', views.manage_reenrollments_view, name='manage_reenrollments'),
+    # رابط تقرير الغياب والحضور
+    path('attendance/report/', views.attendance_report_view, name='attendance_report'),
+    # 🟢 روابط تقارير الـ PDF الذكية
+    path('reports/class-roster/', views.report_class_roster_view, name='report_class_roster'),
+    path('reports/student-registry/', views.report_student_registry_view, name='report_student_registry'),
+    path('reports/dismissed-students/', views.report_dismissed_students_view, name='report_dismissed_students'),
+    # 3. رابط كنترول رصد درجات الامتحانات (شهور / تيرمات / ملاحق)
+    path('exam/marks/record/', views.record_exam_marks_view, name='record_marks'),
+    # 4. رابط التقرير الأكاديمي النهائي لفرز الطلاب (ناجح / دور ثاني / راسب)
+    path('academic/report/final/', views.academic_final_report_view, name='academic_final_report'),
     
     path('overdue-calls/', views.overdue_installments_list, name='overdue_calls'),
     # 🟢 أضف هذا الرابط إذا لم يكن موجوداً في ملف urls آخر
@@ -42,5 +55,10 @@ urlpatterns = [
 
     # 2. مسار API عملية السداد المباشر (الذي يتم استدعاؤه عند الضغط على زر "سداد الآن")
     path('api/remedial/pay/<int:record_id>/', views.pay_remedial_record, name='pay_remedial_record'),
+    
+    # 🟢 روابط نظام الحضور الذكي (QR Code)
+    path('student/card/<str:student_code>/', views.student_id_card_view, name='student_id_card'),
+    path('security/scanner/', views.security_scanner_view, name='security_scanner'),
+    path('api/qr-attendance/', views.api_record_qr_attendance, name='api_record_qr_attendance'),
    
 ]

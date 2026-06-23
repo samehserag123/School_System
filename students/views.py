@@ -20,7 +20,7 @@ from students.models import Classroom
 from finance.models import Payment  # تأكد أن اسم التطبيق عندك هو finance
 from .forms import CourseGroupForm
 from .models import CourseGroup, CoursePayment
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Concat
 # الاستيراد من الموديلات (الجداول)
 from .models import BookSale, InventoryItem, InventoryRestock, GradePackagePrice, CourseGroup
 # الاستيراد من الفورمات (النماذج) - هذا هو السطر الذي ينقصك
@@ -54,10 +54,514 @@ from django.db.models import Subquery, OuterRef
 # تأكد أن هذا الموديل مستورد بشكل صحيح كما يظهر في ملفك
 from finance.models import StudentInstallment, StudentAccount, AcademicYear
 # أضف هذا السطر في أعلى ملف views.py
-from django.db.models import Q, F, Value, Sum, Count, Case, When, DecimalField, Subquery, OuterRef, ExpressionWrapper, Exists
-from django.db.models.functions import Coalesce, Concat
-from django.template.loader import render_to_string
+from django.db.models import Q, F, Value, Sum, Count, Case, When, DecimalField, ExpressionWrapper, Exists
 
+# 1. استيراد الموديلات (جداول قاعدة البيانات) الجديدة
+from .models import AttendanceRecord, ReEnrollmentRecord, SubjectConfig, ExamResult
+
+# 2. استيراد الفورمات (النماذج) الجديدة 
+from .forms import AttendanceFilterForm, ExamResultFilterForm
+
+# 3. تأكد أيضاً من وجود هذا السطر لإدارة العمليات البنكية المجمعة (التي استخدمناها في الدالة الدورية)
+from django.db import transaction
+
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@login_required
+def student_id_card_view(request, student_code):
+    """عرض وطباعة كارنيه الطالب مع الـ QR Code باستخدام كود الطالب"""
+    # البحث باستخدام student_code بدلاً من id
+    student = get_object_or_404(Student, student_code=student_code)
+    return render(request, 'students/student_id_card.html', {'student': student})
+
+
+@login_required
+def security_scanner_view(request):
+    """شاشة موظف الأمن التي تفتح الكاميرا لمسح الكارنيهات"""
+    return render(request, 'students/security_scanner.html')
+
+
+@csrf_exempt # للسماح باستقبال البيانات من الجافاسكريبت بسلاسة
+@login_required
+def api_record_qr_attendance(request):
+    """الـ API السري الذي يستقبل كود الطالب من الكاميرا ويسجل حضوره"""
+    if request.method == 'POST':
+        try:
+            # 1. استخراج الكود الممسوح من الكاميرا
+            data = json.loads(request.body)
+            scanned_code = data.get('student_code')
+            
+            if not scanned_code:
+                return JsonResponse({'status': 'error', 'message': 'لم يتم التعرف على الكود.'}, status=400)
+            
+            # 2. البحث عن الطالب بهذا الكود
+            student = Student.objects.filter(student_code=scanned_code, is_active=True).first()
+            if not student:
+                return JsonResponse({'status': 'error', 'message': '❌ كود غير صحيح، أو الطالب غير نشط!'})
+            
+            # 3. تسجيل الحضور في قاعدة البيانات
+            today = timezone.now().date()
+            active_year = get_active_year()
+            
+            # استخدمنا get_or_create لكي لا يسجل الطالب مرتين إذا مرر الكارنيه مرتين
+            record, created = AttendanceRecord.objects.get_or_create(
+                student=student,
+                date=today,
+                academic_year=active_year,
+                defaults={'status': 'present', 'notes': 'تسجيل بوابة (QR)'}
+            )
+            
+            if not created:
+                if record.status == 'present':
+                    return JsonResponse({
+                        'status': 'info', 
+                        'message': f'⚠️ الطالب ({student.first_name}) مسجل حضوره بالفعل مسبقاً اليوم!'
+                    })
+                else:
+                    record.status = 'present'
+                    record.notes = 'تم التعديل لحاضر عبر البوابة (QR)'
+                    record.save()
+            
+            # 4. إرسال رسالة نجاح لموبايل موظف الأمن
+            return JsonResponse({
+                'status': 'success', 
+                'message': f'✅ تم تسجيل حضور: {student.get_full_name()}',
+                'student_name': student.get_full_name(),
+                'grade': student.grade.name if student.grade else 'غير محدد'
+            })
+            
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': f'خطأ بالنظام: {str(e)}'})
+            
+    return JsonResponse({'status': 'error', 'message': 'طلب غير صالح.'}, status=400)
+
+
+@login_required
+def report_class_roster_view(request):
+    """تقرير طباعة كشوف الفصول (PDF)"""
+    active_year = get_active_year()
+    grade_id = request.GET.get('grade')
+    classroom_id = request.GET.get('classroom')
+    
+    students = []
+    selected_grade = None
+    selected_classroom = None
+    
+    if grade_id:
+        selected_grade = get_object_or_404(Grade, id=grade_id)
+        query = Student.objects.filter(academic_year=active_year, grade=selected_grade, is_active=True).order_by('first_name')
+        if classroom_id:
+            selected_classroom = get_object_or_404(Classroom, id=classroom_id)
+            query = query.filter(classroom=selected_classroom)
+        students = query.only('student_code', 'first_name', 'last_name', 'religion', 'gender')
+
+    context = {
+        'students': students,
+        'all_grades': Grade.objects.all(),
+        'all_classrooms': Classroom.objects.all(),
+        'selected_grade': selected_grade,
+        'selected_classroom': selected_classroom,
+        'active_year': active_year,
+        'title': 'كشف فصل دراسي'
+    }
+    return render(request, 'students/reports/class_roster.html', context)
+
+
+@login_required
+def report_student_registry_view(request):
+    """تقرير طباعة السجل المدني الشامل للطلاب (PDF) - مع دعم الفلترة"""
+    active_year = get_active_year()
+    
+    # استقبال الفلاتر من واجهة المستخدم
+    grade_id = request.GET.get('grade_id')
+    classroom_id = request.GET.get('classroom_id')
+    
+    # جلب جميع الطلاب النشطين كبداية
+    students = Student.objects.filter(
+        academic_year=active_year, is_active=True
+    ).select_related('grade', 'classroom')
+    
+    # عنوان فرعي افتراضي
+    filter_title = "الشامل للطلاب النشطين (الكل)"
+
+    # تطبيق الفلاتر وتعديل عنوان التقرير المطبوع
+    if grade_id:
+        students = students.filter(grade_id=grade_id)
+        selected_grade = Grade.objects.filter(id=grade_id).first()
+        if selected_grade:
+            filter_title = f"الصف: {selected_grade.name}"
+
+    if classroom_id:
+        students = students.filter(classroom_id=classroom_id)
+        # إذا كنت تستخدم موديل Classroom، يمكنك جلب اسمه هنا (حسب تصميم قاعدة بياناتك)
+        # filter_title += f" - الفصل/التخصص"
+
+    # ترتيب نهائي
+    students = students.order_by('grade', 'classroom', 'first_name')
+    
+    context = {
+        'students': students,
+        'total_count': students.count(),
+        'active_year': active_year,
+        'all_grades': Grade.objects.all(), # إرسال الصفوف للقائمة المنسدلة
+        # إذا كان لديك موديل للفصول Classroom أرسله هنا:
+        # 'all_classrooms': Classroom.objects.all(), 
+        'filter_title': filter_title,
+        'title': 'السجل المدني للطلاب'
+    }
+    return render(request, 'students/reports/student_registry.html', context)
+
+
+@login_required
+def report_dismissed_students_view(request):
+    """تقرير طباعة الطلاب المفصولين (PDF)"""
+    active_year = get_active_year()
+    
+    # جلب سجلات الطلاب المفصولين الذين لم يتم إعادة قيدهم بعد
+    dismissed_records = ReEnrollmentRecord.objects.filter(
+        academic_year=active_year, status='dismissed'
+    ).select_related('student__grade', 'student__classroom').order_by('-dismissal_date')
+
+    context = {
+        'records': dismissed_records,
+        'total_count': dismissed_records.count(),
+        'active_year': active_year,
+        'title': 'سجل الطلاب المفصولين أكاديمياً'
+    }
+    return render(request, 'students/reports/dismissed_students.html', context)
+
+
+@login_required
+def attendance_report_view(request):
+    """تقرير إحصائي شامل لحالات الغياب والحضور"""
+    active_year = get_active_year()
+    
+    # 🟢 الحل: التقاط الفلاتر مع التأكد من أنها ليست فارغة ("")
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    # إذا كانت القيمة فارغة أو غير موجودة، اجعلها تاريخ اليوم تلقائياً
+    if not date_from:
+        date_from = timezone.now().date().strftime('%Y-%m-%d')
+    if not date_to:
+        date_to = timezone.now().date().strftime('%Y-%m-%d')
+        
+    grade_id = request.GET.get('grade')
+    status_filter = request.GET.get('status')
+    
+    # جلب السجلات بناءً على التاريخ
+    records = AttendanceRecord.objects.filter(
+        academic_year=active_year, 
+        date__range=[date_from, date_to]
+    ).select_related('student', 'student__grade', 'student__classroom')
+
+    # تطبيق باقي الفلاتر
+    if grade_id:
+        records = records.filter(student__grade_id=grade_id)
+    if status_filter:
+        records = records.filter(status=status_filter)
+
+    # حساب الإحصائيات العلوية السريعة
+    total_records = records.count()
+    present_count = records.filter(status='present').count()
+    absent_count = records.filter(status='absent').count()
+    excused_count = records.filter(status='excused').count()
+
+    context = {
+        'records': records.order_by('-date', 'student__first_name'),
+        'total_records': total_records,
+        'present_count': present_count,
+        'absent_count': absent_count,
+        'excused_count': excused_count,
+        'all_grades': Grade.objects.all(),
+        'title': 'التقرير الشامل للغياب والحضور',
+    }
+    return render(request, 'students/attendance_report.html', context)
+
+
+@login_required
+def take_daily_attendance_view(request):
+    """شاشة رصد الحضور والغياب اليومي للفصول (المطورة)"""
+    active_year = get_active_year()
+    students_data = [] # مصفوفة جديدة لدمج الطالب مع حالة غيابه السابقة
+    initial_date = timezone.now().date()
+    
+    if request.method == 'POST' and request.POST.get('save_attendance'):
+        # معالجة حفظ الحضور والغياب دفعة واحدة
+        posted_date = request.POST.get('attendance_date')
+        posted_term = request.POST.get('attendance_term')
+        posted_grade = request.POST.get('grade', '')
+        posted_classroom = request.POST.get('classroom', '')
+        student_ids = request.POST.getlist('student_ids')
+        
+        with transaction.atomic():
+            for s_id in student_ids:
+                status = request.POST.get(f'status_{s_id}', 'present')
+                notes = request.POST.get(f'notes_{s_id}', '')
+                
+                AttendanceRecord.objects.update_or_create(
+                    student_id=s_id,
+                    date=posted_date,
+                    defaults={
+                        'academic_year': active_year,
+                        'term': posted_term,
+                        'status': status,
+                        'notes': notes
+                    }
+                )
+        messages.success(request, "✅ تم حفظ كشف الحضور والغياب بنجاح.")
+        # 🟢 الإرجاع لنفس الصفحة بنفس الفلاتر ليرى المستخدم النتيجة فوراً
+        redirect_url = reverse('take_attendance') + f"?date={posted_date}&grade={posted_grade}&classroom={posted_classroom}&term={posted_term}"
+        return redirect(redirect_url)
+
+    # معالجة طلب العرض والفلترة (GET)
+    form = AttendanceFilterForm(request.GET or None, initial={'date': initial_date})
+    
+    if form.is_valid():
+        filter_date = form.cleaned_data['date']
+        grade_id = form.cleaned_data['grade']
+        classroom_id = form.cleaned_data['classroom']
+        
+        students_query = Student.objects.filter(academic_year=active_year, grade=grade_id, is_active=True)
+        if classroom_id:
+            students_query = students_query.filter(classroom=classroom_id)
+            
+        students_list = students_query.only('id', 'first_name', 'last_name', 'student_code').order_by('first_name')
+
+        # 🟢 جلب سجلات الغياب المحفوظة مسبقاً لهذا اليوم (إن وجدت)
+        existing_records = AttendanceRecord.objects.filter(
+            academic_year=active_year, date=filter_date, student__in=students_list
+        ).values('student_id', 'status', 'notes')
+        
+        # تحويلها لقاموس للبحث السريع
+        records_map = {rec['student_id']: rec for rec in existing_records}
+
+        # دمج بيانات الطالب مع حالته المحفوظة
+        for student in students_list:
+            rec = records_map.get(student.id, {'status': 'present', 'notes': ''})
+            students_data.append({
+                'student': student,
+                'status': rec['status'],
+                'notes': rec['notes']
+            })
+
+    context = {
+        'form': form,
+        'students_data': students_data, # إرسال البيانات المدمجة
+        'active_year': active_year,
+        'title': 'تسجيل الحضور والغياب اليومي'
+    }
+    return render(request, 'students/take_attendance.html', context)
+
+@login_required
+def academic_final_report_view(request):
+    """تقرير ذكي شامل لفرز الطلاب الناجحين، طلاب الدور الثاني (الملاحق)، والراسبين باقين للإعادة"""
+    active_year = get_active_year()
+    grade_id = request.GET.get('grade_id')
+    
+    results_summary = []
+    
+    if grade_id:
+        # 1. جلب جميع المواد وقواعد النجاح المعتمدة لهذا الصف
+        configs = SubjectConfig.objects.filter(grade_id=grade_id, academic_year=active_year)
+        configs_map = {c.subject_id: c for c in configs}
+        
+        # 2. جلب طلاب هذا الصف
+        students = Student.objects.filter(academic_year=active_year, grade_id=grade_id, is_active=True)
+        
+        # 3. جلب كل نتائج الامتحانات الفصلية (ترم أول وثانٍ) لهذا الصف دفعة واحدة لسرعة الصاروخ
+        all_results = ExamResult.objects.filter(
+            academic_year=active_year, exam_type='term', student__grade_id=grade_id
+        )
+        
+        # تنظيم درجات الطلاب في قاموس ذكي داخل الذاكرة لمنع ضرب قاعدة البيانات
+        # الطالب -> المادة -> مجموع التيرمين
+        student_marks_matrix = {}
+        for res in all_results:
+            if res.student_id not in student_marks_matrix:
+                student_marks_matrix[res.student_id] = {}
+            if res.subject_id not in student_marks_matrix[res.student_id]:
+                student_marks_matrix[res.student_id][res.subject_id] = 0
+                
+            student_marks_matrix[res.student_id][res.subject_id] += res.total_score
+
+        # 4. تحليل حالة كل طالب بناءً على المواد المقررة
+        for student in students:
+            failed_subjects = []
+            passed_count = 0
+            
+            student_profile = student_marks_matrix.get(student.id, {})
+            
+            for sub_id, config in configs_map.items():
+                total_student_score = student_profile.get(sub_id, 0)
+                
+                if total_student_score < config.passing_score:
+                    failed_subjects.append({
+                        'subject_name': config.subject.name,
+                        'score': total_student_score,
+                        'passing_limit': config.passing_score
+                    })
+                else:
+                    passed_count += 1
+            
+            # تحديد الحالة النهائية للطالب بناءً على اللائحة
+            if len(failed_subjects) == 0:
+                final_status = 'passed'
+                status_label = "ناجح ومنقول للدور الأول ✅"
+            elif 1 <= len(failed_subjects) <= 2:
+                final_status = 'second_session'
+                status_label = f"له دور ثانٍ في ({len(failed_subjects)}) مواد ⚠️"
+            else:
+                final_status = 'failed'
+                status_label = "راسب وباقٍ للإعادة ❌"
+                
+            results_summary.append({
+                'student': student,
+                'failed_subjects': failed_subjects,
+                'failed_count': len(failed_subjects),
+                'status': final_status,
+                'status_label': status_label
+            })
+
+    context = {
+        'all_grades': Grade.objects.all(),
+        'selected_grade': grade_id,
+        'results_summary': results_summary,
+        'title': 'تقرير النتائج النهائي والكنترول العام'
+    }
+    return render(request, 'students/academic_final_report.html', context)
+
+@login_required
+def manage_reenrollments_view(request):
+    """إدارة عمليات إعادة قيد الطلاب المفصولين (أكاديمياً فقط بدون أي ربط مالي)"""
+    active_year = get_active_year()
+    
+    if request.method == 'POST' and request.POST.get('action') == 'process_re_enroll':
+        record_id = request.POST.get('record_id')
+        
+        try:
+            with transaction.atomic():
+                # 1. جلب سجل الفصل الخاص بالطالب للعام الحالي
+                record = ReEnrollmentRecord.objects.get(id=record_id, academic_year=active_year)
+                student = record.student
+                
+                # 2. تحديث السجل إلى "تم إعادة القيد" وتثبيت التاريخ اليوم
+                record.status = 're_enrolled'
+                record.reenrollment_date = timezone.now().date()
+                record.save()
+                
+                # 3. إعادة حالة الطالب الأكاديمية إلى "مستجد" (أو نشط) ليعود للجداول والقوائم
+                student.enrollment_status = 'New'  
+                student.is_active = True
+                student.save()
+                
+            messages.success(request, f"✅ تم إعادة قيد الطالب {student.get_full_name()} بنجاح، ويمكنه الآن الحضور ورصد درجاته.")
+        except Exception as e:
+            messages.error(request, f"⚠️ فشل تنفيذ العملية! السبب: {str(e)}")
+        return redirect('manage_reenrollments')
+
+    # جلب كافه الطلاب المفصولين حالياً (بسبب الغياب) والذين ينتظرون إعادة القيد
+    pending_records = ReEnrollmentRecord.objects.filter(
+        academic_year=active_year, status='dismissed'
+    ).select_related('student__grade', 'student__classroom')
+
+    context = {
+        'pending_records': pending_records,
+        'title': 'إعادة قيد الطلاب المفصولين'
+    }
+    return render(request, 'students/manage_reenrollments.html', context)
+
+@login_required
+def record_exam_marks_view(request):
+    """شاشة رصد درجات الامتحانات الشهرية والفصلية والملاحق"""
+    active_year = get_active_year()
+    students_data = []
+    subject_config = None
+    
+    form = ExamResultFilterForm(request.GET or None)
+    
+    if form.is_valid():
+        exam_type = form.cleaned_data['exam_type']
+        term = form.cleaned_data['term']
+        month = form.cleaned_data['month']
+        grade_id = form.cleaned_data['grade']
+        classroom_id = form.cleaned_data['classroom']
+        subject_id = form.cleaned_data['subject']
+        
+        # جلب توزيع درجات المادة المحددة لمعرفة النهايات العظمى في التمبلت
+        subject_config = SubjectConfig.objects.filter(
+            subject_id=subject_id, grade_id=grade_id, academic_year=active_year
+        ).first()
+        
+        # جلب الطلاب المستهدفين للرصد
+        students_query = Student.objects.filter(
+            academic_year=active_year, grade=grade_id, is_active=True
+        )
+        if classroom_id:
+            students_query = students_query.filter(classroom=classroom_id)
+            
+        students = students_query.only('id', 'first_name', 'last_name', 'student_code').order_by('first_name')
+        
+        # جلب الدرجات المرصودة مسبقاً إن وجدت لتعبئتها تلقائياً داخل الحقول (تجنباً لإعادة الرصد)
+        existing_results = ExamResult.objects.filter(
+            academic_year=active_year, exam_type=exam_type, term=term, month=month, subject_id=subject_id
+        ).values('student_id', 'cultural_score', 'practical_score', 'is_absent')
+        
+        results_map = {r['student_id']: r for r in existing_results}
+        
+        for student in students:
+            res = results_map.get(student.id, {'cultural_score': 0, 'practical_score': 0, 'is_absent': False})
+            students_data.append({
+                'student': student,
+                'cultural_score': res['cultural_score'],
+                'practical_score': res['practical_score'],
+                'is_absent': res['is_absent']
+            })
+
+    # معالجة حفظ الدرجات المرصودة (POST)
+    if request.method == 'POST' and 'save_marks' in request.POST:
+        posted_form = ExamResultFilterForm(request.POST)
+        if posted_form.is_valid():
+            p_exam_type = posted_form.cleaned_data['exam_type']
+            p_term = posted_form.cleaned_data['term']
+            p_month = posted_form.cleaned_data['month']
+            p_subject_id = posted_form.cleaned_data['subject']
+            
+            student_ids = request.POST.getlist('post_student_ids')
+            
+            with transaction.atomic():
+                for s_id in student_ids:
+                    c_score = request.POST.get(f'cultural_{s_id}', 0)
+                    p_score = request.POST.get(f'practical_{s_id}', 0)
+                    absent = request.POST.get(f'absent_{s_id}') == 'true'
+                    
+                    ExamResult.objects.update_or_create(
+                        student_id=s_id,
+                        subject_id=p_subject_id,
+                        academic_year=active_year,
+                        exam_type=p_exam_type,
+                        term=p_term,
+                        month=p_month,
+                        defaults={
+                            'cultural_score': Decimal(c_score) if not absent else 0,
+                            'practical_score': Decimal(p_score) if not absent else 0,
+                            'is_absent': absent
+                        }
+                    )
+            messages.success(request, "✅ تم حفظ ورصد درجات الطلاب بنجاح.")
+            return redirect(reverse('record_marks') + f'?exam_type={p_exam_type}&term={p_term}&month={p_month or ""}&grade={request.POST.get("grade")}&classroom={request.POST.get("classroom") or ""}&subject={p_subject_id}')
+
+    context = {
+        'form': form,
+        'students_data': students_data,
+        'subject_config': subject_config,
+        'title': 'كنترول رصد الدرجات التفصيلي'
+    }
+    return render(request, 'students/record_marks.html', context)
 
 
 def save_remedial_from_registry(request):
@@ -1148,7 +1652,8 @@ def student_list(request):
 
     if current_view_year:
         # 🟢 الخطوة 1: الاستعلام الأساسي (بسيط وسريع بدون أي حسابات مالية)
-        base_query = Student.objects.filter(academic_year=current_view_year).select_related("grade", "classroom")
+        # 🟢 الخطوة 1: الاستعلام الأساسي (بسيط وسريع بدون أي حسابات مالية)
+        base_query = Student.objects.filter(academic_year=current_view_year, is_active=True).select_related("grade", "classroom")
         
         # تطبيق فلاتر البحث والنوع والمرحلة 
         if grade_id: base_query = base_query.filter(grade_id=grade_id)
@@ -1241,34 +1746,66 @@ def student_list(request):
             ) - (student.total_paid_display + student.discount_display)
 
         # 🟢 الخطوة 6: عزل وحماية العدادات العلوية السريعة (Stats) عبر الكاش
+        force_refresh = request.GET.get('refresh') == '1'
         cache_key = f"student_stats_year_{selected_year_id}_grade_{grade_id}_class_{classroom_id}_search_{search_query}"
+        
+        if force_refresh:
+            cache.delete(cache_key)
+
         stats = cache.get(cache_key)
 
         if not stats:
-            # هنا ينفذ الاستعلام التقيل للعدادات فقط ويتم تخزينه دون تدمير سرعة الجدول
-            stats_query = Student.objects.filter(academic_year=current_view_year)
-            if grade_id: stats_query = stats_query.filter(grade_id=grade_id)
-            if classroom_id: stats_query = stats_query.filter(classroom_id=classroom_id)
+            # 🚀 تم تدمير المصفوفات هنا واستخدام العلاقات المباشرة (JOINs) مع استبعاد غير النشطين
+            base_f = Q(academic_year=current_view_year, is_active=True)
+            rel_f = Q(academic_year=current_view_year, student__is_active=True)
+            
+            if grade_id: 
+                base_f &= Q(grade_id=grade_id)
+                rel_f &= Q(student__grade_id=grade_id)
+            if classroom_id: 
+                base_f &= Q(classroom_id=classroom_id)
+                rel_f &= Q(student__classroom_id=classroom_id)
             if search_query:
-                stats_query = stats_query.annotate(full_name_db=Concat('first_name', Value(' '), 'last_name')).filter(
-                    Q(full_name_db__icontains=search_query) | Q(student_code__icontains=search_query)
-                )
+                sq = Q(first_name__icontains=search_query) | Q(last_name__icontains=search_query) | Q(student_code__icontains=search_query)
+                base_f &= sq
+                rsq = Q(student__first_name__icontains=search_query) | Q(student__last_name__icontains=search_query) | Q(student__student_code__icontains=search_query)
+                rel_f &= rsq
 
-            stats_query = stats_query.annotate(**financial_annotations).annotate(
-                calculated_remaining_approx=ExpressionWrapper(
-                    (Coalesce(F('previous_debt'), Value(0, output_field=DecimalField())) + F('fees_display') + F('late_fees_display')) - 
-                    (F('total_paid_display') + F('discount_display')), output_field=DecimalField()
-                )
-            )
+            # حساب عدد الطلاب الكلي للفلتر
+            total_students = Student.objects.filter(base_f).count()
+            
+            # استخراج أرقام الطلاب المسكنين (بشكل فريد) لإجراء الحلقات التكرارية السريعة عليها
+            assigned_ids = set(StudentInstallment.objects.filter(rel_f).values_list('student_id', flat=True))
+            assigned_count = len(assigned_ids)
 
-            stats = stats_query.aggregate(
-                total=Count('id'),
-                assigned=Count(Case(When(is_assigned=True, then=1))),
-                debt=Count(Case(When(calculated_remaining_approx__gt=0.01, then=1))),
-                paid=Count(Case(When(Q(is_assigned=True) & Q(calculated_remaining_approx__lte=0.01), then=1))),
-                total_remaining_sum=Sum('calculated_remaining_approx')
-            )
-            cache.set(cache_key, stats, 600) # كاش 10 دقائق
+            # تجميع المبالغ بسرعة فائقة
+            total_due = StudentInstallment.objects.filter(rel_f).aggregate(s=Sum('amount_due'))['s'] or Decimal('0.00')
+            total_late = StudentInstallment.objects.filter(rel_f).aggregate(s=Sum('late_fee'))['s'] or Decimal('0.00')
+            total_paid = Payment.objects.filter(rel_f, is_cancelled=False).aggregate(s=Sum('amount_paid'))['s'] or Decimal('0.00')
+            total_discount = StudentAccount.objects.filter(rel_f).aggregate(s=Sum('discount'))['s'] or Decimal('0.00')
+            total_prev_debt = Student.objects.filter(base_f).aggregate(s=Sum('previous_debt'))['s'] or Decimal('0.00')
+            
+            total_remaining_sum = (total_prev_debt + total_due + total_late) - (total_paid + total_discount)
+
+            paid_c = 0
+            debt_c = 0
+            
+            if assigned_count > 0:
+                prev_debts = {s['id']: (s['previous_debt'] or Decimal('0.00')) for s in Student.objects.filter(base_f).values('id', 'previous_debt')}
+                req_map = {item['student_id']: (item['total_req'] or Decimal('0')) + (item['total_late'] or Decimal('0')) for item in StudentInstallment.objects.filter(rel_f).values('student_id').annotate(total_req=Sum('amount_due'), total_late=Sum('late_fee'))}
+                paid_map = {item['student_id']: (item['total_paid'] or Decimal('0')) for item in Payment.objects.filter(rel_f, is_cancelled=False).values('student_id').annotate(total_paid=Sum('amount_paid'))}
+                disc_map = {item['student_id']: (item['total_disc'] or Decimal('0')) for item in StudentAccount.objects.filter(rel_f).values('student_id').annotate(total_disc=Sum('discount'))}
+
+                # دوامة بايثون للحساب في الرامات
+                for sid in assigned_ids:
+                    balance = (prev_debts.get(sid, Decimal('0')) + req_map.get(sid, Decimal('0'))) - (paid_map.get(sid, Decimal('0')) + disc_map.get(sid, Decimal('0')))
+                    if balance > Decimal('0.01'): 
+                        debt_c += 1
+                    else: 
+                        paid_c += 1
+
+            stats = {'total': total_students, 'assigned': assigned_count, 'paid': paid_c, 'debt': debt_c, 'total_remaining_sum': total_remaining_sum}
+            cache.set(cache_key, stats, 300)
 
         total_count = stats.get('total') or 0
         assigned_count = stats.get('assigned') or 0

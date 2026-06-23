@@ -1,0 +1,135 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* إعدادات الطباعة للطلاب المفصولين (بالطول) */
+        @page { size: A4 portrait; margin: 1.5cm; }
+        
+        :root { --border-color: #334155; }
+        
+        body { 
+            font-family: 'Cairo', sans-serif; background-color: #f1f5f9; 
+            color: #0f172a; margin: 0; padding: 20px; font-size: 12pt; 
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        }
+        
+        .a4-paper { 
+            background: white; width: 21cm; min-height: 29.7cm; 
+            margin: 0 auto; padding: 2cm; box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+            border-radius: 5px;
+        }
+        
+        @media print {
+            body { background: white; padding: 0; }
+            .a4-paper { width: 100%; min-height: auto; box-shadow: none; border-radius: 0; padding: 0; margin: 0; }
+            .no-print { display: none !important; }
+        }
+
+        /* --- الترويسة --- */
+        .print-header {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 3px double var(--border-color); padding-bottom: 10px; margin-bottom: 20px;
+        }
+        .header-col { width: 33%; font-weight: 700; font-size: 11pt; line-height: 1.6; }
+        .header-center { text-align: center; }
+        .header-left { text-align: left; }
+        .school-logo { width: 85px; height: auto; }
+
+        .report-title {
+            text-align: center; font-size: 19pt; font-weight: 800; margin: 15px 0 25px 0;
+            text-decoration: underline; text-underline-offset: 8px; color: #b91c1c; /* لون أحمر يعبر عن الفصل */
+        }
+
+        .stats-bar {
+            text-align: left; font-weight: 700; font-size: 11pt; margin-bottom: 10px; color: #475569;
+        }
+
+        /* --- الجدول --- */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+        th, td { border: 1px solid var(--border-color); padding: 10px 8px; text-align: center; vertical-align: middle; }
+        th { background-color: #fee2e2 !important; font-weight: 800; font-size: 12pt; color: #991b1b; } /* هيدر أحمر خفيف */
+        td { font-weight: 600; }
+        .text-right { text-align: right !important; padding-right: 15px !important; }
+        .date-col { font-family: monospace; font-weight: bold; font-size: 12pt; }
+
+        /* --- التوقيعات --- */
+        .signatures { display: flex; justify-content: space-between; margin-top: 50px; font-weight: 700; font-size: 13pt; page-break-inside: avoid; }
+        .sign-box { text-align: center; width: 30%; }
+
+        .controls { text-align: center; margin-bottom: 20px; }
+        .btn { padding: 10px 25px; font-size: 16px; font-weight: bold; font-family: 'Cairo', sans-serif; cursor: pointer; border: none; border-radius: 8px; margin: 0 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn-print { background: #dc2626; color: white; }
+        .btn-back { background: #475569; color: white; }
+    </style>
+</head>
+<body>
+    <div class="controls no-print">
+        <button onclick="window.print()" class="btn btn-print">🖨️ طباعة تقرير المفصولين (PDF)</button>
+        <button onclick="history.back()" class="btn btn-back">🔙 رجوع للخلف</button>
+    </div>
+    
+    <div class="a4-paper">
+        <div class="print-header">
+            <div class="header-col">
+                محافظة: القاهرة<br>
+                إدارة: عين شمس التعليمية<br>
+                مدرسة: طلعت حرب الفندقية
+            </div>
+            <div class="header-col header-center">
+                <img src="https://cdn-icons-png.flaticon.com/512/8066/8066276.png" class="school-logo" alt="شعار المدرسة">
+            </div>
+            <div class="header-col header-left">
+                العام الدراسي: {{ active_year.name }}<br>
+                تاريخ التقرير: {% now "Y-m-d" %}<br>
+                قسم: شئون الطلاب
+            </div>
+        </div>
+
+        <div class="report-title">
+            كشف السجل الأكاديمي للطلاب المفصولين
+        </div>
+
+        <div class="stats-bar">
+            إجمالي حالات الفصل الأكاديمي: <span style="color: #b91c1c;">{{ total_count }} طالب</span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 5%;">م</th>
+                    <th style="width: 40%;">اسم الطالب الرباعي</th>
+                    <th style="width: 25%;">الصف / الفصل</th>
+                    <th style="width: 15%;">تاريخ قرار الفصل</th>
+                    <th style="width: 15%;">ملاحظات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td class="text-right">{{ r.student.get_full_name }}</td>
+                    <td>{{ r.student.grade.name }}<br><span style="font-size: 10pt; color: #475569;">{{ r.student.classroom.name|default:"--" }}</span></td>
+                    <td class="date-col">{{ r.dismissal_date|date:"Y-m-d" }}</td>
+                    <td></td> </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="color: #16a34a; font-weight: bold; padding: 20px;">لا توجد بيانات لطلاب مفصولين في هذا العام (ممتاز).</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="signatures">
+            <div class="sign-box">شئون الطلاب<br>.............................</div>
+            <div class="sign-box">رئيس الكنترول<br>.............................</div>
+            <div class="sign-box">يعتمد، مدير المدرسة<br>.............................</div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+        }
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; padding: 30px 15px; }
+        
+        .dashboard-header {
+            background: var(--primary-gradient); border-radius: 20px; padding: 35px; color: white; margin-bottom: 30px;
+        }
+        
+        /* كروت الإحصائيات (Stat Cards) */
+        .stat-card { border-radius: 16px; padding: 20px; color: white; box-shadow: var(--card-shadow); transition: 0.3s; }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-present { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .stat-absent { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        .stat-excused { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .stat-total { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+
+        .filter-card { background: white; border-radius: 16px; padding: 25px; box-shadow: var(--card-shadow); margin-bottom: 30px; }
+        .table-card { background: white; border-radius: 16px; padding: 20px; box-shadow: var(--card-shadow); }
+        
+        .table th { background-color: #f1f5f9; color: #475569; padding: 15px; border: none; font-weight: 800; }
+        .table td { padding: 15px; vertical-align: middle; border-bottom: 1px solid #f1f5f9; font-weight: 600; }
+        
+        /* باجات الحالة في الجدول */
+        .badge-status { padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; }
+        .badge-present { background: #d1fae5; color: #065f46; }
+        .badge-absent { background: #fee2e2; color: #991b1b; }
+        .badge-excused { background: #fef3c7; color: #92400e; }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid max-width-1400">
+    
+    <div class="dashboard-header d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <h1 class="dashboard-title fw-bold mb-1">{{ title }}</h1>
+            <p class="m-0 text-white-50 mb-3">متابعة إحصائيات حضور وغياب الطلاب بشكل دقيق</p>
+            
+            <div class="mt-2">
+                <a href="{% url 'home' %}" class="btn btn-light btn-sm fw-bold rounded-pill shadow-sm px-4" style="color: #1e293b;">العودة للرئيسية</a>
+                <button onclick="history.back()" class="btn btn-outline-light btn-sm fw-bold rounded-pill px-4 ms-2">رجوع للخلف</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card stat-total text-center">
+                <h5 class="fw-bold mb-1">إجمالي السجلات</h5>
+                <h2 class="fw-bold m-0">{{ total_records }}</h2>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card stat-present text-center">
+                <h5 class="fw-bold mb-1">الحضور</h5>
+                <h2 class="fw-bold m-0">{{ present_count }}</h2>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card stat-absent text-center">
+                <h5 class="fw-bold mb-1">الغياب</h5>
+                <h2 class="fw-bold m-0">{{ absent_count }}</h2>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card stat-excused text-center">
+                <h5 class="fw-bold mb-1">غياب بعذر</h5>
+                <h2 class="fw-bold m-0">{{ excused_count }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="filter-card">
+        <form method="GET" action="">
+            <div class="row align-items-end g-3">
+                <div class="col-md-3">
+                    <label class="form-label text-muted fw-bold">من تاريخ</label>
+                    <input type="date" name="date_from" class="form-control fw-bold" value="{{ request.GET.date_from|default:'' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-muted fw-bold">إلى تاريخ</label>
+                    <input type="date" name="date_to" class="form-control fw-bold" value="{{ request.GET.date_to|default:'' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label text-muted fw-bold">الصف</label>
+                    <select name="grade" class="form-select fw-bold">
+                        <option value="">الكل</option>
+                        {% for g in all_grades %}
+                            <option value="{{ g.id }}" {% if request.GET.grade == g.id|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label text-muted fw-bold">الحالة</label>
+                    <select name="status" class="form-select fw-bold">
+                        <option value="">الكل</option>
+                        <option value="present" {% if request.GET.status == 'present' %}selected{% endif %}>حاضر</option>
+                        <option value="absent" {% if request.GET.status == 'absent' %}selected{% endif %}>غائب</option>
+                        <option value="excused" {% if request.GET.status == 'excused' %}selected{% endif %}>بعذر</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold p-2" style="border-radius: 10px;">استخراج التقرير</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-card">
+        {% if records %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 5%;">#</th>
+                        <th style="width: 15%;">التاريخ</th>
+                        <th style="width: 30%;">اسم الطالب</th>
+                        <th style="width: 15%;">الصف / الفصل</th>
+                        <th style="width: 15%;">الحالة</th>
+                        <th style="width: 20%;">ملاحظات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rec in records %}
+                    <tr>
+                        <td class="text-muted">{{ forloop.counter }}</td>
+                        <td class="fw-bold text-primary">{{ rec.date|date:"Y-m-d" }}</td>
+                        <td>
+                            <div class="text-dark fw-bold">{{ rec.student.get_full_name }}</div>
+                            <div class="text-muted" style="font-size: 0.8rem;">كود: {{ rec.student.student_code }}</div>
+                        </td>
+                        <td>{{ rec.student.grade.name }} <br> <span class="text-muted" style="font-size: 0.8rem;">{{ rec.student.classroom.name|default:"--" }}</span></td>
+                        <td>
+                            {% if rec.status == 'present' %}
+                                <span class="badge-status badge-present">حاضر</span>
+                            {% elif rec.status == 'absent' %}
+                                <span class="badge-status badge-absent">غائب</span>
+                            {% else %}
+                                <span class="badge-status badge-excused">غياب بعذر</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ rec.notes|default:"--" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center p-5">
+            <h4 class="text-muted fw-bold">لا توجد سجلات غياب/حضور تطابق الفلتر المحدد.</h4>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+</body>
+</html>

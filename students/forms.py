@@ -11,6 +11,26 @@ from treasury.models import GeneralLedger
 from .models import BusSubscription, BusRoute
 from .models import RemedialProgramRecord, RemedialFeeSetting
 
+from .models import AttendanceRecord, ExamResult, ReEnrollmentRecord, SubjectConfig
+from students.models import Grade, Classroom, Subject
+
+class AttendanceFilterForm(forms.Form):
+    """نموذج فلترة الطلاب لتسجيل الحضور والغياب اليومي"""
+    date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}), label="تاريخ اليوم")
+    grade = forms.ModelChoiceField(queryset=Grade.objects.all(), widget=forms.Select(attrs={'class': 'form-control', 'onchange': 'this.form.submit()'}), label="الصف الدراسي")
+    classroom = forms.ModelChoiceField(queryset=Classroom.objects.all(), required=False, widget=forms.Select(attrs={'class': 'form-control'}), label="الفصل")
+    term = forms.ChoiceField(choices=[('term1', 'الترم الأول'), ('term2', 'الترم الثاني')], widget=forms.Select(attrs={'class': 'form-control'}), label="الترم")
+
+class ExamResultFilterForm(forms.Form):
+    """نموذج فلترة الكنترول لرصد درجات الشهور والتيرمات والملاحق"""
+    exam_type = forms.ChoiceField(choices=[('month', 'امتحان شهر'), ('term', 'امتحان نهاية ترم'), ('second_session', 'امتحان دور ثاني (ملاحق)')], widget=forms.Select(attrs={'class': 'form-control', 'id': 'exam_type_select'}), label="نوع الامتحان")
+    term = forms.ChoiceField(choices=[('term1', 'الترم الأول'), ('term2', 'الترم الثاني'), ('second_session', 'الدور الثاني')], widget=forms.Select(attrs={'class': 'form-control'}), label="الترم/الفترة")
+    month = forms.ChoiceField(choices=[('', '---')] + [('10', 'أكتوبر'), ('11', 'نوفمبر'), ('12', 'ديسمبر'), ('2', 'فبراير'), ('3', 'مارس'), ('4', 'أبريل')], required=False, widget=forms.Select(attrs={'class': 'form-control'}), label="الشهر (إن وجد)")
+    grade = forms.ModelChoiceField(queryset=Grade.objects.all(), widget=forms.Select(attrs={'class': 'form-control'}), label="الصف الدراسي")
+    classroom = forms.ModelChoiceField(queryset=Classroom.objects.all(), required=False, widget=forms.Select(attrs={'class': 'form-control'}), label="الفصل")
+    subject = forms.ModelChoiceField(queryset=Subject.objects.all(), widget=forms.Select(attrs={'class': 'form-control'}), label="المادة الدراسية")
+    
+    
 class RemedialProgramForm(forms.ModelForm):
     class Meta:
         model = RemedialProgramRecord

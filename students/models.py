@@ -9,6 +9,122 @@ from decimal import Decimal
 from django.db import models, transaction
 
 
+# --- خيارات الفترات الزمنية ---
+TERM_CHOICES = [
+    ('term1', 'الترم الأول'),
+    ('term2', 'الترم الثاني'),
+    ('second_session', 'الدور الثاني (ملاحق)'),
+]
+
+MONTH_CHOICES = [
+    ('10', 'أكتوبر'), ('11', 'نوفمبر'), ('12', 'ديسمبر'), 
+    ('2', 'فبراير'), ('3', 'مارس'), ('4', 'أبريل'),
+]
+
+# --- 1. جدول الغياب والحضور اليومي ---
+class AttendanceRecord(models.Model):
+    ATTENDANCE_STATUS = [
+        ('present', 'حاضر'),
+        ('absent', 'غائب'),
+        ('excused', 'غياب بعذر'),
+    ]
+    
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='attendances', verbose_name="الطالب")
+    academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
+    date = models.DateField("تاريخ اليوم", default=timezone.now)
+    term = models.CharField("الترم", max_length=20, choices=TERM_CHOICES, default='term1')
+    status = models.CharField("الحالة", max_length=10, choices=ATTENDANCE_STATUS, default='present')
+    notes = models.CharField("ملاحظات", max_length=255, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "سجل غياب"
+        verbose_name_plural = "سجلات الغياب"
+        unique_together = ('student', 'date') # لمنع تكرار تسجيل الغياب لنفس الطالب في نفس اليوم
+
+    def __str__(self):
+        return f"{self.student.first_name} - {self.date} - {self.get_status_display()}"
+
+
+# --- 2. جدول إعادة القيد (للطلاب المفصولين بسبب الغياب) ---
+class ReEnrollmentRecord(models.Model):
+    STATUS_CHOICES = [
+        ('dismissed', 'مفصول لتخطي الغياب'),
+        ('re_enrolled', 'تم إعادة القيد'),
+    ]
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='reenrollments', verbose_name="الطالب")
+    academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
+    dismissal_date = models.DateField("تاريخ الفصل", auto_now_add=True)
+    reenrollment_date = models.DateField("تاريخ إعادة القيد", blank=True, null=True)
+    status = models.CharField("الحالة", max_length=20, choices=STATUS_CHOICES, default='dismissed')
+    fee_paid = models.BooleanField("تم دفع رسوم الإعادة؟", default=False)
+    
+    class Meta:
+        verbose_name = "سجل إعادة قيد"
+        verbose_name_plural = "سجلات إعادة القيد"
+
+    def __str__(self):
+        return f"{self.student.get_full_name()} - {self.get_status_display()}"
+    
+    
+    
+# --- 3. إعدادات المادة (توسيع لموديل Subject الحالي) ---
+class SubjectConfig(models.Model):
+    subject = models.OneToOneField('Subject', on_delete=models.CASCADE, verbose_name="المادة")
+    academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
+    grade = models.ForeignKey('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
+    
+    # توزيع الدرجات
+    max_cultural = models.DecimalField("النهاية العظمى (ثقافي)", max_digits=5, decimal_places=2, default=50)
+    max_practical = models.DecimalField("النهاية العظمى (عملي)", max_digits=5, decimal_places=2, default=50)
+    passing_score = models.DecimalField("درجة النجاح الكلية", max_digits=5, decimal_places=2, default=50)
+
+    class Meta:
+        verbose_name = "توزيع درجات المادة"
+        verbose_name_plural = "توزيع درجات المواد"
+
+    @property
+    def total_max_score(self):
+        return self.max_cultural + self.max_practical
+
+
+# --- 4. جدول رصد الدرجات (يشمل الشهور، التيرمات، الملاحق) ---
+class ExamResult(models.Model):
+    EXAM_TYPES = [
+        ('month', 'امتحان شهر'),
+        ('term', 'امتحان نهاية ترم'),
+        ('second_session', 'امتحان دور ثاني'),
+    ]
+
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='exam_results', verbose_name="الطالب")
+    subject = models.ForeignKey('Subject', on_delete=models.CASCADE, verbose_name="المادة")
+    academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
+    
+    exam_type = models.CharField("نوع الامتحان", max_length=20, choices=EXAM_TYPES, default='term')
+    term = models.CharField("الترم", max_length=20, choices=TERM_CHOICES)
+    month = models.CharField("الشهر (للامتحانات الشهرية)", max_length=10, choices=MONTH_CHOICES, blank=True, null=True)
+    
+    cultural_score = models.DecimalField("درجة النظري (ثقافي)", max_digits=5, decimal_places=2, default=0)
+    practical_score = models.DecimalField("درجة العملي", max_digits=5, decimal_places=2, default=0)
+    
+    is_absent = models.BooleanField("غائب في الامتحان؟", default=False)
+
+    class Meta:
+        verbose_name = "نتيجة امتحان"
+        verbose_name_plural = "رصد الدرجات"
+        # ضمان عدم رصد درجة لنفس الطالب في نفس المادة لنفس الترم ونفس الشهر مرتين
+        unique_together = ('student', 'subject', 'academic_year', 'exam_type', 'term', 'month')
+
+    @property
+    def total_score(self):
+        if self.is_absent:
+            return 0
+        return self.cultural_score + self.practical_score
+
+    def __str__(self):
+        exam_name = self.get_month_display() if self.exam_type == 'month' else self.get_term_display()
+        return f"{self.student.first_name} - {self.subject.name} - {exam_name}"
+    
+    
 class SystemSettings(models.Model):
     is_admission_open = models.BooleanField(default=True, verbose_name="فتح باب التقديم (إظهار زر الإضافة)")
 

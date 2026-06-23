@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <!-- خط Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            --bg-light: #f8fafc;
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+            
+            /* ألوان الحالات */
+            --success-color: #10b981;
+            --success-bg: #d1fae5;
+            --warning-color: #f59e0b;
+            --warning-bg: #fef3c7;
+            --danger-color: #ef4444;
+            --danger-bg: #fee2e2;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f1f5f9;
+            color: #334155;
+            padding: 30px 15px;
+        }
+
+        /* الهيدر الداكن الفخم */
+        .dashboard-header {
+            background: var(--primary-gradient);
+            border-radius: 20px;
+            padding: 35px;
+            color: white;
+            box-shadow: 0 15px 40px rgba(15, 23, 42, 0.2);
+            margin-bottom: 35px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dashboard-title { font-weight: 800; font-size: 2.2rem; margin-bottom: 5px; color: #f8fafc; }
+        
+        .filter-card {
+            background: white; border-radius: 18px; box-shadow: var(--card-shadow); padding: 25px; margin-bottom: 30px;
+        }
+
+        .form-select, .btn-filter {
+            border-radius: 12px; padding: 12px; font-weight: 700; font-size: 1rem;
+        }
+
+        .btn-filter {
+            background: #3b82f6; color: white; border: none; width: 100%; transition: all 0.3s;
+        }
+        .btn-filter:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); }
+
+        /* تصميم الكارت الخاص بكل طالب (Grid System بدلاً من الجداول) */
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .student-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .student-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+            border-color: #cbd5e1;
+        }
+
+        /* شريط الحالة الجانبي الملون */
+        .status-bar { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; }
+        .status-passed .status-bar { background-color: var(--success-color); }
+        .status-second_session .status-bar { background-color: var(--warning-color); }
+        .status-failed .status-bar { background-color: var(--danger-color); }
+
+        .student-name { font-weight: 800; font-size: 1.25rem; color: #0f172a; margin-bottom: 5px; }
+        .student-code { font-size: 0.9rem; color: #64748b; font-weight: 600; }
+
+        /* باجات الحالة (Status Badges) */
+        .badge-status {
+            padding: 8px 16px; border-radius: 30px; font-weight: 800; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .badge-passed { background-color: var(--success-bg); color: #065f46; border: 1px solid #a7f3d0; }
+        .badge-second_session { background-color: var(--warning-bg); color: #92400e; border: 1px solid #fde68a; }
+        .badge-failed { background-color: var(--danger-bg); color: #991b1b; border: 1px solid #fecaca; }
+
+        /* وسوم المواد الراسب فيها (Tags) */
+        .failed-subjects-box {
+            margin-top: 15px; padding-top: 15px; border-top: 1px dashed #e2e8f0;
+        }
+        .subject-tag {
+            background: #f1f5f9; color: #475569; font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: 8px; display: inline-block; margin: 3px; border: 1px solid #e2e8f0;
+        }
+        .subject-tag span.score { color: var(--danger-color); font-weight: 800; }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid max-width-1400">
+    <div class="dashboard-header d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <h1 class="dashboard-title">التقرير الأكاديمي النهائي للكنترول</h1>
+            <p class="m-0 text-white-50 mb-3">تحليل ذكي لنتائج الطلاب، وتحديد الناجحين والملاحق تلقائياً بناءً على لوائح النجاح</p>
+            
+            <div class="mt-2">
+                <a href="{% url 'home' %}" class="btn btn-light btn-sm fw-bold rounded-pill shadow-sm px-4" style="color: #1e293b;">
+                    <i class="bi bi-house-door-fill me-1"></i> العودة للرئيسية
+                </a>
+                <button onclick="history.back()" class="btn btn-outline-light btn-sm fw-bold rounded-pill px-4 ms-2">
+                    <i class="bi bi-arrow-right-circle me-1"></i> رجوع للخلف
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="filter-card">
+        <form method="GET" action="">
+            <div class="row align-items-end justify-content-center g-3">
+                <div class="col-md-5">
+                    <label class="form-label text-muted fw-bold mb-2">اختر الصف الدراسي لاستخراج النتيجة</label>
+                    <select name="grade_id" class="form-select" required>
+                        <option value="">-- اختر الصف --</option>
+                        {% for grade in all_grades %}
+                            <option value="{{ grade.id }}" {% if selected_grade == grade.id|stringformat:"s" %}selected{% endif %}>{{ grade.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn-filter">استخراج التقرير</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if results_summary %}
+        <div class="report-grid">
+            {% for result in results_summary %}
+            <div class="student-card status-{{ result.status }}">
+                <div class="status-bar"></div>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h3 class="student-name">{{ result.student.get_full_name }}</h3>
+                        <div class="student-code">كود: {{ result.student.student_code|default:"--" }}</div>
+                    </div>
+                    <!-- باج الحالة الديناميكي -->
+                    <span class="badge-status badge-{{ result.status }}">
+                        {{ result.status_label }}
+                    </span>
+                </div>
+
+                {% if result.failed_count > 0 %}
+                <div class="failed-subjects-box">
+                    <p class="mb-2" style="font-size: 0.85rem; font-weight: 700; color: #64748b;">المواد التي تحتاج لمعالجة ({{ result.failed_count }}):</p>
+                    <div>
+                        {% for sub in result.failed_subjects %}
+                            <span class="subject-tag">
+                                {{ sub.subject_name }} 
+                                (جاب <span class="score">{{ sub.score|floatformat:0 }}</span> من {{ sub.passing_limit|floatformat:0 }})
+                            </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    {% elif selected_grade %}
+        <div class="alert alert-info text-center rounded-4 shadow-sm p-4">
+            <h5 class="fw-bold m-0">لم يتم رصد درجات كافية لطلاب هذا الصف لإصدار تقرير نهائي حتى الآن.</h5>
+        </div>
+    {% endif %}
+</div>
+
+</body>
+</html>

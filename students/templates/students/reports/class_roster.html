@@ -1,0 +1,267 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>طباعة كشف فصل | {{ selected_classroom.name|default:"عام" }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* =======================================================
+           🟢 الكود السحري لضبط مقاس الورقة A4 والطباعة
+           ======================================================= */
+        @page {
+            size: A4 portrait; /* ورقة A4 بالطول */
+            margin: 1.5cm; /* هوامش متساوية لعدم قص الكلام في الطابعة */
+        }
+
+        :root {
+            --primary-color: #1e293b;
+            --border-color: #000000;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f1f5f9; /* لون خلفية للشاشة فقط */
+            color: #000;
+            margin: 0;
+            padding: 20px;
+            font-size: 14pt; /* حجم خط مثالي للقراءة الورقية */
+            -webkit-print-color-adjust: exact; /* إجبار الطابعة على طباعة الألوان */
+            print-color-adjust: exact;
+        }
+
+        /* حاوية الورقة البيضاء (تظهر على الشاشة كأنها ورقة حقيقية) */
+        .a4-paper {
+            background: white;
+            width: 21cm;
+            min-height: 29.7cm;
+            margin: 0 auto;
+            padding: 2cm;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-radius: 5px;
+        }
+
+        /* =======================================================
+           🔴 أوامر الإخفاء وتعديل الشكل أثناء الطباعة الفعلية
+           ======================================================= */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .a4-paper {
+                width: 100%;
+                min-height: auto;
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+                border-radius: 0;
+            }
+            .no-print {
+                display: none !important; /* إخفاء أي أزرار أو قوائم */
+            }
+        }
+
+        /* ----------------------------------------------------
+           تنسيقات الترويسة (الهيدر الرسمي للمدرسة)
+           ---------------------------------------------------- */
+        .print-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px double var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .header-right, .header-left {
+            width: 33%;
+            font-weight: 700;
+            line-height: 1.6;
+            font-size: 12pt;
+        }
+
+        .header-center {
+            width: 33%;
+            text-align: center;
+        }
+
+        /* شعار المدرسة (يمكنك استبدال المسار بمسار اللوجو الحقيقي) */
+        .school-logo {
+            width: 90px;
+            height: auto;
+        }
+
+        .header-left {
+            text-align: left;
+        }
+
+        .report-title {
+            text-align: center;
+            font-size: 20pt;
+            font-weight: 800;
+            margin: 15px 0 25px 0;
+            text-decoration: underline;
+            text-underline-offset: 8px;
+        }
+
+        /* ----------------------------------------------------
+           تنسيقات الجدول الرسمي
+           ---------------------------------------------------- */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        /* تكرار هيدر الجدول في كل صفحة عند الطباعة */
+        thead {
+            display: table-header-group;
+        }
+
+        /* منع قص السطر الواحد بين صفحتين */
+        tr {
+            page-break-inside: avoid;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 10px 8px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        th {
+            background-color: #e2e8f0 !important;
+            font-weight: 800;
+            font-size: 13pt;
+        }
+
+        td {
+            font-weight: 600;
+            font-size: 12pt;
+        }
+
+        /* ----------------------------------------------------
+           التوقيعات في أسفل الورقة
+           ---------------------------------------------------- */
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 50px;
+            font-weight: 700;
+            font-size: 14pt;
+            page-break-inside: avoid; /* منع فصل التوقيعات في صفحة جديدة وحدها */
+        }
+
+        .sign-box {
+            text-align: center;
+            width: 30%;
+        }
+
+        /* أزرار التحكم (لا تظهر في الطباعة) */
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 10px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            font-family: 'Cairo', sans-serif;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            margin: 0 5px;
+        }
+        .btn-print { background: #2563eb; color: white; }
+        .btn-back { background: #475569; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="controls no-print">
+        <button onclick="window.print()" class="btn btn-print">🖨️ طباعة / حفظ كـ PDF</button>
+        <button onclick="history.back()" class="btn btn-back">🔙 رجوع للخلف</button>
+    </div>
+
+    <div class="a4-paper">
+        
+        <div class="print-header">
+            <div class="header-right">
+                محافظة: القاهرة<br>
+                إدارة: الزيتون التعليمية<br>
+                مدرسة: طلعت حرب الفندقية
+            </div>
+            
+            <div class="header-center">
+                <img src="https://cdn-icons-png.flaticon.com/512/8066/8066276.png" class="school-logo" alt="شعار المدرسة">
+            </div>
+            
+            <div class="header-left">
+                العام الدراسي: {{ active_year.name }}<br>
+                تاريخ الطباعة: {% now "Y-m-d" %}<br>
+                الوقت: {% now "h:i A" %}
+            </div>
+        </div>
+
+        <div class="report-title">
+            كشف أسماء طلاب 
+            {% if selected_classroom %}
+                (فصل {{ selected_classroom.name }})
+            {% elif selected_grade %}
+                ({{ selected_grade.name }})
+            {% else %}
+                عام
+            {% endif %}
+        </div>
+
+        {% if students %}
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 5%;">م</th>
+                        <th style="width: 15%;">كود الطالب</th>
+                        <th style="width: 40%;">الاسم الرباعي</th>
+                        <th style="width: 10%;">النوع</th>
+                        <th style="width: 10%;">الديانة</th>
+                        <th style="width: 20%;">ملاحظات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ student.student_code|default:"-" }}</td>
+                            <td style="text-align: right; padding-right: 15px;">{{ student.get_full_name }}</td>
+                            <td>{{ student.get_gender_display|default:"-" }}</td>
+                            <td>{{ student.get_religion_display|default:"-" }}</td>
+                            <td></td> </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <h3 style="text-align: center; color: red;">لا يوجد طلاب مسجلين في هذا الفصل حالياً.</h3>
+        {% endif %}
+
+        <div class="signatures">
+            <div class="sign-box">
+                يعتمد، شئون الطلاب<br>
+                .............................
+            </div>
+            <div class="sign-box">
+                رئيس الكنترول<br>
+                .............................
+            </div>
+            <div class="sign-box">
+                مدير إدارة المدرسة<br>
+                .............................
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

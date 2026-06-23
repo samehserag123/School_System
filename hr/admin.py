@@ -15,23 +15,31 @@ class DepartmentAdmin(admin.ModelAdmin):
         return obj.employee_set.count()
     get_employee_count.short_description = "عدد الموظفين"
 
-# 2. تنسيق قواعد الحضور والانصراف المرنة
+
 @admin.register(AttendanceRule)
 class AttendanceRuleAdmin(admin.ModelAdmin):
-    # تم تحديث الحقول المعروضة لتشمل المعاملات الحسابية الجديدة
-    list_display = ('name', 'work_start_time', 'work_end_time', 'grace_period', 'working_days_summary')
+    # الحقول التي ستظهر في الجدول الخارجي
+    list_display = ('name', 'shift_type', 'grace_period', 'late_deduction_multiplier', 'overtime_multiplier_normal')
+    list_filter = ('shift_type',)
     
+    # تنسيق شكل صفحة الإضافة/التعديل من الداخل (Fieldsets) لتبدو احترافية
     fieldsets = (
-        ("المعلومات الأساسية", {
-            'fields': ('name', 'work_start_time', 'work_end_time')
+        ('المعلومات الأساسية ونوع الوردية', {
+            'fields': ('name', 'shift_type')
         }),
-        ("إعدادات التأخير والإضافي المرنة", {
-            'fields': ('grace_period', 'deduction_multiplier', 'overtime_multiplier', 'absent_deduction_days', 'requires_fingerprint'),
-            'classes': ('collapse',), # جعلها قابلة للطي للتنظيم
+        ('مواعيد وساعات العمل', {
+            'fields': ('work_start_time', 'work_end_time', 'target_work_hours'),
+            'description': 'حدد وقت الحضور والانصراف (للوردية الثابتة)، أو الساعات المستهدفة (للوردية المرنة).'
         }),
-        ("جدول العمل الأسبوعي", {
-            'description': "اختر أيام العمل الرسمية (المحددة بـ صح تعني يوم عمل، وغير المحددة تعني عطلة)",
-            'fields': (('sunday', 'monday', 'tuesday', 'wednesday', 'thursday'), ('friday', 'saturday')),
+        ('قوانين التأخير والغياب', {
+            'fields': ('grace_period', 'max_late_allowed_minutes', 'late_deduction_multiplier', 'absent_deduction_days')
+        }),
+        ('لوائح العمل الإضافي (Overtime)', {
+            'fields': ('overtime_multiplier_normal', 'overtime_multiplier_weekend')
+        }),
+        ('أيام الدوام الأسبوعية', {
+            'fields': ('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'),
+            'description': 'ضع علامة (صح) أمام أيام العمل الرسمية، واترك أيام العطلات فارغة.'
         }),
     )
 
