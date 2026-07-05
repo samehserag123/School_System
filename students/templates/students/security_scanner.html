@@ -60,7 +60,11 @@
                     <div id="student-info-box" style="display: none; width: 100%;">
                         <img id="student-photo" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" class="student-avatar-preview" alt="صورة الطالب">
                         <h4 class="fw-bold text-white mb-1" id="lbl-student-name">--</h4>
-                        <p class="text-info fw-bold mb-2 small" id="lbl-student-grade">--</p>
+                        <p class="text-info fw-bold mb-1 small" id="lbl-student-grade">--</p>
+                        
+                        <!-- 🟢 السطر الجديد: مكان مخصص لعرض الشعبة/التخصص بلون مختلف -->
+                        <p class="text-warning fw-bold mb-2 small" id="lbl-student-spec">--</p>
+                        
                         <p class="text-muted small mb-0">الكود المكتشف: <span id="lbl-student-code" class="font-monospace fw-bold text-warning">--</span></p>
                         
                         <div id="api-status-badge" class="status-badge mx-auto"></div>
@@ -100,6 +104,7 @@
         document.getElementById('lbl-student-code').innerText = decodedText;
         document.getElementById('lbl-student-name').innerText = "جاري جلب الاسم من السيستم...";
         document.getElementById('lbl-student-grade').innerText = "يرجى الضغط على الزر بالأسفل لتأكيد الدخول";
+        document.getElementById('lbl-student-spec').innerText = "--";
         
         document.getElementById('btn-send').style.display = 'block';
         document.getElementById('api-status-badge').style.display = 'none';
@@ -128,6 +133,9 @@
             if (data.status === 'success' || data.status === 'info') {
                 document.getElementById('lbl-student-name').innerText = data.student_name || "طالب مسجل";
                 document.getElementById('lbl-student-grade').innerText = "الصف: " + (data.grade || "--");
+                
+                // 🟢 السطر الجديد: تحديث حقل التخصص بناءً على ما جاء من السيستم
+                document.getElementById('lbl-student-spec').innerText = "التخصص: " + (data.specialization || "--");
                 
                 if(data.status === 'success') {
                     badge.className = "status-badge bg-success text-white py-2 shadow-sm";

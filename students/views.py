@@ -88,7 +88,15 @@ def security_scanner_view(request):
 @csrf_exempt # للسماح باستقبال البيانات من الجافاسكريبت بسلاسة
 @login_required
 def api_record_qr_attendance(request):
-    """الـ API السري الذي يستقبل كود الطالب من الكاميرا ويسجل حضوره"""
+    """الـ API السري الذي يستقبل كود الطالب من الكاميرا ويسجل حضوره بشروط صارمة"""
+    
+    # 🔴 الشرط الصارم 1: منع الطلاب تماماً من إرسال طلبات حضور؛ الصلاحية فقط لموظفي الأمن والمدرسة المعتمدين
+    if not request.user.is_staff:
+        return JsonResponse({
+            'status': 'error', 
+            'message': '❌ غير مصرح لك بتسجيل حضور الطلاب. هذه الصلاحية مخصصة لموظف البوابة فقط!'
+        }, status=403)
+
     if request.method == 'POST':
         try:
             # 1. استخراج الكود الممسوح من الكاميرا
@@ -107,12 +115,18 @@ def api_record_qr_attendance(request):
             today = timezone.now().date()
             active_year = get_active_year()
             
+            # 🔴 الشرط الصارم 2: جلب اسم موظف الأمن الفعلي الذي قام بالمسح لتسجيله في النظام
+            security_agent = request.user.get_full_name() or request.user.username
+            
             # استخدمنا get_or_create لكي لا يسجل الطالب مرتين إذا مرر الكارنيه مرتين
             record, created = AttendanceRecord.objects.get_or_create(
                 student=student,
                 date=today,
                 academic_year=active_year,
-                defaults={'status': 'present', 'notes': 'تسجيل بوابة (QR)'}
+                defaults={
+                    'status': 'present', 
+                    'notes': f'بوابة (QR) - بواسطة الموظف: {security_agent}'
+                }
             )
             
             if not created:
@@ -123,7 +137,7 @@ def api_record_qr_attendance(request):
                     })
                 else:
                     record.status = 'present'
-                    record.notes = 'تم التعديل لحاضر عبر البوابة (QR)'
+                    record.notes = f'تم التعديل لحاضر عبر البوابة بواسطة: {security_agent}'
                     record.save()
             
             # 4. إرسال رسالة نجاح لموبايل موظف الأمن
@@ -131,7 +145,8 @@ def api_record_qr_attendance(request):
                 'status': 'success', 
                 'message': f'✅ تم تسجيل حضور: {student.get_full_name()}',
                 'student_name': student.get_full_name(),
-                'grade': student.grade.name if student.grade else 'غير محدد'
+                'grade': student.grade.name if student.grade else 'غير محدد',
+                'specialization': student.get_specialization_display() if student.specialization else 'شعبة عامة'
             })
             
         except Exception as e:
