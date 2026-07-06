@@ -61,15 +61,33 @@ class AttendanceRuleAdmin(admin.ModelAdmin):
 # 3. تنسيق الموظفين
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ('emp_id', 'name', 'department', 'attendance_rule', 'base_salary', 'colored_status')
-    list_filter = ('department', 'attendance_rule', 'is_active')
+    # 1. إضافة حقل التأمين 'is_insured' لجدول العرض الخارجي بجانب تعديلاتك
+    list_display = ('emp_id', 'name', 'department', 'attendance_rule', 'base_salary', 'is_insured', 'colored_status')
+    
+    # 2. إضافة فلتر التأمينات للمساعدة في تصفية المؤمن عليهم والمستبعدين بسرعة
+    list_filter = ('department', 'attendance_rule', 'is_active', 'is_insured')
     search_fields = ('name', 'emp_id')
     list_editable = ('attendance_rule',) # تغيير القاعدة بنقرة واحدة من الخارج لتسهيل الحالات الخاصة
     
+    # 3. تقسيم واجهة الإدخال والتعديل الداخلية (Fieldsets) لراحة المستخدم
+    fieldsets = (
+        ('البيانات الأساسية والتعاقدية', {
+            'fields': ('emp_id', 'name', 'department', 'attendance_rule', 'is_active', 'base_salary')
+        }),
+        ('البيانات التأمينية والبدلات 🛡️', {
+            'fields': ('is_insured', 'insurance_number', 'insurance_basic_salary', 'insurance_variable_allowance', 'insurance_deduction'),
+            'description': 'تفعيل خيار التأمين يربط حسابات الموظف تلقائياً بمحرك الخصومات في كشف الرواتب.'
+        }),
+        ('إدارة أرصدة الإجازات التراكمية', {
+            'fields': ('annual_balance', 'casual_balance', 'sick_balance')
+        }),
+    )
+    
+    # 4. دالة الحالة الملونة الذكية الخاصة بك
     def colored_status(self, obj):
         if obj.is_active:
             return format_html('<b style="color:green;">نشط</b>')
-        return format_html('<b style="color:red;">موقف</b>')
+        return format_html('<b style="color:red;">موقوف</b>')
     colored_status.short_description = "الحالة"
 
 # 4. سجل البصمة الخام

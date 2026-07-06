@@ -7,6 +7,7 @@ urlpatterns = [
     path('', views.hr_dashboard, name='hr_dashboard'),
     path('employees/add/', views.employee_create_view, name='employee_create'),
     path('employees/', views.employee_list, name='employee_list'),
+    path('employees/<int:employee_id>/edit/', views.employee_update_view, name='employee_update'),
     path('attendance/', views.attendance_list, name='attendance_list'),
     path('attendance/upload/', views.upload_and_process_attendance, name='upload_attendance'),
     path('leaves/', views.leave_list, name='leave_list'),

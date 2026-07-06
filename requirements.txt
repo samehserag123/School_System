@@ -41,3 +41,4 @@ gunicorn
 pandas
 qrcode
 pypdf
+opencv-python-headless

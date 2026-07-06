@@ -19,7 +19,7 @@ def monthly_payroll_report(request):
         month = int(request.GET.get('month', today.month))
         
         # 🚀 جلب الموظفين النشطين وترتيبهم
-        employees = Employee.objects.filter(is_active=True).select_related('attendance_rule').order_by('name')
+        employees = Employee.objects.filter(is_active=True).select_related('attendance_rule').order_by('id')
         
         # ⚡ الضربة القاضية للبطء: جلب كل سجلات الحضور للشهر ده في استعلام واحد فقط!
         all_attendances = DailyAttendance.objects.filter(date__year=year, date__month=month)
@@ -38,10 +38,8 @@ def monthly_payroll_report(request):
         total_company_net = 0.0
 
         for employee in employees:
-            # جلب سجلات الموظف من الذاكرة مباشرة بدون أي Query جديد
             emp_attendances = attendance_map.get(employee.id, [])
             
-            # حساب الإجماليات في الذاكرة (سريع جداً)
             total_overtime_hours = sum(float(a.overtime_hours or 0) for a in emp_attendances)
             total_deduction_hours = sum(float(a.deduction_hours or 0) for a in emp_attendances)
             total_absence_days = sum(1 for a in emp_attendances if a.status == 'absent')
@@ -53,13 +51,14 @@ def monthly_payroll_report(request):
             overtime_allowance = total_overtime_hours * hourly_rate
             late_deduction = total_deduction_hours * hourly_rate
             
-            absent_multiplier = 1.0
-            if employee.attendance_rule:
-                absent_multiplier = float(employee.attendance_rule.absent_deduction_days)
-                
+            absent_multiplier = float(employee.attendance_rule.absent_deduction_days) if employee.attendance_rule else 1.0
             absence_deduction = total_absence_days * day_rate * absent_multiplier
             
-            total_deductions = late_deduction + absence_deduction
+            # 🛡️ حساب الاستقطاع التأميني للموظف (إذا كان مؤمناً عليه)
+            insurance_monthly_deduction = float(employee.insurance_deduction) if employee.is_insured else 0.0
+            
+            # إضافة التأمينات لإجمالي الخصومات
+            total_deductions = late_deduction + absence_deduction + insurance_monthly_deduction
             net_salary = base_salary + overtime_allowance - total_deductions
             
             total_company_base += base_salary
@@ -72,6 +71,7 @@ def monthly_payroll_report(request):
                 'base_salary': base_salary,
                 'overtime_hours': total_overtime_hours,
                 'overtime_allowance': round(overtime_allowance, 2),
+                'insurance_deduction': round(insurance_monthly_deduction, 2), # تمرير التأمينات للتمبلت
                 'deductions': round(total_deductions, 2),
                 'net_salary': round(net_salary, 2),
             })
@@ -194,10 +194,23 @@ def calculate_monthly_salary(request, employee_id, year, month):
     late_deduction = total_deductions_hours * hourly_rate
     
     # خصم الغياب المباشر بناءً على معامل الغياب المخصص للموظف بقاعدته
-    absence_deduction = total_absence_days * day_rate * employee.attendance_rule.absent_deduction_days
+    absent_multiplier = float(employee.attendance_rule.absent_deduction_days) if employee.attendance_rule else 1.0
+    absence_deduction = total_absence_days * day_rate * absent_multiplier
     
-    # صافي الراتب النهائي بعد التسويات
-    net_salary = float(employee.base_salary) + overtime_allowance - late_deduction - absence_deduction
+    # 🛡️ محرك فحص واحتساب البيانات التأمينية المضافة حديثاً للموظف
+    if employee.is_insured:
+        ins_basic = float(employee.insurance_basic_salary or 0.0)
+        ins_allowance = float(employee.insurance_variable_allowance or 0.0)
+        ins_deduction = float(employee.insurance_deduction or 0.0)
+        ins_number = employee.insurance_number
+    else:
+        ins_basic = 0.0
+        ins_allowance = 0.0
+        ins_deduction = 0.0
+        ins_number = "غير مؤمن عليه"
+    
+    # صافي الراتب النهائي بعد التسويات وخصم الاستقطاع التأميني (حصة الموظف)
+    net_salary = float(employee.base_salary) + overtime_allowance - late_deduction - absence_deduction - ins_deduction
 
     context = {
         'employee': employee,
@@ -205,6 +218,14 @@ def calculate_monthly_salary(request, employee_id, year, month):
         'overtime_allowance': round(overtime_allowance, 2),
         'late_deduction': round(late_deduction, 2),
         'absence_deduction': round(absence_deduction, 2),
+        
+        # 🛡️ إرسال المتغيرات التأمينية الجديدة لكي تظهر في صفحة مفردات الراتب (payroll_slip.html)
+        'is_insured': employee.is_insured,
+        'insurance_number': ins_number,
+        'insurance_basic_salary': round(ins_basic, 2),
+        'insurance_variable_allowance': round(ins_allowance, 2),
+        'insurance_deduction': round(ins_deduction, 2),
+        
         'net_salary': round(net_salary, 2),
     }
     return render(request, 'hr/payroll_slip.html', context)
@@ -549,7 +570,7 @@ def leave_request_view(request):
         form = LeaveRequestForm()
         
     # جلب الموظفين النشطين لملء القائمة المنسدلة في التمبلت المكتوب يدويًا
-    employees = Employee.objects.filter(is_active=True).order_by('name')
+    employees = Employee.objects.filter(is_active=True).order_by('id')
     
     # جلب العداد لتحديث الجرس والقائمة الجانبية
     notification_count = LeaveRequest.objects.filter(status='pending').count()
@@ -585,3 +606,20 @@ def leave_reject(request, leave_id):
     except Exception as e:
         messages.error(request, f"خطأ أثناء الرفض: {str(e)}")
     return redirect('hr:leave_list')
+
+# أضف هذه الدالة في نهاية ملف views.py تماماً لكي تقرأ بيانات الموظف وتفتح له الفورم المخصص
+def employee_update_view(request, employee_id):
+    employee = Employee.objects.get(id=employee_id)
+    if request.method == 'POST':
+        # تمرير instance=employee يضمن التعديل على نفس الموظف بدلاً من إنشاء واحد جديد
+        form = EmployeeForm(request.POST, request.FILES, instance=employee)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'تم تحديث بيانات الموظف "{employee.name}" بنجاح!')
+            return redirect('hr:employee_list')
+        else:
+            messages.error(request, 'عذراً، يرجى مراجعة البيانات وتصحيح الأخطاء.')
+    else:
+        form = EmployeeForm(instance=employee)
+        
+    return render(request, 'hr/employee_form.html', {'form': form, 'employee': employee})

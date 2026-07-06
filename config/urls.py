@@ -6,6 +6,7 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from finance.views import MyLoginView
 from . import views 
+from students import views as student_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -22,6 +23,7 @@ urlpatterns = [
 
     path('api/v1/finance/', include('finance.api_urls')), 
     path('api/v1/students/', include('students.api_urls')),
+    
 ]
 
 # تفعيل الـ Debug Toolbar وملفات الميديا فقط في وضع DEBUG

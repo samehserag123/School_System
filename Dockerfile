@@ -2,8 +2,8 @@
 FROM python:3.12-slim
 
 # إعدادات لضمان ظهور رسائل الخطأ فوراً وسرعة التشغيل
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # تحديد مجلد العمل داخل الحاوية
 WORKDIR /app

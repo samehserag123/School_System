@@ -71,6 +71,13 @@ class Employee(models.Model):
     is_active = models.BooleanField(default=True, verbose_name="على رأس العمل حالياً")
     base_salary = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="الراتب الأساسي التعاقدي")
     
+    # 🛡️ --- قسم البيانات التأمينية --- 🛡️
+    is_insured = models.BooleanField(default=False, verbose_name="خاضع للتأمينات الاجتماعية؟")
+    insurance_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="الرقم التأميني")
+    insurance_basic_salary = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="الأجر الأساسي التأميني")
+    insurance_variable_allowance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="البدلات التأمينية / الأجر المتغير")
+    insurance_deduction = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="قيمة الاستقطاع التأميني (حصة الموظف)")
+    
     # رصيد الإجازات الفعلي التراكمي
     annual_balance = models.FloatField(default=21.0, verbose_name="رصيد الإجازات السنوية")
     casual_balance = models.FloatField(default=7.0, verbose_name="رصيد الإجازات العارضة")

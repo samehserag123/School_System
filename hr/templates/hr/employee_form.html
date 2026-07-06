@@ -4,7 +4,7 @@
 {% block header_title %}تسجيل موظف جديد{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto space-y-6">
+<div class="max-w-4xl mx-auto space-y-6">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
         
         <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
@@ -12,12 +12,12 @@
                 <i data-lucide="user-plus" class="w-6 h-6"></i>
             </div>
             <div>
-                <h3 class="text-base font-bold text-slate-800">بيانات الموظف الأساسية</h3>
-                <p class="text-xs text-slate-500 mt-0.5">يرجى إدخال الملف التعريفي للموظف الجديد لربطه بالحسابات المالية وجهاز البصمة.</p>
+                <h3 class="text-base font-bold text-slate-800">الملف التعريفي والمالي للموظف</h3>
+                <p class="text-xs text-slate-500 mt-0.5">يرجى إدخال البيانات الأساسية ثم تحديد الموقف التأميني للموظف لربطه بمحرك الرواتب.</p>
             </div>
         </div>
 
-        <form method="POST" action="" enctype="multipart/form-data" onsubmit="activateLoadingButton(this.querySelector('button[type=\'submit\']'))" class="p-6 space-y-5">
+        <form method="POST" action="" enctype="multipart/form-data" onsubmit="activateLoadingButton(this.querySelector('button[type=\'submit\']'))" class="p-6 space-y-6">
             {% csrf_token %}
 
             {% if form.non_field_errors %}
@@ -28,28 +28,78 @@
                 </div>
             {% endif %}
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {% for field in form %}
-                    <div class="flex flex-col gap-1.5 {% if field.name == 'notes' or field.name == 'address' %}sm:col-span-2{% endif %}">
-                        <label class="text-sm font-bold text-slate-700">
-                            {{ field.label }}
-                            {% if field.field.required %}<span class="text-rose-500">*</span>{% endif %}
-                        </label>
-                        
-                        <div class="relative">
-                            {{ field }}
-                        </div>
+            <!-- 🏛️ القسم الأول: البيانات الإدارية والتعاقدية -->
+            <div>
+                <h4 class="text-sm font-bold text-primary mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                    <i data-lucide="briefcase" class="w-4 h-4"></i> البيانات الوظيفية والراتب الأساسي
+                </h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {% for field in form %}
+                        {% if field.name == 'emp_id' or field.name == 'name' or field.name == 'department' or field.name == 'attendance_rule' or field.name == 'base_salary' or field.name == 'is_active' %}
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-sm font-bold text-slate-700">
+                                    {{ field.label }}
+                                    {% if field.field.required %}<span class="text-rose-500">*</span>{% endif %}
+                                </label>
+                                <div class="relative flex items-center">
+                                    {{ field }}
+                                </div>
+                                {% if field.errors %}
+                                    <p class="text-xs text-rose-600 font-bold mt-0.5">{{ field.errors.0 }}</p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
 
-                        {% if field.errors %}
-                            <p class="text-xs text-rose-600 font-bold mt-0.5">{{ field.errors.0 }}</p>
+            <!-- 🛡️ القسم الثاني: البيانات التأمينية (يظهر بشكل منفصل واحترافي) -->
+            <div class="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
+                <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="shield-check" class="text-emerald-600 w-5 h-5"></i> القسم التأميني والبدلات
+                </h4>
+                
+                <!-- حقل الاختيار (خاضع للتأمين أم لا) -->
+                <div class="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl max-w-xs shadow-sm">
+                    {{ form.is_insured }}
+                    <label for="{{ form.is_insured.id_for_label }}" class="text-sm font-bold text-slate-700 cursor-pointer">
+                        {{ form.is_insured.label }}
+                    </label>
+                </div>
+
+                <!-- شبكة الحقول التأمينية الأخرى -->
+                <div id="insurance-fields-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    {% for field in form %}
+                        {% if field.name == 'insurance_number' or field.name == 'insurance_basic_salary' or field.name == 'insurance_variable_allowance' or field.name == 'insurance_deduction' %}
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-sm font-bold text-slate-700">
+                                    {{ field.label }}
+                                </label>
+                                <div class="relative">
+                                    {{ field }}
+                                </div>
+                                {% if field.errors %}
+                                    <p class="text-xs text-rose-600 font-bold mt-0.5">{{ field.errors.0 }}</p>
+                                {% endif %}
+                            </div>
                         {% endif %}
-                        {% if field.help_text %}
-                            <p class="text-xs text-slate-400 font-medium">{{ field.help_text }}</p>
-                        {% endif %}
-                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 📋 القسم الثالث: أرصدة الإجازات وبقية الحقول التراكمية إن وُجدت -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {% for field in form %}
+                    {% if field.name == 'annual_balance' or field.name == 'casual_balance' or field.name == 'sick_balance' %}
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-sm font-bold text-slate-700">{{ field.label }}</label>
+                            <div>{{ field }}</div>
+                        </div>
+                    {% endif %}
                 {% endfor %}
             </div>
 
+            <!-- أزرار التحكم -->
             <div class="border-t border-slate-100 pt-4 flex justify-end gap-3">
                 <a href="{% url 'hr:employee_list' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all text-sm">
                     إلغاء
@@ -65,12 +115,33 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // 1. تطبيق تنسيق التصميم الموحد على جميع الحقول عدا التشيك بوكس
         const inputs = document.querySelectorAll('form input, form select, form textarea');
         inputs.forEach(input => {
             if (input.type !== 'checkbox' && input.type !== 'radio') {
                 input.className = "w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-white";
+            } else if (input.type === 'checkbox' && input.name === 'is_insured') {
+                // تنسيق جميل ومخصص لتشيك بوكس التأمينات
+                input.className = "w-5 h-5 text-primary focus:ring-primary border-slate-300 rounded cursor-pointer";
             }
         });
+
+        // 2. ⚡ حركة ديناميكية ذكية: إخفاء حقول التأمينات إذا كان الموظف غير خاضع للتأمين، وإظهارها فوراً عند تفعيله
+        const isInsuredCheckbox = document.querySelector('input[name="is_insured"]');
+        const insuranceGrid = document.getElementById('insurance-fields-grid');
+        
+        if (isInsuredCheckbox && insuranceGrid) {
+            function toggleInsuranceFields() {
+                if (isInsuredCheckbox.checked) {
+                    insuranceGrid.style.display = 'grid';
+                } else {
+                    insuranceGrid.style.display = 'none';
+                }
+            }
+            // تشغيل الفحص عند تحميل الصفحة وعند التغيير
+            toggleInsuranceFields();
+            isInsuredCheckbox.addEventListener('change', toggleInsuranceFields);
+        }
     });
 </script>
 {% endblock %}

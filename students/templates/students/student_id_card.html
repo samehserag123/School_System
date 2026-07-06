@@ -6,29 +6,30 @@
     <title>كارنيه الطالب | {{ student.get_full_name }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* 🎛️ لوحة تحكم المعايرة الدقيقة لطابعات الـ PVC - غير الأصفار أدناه لحل مشكلة ترحيل الظهر */
+        /* 🎛️ لوحة تحكم المعايرة الدقيقة لطابعات الـ PVC */
         :root {
-            --back-shift-x: -0.4cm; /* الإزاحة الأفقية للظهر (يمين/يسار) - مثال: 0.2cm أو -0.2cm */
-            --back-shift-y: 0cm; /* الإزاحة الرأسية للظهر (أعلى/أسفل) - مثال: 0.1cm أو -0.1cm */
+            --back-shift-x: 0cm; 
+            --back-shift-y: 0cm; 
         }
 
         body { 
             font-family: 'Cairo', sans-serif; 
             background: #cbd5e1; 
             display: flex; 
-            flex-direction: column;
-            align-items: center; 
-            gap: 20px;
+            flex-direction: row; /* عرض الكارنيهين جنب بعض على الشاشة */
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 30px;
             padding: 40px 0;
             margin: 0; 
             -webkit-print-color-adjust: exact; 
             print-color-adjust: exact;
         }
 
-        /* حجم الكارنيه القياسي (CR80) بالعرض أثناء العرض على الشاشة */
+        /* 🟢 الأبعاد الجديدة للطول (العرض 5.4 والطول 8.6) */
         .id-card {
-            width: 8.6cm;
-            height: 5.4cm;
+            width: 5.4cm;
+            height: 8.6cm;
             background: #ffffff;
             border: 2px solid #94a3b8;
             border-radius: 8px;
@@ -52,15 +53,14 @@
             }
             .id-card { 
                 box-shadow: none !important; 
-                border: none !important; /* 🔴 مسح الإطارات كلياً يمنع انزلاق الرولات الميكانيكية */
+                border: none !important; 
                 border-radius: 0 !important;
                 page-break-after: always; 
                 margin: 0 !important; 
-                width: 8.6cm !important;
-                height: 5.4cm !important;
+                width: 5.4cm !important;
+                height: 8.6cm !important;
             }
             
-            /* 🔴 تدوير الظهر 180 درجة مع تطبيق مصفوفة الإزاحة الدقيقة لمعايرة النصف سنتيمتر */
             .back-side {
                 transform: rotate(180deg) translate(var(--back-shift-x), var(--back-shift-y));
                 transform-origin: center center;
@@ -69,19 +69,19 @@
             .no-print { display: none !important; }
             
             @page {
-                size: 8.6cm 5.4cm; /* مطابقة كاملة لأبعاد بطاقة الـ PVC الحقيقية */
+                size: 5.4cm 8.6cm; /* أبعاد الطباعة بالطول */
                 margin: 0;
             }
         }
 
         /* =========================================
-           تصميم الوجه الأمامي (Front - بالعرض)
+           تصميم الوجه الأمامي (Front - بالطول)
            ========================================= */
         .front-header {
             background: #1e3a8a;
             color: #ffffff;
-            padding: 4px 10px;
-            font-size: 10pt;
+            padding: 6px 5px;
+            font-size: 9pt;
             font-weight: 800;
             text-align: center;
             border-bottom: 2px solid #f59e0b;
@@ -89,13 +89,14 @@
 
         .front-body {
             display: flex;
-            flex-direction: row;
-            padding: 5px 10px;
-            gap: 10px;
+            flex-direction: column; /* الترتيب أصبح عمودي */
+            padding: 8px 10px;
+            gap: 8px;
             flex-grow: 1;
-            align-items: center;
+            align-items: center; /* توسيط العناصر */
         }
 
+        /* تعديل حجم ومكان الصورة لتناسب الطول */
         .photo-container {
             width: 2.2cm;
             height: 2.6cm;
@@ -114,27 +115,28 @@
         }
 
         .details-container {
-            flex-grow: 1;
+            width: 100%;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
         }
 
         .student-name {
-            font-size: 11pt;
+            font-size: 10pt;
             font-weight: 800;
             color: #0f172a;
-            margin: 0 0 5px 0;
+            margin: 0 0 8px 0;
             line-height: 1.2;
+            text-align: center; /* توسيط الاسم */
         }
 
         .info-row {
             display: flex;
             justify-content: space-between;
-            font-size: 9pt;
+            font-size: 8.5pt;
             font-weight: 700;
             color: #334155;
-            margin-bottom: 3px;
+            margin-bottom: 4px;
             border-bottom: 1px dashed #cbd5e1;
             padding-bottom: 2px;
         }
@@ -144,7 +146,7 @@
         .front-footer {
             background: #f1f5f9;
             text-align: center;
-            padding: 3px;
+            padding: 4px;
             font-size: 7pt;
             font-weight: 700;
             color: #64748b;
@@ -152,12 +154,12 @@
         }
 
         /* =========================================
-           تصميم الوجه الخلفي (Back - بالعرض)
+           تصميم الوجه الخلفي (Back - بالطول)
            ========================================= */
         .back-header {
             background: #2563eb;
             color: white;
-            padding: 6px 5px;
+            padding: 8px 5px;
             font-size: 9pt;
             font-weight: 800;
             text-align: center;
@@ -178,8 +180,8 @@
         }
 
         .qr-code {
-            width: 80px; 
-            height: 80px;
+            width: 90px; /* تكبير الـ QR قليلاً لوجود مساحة طولية */
+            height: 90px;
         }
 
         .qr-serial {
@@ -187,23 +189,23 @@
             font-size: 11pt;
             font-weight: 900;
             color: #0f172a;
-            margin-top: 3px;
+            margin-top: 8px;
             letter-spacing: 2px;
         }
 
         /* =========================================
            أزرار التحكم
            ========================================= */
-        .controls { text-align: center; margin-bottom: 10px; }
+        .controls-wrapper { width: 100%; text-align: center; margin-bottom: 10px; }
         .btn { padding: 10px 25px; font-size: 12pt; font-family: 'Cairo'; font-weight: bold; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
 
-    <div class="controls no-print">
+    <div class="controls-wrapper no-print">
         <button onclick="window.print()" class="btn">🖨️ طباعة الكارنيه (وش وظهر)</button>
         <p style="font-size: 10pt; color: #475569; margin-top: 5px; font-weight: bold;">
-            💡 تأكد من اختيار "Print on both sides" أو "Two-sided" من إعدادات الطابعة
+            💡 التصميم أصبح بالطول (Portrait) - تأكد من إعدادات الطابعة
         </p>
     </div>
 
@@ -213,28 +215,41 @@
         </div>
         
         <div class="front-body">
-            <div class="details-container">
-                <p class="student-name">{{ student.get_full_name }}</p>
-                <div class="info-row">
-                    <span class="label">الصف:</span>
-                    <span>{{ student.grade.name }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">العام:</span>
-                    <span>{{ student.academic_year.name|default:"2025/2026" }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">الديانة:</span>
-                    <span>{{ student.get_religion_display }}</span>
-                </div>
-            </div>
-
             <div class="photo-container">
                 {% if student.image %}
                     <img src="{{ student.image.url }}" alt="صورة الطالب">
                 {% else %}
                     <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="صورة">
                 {% endif %}
+            </div>
+
+            <div class="details-container">
+                <p class="student-name">{{ student.get_full_name }}</p>
+                <div class="info-row">
+                    <span class="label">الصف:</span>
+                    <span>{{ student.grade.name|default:"غير محدد" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">التخصص:</span>
+                    <span>
+                        {% if student.specialization %}
+                            {{ student.get_specialization_display }}
+                        {% else %}
+                            شعبة عامة
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <div class="info-row">
+                    <span class="label">العام:</span>
+                    <span>
+                        {% if student.academic_year %}
+                            {{ student.academic_year.name }}
+                        {% else %}
+                            2025/2026
+                        {% endif %}
+                    </span>
+                </div>
             </div>
         </div>
 

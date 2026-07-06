@@ -14,6 +14,8 @@ urlpatterns = [
     path('attendance/re-enroll/', views.manage_reenrollments_view, name='manage_reenrollments'),
     # رابط تقرير الغياب والحضور
     path('attendance/report/', views.attendance_report_view, name='attendance_report'),
+    path('scanner/', views.security_scanner_view, name='security_scanner'),
+    path('api/qr-attendance/', views.api_record_qr_attendance, name='api_record_qr_attendance'),
     # 🟢 روابط تقارير الـ PDF الذكية
     path('reports/class-roster/', views.report_class_roster_view, name='report_class_roster'),
     path('reports/student-registry/', views.report_student_registry_view, name='report_student_registry'),
