@@ -1,7 +1,7 @@
 # students/urls.py (أو الملف الذي تدير فيه الروابط المالية)
 from django.urls import path
 from . import views
-from students.views import get_pending_sales_api 
+from students.views import get_pending_sales_api
 
 urlpatterns = [
     # ... الروابط الموجودة مسبقاً ...
@@ -16,6 +16,7 @@ urlpatterns = [
     path('attendance/report/', views.attendance_report_view, name='attendance_report'),
     path('scanner/', views.security_scanner_view, name='security_scanner'),
     path('api/qr-attendance/', views.api_record_qr_attendance, name='api_record_qr_attendance'),
+    path('students/gate-block/save/', views.save_student_gate_block, name='save_student_gate_block'),
     # 🟢 روابط تقارير الـ PDF الذكية
     path('reports/class-roster/', views.report_class_roster_view, name='report_class_roster'),
     path('reports/student-registry/', views.report_student_registry_view, name='report_student_registry'),
@@ -24,11 +25,11 @@ urlpatterns = [
     path('exam/marks/record/', views.record_exam_marks_view, name='record_marks'),
     # 4. رابط التقرير الأكاديمي النهائي لفرز الطلاب (ناجح / دور ثاني / راسب)
     path('academic/report/final/', views.academic_final_report_view, name='academic_final_report'),
-    
+
     path('overdue-calls/', views.overdue_installments_list, name='overdue_calls'),
     # 🟢 أضف هذا الرابط إذا لم يكن موجوداً في ملف urls آخر
     # ملاحظة: تأكد من وجود دالة باسم add_ledger_entry في views.py
-    path('treasury/add/', views.add_ledger_entry, name='add_ledger_entry'), 
+    path('treasury/add/', views.add_ledger_entry, name='add_ledger_entry'),
 
     path('course-prices/', views.course_prices_view, name='course_prices'),
     path('mark-session/<int:enrollment_id>/', views.mark_session_attendance, name='mark_session_attendance'),
@@ -36,11 +37,11 @@ urlpatterns = [
     # students/urls.py
     path('student-analytics/<int:student_id>/', views.student_detail_analytics, name='student_analytics_detail'),
     path('students/analytics/', views.students_analytics_view, name='students_analytics'),
-    
+
     path('bus-dashboard/', views.bus_dashboard_view, name='bus_dashboard'),
-    
+
     path('misc-revenue/', views.misc_revenue_view, name='misc_revenue'),
-    
+
     path('sales/', views.book_sales_list, name='book_sales_list'),
     path('sales/add/', views.add_book_sale, name='add_book_sale'),
     path('sales/print/<int:sale_id>/', views.print_receipt_view, name='print_book_receipt'),
@@ -50,17 +51,17 @@ urlpatterns = [
     path('students/api/get-pending-sales/<int:student_id>/', get_pending_sales_api, name='get_pending_sales_api'),
     path('collect-fee/<int:enrollment_id>/', views.collect_fee_view, name='collect_fee'),
     path('remedial/add/', views.add_remedial_program, name='add_remedial_program'),
-    
+
     path('remedial/dashboard/', views.manage_remedial_dashboard, name='remedial_dashboard'),
-    
+
     path('remedial/save-quick/', views.save_remedial_from_registry, name='save_remedial_from_registry'),
 
     # 2. مسار API عملية السداد المباشر (الذي يتم استدعاؤه عند الضغط على زر "سداد الآن")
     path('api/remedial/pay/<int:record_id>/', views.pay_remedial_record, name='pay_remedial_record'),
-    
+
     # 🟢 روابط نظام الحضور الذكي (QR Code)
     path('student/card/<str:student_code>/', views.student_id_card_view, name='student_id_card'),
     path('security/scanner/', views.security_scanner_view, name='security_scanner'),
     path('api/qr-attendance/', views.api_record_qr_attendance, name='api_record_qr_attendance'),
-   
+
 ]

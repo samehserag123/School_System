@@ -35,7 +35,7 @@ ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.s
 # إضافة روابط Cloudflare تلقائياً
 if '.trycloudflare.com' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('.trycloudflare.com')
-    
+
 # إضافة الـ IP المحلي الحالي لتتمكن من الفتح من الموبايل
 if '192.168.147.93' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('192.168.147.93')
@@ -43,7 +43,7 @@ if '192.168.147.93' not in ALLOWED_HOSTS:
 # تأمين أخير لبيئة التطوير المحلية (يقبل أي اتصال)
 if '*' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('*')
-    
+
 # السماح لروابط Cloudflare المتغيرة بالتعامل مع النماذج وتسجيل الدخول
 CSRF_TRUSTED_ORIGINS = ["https://*.trycloudflare.com"]
 
@@ -86,13 +86,13 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    
+
 ]
 
 if DEBUG:
     # إضافتها في نهاية القائمة تماماً بكل أمان
     MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
-    
+
 
 ROOT_URLCONF = 'config.urls'
 
@@ -103,7 +103,7 @@ TEMPLATES = [
             BASE_DIR / "templates",  # المسار العام
             BASE_DIR / "students/templates/students/books",  # لو عايز Django يشوف القوالب مباشرة هنا
         ],
-        
+
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -121,11 +121,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 if os.environ.get('PYTHONANYWHERE_SITE'):
-    # قاعدة البيانات المجانية والسهلة للسيرفر السحابي
+    # قاعدة البيانات الحية للمدرسة على السيرفر السحابي - MySQL
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'sameh123$talaat_harb',
+            'USER': 'sameh123',
+            'PASSWORD': 'w2y_wyt_i.ant@d',
+            'HOST': 'sameh123.mysql.pythonanywhere-services.com',
         }
     }
 else:
@@ -144,7 +147,7 @@ else:
 db_from_env = dj_database_url.config(conn_max_age=600)
 if db_from_env:
     DATABASES['default'].update(db_from_env)
-    
+
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 

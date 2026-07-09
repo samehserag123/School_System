@@ -17,7 +17,7 @@ TERM_CHOICES = [
 ]
 
 MONTH_CHOICES = [
-    ('10', 'أكتوبر'), ('11', 'نوفمبر'), ('12', 'ديسمبر'), 
+    ('10', 'أكتوبر'), ('11', 'نوفمبر'), ('12', 'ديسمبر'),
     ('2', 'فبراير'), ('3', 'مارس'), ('4', 'أبريل'),
 ]
 
@@ -28,7 +28,7 @@ class AttendanceRecord(models.Model):
         ('absent', 'غائب'),
         ('excused', 'غياب بعذر'),
     ]
-    
+
     student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='attendances', verbose_name="الطالب")
     academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
     date = models.DateField("تاريخ اليوم", default=timezone.now)
@@ -57,22 +57,22 @@ class ReEnrollmentRecord(models.Model):
     reenrollment_date = models.DateField("تاريخ إعادة القيد", blank=True, null=True)
     status = models.CharField("الحالة", max_length=20, choices=STATUS_CHOICES, default='dismissed')
     fee_paid = models.BooleanField("تم دفع رسوم الإعادة؟", default=False)
-    
+
     class Meta:
         verbose_name = "سجل إعادة قيد"
         verbose_name_plural = "سجلات إعادة القيد"
 
     def __str__(self):
         return f"{self.student.get_full_name()} - {self.get_status_display()}"
-    
-    
-    
+
+
+
 # --- 3. إعدادات المادة (توسيع لموديل Subject الحالي) ---
 class SubjectConfig(models.Model):
     subject = models.OneToOneField('Subject', on_delete=models.CASCADE, verbose_name="المادة")
     academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
     grade = models.ForeignKey('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
-    
+
     # توزيع الدرجات
     max_cultural = models.DecimalField("النهاية العظمى (ثقافي)", max_digits=5, decimal_places=2, default=50)
     max_practical = models.DecimalField("النهاية العظمى (عملي)", max_digits=5, decimal_places=2, default=50)
@@ -98,14 +98,14 @@ class ExamResult(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='exam_results', verbose_name="الطالب")
     subject = models.ForeignKey('Subject', on_delete=models.CASCADE, verbose_name="المادة")
     academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
-    
+
     exam_type = models.CharField("نوع الامتحان", max_length=20, choices=EXAM_TYPES, default='term')
     term = models.CharField("الترم", max_length=20, choices=TERM_CHOICES)
     month = models.CharField("الشهر (للامتحانات الشهرية)", max_length=10, choices=MONTH_CHOICES, blank=True, null=True)
-    
+
     cultural_score = models.DecimalField("درجة النظري (ثقافي)", max_digits=5, decimal_places=2, default=0)
     practical_score = models.DecimalField("درجة العملي", max_digits=5, decimal_places=2, default=0)
-    
+
     is_absent = models.BooleanField("غائب في الامتحان؟", default=False)
 
     class Meta:
@@ -123,8 +123,8 @@ class ExamResult(models.Model):
     def __str__(self):
         exam_name = self.get_month_display() if self.exam_type == 'month' else self.get_term_display()
         return f"{self.student.first_name} - {self.subject.name} - {exam_name}"
-    
-    
+
+
 class SystemSettings(models.Model):
     is_admission_open = models.BooleanField(default=True, verbose_name="فتح باب التقديم (إظهار زر الإضافة)")
 
@@ -134,13 +134,13 @@ class SystemSettings(models.Model):
 
     def __str__(self):
         return "حالة التقديم"
-    
-    
+
+
 
 numbers_only = RegexValidator(
     regex=r'^\d+$',
     message='يجب إدخال أرقام فقط.'
-) 
+)
 class Grade(models.Model):
     name = models.CharField("اسم الصف", max_length=100)
 
@@ -175,9 +175,9 @@ class Student(models.Model):
     GENDER_CHOICES = [('Male', 'بنين'), ('Female', 'بنات')]
     SPECIALIZATION_CHOICES = [
         ("General", "شعبة عامة"), ("Restaurant", "فني مضيف"), ("Kitchen", "فن طاهي"),
-        ("Internal", " مشرف غرف"), 
+        ("Internal", " مشرف غرف"),
     ]
-    
+
     phone_validator = RegexValidator(
         regex=r'^01[0-9]{9}$',
         message="يجب إدخال رقم موبايل مصري صحيح مكون من 11 رقم"
@@ -189,7 +189,7 @@ class Student(models.Model):
     registration_number = models.CharField("رقم القيد", max_length=50, blank=True, null=True)
     first_name = models.CharField("الاسم الأول", max_length=100, db_index=True)
     last_name = models.CharField("اسم العائلة", max_length=100, db_index=True)
-    
+
     # 1. إضافة الرقم القومي مع التحقق (14 رقم فقط)
     national_id_validator = RegexValidator(
         regex=r'^\d{14}$',
@@ -206,7 +206,7 @@ class Student(models.Model):
     # --- البيانات الشخصية ---
     date_of_birth = models.DateField("تاريخ الميلاد", null=True, blank=True)
     birth_place = models.CharField("محل الميلاد", max_length=150, blank=True, null=True)
-    
+
     # إضافة null و blank للنوع
     gender = models.CharField("النوع", max_length=10, choices=GENDER_CHOICES, null=True, blank=True, db_index=True)
     religion = models.CharField("الديانة", max_length=20, choices=RELIGION_CHOICES, null=True, blank=True, db_index=True)
@@ -226,21 +226,27 @@ class Student(models.Model):
     # --- الحالة الأكاديمية ---
     # جعل حالة القيد اختيارية
     enrollment_status = models.CharField("حالة القيد", max_length=20, choices=STATUS_CHOICES, null=True, blank=True)
-    
+
     # الدمج (BooleanField يفضل أن يكون له default لكن وضعنا null=True ليكون اختيارياً تماماً)
     integration_status = models.BooleanField("موقف الدمج", default=False, null=True, blank=True, db_index=True)
-    
+
     specialization = models.CharField("التخصص", max_length=30, choices=SPECIALIZATION_CHOICES, blank=True, null=True, db_index=True)
     previous_debt = models.DecimalField("مديونية سابقة مرحلة", max_digits=10, decimal_places=2, default=0)
     last_promotion_date = models.DateField(null=True, blank=True)
-    
+
     grade = models.ForeignKey("students.Grade", on_delete=models.PROTECT, null=True, verbose_name="الصف الدراسي")
-    classroom = models.ForeignKey("students.Classroom", on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الفصل")    
+    classroom = models.ForeignKey("students.Classroom", on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الفصل")
     academic_year = models.ForeignKey("finance.AcademicYear", on_delete=models.CASCADE, verbose_name="السنة الدراسية", related_name="students")
 
     is_active = models.BooleanField("نشط", default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
+    # حقول الحظر الذكي لبوابة الأمن
+    is_blocked_at_gate = models.BooleanField("محظور من الدخول يدوياً", default=False)
+    gate_block_reason = models.CharField("سبب حظر البوابة", max_length=255, blank=True, null=True)
+    gate_blocked_from = models.DateField("تاريخ بدء الحظر", null=True, blank=True)
+    gate_blocked_to = models.DateField("تاريخ نهاية الحظر", null=True, blank=True)
+
     class Meta:
         ordering = ["-created_at"]
         verbose_name = "طالب"
@@ -262,7 +268,7 @@ class Student(models.Model):
         from decimal import Decimal
         from django.db.models import Sum
         from finance.models import Payment  # استيراد الموديل مباشرة
-        
+
         # 1. المديونية القديمة
         old_debt = Decimal(str(self.previous_debt or 0))
 
@@ -278,14 +284,14 @@ class Student(models.Model):
 
         remaining = (old_debt + total_fees_all_years) - total_paid_ever
         return max(remaining, Decimal('0.00'))
-    
-    
+
+
     def get_full_name(self):
         # معالجة آمنة للحقول الفارغة لمنع ظهور None
         first = self.first_name if self.first_name else ""
         last = self.last_name if self.last_name else ""
         full = f"{first} {last}".strip()
-        
+
         # إذا كان الاسم فارغاً، نرجع كود الطالب
         return full if full else f"طالب رقم {self.student_code}"
 
@@ -303,16 +309,16 @@ class Student(models.Model):
             code = f"{year_prefix}{random_num}"
             if not Student.objects.filter(student_code=code).exists():
                 return code
-    
-    
+
+
     @property
     def total_required_amount(self):
         # ❌ متضيفش previous_debt هنا
         return self.current_year_fees_amount
         # 1. إجمالي المطلوب (السنة دي + المديونية اللي اترحلّت في الحقل)
-    
-    
-    
+
+
+
     @property
     def current_year_paid(self):
         from finance.models import Payment
@@ -321,12 +327,12 @@ class Student(models.Model):
             student=self,
             academic_year=self.academic_year # شرط السنة الحالية
         ).filter(
-            Q(revenue_category__name__icontains="اساس") | 
+            Q(revenue_category__name__icontains="اساس") |
             Q(revenue_category__name__icontains="مصروف")
         ).aggregate(total=Sum('amount_paid'))['total'] or 0
         return Decimal(str(total))
 
-    
+
     # students/models.py
 
     @property
@@ -334,7 +340,7 @@ class Student(models.Model):
         from decimal import Decimal
         # 1. المديونية المرحلة (القديمة)
         old_debt = Decimal(str(self.previous_debt or 0))
-        
+
         # 2. صافي مصاريف السنة الحالية (المصاريف - الخصم)
         acc = self.accounts.filter(academic_year=self.academic_year).last()
         current_fees = Decimal('0.00')
@@ -343,7 +349,7 @@ class Student(models.Model):
             current_fees = Decimal(str(acc.total_fees or 0)) - Decimal(str(acc.discount or 0))
 
         # 3. إجمالي المدفوعات المسجلة للسنة الحالية
-        total_paid = self.current_year_paid 
+        total_paid = self.current_year_paid
 
         # المعادلة: (قديم + جديد) - مدفوع
         remaining = (old_debt + current_fees) - total_paid
@@ -358,9 +364,9 @@ class Student(models.Model):
             from decimal import Decimal
 
             return max(Decimal('0.00'), Decimal(str(self.previous_debt or 0)))
-    
-         
-        
+
+
+
     @property
     def total_balance_due(self):
         from decimal import Decimal
@@ -373,8 +379,8 @@ class Student(models.Model):
         ).aggregate(total=Sum('amount_paid'))['total'] or 0
 
         return total_required - Decimal(str(current_year_paid))
-    
-        
+
+
     @property
     def current_year_fees_amount(self):
         """جلب إجمالي المصروفات المطلوبة من حساب الطالب للسنة الحالية"""
@@ -383,11 +389,11 @@ class Student(models.Model):
 
         # البحث عن حساب الطالب المرتبط بالسنة الدراسية الحالية
         account = self.accounts.filter(academic_year=self.academic_year).first()
-        
+
         if account:
             # نستخدم Decimal لضمان دقة الحسابات المالية ومنع أخطاء التقريب
             return Decimal(str(account.total_fees or 0))
-        
+
         # لو الطالب مش متسكن له حساب، نرجع صفر عشان السيستم ما يضربش
         return Decimal("0.00")
 
@@ -402,8 +408,8 @@ class Student(models.Model):
     @property
     def current_account(self):
         return self.accounts.filter(academic_year=self.academic_year).first()
-    
-   
+
+
 # ----------------------------------------------------------------
 # الجداول الجديدة: المدرسين، المواد، والكورسات
 # ----------------------------------------------------------------
@@ -428,18 +434,18 @@ class RemedialProgramRecord(models.Model):
     subjects_count = models.PositiveIntegerField(default=1, verbose_name="عدد المواد المتخلف عنها")
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="إجمالي الرسوم المطلوبة")
     is_paid = models.BooleanField(
-        default=False, 
-        verbose_name="تم السداد؟", 
+        default=False,
+        verbose_name="تم السداد؟",
         db_index=True  # 🟢 إضافة الفهرس هنا لتسريع فلترة المسدد وغير المسدد
     )
     notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات")
-    
+
     created_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, verbose_name="مسجل البيان")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.student.get_full_name()} - {self.subjects_count} مواد"    
-    
+        return f"{self.student.get_full_name()} - {self.subjects_count} مواد"
+
 class Teacher(models.Model):
     name = models.CharField("اسم المدرس", max_length=150)
     phone = models.CharField("رقم الهاتف", max_length=20, validators=[numbers_only], blank=True, null=True)
@@ -481,12 +487,12 @@ class InventoryItem(models.Model):
         ('book', 'كتاب دراسي'),
         ('uniform', 'زي مدرسي'),
     ]
-    
+
     item_type = models.CharField("نوع الصنف", max_length=10, choices=ITEM_TYPE_CHOICES, default='book')
     subject = models.ForeignKey('Subject', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="المادة (للكتب)")
     uniform = models.ForeignKey('Uniform', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الزي (للملابس)")
-    grade = models.ForeignKey('Grade', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الصف الدراسي")    
-    
+    grade = models.ForeignKey('Grade', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الصف الدراسي")
+
     # ⚠️ هذا الحقل يمثل الرصيد الذي بدأت به (الافتتاحي) ولن ينقص أبداً
     stock_quantity = models.PositiveIntegerField("الرصيد الافتتاحي", default=0)
 
@@ -526,7 +532,7 @@ class InventoryItem(models.Model):
     def __str__(self):
         # استخدام display_name الجديد لتعريف الكائن
         return f"{self.display_name} - {self.grade.name if self.grade else 'عام'}"
-            
+
 
 # سجل عمليات التوريد (الوارد)
 class InventoryRestock(models.Model):
@@ -537,15 +543,15 @@ class InventoryRestock(models.Model):
 
     def __str__(self):
         return f"وارد: {self.quantity} لـ {self.item}"
-    
-    
+
+
 # 4. أسعار الباقات المالية لكل صف
 class GradePackagePrice(models.Model):
     academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="السنة الدراسية")
     grade = models.ForeignKey('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
     books_price = models.DecimalField("سعر باقة الكتب الإجمالي", max_digits=10, decimal_places=2, default=0)
     uniform_price = models.DecimalField("سعر باقة الزي الإجمالي", max_digits=10, decimal_places=2, default=0)
-    
+
     class Meta:
         # منع تكرار السعر لنفس الصف في نفس السنة
         unique_together = ('academic_year', 'grade')
@@ -591,18 +597,18 @@ class BookSale(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب")
     item = models.ForeignKey('InventoryItem', on_delete=models.CASCADE, verbose_name="الصنف")
     quantity = models.PositiveIntegerField("الكمية", default=1)
-    
+
     total_amount = models.DecimalField("الإجمالي المطلوب", max_digits=10, decimal_places=2, default=0)
-    
+
     # حقل "المبلغ المدفوع الآن" - يستخدم لاستلام المبلغ من شاشة الصرف مباشرة
     pay_now = models.DecimalField("المبلغ المدفوع الآن", max_digits=10, decimal_places=2, default=0)
-    
+
     status = models.CharField("حالة الحركة", max_length=20, choices=STATUS_CHOICES, default='pending')
-    
+
     is_delivered = models.BooleanField("تم الاستلام من المخزن؟", default=False)
-    
+
     sale_date = models.DateTimeField(
-        "تاريخ الحركة", 
+        "تاريخ الحركة",
         auto_now_add=True,
         db_index=True  # 🟢 إضافة الفهرس هنا لتسريع الـ ORDER BY
     )
@@ -628,14 +634,14 @@ class BookSale(models.Model):
     def save(self, *args, **kwargs):
         # 1. جلب الموظف الحالي (يتم تمريره من الـ View عبر _current_user)
         current_user = getattr(self, '_current_user', None)
-        
+
         # 2. حساب الإجمالي تلقائياً من باقة الصف إذا لم يتم إدخاله يدوياً
         if not self.total_amount:
             try:
                 # استيراد محلي لتجنب مشاكل الاعتماد الدائري
-                from .models import GradePackagePrice 
+                from .models import GradePackagePrice
                 package = GradePackagePrice.objects.get(
-                    grade=self.student.grade, 
+                    grade=self.student.grade,
                     academic_year=self.student.academic_year
                 )
                 # تحديد السعر بناءً على نوع الصنف (كتاب أم زي)
@@ -652,14 +658,14 @@ class BookSale(models.Model):
         if is_new and self.pay_now > 0:
             # استيراد الموديل المتاح فقط لتجنب ImportError الخاص بـ Category
             from treasury.models import GeneralLedger
-            
+
             # إنشاء قيد في الخزينة العامة
             GeneralLedger.objects.create(
                 student=self.student,
                 # تم إلغاء حقل category هنا لتجنب خطأ الاستيراد الذي واجهته
                 amount=self.pay_now,
                 # الربط السحري: نضع رقم الإذن في الملاحظات مسبوقاً بـ # ليقرأه الإيصال تلقائياً
-                notes=f"سداد آلي لإذن استلام رقم #{self.id}", 
+                notes=f"سداد آلي لإذن استلام رقم #{self.id}",
                 receipt_number=f"BS-{self.id}",
                 collected_by=current_user
             )
@@ -667,14 +673,14 @@ class BookSale(models.Model):
         # 5. تحديث الحالة النهائية للإذن بناءً على ما تم دفعه فعلياً في الخزينة
         # نستخدم calculated_paid_amount التي تبحث في الخزينة برقم الإذن #
         actual_paid = self.calculated_paid_amount
-        
+
         if actual_paid >= self.total_amount and self.total_amount > 0:
             new_status = 'delivered' if self.is_delivered else 'paid'
         elif actual_paid > 0:
             new_status = 'pending' # دفع جزئي
         else:
             new_status = 'pending' # لم يتم الدفع
-        
+
         # تحديث الحالة في قاعدة البيانات مباشرة لتجنب تكرار دالة save
         if new_status != self.status:
             type(self).objects.filter(id=self.id).update(status=new_status)
@@ -692,7 +698,7 @@ class BookSale(models.Model):
     def __str__(self):
         """تعريف الاسم الذي يظهر في لوحة التحكم"""
         return f"{self.student.get_full_name()} - {self.item.display_name}"
-    
+
 
 # models.py
 class ExternalStudent(models.Model):
@@ -703,28 +709,28 @@ class ExternalStudent(models.Model):
     def __str__(self):
         # سنضيف رقم الهاتف بجانب الاسم لتمييزهم في لوحة التحكم
         return f"{self.full_name} - {self.phone_number}"
-    
+
 class CourseGroup(models.Model):
     student = models.ForeignKey(
-        'Student', 
-        on_delete=models.CASCADE, 
+        'Student',
+        on_delete=models.CASCADE,
         null=True,  # 🟢 إضافة هذه
         blank=True, # 🟢 إضافة هذه
-        verbose_name="الطالب المدرسي", 
+        verbose_name="الطالب المدرسي",
         related_name="enrolled_courses"
     )
     # حقل الطالب الخارجي (الذي أضفناه سابقاً)
     external_student = models.ForeignKey(
-        'ExternalStudent', 
-        on_delete=models.CASCADE, 
-        null=True, 
-        blank=True, 
+        'ExternalStudent',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         verbose_name="الطالب الخارجي"
     )
     course_info = models.ForeignKey('SubjectPrice', on_delete=models.PROTECT, verbose_name="بيانات الكورس والسعر")
     registration_date = models.DateField("تاريخ الاشتراك", auto_now_add=True)
     notes = models.TextField("ملاحظات إضافية", blank=True, null=True)
-    required_amount = models.DecimalField("المبلغ المطلوب", max_digits=10, decimal_places=2, default=0.00) 
+    required_amount = models.DecimalField("المبلغ المطلوب", max_digits=10, decimal_places=2, default=0.00)
     total_sessions = models.PositiveIntegerField("إجمالي عدد الحصص المتفق عليها", default=8)
     # حقل اختياري لتحديد موعد البدء الفعلي
     start_date = models.DateField("تاريخ بدء الحصص", default=timezone.now)
@@ -734,41 +740,41 @@ class CourseGroup(models.Model):
         verbose_name_plural = "سجل اشتراكات الطلاب"
 
     # --- الدوال الحسابية والذكية ---
-    
+
     @property
     def total_paid(self):
         """يجمع كل المبالغ المدفوعة لهذا الكورس من جدول التحصيلات"""
-        return self.payments.aggregate(total=Sum('amount_paid'))['total'] or 0 
+        return self.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
     @property
     def remaining_amount(self):
         """يحسب المتبقي بناءً على المبلغ المطلوب فعلياً (المربوط بعدد الحصص)"""
-        return self.required_amount - self.total_paid 
+        return self.required_amount - self.total_paid
     @property
     def attended_sessions_count(self):
         """حساب عدد الحصص التي حضرها الطالب فعلياً"""
-        return self.sessions.filter(attendance_status='attended').count() 
+        return self.sessions.filter(attendance_status='attended').count()
     @property
     def remaining_sessions(self):
         """حساب عدد الحصص المتبقية للطالب بناءً على إجمالي الحصص المتفق عليها"""
-        return max(0, self.total_sessions - self.attended_sessions_count) 
+        return max(0, self.total_sessions - self.attended_sessions_count)
     @property
     def session_status_label(self):
         """تنبيه نصي بحالة الحصص لراحة المستخدم"""
-        rem = self.remaining_sessions 
+        rem = self.remaining_sessions
         if rem == 0:
-            return "انتهت الحصص (يجب التجديد) ⚠️" 
-        return f"متبقي {rem} حصة" 
+            return "انتهت الحصص (يجب التجديد) ⚠️"
+        return f"متبقي {rem} حصة"
     @property
     def payment_status(self):
         """تحديد حالة الدفع بناءً على المبلغ المطلوب المخصص"""
-        remaining = self.remaining_amount 
+        remaining = self.remaining_amount
         if remaining <= 0:
-            return "خالص ✅" 
-        return f"باقي {remaining} ج.م" 
+            return "خالص ✅"
+        return f"باقي {remaining} ج.م"
     def __str__(self):
         """تعديل لعرض اسم الطالب المدرسي أو الخارجي بشكل صحيح"""
-        # التحقق من وجود طالب مدرسي أولاً، وإلا استخدام اسم الطالب الخارجي 
-        student_name = self.student.get_full_name() if self.student else self.external_student.full_name 
+        # التحقق من وجود طالب مدرسي أولاً، وإلا استخدام اسم الطالب الخارجي
+        student_name = self.student.get_full_name() if self.student else self.external_student.full_name
         return f"{student_name} - {self.course_info.subject.name}"
 
 class StudentSession(models.Model):
@@ -809,9 +815,9 @@ class CoursePayment(models.Model):
 
     def __str__(self):
         return f"تحصيل {self.amount_paid} من {self.course_enrollment.student}"
-    
-    
-    
+
+
+
 # أضف هذه الدوال داخل كلاس Student في ملف models.py
     @property
     def book_sales_summary(self):
@@ -820,12 +826,12 @@ class CoursePayment(models.Model):
         total_required = sum(s.total_amount for s in sales)
         total_paid = sum(s.paid_amount for s in sales)
         pending_delivery = sales.filter(is_delivered=False, status='paid').count()
-        
+
         return {
             'total_due': total_required - total_paid,
             'pending_items_count': pending_delivery, # أشياء دفع ثمنها ولم يستلمها
         }
-        
+
 
 class BusRoute(models.Model):
     """جدول خطوط الباصات"""
@@ -834,7 +840,7 @@ class BusRoute(models.Model):
     driver_phone = models.CharField("هاتف السائق", max_length=20, blank=True, null=True)
     bus_number = models.CharField("رقم اللوحة", max_length=50, blank=True, null=True)
     capacity = models.PositiveIntegerField("سعة الباص (عدد الكراسي)", default=20)
-    
+
     # أسعار الخط (يمكن تركها 0 وتحديد السعر وقت الاشتراك)
     monthly_price = models.DecimalField("السعر الشهري", max_digits=10, decimal_places=2, default=0)
     term_price = models.DecimalField("سعر التيرم", max_digits=10, decimal_places=2, default=0)
@@ -865,10 +871,10 @@ class BusSubscription(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب", related_name="bus_subscriptions")
     route = models.ForeignKey(BusRoute, on_delete=models.PROTECT, verbose_name="خط الباص", related_name="subscriptions")
     sub_type = models.CharField("نوع الاشتراك", max_length=20, choices=SUBSCRIPTION_TYPES, default='monthly')
-    
+
     start_date = models.DateField("تاريخ بداية الاشتراك")
     end_date = models.DateField("تاريخ نهاية الاشتراك")
-    
+
     required_amount = models.DecimalField("المبلغ المطلوب", max_digits=10, decimal_places=2)
     is_active = models.BooleanField("حالة الاشتراك (فعال)", default=True)
     notes = models.TextField("ملاحظات", blank=True, null=True)
@@ -923,7 +929,7 @@ class MiscellaneousRevenue(models.Model):
         ('papers', 'رسوم استخراج أوراق'),
         ('other', 'أخرى متنوعة'),
     ]
-    
+
     title = models.CharField("بيان الإيراد", max_length=200)
     revenue_type = models.CharField("تصنيف الإيراد", max_length=50, choices=REVENUE_TYPES, default='other')
     amount = models.DecimalField("المبلغ المورد", max_digits=12, decimal_places=2)
@@ -938,7 +944,7 @@ class MiscellaneousRevenue(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.amount} ج.م"
-    
-    
-    
-    
+
+
+
+

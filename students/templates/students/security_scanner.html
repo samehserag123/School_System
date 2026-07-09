@@ -12,17 +12,15 @@
     <style>
         body { font-family: 'Cairo', sans-serif; background-color: #0f172a; color: #f8fafc; padding: 15px 10px; }
         .scanner-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        
-        /* تحسين صندوق الكاميرا ليكون متجاوباً تماماً مع شاشات الموبايل الطولية */
         #reader { width: 100%; max-width: 450px; margin: 0 auto; border-radius: 15px; overflow: hidden; border: 2px solid #475569 !important; }
         #reader video { border-radius: 13px; object-fit: cover; }
-        
         .result-panel { background-color: #111827; border-radius: 15px; padding: 20px; min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed #334155; }
         .student-avatar-preview { width: 90px; height: 90px; border-radius: 50%; border: 4px solid #3b82f6; object-fit: cover; margin-bottom: 12px; }
         
-        /* زر إرسال ضخم ومناسب للمس بالإصبع على شاشات الهواتف */
-        .btn-confirm-attendance { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; padding: 16px 35px; border-radius: 14px; font-weight: 700; font-size: 1.25rem; width: 100%; box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3); transition: 0.2s; display: none; }
-        .btn-confirm-attendance:hover { transform: translateY(-2px); color: white; }
+        /* تصميم زر التحكم الديناميكي ليتوافق مع حالة المنع والسماح */
+        .btn-action-attendance { color: white; border: none; padding: 16px 20px; border-radius: 14px; font-weight: 700; font-size: 1.2rem; width: 100%; transition: 0.2s; display: none; }
+        .btn-allowed { background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3); }
+        .btn-blocked { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); opacity: 0.8; cursor: not-allowed; }
         .status-badge { padding: 10px 18px; border-radius: 30px; font-weight: bold; font-size: 11pt; margin-top: 12px; display: none; width: 100%; text-align: center; }
     </style>
 
@@ -33,10 +31,11 @@
 <div class="container-fluid">
     <div class="text-center mb-3">
         <h3 class="fw-bold text-info m-0"><i class="bi bi-shield-lock-fill"></i> نظام بوابة الأمن الذكية</h3>
-        <p class="text-muted small">مدرسة طلعت حرب الفندقية - رصد الحضور اللحظي للموبايل</p>
+        <p class="text-muted small">مدرسة طلعت حرب الفندقية - التحكم الذكي في تصاريح الدخول</p>
     </div>
 
     <div class="row g-3 justify-content-center">
+        <!-- مربع الكاميرا -->
         <div class="col-12 col-md-6 col-lg-5 text-center">
             <div class="scanner-card">
                 <h6 class="fw-bold mb-3 text-warning"><i class="bi bi-camera-video-fill"></i> وجه كاميرا الهاتف نحو كيو ار الكارنيه</h6>
@@ -47,33 +46,32 @@
             </div>
         </div>
 
+        <!-- لوحة عرض تفاصيل الدخول -->
         <div class="col-12 col-md-6 col-lg-5">
             <div class="scanner-card h-100 d-flex flex-column justify-content-between">
-                <h6 class="fw-bold mb-3 text-info"><i class="bi bi-card-heading"></i> بيانات الطالب المكتشف حالياً</h6>
+                <h6 class="fw-bold mb-3 text-info"><i class="bi bi-card-heading"></i> حالة تصريح الطالب الحالي</h6>
                 
                 <div class="result-panel text-center" id="result-panel">
                     <div id="waiting-placeholder">
                         <i class="bi bi-qr-code-scan text-muted" style="font-size: 3.5rem;"></i>
-                        <p class="text-muted mt-2 fw-bold small">في انتظار مسح كارنيه الطالب...</p>
+                        <p class="text-muted mt-2 fw-bold small">في انتظار مسح كارنيه الطالب لتحديد الصلاحية...</p>
                     </div>
                     
                     <div id="student-info-box" style="display: none; width: 100%;">
                         <img id="student-photo" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" class="student-avatar-preview" alt="صورة الطالب">
                         <h4 class="fw-bold text-white mb-1" id="lbl-student-name">--</h4>
                         <p class="text-info fw-bold mb-1 small" id="lbl-student-grade">--</p>
-                        
-                        <!-- 🟢 السطر الجديد: مكان مخصص لعرض الشعبة/التخصص بلون مختلف -->
                         <p class="text-warning fw-bold mb-2 small" id="lbl-student-spec">--</p>
-                        
                         <p class="text-muted small mb-0">الكود المكتشف: <span id="lbl-student-code" class="font-monospace fw-bold text-warning">--</span></p>
                         
                         <div id="api-status-badge" class="status-badge mx-auto"></div>
                     </div>
                 </div>
 
+                <!-- زر التحكم التفاعلي للأمن -->
                 <div class="mt-3">
-                    <button id="btn-send" onclick="sendAttendanceToDatabase()" class="btn btn-confirm-attendance">
-                        <i class="bi bi-cloud-arrow-up-fill me-1"></i> تأكيد دخول الطالب وإرسال للسيستم (Send)
+                    <button id="btn-send" onclick="sendAttendanceToDatabase()" class="btn-action-attendance">
+                        --
                     </button>
                 </div>
             </div>
@@ -94,20 +92,73 @@
         lastScannedCode = decodedText;
         
         successSound.play(); 
-        
-        // 🟢 ميزة الموبايل 1: اهتزاز خفيف فوري (80 ملم) ليعرف الأمن أن الكود تم التقاطه بنجاح دون النظر للشاشة
         if (navigator.vibrate) { navigator.vibrate(80); }
         
+        // إعداد الواجهة لبدء الفحص
         document.getElementById('waiting-placeholder').style.display = 'none';
         document.getElementById('student-info-box').style.display = 'block';
-        
         document.getElementById('lbl-student-code').innerText = decodedText;
-        document.getElementById('lbl-student-name').innerText = "جاري جلب الاسم من السيستم...";
-        document.getElementById('lbl-student-grade').innerText = "يرجى الضغط على الزر بالأسفل لتأكيد الدخول";
+        document.getElementById('lbl-student-name').innerText = "جاري فحص حالة الصلاحية بالسيستم...";
+        document.getElementById('lbl-student-grade').innerText = "برجاء الانتظار ثوانٍ...";
         document.getElementById('lbl-student-spec').innerText = "--";
         
-        document.getElementById('btn-send').style.display = 'block';
+        const btn = document.getElementById('btn-send');
+        btn.style.display = 'none'; 
+        btn.disabled = true;
         document.getElementById('api-status-badge').style.display = 'none';
+
+        // 🔍 خطوة الفحص المبدئي (Check Action)
+        fetch('/students/api/qr-attendance/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ 'student_code': decodedText, 'action': 'check' })
+        })
+        .then(response => response.json())
+        .then(data => {
+            const badge = document.getElementById('api-status-badge');
+            badge.style.display = 'block';
+            btn.style.display = 'block';
+            
+            if (data.status === 'success') {
+                document.getElementById('lbl-student-name').innerText = data.student_name;
+                document.getElementById('lbl-student-grade').innerText = "الصف: " + data.grade;
+                document.getElementById('lbl-student-spec').innerText = "التخصص: " + data.specialization;
+                
+                if (data.allowed) {
+                    // 🟢 الطالب سليم ومسموح بدخوله
+                    badge.className = "status-badge bg-success text-white py-2 shadow-sm";
+                    badge.innerText = "✅ مسموح له بالدخول للمدرسة";
+                    
+                    // تفعيل زر الضغط وتلوينه بالأخضر
+                    btn.className = "btn-action-attendance btn-allowed";
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> اضغط هنا لتسجيل حضور الطالب ومسحه';
+                } else {
+                    // 🔴 الطالب ممنوع من الدخول (مفصول أو غير نشط)
+                    badge.className = "status-badge bg-danger text-white py-2 shadow-sm";
+                    badge.innerText = "❌ ممنوع من الدخول: " + data.block_reason;
+                    errorSound.play();
+                    
+                    // إغلاق وقفل زر الضغط تماماً وتحويله للأحمر المقفول
+                    btn.className = "btn-action-attendance btn-blocked";
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="bi bi-lock-fill me-1"></i> حظر دخول - زرار الحضور مقفول';
+                    if (navigator.vibrate) { navigator.vibrate(300); }
+                }
+            } else {
+                errorSound.play();
+                badge.className = "status-badge bg-danger text-white py-2 shadow-sm";
+                badge.innerText = "❌ خطأ: " + data.message;
+                btn.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            errorSound.play();
+            alert("حدث خطأ أثناء فحص بيانات الطالب!");
+        });
     }
 
     function sendAttendanceToDatabase() {
@@ -115,65 +166,54 @@
         
         const btn = document.getElementById('btn-send');
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري الحفظ...';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري رصد وتثبيت الحضور...';
 
+        // 💾 خطوة الحفظ الفعلي النهائية (Save Action)
         fetch('/students/api/qr-attendance/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': '{{ csrf_token }}'
             },
-            body: JSON.stringify({ 'student_code': lastScannedCode })
+            body: JSON.stringify({ 'student_code': lastScannedCode, 'action': 'save' })
         })
         .then(response => response.json())
         .then(data => {
             const badge = document.getElementById('api-status-badge');
             badge.style.display = 'block';
             
-            if (data.status === 'success' || data.status === 'info') {
-                document.getElementById('lbl-student-name').innerText = data.student_name || "طالب مسجل";
-                document.getElementById('lbl-student-grade').innerText = "الصف: " + (data.grade || "--");
-                
-                // 🟢 السطر الجديد: تحديث حقل التخصص بناءً على ما جاء من السيستم
-                document.getElementById('lbl-student-spec').innerText = "التخصص: " + (data.specialization || "--");
-                
-                if(data.status === 'success') {
-                    badge.className = "status-badge bg-success text-white py-2 shadow-sm";
-                    badge.innerText = "✅ تم تسجيل دخول الطالب بنجاح";
-                    // 🟢 ميزة الموبايل 2: اهتزاز مزدوج خفيف لتأكيد الحفظ الناجح بالسيستم
-                    if (navigator.vibrate) { navigator.vibrate([60, 40, 60]); }
-                } else {
-                    badge.className = "status-badge bg-warning text-dark py-2 shadow-sm";
-                    badge.innerText = "⚠️ الطالب مسجل حضور بالفعل اليوم";
-                    if (navigator.vibrate) { navigator.vibrate(100); }
-                }
+            if (data.status === 'success') {
+                badge.className = "status-badge bg-success text-white py-2 shadow-sm";
+                badge.innerText = data.message;
+                if (navigator.vibrate) { navigator.vibrate([60, 40, 60]); }
+                btn.style.display = 'none'; // إخفاء الزرار بعد إتمام الحفظ بنجاح
                 successSound.play();
+            } else if (data.status === 'info') {
+                badge.className = "status-badge bg-warning text-dark py-2 shadow-sm";
+                badge.innerText = data.message;
+                btn.style.display = 'none';
             } else {
                 errorSound.play();
                 badge.className = "status-badge bg-danger text-white py-2 shadow-sm";
-                badge.innerText = "❌ خطأ: " + data.message;
-                // 🟢 ميزة الموبايل 3: اهتزاز طويل وتنبيهي قوي (300 ملم) في حالة وجود كارت مزور أو خطأ
-                if (navigator.vibrate) { navigator.vibrate(300); }
+                badge.innerText = "❌ خطأ أثناء الحفظ: " + data.message;
             }
         })
         .catch(error => {
             errorSound.play();
-            alert("حدث خطأ في الاتصال بالسيرفر!");
-            if (navigator.vibrate) { navigator.vibrate([200, 100, 200]); }
+            alert("حدث خطأ في الاتصال بالسيرفر أثناء تثبيت الحضور!");
         })
         .finally(() => {
-            btn.disabled = false;
-            btn.style.display = 'none'; 
-            setTimeout(() => { lastScannedCode = null; }, 4000);
+            // تصفير الكود بعد 3 ثواني للاستعداد للطالب التالي
+            setTimeout(() => { lastScannedCode = null; }, 3000);
         });
     }
 
-    // 🟢 ميزة الموبايل 4: تهيئة الكاميرا الخلفية للموبايل تلقائياً بتركيز بؤري ذكي (Focus)
     let html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
         fps: 15, 
         qrbox: 230,
         rememberLastUsedCamera: true,
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+        config: { facingMode: "environment" }
     });
     html5QrcodeScanner.render(onScanSuccess);
 </script>

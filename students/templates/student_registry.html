@@ -236,12 +236,10 @@
                     </thead>
                     <tbody id="tableBody">
                         {% for student in students %}
-                        <!-- أضفنا id فريد للسطر و style مخصص للوميض البصري عند استهدافه -->
                         <tr id="student-{{ student.id }}" class="student-row">
                             <td><input type="checkbox" class="form-check-input student-checkbox" value="{{ student.id }}"></td>
                             <td class="text-info fw-bold">{{ student.student_code }}</td>
                             <td class="text-end fw-bold text-white">
-                                <!-- تم تعديل الرابط لاستدعاء دالة javascript تقوم بتمرير الفلاتر الحالية لصفحة التعديل بأمان -->
                                 <a href="javascript:void(0)" onclick="navigateToEdit('{{ student.id }}')" class="text-decoration-none text-white text-white-hover">
                                     {{ student.first_name }} {{ student.last_name }}
                                 </a>
@@ -267,10 +265,17 @@
                             <td class="font-monospace text-muted">{{ student.national_id }}</td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <!-- 👁️ زر لوحة التحكم الكاملة والملف المالي (student_dashboard) -->
-                                    <a href="{% url 'student_dashboard' student.id %}" class="btn btn-outline-info" title="لوحة تحكم الطالب الكاملة">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
+                                    <!-- 🛑 زر الحظر الديناميكي المطور بالتواريخ ورفع الحظر بنجاح -->
+                                    <button type="button" 
+                                            class="btn {% if student.is_blocked_at_gate %}btn-danger{% else %}btn-outline-danger{% endif %}" 
+                                            title="إدارة حظر بوابة الأمن والتصاريح" 
+                                            onclick="openGateBlockModal('{{ student.id }}', '{{ student.first_name }} {{ student.last_name }}', '{% if student.is_blocked_at_gate %}true{% else %}false{% endif %}', '{{ student.gate_block_reason|default_if_none:''|escapejs }}', '{{ student.gate_blocked_from|date:'Y-m-d' }}', '{{ student.gate_blocked_to|date:'Y-m-d' }}')">
+                                        {% if student.is_blocked_at_gate %}
+                                            <i class="bi bi-lock-fill"></i>
+                                        {% else %}
+                                            <i class="bi bi-shield-slash-fill"></i>
+                                        {% endif %}
+                                    </button>
                                     
                                     <!-- 📞 زر المتابعة والتحصيل والاقساط المتأخرة -->
                                     <a href="{% url 'overdue_calls' %}?student_id={{ student.id }}" class="btn btn-outline-warning" title="قائمة المتابعة والأقساط المتأخرة">
@@ -320,6 +325,7 @@
                         </li>
                     {% endif %}
 
+                    <!-- 🟢 تم إرجاع الحلقة الأصلية الخاصة بك هنا لمنع الخطأ البرمجي تماماً -->
                     {% for i in students.paginator.page_range %}
                         {% if students.number == i %}
                             <li class="page-item active">
@@ -346,6 +352,69 @@
                 </ul>
             </nav>
             {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 🆕 المودال المطور المخصص لإدارة حظر الطلاب وتحديد فترات الحظر ورفعها يدوياً -->
+<div class="modal fade animate__animated animate__fadeIn" id="gateBlockModal" tabindex="-1" aria-labelledby="gateBlockModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-danger" style="border-width: 2px;">
+            <div class="modal-header border-secondary bg-black">
+                <h5 class="modal-title fw-bold text-danger" id="gateBlockModalLabel">
+                    <i class="bi bi-shield-lock-fill me-2"></i>إدارة صلاحيات حظر بوابة الأمن
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <form id="gateBlockForm" method="POST" action="{% url 'save_student_gate_block' %}">
+                {% csrf_token %}
+                <input type="hidden" name="student_id" id="block_student_id">
+                <input type="hidden" name="action_type" id="block_action_type" value="block">
+                
+                <div class="modal-body">
+                    <!-- كرت توضيح الحالة الحالية للطالب -->
+                    <div id="block_current_status_card" class="alert mb-3 text-center py-2 fw-bold">
+                        الحالة الحالية: <span id="lbl_current_status_text">--</span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small d-block">اسم الطالب المستهدف</label>
+                        <h5 id="block_student_name" class="fw-bold text-white border-bottom border-secondary pb-2">--</h5>
+                    </div>
+
+                    <!-- حقل إدخال سبب الحظر -->
+                    <div class="mb-3">
+                        <label for="block_reason" class="form-label fw-bold small text-warning">سبب الحظر من دخول المدرسة</label>
+                        <textarea name="gate_block_reason" id="block_reason" class="form-control bg-black border-secondary text-white small" rows="3" placeholder="اكتب هنا سبب المنع بوضوح ليظهر على جهاز الأمن فوراً عند البوابة..." required></textarea>
+                    </div>
+
+                    <!-- 🟢 تم إبراز العناوين وتفتيح الألوان للأبيض الناصع لتظهر (من يوم / إلى يوم) بوضوح تام -->
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label for="block_from" class="form-label fw-bold small text-white"><i class="bi bi-calendar-range text-info me-1"></i>الحظر من تاريخ (يوم):</label>
+                            <input type="date" name="gate_blocked_from" id="block_from" class="form-control bg-black border-secondary text-white text-center small" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="block_to" class="form-label fw-bold small text-white"><i class="bi bi-calendar-check text-danger me-1"></i>الحظر إلى تاريخ (يوم):</label>
+                            <input type="date" name="gate_blocked_to" id="block_to" class="form-control bg-black border-secondary text-white text-center small" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer border-secondary bg-black d-flex justify-content-between">
+                    <div>
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <!-- زر رفع الحظر يظهر حركياً بالجافاسكريبت فقط لو كان الطالب محظوراً بالفعل -->
+                        <button type="button" id="btnLiftBlock" onclick="submitLiftBlock()" class="btn btn-sm btn-success fw-bold" style="display: none;">
+                            <i class="bi bi-shield-check me-1"></i> رفع الحظر فوراً
+                        </button>
+                    </div>
+                    <button type="submit" id="btnApplyBlock" class="btn btn-sm btn-danger px-4 fw-bold">
+                        <i class="bi bi-slash-circle me-1"></i> حفظ وتطبيق الحظر
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -413,71 +482,96 @@
 
 <script>
 
+// دالة جافاسكريبت المخصصة لتشغيل وتحضير مودال الحظر وتوزيع البيانات والتواريخ بدقة
+function openGateBlockModal(studentId, studentName, isBlocked, reason, fromDate, toDate) {
+    document.getElementById('block_student_id').value = studentId;
+    document.getElementById('block_student_name').innerText = studentName;
+    document.getElementById('block_reason').value = reason;
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('block_from').value = fromDate && fromDate !== 'None' ? fromDate : todayStr;
+    document.getElementById('block_to').value = toDate && toDate !== 'None' ? toDate : todayStr;
+    
+    const statusCard = document.getElementById('block_current_status_card');
+    const statusText = document.getElementById('lbl_current_status_text');
+    const btnLift = document.getElementById('btnLiftBlock');
+    const btnApply = document.getElementById('btnApplyBlock');
+    
+    if (isBlocked === 'true') {
+        statusCard.className = "alert alert-danger mb-3 text-center py-2 fw-bold animate__animated animate__flash";
+        statusText.innerText = "🛑 محظور حالياً من دخول المدرسة بقرار إداري";
+        btnLift.style.display = "inline-block";
+        btnApply.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> تحديث بيانات الحظر الحالية';
+        document.getElementById('block_action_type').value = "block";
+    } else {
+        statusCard.className = "alert alert-success mb-3 text-center py-2 fw-bold";
+        statusText.innerText = "✅ الطالب نشط ومصرح له بالدخول للبوابة";
+        btnLift.style.display = "none";
+        btnApply.innerHTML = '<i class="bi bi-slash-circle me-1"></i> حفظ وتطبيق حظر البوابة';
+        document.getElementById('block_action_type').value = "block";
+    }
+    
+    var myModal = new bootstrap.Modal(document.getElementById('gateBlockModal'));
+    myModal.show();
+}
+
+// دالة رفع الحظر الفوري وتعديل قيمة الأكشن قبل الإرسال
+function submitLiftBlock() {
+    if (confirm("هل أنت متأكد من رغبتك في رفع الحظر فوراً عن هذا الطالب والسماح له بالمرور؟")) {
+        document.getElementById('block_action_type').value = "unblock";
+        document.getElementById('gateBlockForm').submit();
+    }
+}
+
 // دالة الانتقال للتعديل مع الحفاظ على الفلاتر الحالية ورقم الصفحة في الرابط
 function navigateToEdit(studentId) {
     const currentParams = new URLSearchParams(window.location.search);
     currentParams.set('edit_id', studentId);
     
-    // إذا لم يكن رقم الصفحة موجوداً في الرابط الحالي، نقوم بجلب قيمته الافتراضية
     if (!currentParams.has('page')) {
         currentParams.set('page', '1');
     }
     
-    // التوجه لصفحة إضافة طالب مع تمرير كافة معايير الفلترة الحالية كـ Query Parameters
     window.location.href = "{% url 'add_student' %}?" + currentParams.toString();
 }
 
-// كود تفعيل الوميض والتركيز التلقائي عند العودة بعد الحفظ
-// كود الفحص الذكي وعرض مودال التحديد والوميض بعد التعديل والحفظ
+// كود التحديد البصري بعد العودة من التعديل
 window.addEventListener("load", function() {
-    // جلب معرف الطالب المعدل من ذاكرة المتصفح
     const lastEditedId = localStorage.getItem('last_edited_student_id');
-    
     if (lastEditedId) {
-        // البحث عن السطر الخاص بالطالب في الجدول الحالي
         const targetRow = document.getElementById('student-' + lastEditedId);
-        
         if (targetRow) {
-            // 1. استخراج بيانات الطالب من السطر لعرضها داخل المودال التنبيهي
             const studentLink = targetRow.querySelector('td.text-end a');
             const studentName = studentLink ? studentLink.innerText.trim() : "الطالب المسجل";
             const studentCode = targetRow.querySelector('td.text-info')?.innerText.trim() || "";
             const studentGrade = targetRow.querySelector('td:nth-child(4) span')?.innerText.trim() || "";
 
-            // 2. تعبئة بيانات المودال التنبيهي
             document.getElementById('successModalStudentName').innerText = studentName;
             document.getElementById('successModalStudentInfo').innerText = `كود الطالب: ${studentCode} | الصف: ${studentGrade}`;
             
-            // 3. إظهار المودال التنبيهي في منتصف الشاشة دون تحريك الصفحة
             const successModal = new bootstrap.Modal(document.getElementById('editSuccessModal'));
             successModal.show();
             
-            // 4. تطبيق تأثير الوميض البصري على السطر في الخلفية لتمييزه
             targetRow.style.transition = "background-color 0.4s ease-in-out";
-            targetRow.style.backgroundColor = "rgba(13, 202, 240, 0.3)"; // إضاءة زرقاء خفيفة
+            targetRow.style.backgroundColor = "rgba(13, 202, 240, 0.3)";
             
-            // إزالة لون الوميض بعد 4 ثوانٍ ليعود الجدول لطبيعته
             setTimeout(() => {
                 targetRow.style.backgroundColor = "";
             }, 4000);
 
-            // 5. برمجة زر "الانتقال لمكانه بالجدول" داخل المودال عند الحاجة فقط
             document.getElementById('btnScrollToStudent').onclick = function() {
                 successModal.hide();
                 setTimeout(() => {
                     targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    // وميض إضافي تأكيدي عند النزول له
-                    targetRow.style.backgroundColor = "rgba(255, 193, 7, 0.3)"; // وميض أصفر تنبيهي
+                    targetRow.style.backgroundColor = "rgba(255, 193, 7, 0.3)";
                     setTimeout(() => targetRow.style.backgroundColor = "", 2000);
                 }, 300);
             };
             
-            // تنظيف الذاكرة حتى لا يظهر المودال مجدداً عند تحديث الصفحة العادي
             localStorage.removeItem('last_edited_student_id');
         }
     }
 });
-
 
 function animateValue(obj, start, end, duration) {
     if (!obj) return;
@@ -506,7 +600,6 @@ function runFilters(pageNumber = 1) {
     const fRelig = document.getElementById("f-religion").value;
     const fInteg = document.getElementById("f-integ").value;
 
-    // إصلاح: بناء URL نظيف تماماً بناءً على مسار الصفحة الحالي لتجنب تراكم البارامترات القديمة
     const url = new URL(window.location.pathname, window.location.origin);
     const params = url.searchParams;
     
@@ -520,8 +613,6 @@ function runFilters(pageNumber = 1) {
     
     params.set('page', pageNumber);
 
-    // إصلاح جوهري: تحديث شريط عنوان المتصفح بالبارامترات الجديدة لحظياً
-    // هذا يضمن أن دالة navigateToEdit ستقرأ الفلاتر الصحيحة والحديثة دائماً
     window.history.replaceState({}, '', url.toString());
 
     fetch(url.toString(), {
@@ -650,18 +741,15 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 });
-// 🎯 كود إجبار مؤشر الكتابة على فتح قائمة البحث السريع للطلاب فوراً عند تحميل الصفحة
+
 setTimeout(function() {
-    // 1. فتح قائمة السلكت2 الخاصة بالطلاب تلقائياً
     $('#student_select').select2('open');
-    
-    // 2. إجبار نظام التركيز على الانتقال لداخل حقل البحث الديناميكي المنشأ
     setTimeout(function() {
         const searchField = document.querySelector('.select2-search__field');
         if (searchField) {
             searchField.focus();
         }
     }, 100);
-}, 400); // تأخير 400 مللي ثانية لضمان أن المتصفح انتهى تماماً من رسم وعرض عناصر الصفحة
+}, 400);
 </script>
 {% endblock %}
