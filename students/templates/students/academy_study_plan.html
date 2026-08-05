@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+    .glass-card { background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(20px); border-radius: 20px; }
+    .term-header { background: linear-gradient(90deg, rgba(56, 189, 248, 0.2), transparent); border-right: 4px solid #38bdf8; }
+    .toast-popup { position: fixed; bottom: 30px; left: 30px; z-index: 999999; display: none; padding: 15px 25px; border-radius: 15px; font-weight: 800; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+</style>
+
+<div class="container py-4" dir="rtl">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <h3 class="fw-bold m-0 text-white"><i class="bi bi-diagram-3-fill text-info me-2"></i> الخطة الدراسية وتسكين المواد</h3>
+        <div class="d-flex gap-2">
+            <a href="{% url 'academy_attendance_sheet' %}" class="btn btn-dark border-secondary rounded-pill px-4"><i class="bi bi-clipboard2-check-fill text-success me-1"></i> رصد الحضور</a>
+            <a href="{% url 'academy_dashboard' %}" class="btn btn-dark border-secondary rounded-pill px-4"><i class="bi bi-speedometer2 text-warning me-1"></i> الأكاديمية</a>
+            <a href="/" class="btn btn-dark border-secondary rounded-pill px-4"><i class="bi bi-house-door-fill text-white me-1"></i> الرئيسية</a>
+        </div>
+    </div>
+
+    <div class="glass-card shadow-lg p-4 mb-4">
+        <div class="row align-items-center g-3">
+            <div class="col-md-5">
+                <h5 class="fw-bold text-warning mb-2"><i class="bi bi-gear-fill me-2"></i> هيكلة الأقسام الدراسية</h5>
+            </div>
+            <div class="col-md-7">
+                <form method="GET" class="d-flex align-items-center gap-3 p-3 rounded-4" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
+                    <label class="form-label text-info fw-bold m-0 fs-5">الدبلومة:</label>
+                    <select name="course_id" class="form-select bg-black text-white border-warning fw-bold fs-5 shadow-sm" onchange="this.form.submit()">
+                        {% for c in courses %}
+                            <option value="{{ c.id }}" {% if selected_course and selected_course.id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {% if selected_course %}
+    <div class="glass-card shadow-lg mb-5 p-4 border-primary">
+        <h5 class="text-white fw-bold mb-4 border-bottom border-secondary pb-3">إضافة تسكين جديد لـ <span class="text-warning">({{ selected_course.name }})</span></h5>
+        <form id="addPlanForm" class="row g-3 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_term_subject">
+            <input type="hidden" name="course" value="{{ selected_course.id }}">
+
+            <div class="col-md-3">
+                <label class="form-label text-info fw-bold">التيرم</label>
+                <select name="term_number" class="form-select bg-dark text-white border-secondary fw-bold py-2" required>
+                    {% for num, label in term_choices %}<option value="{{ num }}">{{ label }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-info fw-bold">المادة</label>
+                <select name="subject" class="form-select bg-dark text-white border-secondary fw-bold py-2" required>
+                    <option value="">-- المادة --</option>
+                    {% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-info fw-bold">الدكتور المحاضر</label>
+                <select name="doctor" class="form-select bg-dark text-white border-secondary fw-bold py-2" required>
+                    <option value="">-- الدكتور --</option>
+                    {% for d in doctors %}<option value="{{ d.id }}">د. {{ d.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <!-- زر Button لمنع الريلود -->
+                <button type="button" onclick="addPlanAjax()" class="btn btn-success w-100 fw-bold py-2"><i class="bi bi-link-45deg me-1"></i> ربط وتسكين</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="row g-4" id="plansContainer">
+        {% for term in terms_data %}
+        <div class="col-12">
+            <div class="glass-card shadow overflow-hidden">
+                <div class="term-header text-white fw-bold p-3"><h5 class="m-0 text-info fw-bold">{{ term.label }}</h5></div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover m-0 text-center">
+                        <thead style="background: rgba(0,0,0,0.4);">
+                            <tr><th class="text-start ps-4 py-3">المادة</th><th class="py-3">الدكتور المحاضر</th><th class="py-3">الإجراء</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for item in term.items %}
+                            <tr id="row-ts-{{ item.id }}">
+                                <td class="text-start ps-4 fw-bold text-white fs-6 py-3">{{ item.subject.name }}</td>
+                                <td class="fw-bold text-warning">د. {{ item.doctor.name }}</td>
+                                <td>
+                                    <!-- زر Button صريح لمنع الريلود أثناء الحذف -->
+                                    <button type="button" onclick="deletePlanAjax({{ item.id }})" class="btn btn-sm btn-outline-danger px-4 rounded-pill fw-bold shadow-sm">
+                                        <i class="bi bi-trash3-fill me-1"></i> حذف
+                                    </button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="py-4 text-muted">لا توجد مواد مسكنة.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<div id="toastPopup" class="toast-popup text-white"></div>
+
+<script>
+    function addPlanAjax() {
+        const form = document.getElementById('addPlanForm');
+        // تحقق من الحقول المطلوبة
+        if(!form.checkValidity()) { form.reportValidity(); return; }
+
+        fetch(window.location.href, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(res => {
+            // للتأكد من ظهور المادة بالجدول يتم عمل تحديث للصفحة مرة واحدة فقط للإضافة
+            window.location.reload(); 
+        });
+    }
+
+    function deletePlanAjax(tsId) {
+        if (!confirm('هل أنت متأكد من حذف تسكين هذه المادة؟')) return;
+
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        formData.append('action', 'delete_term_subject');
+        formData.append('ts_id', tsId);
+
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            const row = document.getElementById(`row-ts-${tsId}`);
+            if (row) {
+                row.style.transition = 'all 0.4s ease';
+                row.style.opacity = '0';
+                setTimeout(() => row.remove(), 400);
+            }
+            showToast('🗑️ تم الحذف بنجاح دون ريلود!', 'bg-success');
+        });
+    }
+
+    function showToast(msg, bg) {
+        const t = document.getElementById('toastPopup');
+        t.className = `toast-popup ${bg} text-white`;
+        t.innerText = msg;
+        t.style.display = 'block';
+        setTimeout(() => t.style.display = 'none', 3000);
+    }
+</script>
+{% endblock %}

@@ -4,35 +4,37 @@
 {% block extra_css %}
 <style>
     .student-card {
-        background-color: #1a1d21 !important;
-        border: 1px solid #2d3238 !important;
-        border-radius: 20px !important;
-        padding: 40px !important;
+        background-color: #11151c !important;
+        border: 1px solid #1e293b !important;
+        border-radius: 24px !important;
+        padding: 35px !important;
     }
 
-    /* --- تنسيق الدائرة العلوية --- */
+    /* --- تنسيق الدائرة العلوية للصورة --- */
     .profile-pic-container {
         display: flex;
         flex-direction: column;
         align-items: center;
-        margin-bottom: 30px;
+        margin-bottom: 25px;
     }
 
     .profile-pic-wrapper {
         position: relative;
-        width: 140px;
-        height: 140px;
+        width: 145px;
+        height: 145px;
         border-radius: 50%;
-        border: 4px solid #ffc107;
+        border: 4px solid #38bdf8;
         overflow: hidden;
         cursor: pointer;
-        background-color: #0f1113;
+        background-color: #020617;
+        box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
         transition: all 0.3s ease;
     }
 
     .profile-pic-wrapper:hover {
-        border-color: #0dcaf0;
-        transform: scale(1.02);
+        border-color: #fbbf24;
+        transform: scale(1.03);
+        box-shadow: 0 0 35px rgba(251, 191, 36, 0.35);
     }
 
     .profile-pic-wrapper img {
@@ -45,11 +47,12 @@
         position: absolute;
         bottom: 0;
         width: 100%;
-        background: rgba(0, 0, 0, 0.6);
-        color: #fff;
+        background: rgba(0, 0, 0, 0.75);
+        color: #38bdf8;
         text-align: center;
-        padding: 5px 0;
-        font-size: 12px;
+        padding: 6px 0;
+        font-size: 13px;
+        font-weight: bold;
         opacity: 0;
         transition: opacity 0.3s;
     }
@@ -62,63 +65,107 @@
         display: none !important;
     }
 
+    /* --- تصميم الحاويات والبطاقات الموحدة (Section Cards) --- */
+    .section-card-box {
+        background: rgba(15, 23, 42, 0.85) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 18px !important;
+        padding: 22px 25px !important;
+        margin-bottom: 24px !important;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        transition: border-color 0.3s ease;
+    }
+
+    .section-card-box:hover {
+        border-color: rgba(56, 189, 248, 0.3) !important;
+    }
+
+    .card-header-title {
+        color: #fbbf24;
+        font-weight: 800;
+        font-size: 1.15rem;
+        margin-bottom: 18px;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: 10px;
+    }
+
     /* --- تنسيق الحقول --- */
     .form-control, .form-select {
-        background-color: #0f1113 !important;
+        background-color: #020617 !important;
         color: #ffffff !important;
         border: 1px solid #334155 !important;
-        padding: 10px !important;
+        padding: 11px 14px !important;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
     }
 
-    /* تحسين شكل الحقول عند التعطيل Disabled */
+    .form-control:focus, .form-select:focus {
+        border-color: #38bdf8 !important;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.3) !important;
+        outline: none !important;
+    }
+
+    .form-label {
+        color: #94a3b8 !important;
+        font-weight: 700 !important;
+        font-size: 0.9rem !important;
+        margin-bottom: 6px !important;
+    }
+
     .form-control:disabled, .form-select:disabled {
-        opacity: 0.7;
+        opacity: 0.65;
         cursor: not-allowed;
-        background-color: #161b22 !important;
-        border-color: #21262d !important;
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
     }
 
-    .section-title {
-        border-right: 4px solid #ffc107;
-        padding-right: 15px;
-        margin: 30px 0 20px 0;
-        color: #f8f9fa;
-        font-weight: bold;
-    }
-
-    /* --- تنسيق الزر والدمج في الأسفل --- */
+    /* --- الأزرار ومفتاح التبديل --- */
     .btn-save {
-        background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+        background: linear-gradient(135deg, #0284c7, #06b6d4);
         border: none;
-        padding: 12px 60px;
+        padding: 12px 55px;
         border-radius: 50px;
-        font-weight: bold;
+        font-weight: 900;
+        font-size: 1.1rem;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(6, 182, 212, 0.4);
     }
 
     .form-check-input {
-        width: 2.5em !important;
-        height: 1.25em !important;
+        width: 2.6em !important;
+        height: 1.3em !important;
         cursor: pointer;
-        background-color: #0f1113 !important;
-        border-color: #334155 !important;
+        background-color: #020617 !important;
+        border-color: #475569 !important;
     }
 
     .form-check-input:checked {
-        background-color: #ffc107 !important;
-        border-color: #ffc107 !important;
+        background-color: #fbbf24 !important;
+        border-color: #fbbf24 !important;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-5">
+<div class="container py-4" dir="rtl">
     <div class="card student-card shadow-lg">
-        <h3 class="text-center fw-bold text-white mb-4">
-            {% if student %} بيانات الطالب: {{ student.get_full_name }} {% else %} إضافة طالب جديد {% endif %}
+        
+        <h3 class="text-center fw-black text-white mb-4 d-flex align-items-center justify-content-center gap-2">
+            <i class="bi bi-person-vcard text-warning fs-2"></i>
+            {% if student %} بيانات الطالب: <span class="text-info">{{ student.get_full_name }}</span> {% else %} إضافة طالب جديد {% endif %}
         </h3>
-         {% if form.errors %}
-            <div class="alert alert-danger border-0 shadow-sm mb-4" style="border-radius: 15px;">
-                <ul class="mb-0">
+
+        {% if form.errors %}
+            <div class="alert alert-danger border-danger border-opacity-50 bg-black text-white shadow-lg mb-4" style="border-radius: 16px;">
+                <h6 class="fw-bold text-danger mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i> يرجى تصحيح الأخطاء التالية:</h6>
+                <ul class="mb-0 ps-3">
                     {% for field, errors in form.errors.items %}
                         {% for error in errors %}
                             <li><strong>{{ field }}:</strong> {{ error }}</li>
@@ -127,9 +174,11 @@
                 </ul>
             </div>
         {% endif %}
+
         <form method="post" id="studentForm" enctype="multipart/form-data">
             {% csrf_token %}
 
+            <!-- 📸 دائرة رفع الصورة الشخصية -->
             <div class="profile-pic-container">
                 <div class="profile-pic-wrapper" {% if not student_admin_mode %}onclick="document.getElementById('hidden-image-input').click();"{% endif %}>
                     {% if student and student.image %}
@@ -140,136 +189,176 @@
                     
                     {% if not student_admin_mode %}
                     <div class="upload-overlay">
-                        <i class="bi bi-camera"></i> تغيير
+                        <i class="bi bi-camera-fill me-1"></i> تغيير الصورة
                     </div>
                     {% endif %}
                 </div>
-                <label class="text-muted mt-2">صورة الطالب</label>
+                <span class="text-white-50 small mt-2 fw-bold"><i class="bi bi-image me-1 text-info"></i> صورة الطالب الشخصية</span>
                 <input type="file" name="image" id="hidden-image-input" accept="image/*" onchange="previewImage(this)">
             </div>
 
-            <h5 class="section-title">البيانات الأساسية</h5>
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label text-info">السنة الدراسية</label>
-                    {{ form.academic_year }}
+            <!-- 1️⃣ بطاقة البيانات الأساسية -->
+            <div class="section-card-box">
+                <div class="card-header-title">
+                    <i class="bi bi-card-heading text-info me-2 fs-5"></i> البيانات الأساسية
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label text-info">الاسم الأول</label>
-                    {{ form.first_name }}
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label text-info">اسم العائلة</label>
-                    {{ form.last_name }}
-                </div>
-            </div>
-
-            <h5 class="section-title">البيانات الشخصية</h5>
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label text-info">الرقم القومي</label>
-                    {{ form.national_id }}
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label text-info">الجنسية</label>
-                    {{ form.nationality }}
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label text-info">النوع</label>
-                    {{ form.gender }}
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label text-info">الديانة</label>
-                    {{ form.religion }}
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label text-info">تاريخ الميلاد</label>
-                    {{ form.date_of_birth }}
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label"><i class="bi bi-calendar-check text-warning me-1"></i> السنة الدراسية</label>
+                        {{ form.academic_year }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><i class="bi bi-person me-1 text-info"></i> الاسم الأول</label>
+                        {{ form.first_name }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><i class="bi bi-people me-1 text-info"></i> اسم العائلة</label>
+                        {{ form.last_name }}
+                    </div>
                 </div>
             </div>
 
-            <div class="row g-3 mt-2">
-                <div class="col-md-3">
-                    <label class="form-label text-info">العنوان</label>
-                    {{ form.address }}
+            <!-- 2️⃣ بطاقة البيانات الشخصية -->
+            <div class="section-card-box">
+                <div class="card-header-title">
+                    <i class="bi bi-person-lines-fill text-warning me-2 fs-5"></i> البيانات الشخصية
                 </div>
-
-                <div class="col-md-4">
-                    <label class="form-label text-info">رقم التليفون</label>
-                    {{ form.phone }}
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label text-info"> الواتس اب</label>
-                    {{ form.whatsapp_number }}
-                </div>
-                
-
-                <div class="col-md-3">
-                    <label class="form-label text-info">اسم الأم</label>
-                    {{ form.mother_name }}
-                </div>
-
-                <div class="col-md-2">
-                    <label class="form-label text-info">وظيفة الأب</label>
-                    {{ form.father_job }}
-                </div>
-            </div>
-
-            <h5 class="section-title">الحالة الأكاديمية</h5>
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label text-info">الصف الدراسي</label>
-                    {{ form.grade }}
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label text-info">الفصل</label>
-                    {{ form.classroom }}
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label text-info">التخصص</label>
-                    {{ form.specialization }}
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label text-info">حالة القيد</label>
-                    {{ form.enrollment_status }}
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label text-info">رقم القيد</label>
-                    {{ form.registration_number }}
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label"><i class="bi bi-credit-card-2-front text-info me-1"></i> الرقم القومي</label>
+                        {{ form.national_id }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label"><i class="bi bi-flag me-1 text-secondary"></i> الجنسية</label>
+                        {{ form.nationality }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label"><i class="bi bi-gender-ambiguous me-1 text-info"></i> النوع</label>
+                        {{ form.gender }}
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label"><i class="bi bi-book me-1 text-info"></i> الديانة</label>
+                        {{ form.religion }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label"><i class="bi bi-calendar-event me-1 text-info"></i> تاريخ الميلاد</label>
+                        {{ form.date_of_birth }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label"><i class="bi bi-geo-alt me-1 text-info"></i> محل الميلاد</label>
+                        {{ form.birth_place }}
+                    </div>
                 </div>
             </div>
 
-            <div class="row mt-5 align-items-center">
-                <div class="col-md-4 text-end">
+            <!-- 3️⃣ بطاقة بيانات التواصل وأولياء الأمور -->
+            <div class="section-card-box">
+                <div class="card-header-title">
+                    <i class="bi bi-telephone-inbound-fill text-success me-2 fs-5"></i> بيانات التواصل وأولياء الأمور
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label"><i class="bi bi-telephone-fill text-info me-1"></i> رقم التليفون</label>
+                        {{ form.phone }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><i class="bi bi-whatsapp text-success me-1"></i> الواتس اب</label>
+                        {{ form.whatsapp_number }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><i class="bi bi-house-door-fill text-warning me-1"></i> العنوان بالتفصيل</label>
+                        {{ form.address }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label"><i class="bi bi-person-heart text-danger me-1"></i> اسم الأم بالكامل</label>
+                        {{ form.mother_name }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label"><i class="bi bi-briefcase-fill text-primary me-1"></i> وظيفة الأب</label>
+                        {{ form.father_job }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4️⃣ بطاقة الحالة الأكاديمية -->
+            <div class="section-card-box">
+                <div class="card-header-title">
+                    <i class="bi bi-mortarboard-fill text-info me-2 fs-5"></i> الحالة الأكاديمية
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label"><i class="bi bi-building me-1 text-warning"></i> الصف الدراسي</label>
+                        {{ form.grade }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><i class="bi bi-door-open-fill me-1 text-info"></i> الفصل</label>
+                        {{ form.classroom }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><i class="bi bi-journal-bookmark-fill me-1 text-success"></i> التخصص</label>
+                        {{ form.specialization }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5️⃣ بطاقة حالة الطالب ورقم القيد عند فتح الملف -->
+            <div class="section-card-box border-warning border-opacity-25" style="background: rgba(15, 23, 42, 0.95) !important;">
+                <div class="card-header-title text-warning">
+                    <i class="bi bi-person-badge-fill me-2 fs-5"></i> حالة الطالب ورقم القيد عند فتح الملف
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label text-warning fw-bold"><i class="bi bi-hash me-1"></i> رقم القيد (أرقام فقط)</label>
+                        {{ form.registration_number }}
+                    </div>
+                    <div class="col-md-3">
+                        <!-- 🟢 قراءة حقل حالة القيد عند فتح الملف الثابتة -->
+                        <label class="form-label text-info fw-bold"><i class="bi bi-info-circle-fill me-1"></i> حالة القيد عند فتح الملف</label>
+                        {{ form.initial_status }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-success fw-bold"><i class="bi bi-chat-square-text-fill me-1"></i> ملاحظات حالة القيد</label>
+                        {{ form.enrollment_notes }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🔘 شريط الإجراءات السفلي والمفاتيح التشغيلية -->
+            <div class="row mt-4 align-items-center">
+                <div class="col-md-3 text-start">
                     {% if student %}
-                    <a href="{% url 'student_id_card' student.student_code %}" class="btn btn-outline-info fw-bold shadow" target="_blank">
+                    <a href="{% url 'student_id_card' student.student_code %}" class="btn btn-outline-info fw-bold rounded-pill px-4 py-2 shadow" target="_blank">
                         <i class="bi bi-qr-code-scan me-1"></i> طباعة الكارنيه (QR)
                     </a>
                     {% endif %}
                 </div>
                 
                 <div class="col-md-4 text-center">
-                
-                <div class="col-md-4 text-center">
                     {% if not student_admin_mode %}
-                        <button type="submit" class="btn btn-save text-white shadow">
-                            <i class="bi bi-check-circle me-2"></i> حفظ البيانات
+                        <button type="submit" class="btn btn-save text-white shadow-lg">
+                            <i class="bi bi-check-circle-fill me-2"></i> حفظ البيانات
                         </button>
                     {% else %}
-                        <div class="alert alert-warning border-0 shadow-sm mb-0 py-2">
+                        <div class="alert alert-warning border-0 shadow-sm mb-0 py-2 rounded-pill fw-bold text-center">
                             <i class="bi bi-eye-fill ms-1"></i> وضع العرض فقط
                         </div>
                     {% endif %}
                 </div>
 
-                <div class="col-md-4 d-flex justify-content-end align-items-center">
+                <!-- 🟢 تجميع خيارات الخصائص والإعفاء في أقصى اليسار -->
+                <div class="col-md-5 d-flex justify-content-end align-items-center gap-3 flex-wrap">
                     <div class="form-check form-switch mb-0">
+                        {{ form.is_application_fee_exempt }}
+                        <label class="form-check-label text-info fw-bold ms-1" style="cursor: pointer;">معافى من رسوم الملف؟</label>
+                    </div>
+
+                    <div class="form-check form-switch mb-0 ms-2">
                         {{ form.integration_status }}
-                        <label class="form-check-label text-warning fw-bold ms-2" style="cursor: pointer;">طالب دمج؟</label>
+                        <label class="form-check-label text-warning fw-bold ms-1" style="cursor: pointer;">طالب دمج؟</label>
                     </div>
                 </div>
             </div>
+
         </form>
     </div>
 </div>
@@ -289,47 +378,62 @@
     const form = document.getElementById("studentForm");
     const isViewMode = "{{ student_admin_mode }}" === "True";
 
-    // إذا كنا في وضع العرض، لا نحتاج لتفعيل الميزات التفاعلية
     if (isViewMode) return;
 
-    // --- الجزء الأول: استخراج تاريخ الميلاد من الرقم القومي ---
+    // تأكيد إضافي بالـ JS لمنع الحروف في حقل رقم القيد بشكل لحظي
+    const regInput = document.querySelector('input[name="registration_number"]');
+    if (regInput) {
+        regInput.addEventListener("input", function() {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+    }
+
+    const egyptGovernorates = {
+        "01": "القاهرة", "02": "الإسكندرية", "03": "بورسعيد", "04": "السويس",
+        "11": "دمياط", "12": "الدقهلية", "13": "الشرقية", "14": "القليوبية",
+        "15": "كفر الشيخ", "16": "الغربية", "17": "المنوفية", "18": "البحيرة",
+        "19": "الإسماعيلية", "21": "الجيزة", "22": "بني سويف", "23": "الفيوم",
+        "24": "المنيا", "25": "أسيوط", "26": "سوهاج", "27": "قنا",
+        "28": "أسوان", "29": "الأقصر", "31": "البحر الأحمر", "32": "الوادى الجديد",
+        "33": "مطروح", "34": "شمال سيناء", "35": "جنوب سيناء", "88": "مولود خارج الجمهورية"
+    };
+
     const nationalIdInput = document.querySelector('input[name="national_id"]');
     const dobInput = document.querySelector('input[name="date_of_birth"]');
+    const birthPlaceInput = document.querySelector('input[name="birth_place"]');
 
-    if (nationalIdInput && dobInput) {
+    if (nationalIdInput) {
         nationalIdInput.addEventListener("input", function() {
             const id = this.value.trim();
 
-            // التحقق من كتابة 14 رقمًا (نظام الرقم القومي المصري)
             if (id.length === 14 && !isNaN(id)) {
-                const centuryDigit = id.substring(0, 1); // 2 للقرن العشرين، 3 للقرن الحادي والعشرين
+                const centuryDigit = id.substring(0, 1);
                 const yearPart = id.substring(1, 3);
                 const monthPart = id.substring(3, 5);
                 const dayPart = id.substring(5, 7);
 
-                // تحديد البادئة (19 أو 20)
                 let yearPrefix = (centuryDigit === "3") ? "20" : "19";
                 const fullYear = yearPrefix + yearPart;
-
-                // تنسيق التاريخ ليتناسب مع حقل Date في المتصفح (YYYY-MM-DD)
                 const formattedDate = `${fullYear}-${monthPart}-${dayPart}`;
                 
-                // تحديث قيمة حقل تاريخ الميلاد
-                dobInput.value = formattedDate;
+                if (dobInput) dobInput.value = formattedDate;
+
+                const govCode = id.substring(7, 9);
+                if (birthPlaceInput && egyptGovernorates[govCode]) {
+                    birthPlaceInput.value = egyptGovernorates[govCode];
+                }
             }
         });
     }
 
-    // --- الجزء الثاني: التنقل بين الحقول باستخدام زر Enter ---
     const inputs = Array.from(form.querySelectorAll("input:not([type='hidden']):not([type='file']), select, textarea, button"));
 
     inputs.forEach((input, index) => {
         input.addEventListener("keydown", function(e) {
             if (e.key === "Enter") {
-                // السماح لزر الـ Enter بالعمل الطبيعي داخل الـ Textarea
                 if (e.target.tagName.toLowerCase() === "textarea") return;
                 
-                e.preventDefault(); // منع إرسال النموذج فوراً
+                e.preventDefault();
                 const nextInput = inputs[index + 1];
                 
                 if (nextInput) {

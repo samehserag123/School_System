@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container-fluid py-4 animate__animated animate__fadeIn" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-4 bg-dark bg-opacity-40 p-4 rounded-3 shadow-lg border-right border-info" style="border-right: 5px solid #0dcaf0 !important; backdrop-filter: blur(10px);">
+        <div>
+            <h2 class="fw-bold mb-1 text-info">غرفة الكنترول العام والفرز السنوي</h2>
+            <p class="text-white-50 small mb-0 fw-bold">العام الدراسي الحالي المعتمد: {{ active_year.name }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="runBulkAction('promote_rest')" class="btn btn-success fw-bold px-3 shadow-sm"><i class="bi bi-mortarboard-fill"></i> اعتماد نجاح المنقولين</button>
+            <button onclick="runBulkAction('mark_failed')" class="btn btn-danger fw-bold px-3 shadow-sm"><i class="bi bi-x-circle-fill"></i> وسم المحدد كراسب جماعياً</button>
+        </div>
+    </div>
+
+    <!-- فلتر الصف الفاخر -->
+    <div class="card mb-4 border-0 shadow-lg" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1) !important;">
+        <div class="card-body text-white">
+            <form method="GET" action="" class="row g-3 align-items-center">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-info">اختر الصف الدراسي لبدء الفرز والمراجعة اللحظية:</label>
+                    <select name="grade_id" class="form-select fw-bold bg-dark bg-opacity-50 text-white border-secondary" onchange="this.form.submit()">
+                        <option value="">--- اختر الصف الدراسي المستهدف ---</option>
+                        {% for grade in all_grades %}
+                            <option value="{{ grade.id }}" {% if selected_grade == grade.id|stringformat:"i" %}selected{% endif %}>{{ grade.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if students %}
+    <div class="card border-0 shadow-lg" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1) !important;">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0 text-center">
+                <thead class="table-dark border-bottom border-secondary">
+                    <tr>
+                        <th style="width: 50px;"><input type="checkbox" id="selectAll" class="form-check-input border-secondary shadow-none"></th>
+                        <th>كود الطالب</th>
+                        <th class="text-start" style="padding-right: 15px;">اسم الطالب بالكامل من السجل الرئيسي</th>
+                        <th>الفصل الدراسي</th>
+                        <th>النوع</th>
+                        <th>نظام الدراسة</th>
+                        <th>حالة القيد والنتيجة</th>
+                        <th>تعديل الموقف اللحظي</th>
+                    </tr>
+                </thead>
+                <tbody class="border-0">
+                    {% for s in students %}
+                    <tr id="student-row-{{ s.id }}">
+                        <td><input type="checkbox" name="student_ids" value="{{ s.id }}" class="form-check-input student-chk border-secondary shadow-none"></td>
+                        <td class="fw-bold text-info fs-6">{{ s.student_code }}</td>
+                        <td class="text-start fw-bold text-white-50" style="padding-right: 15px;">{{ s.get_full_name }}</td>
+                        <td><span class="badge bg-dark px-3 py-1.5 border border-secondary">{{ s.classroom.name|default:"-" }}</span></td>
+                        <td>{{ s.get_gender_display }}</td>
+                        <td>{{ s.get_study_type_display }}</td>
+                        <td>
+                            <span id="badge-{{ s.id }}" class="badge px-3 py-2 fs-6 fw-bold {% if s.enrollment_status == 'Promoted' %}bg-success text-white{% elif s.enrollment_status == 'Failed' %}bg-danger text-white{% else %}bg-warning text-dark{% endif %}">
+                                {{ s.get_enrollment_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <select onchange="updateStudentStatus('{{ s.id }}', this.value)" class="form-select form-select-sm d-inline-block w-auto bg-dark text-info border-secondary fw-bold">
+                                <option value="">-- تغيير الموقف إلى --</option>
+                                <option value="Promoted">ناجح ومنقول 🎓</option>
+                                <option value="Failed">راسب وباق للإعادة ❌</option>
+                                <option value="New">مستجد قيد الدراسة 📝</option>
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- أزرار تقسيم الصفحات لمنع حدوث ثقل أو تجميد في الحساب -->
+        {% if students.has_other_pages %}
+        <div class="card-footer bg-transparent border-top border-secondary py-3 d-flex justify-content-center">
+            <nav>
+                <ul class="pagination pagination-sm mb-0 gap-1">
+                    {% if students.has_previous %}
+                        <li class="page-item"><a class="page-link bg-dark text-info border-secondary fw-bold" href="?grade_id={{ selected_grade }}&page={{ students.previous_page_number }}">السابق</a></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link bg-info text-dark border-info fw-bold">صفحة {{ students.number }} من {{ students.paginator.num_pages }}</span></li>
+                    {% if students.has_next %}
+                        <li class="page-item"><a class="page-link bg-dark text-info border-secondary fw-bold" href="?grade_id={{ selected_grade }}&page={{ students.next_page_number }}">التالي</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center fw-bold py-4 bg-dark bg-opacity-40 text-info border-0 shadow" style="backdrop-filter: blur(10px);">الرجاء اختيار الصف الدراسي المطلوب من القائمة المنسدلة بالأعلى لبدء عمليات الفرز والاعتماد الجماعي للنتائج.</div>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById('selectAll').addEventListener('change', function() {
+    document.querySelectorAll('.student-chk').forEach(chk => chk.checked = this.checked);
+});
+
+// تحديث لحظي ذكي بتقنية AJAX دون الحاجة لعمل ريفريش كامل للصفحة
+function updateStudentStatus(studentId, newStatus) {
+    if(!newStatus) return;
+    
+    const loader = document.getElementById("global-loader");
+    if(loader) loader.classList.add("active");
+
+    fetch("{% url 'ajax_update_status' %}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": "{{ csrf_token }}" },
+        body: JSON.stringify({ student_id: studentId, status: newStatus })
+    }).then(res => res.json()).then(data => {
+        if(loader) loader.classList.remove("active");
+        if(data.success) {
+            const badge = document.getElementById(`badge-${studentId}`);
+            if(badge) {
+                badge.className = "badge px-3 py-2 fs-6 fw-bold " + 
+                    (newStatus === 'Promoted' ? 'bg-success text-white' : newStatus === 'Failed' ? 'bg-danger text-white' : 'bg-warning text-dark');
+                badge.innerText = newStatus === 'Promoted' ? 'ناجح ومنقول' : newStatus === 'Failed' ? 'راسب وباق للإعادة' : 'مستجد قيد الدراسة';
+            }
+            // إظهار إشعار النجاح الذكي المكتوب في الـ base
+            if (typeof showAccessDenied === 'function') {
+                // تزوير دالة التوست لإظهار رسالة تحديث ناجحة
+                let container = document.querySelector('.toast-notification-container');
+                const toast = document.createElement('div');
+                toast.className = 'modern-toast toast-success';
+                toast.innerHTML = `<div class="toast-icon"><i class="bi bi-check-circle-fill"></i></div><div class="toast-message">تم تحديث حالة الطالب اللحظية بنجاح بنظام الكنترول.</div><div class="toast-progress"></div>`;
+                container.appendChild(toast);
+                setTimeout(() => { toast.classList.add('toast-fade-out'); setTimeout(() => toast.remove(), 400); }, 3000);
+            }
+        } else {
+            alert("⚠️ فشل التحديث: " + data.error);
+        }
+    }).catch(err => { if(loader) loader.classList.remove("active"); });
+}
+
+function runBulkAction(actionType) {
+    let selectedIds = Array.from(document.querySelectorAll('.student-chk:checked')).map(chk => chk.value);
+    if(actionType === 'mark_failed' && selectedIds.length === 0) {
+        alert("الرجاء تحديد طالب واحد على الأقل من الشيت لوسمه كراسب.");
+        return;
+    }
+    if(!confirm("هل أنت متأكد من تنفيذ هذا الإجراء الجماعي المسرع في الكنترول السنوي؟")) return;
+
+    const loader = document.getElementById("global-loader");
+    if(loader) loader.classList.add("active");
+
+    fetch("{% url 'ajax_bulk_status' %}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": "{{ csrf_token }}" },
+        body: JSON.stringify({ action: actionType, student_ids: selectedIds, grade_id: "{{ selected_grade }}" })
+    }).then(res => res.json()).then(data => {
+        if(loader) loader.classList.remove("active");
+        if(data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert("خطأ: " + data.error);
+        }
+    }).catch(err => { if(loader) loader.classList.remove("active"); });
+}
+</script>
+{% endblock %}

@@ -1,117 +1,307 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_title %}
+<div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3 animate__animated animate__fadeIn">
+    <div class="d-flex align-items-center gap-3">
+        <div class="icon-header-box bg-warning bg-opacity-10 p-3 rounded-4 border border-warning border-opacity-25">
+            <i class="bi bi-box-arrow-in-down text-warning fs-2"></i>
+        </div>
+        <div>
+            <h4 class="fw-black text-white m-0">تسجيل أذونات وتوريدات كميات المخزن</h4>
+            <p class="text-warning opacity-75 small m-0 fw-semibold">إدخال الكميات الجديدة الموردة، تعديل الأرصدة، وتوثيق الفواتير والموردين</p>
+        </div>
+    </div>
+    
+    <!-- أزرار التنقل المباشر -->
+    <div class="d-flex gap-2">
+        <a href="{% url 'inventory_report' %}" class="btn btn-outline-warning btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm border-opacity-25">
+            <i class="bi bi-box-seam me-1"></i> منظومة الجرد الموحد
+        </a>
+        <a href="/" class="btn btn-outline-light btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm border-opacity-25">
+            <i class="bi bi-house-door-fill text-info me-1"></i> الشاشة الرئيسية
+        </a>
+    </div>
+</div>
+{% endblock %}
 
 {% block content %}
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
+<style>
+    :root {
+        --bg-main: #030712;
+        --glass-surface: rgba(15, 23, 42, 0.85);
+        --glass-card: rgba(30, 41, 59, 0.75);
+        --glass-border: rgba(255, 255, 255, 0.12);
+        
+        --neon-cyan: #38bdf8;
+        --neon-emerald: #34d399;
+        --neon-amber: #fbbf24;
+    }
 
-            <div class="card bg-dark text-white border-success shadow-lg p-2">
-                <div class="card-header bg-success bg-opacity-25 border-success py-3 rounded text-center">
-                    <h4 class="mb-0 text-success fw-bold">
-                        <i class="bi bi-box-arrow-in-down me-2"></i> تسجيل توريد كميات جديدة (للمدير)
-                    </h4>
+    body {
+        background-color: var(--bg-main) !important;
+        color: #f8fafc !important;
+    }
+
+    .glass-card {
+        background: var(--glass-surface) !important;
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 24px !important;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .form-control-neon, .form-select-neon {
+        background-color: rgba(2, 6, 23, 0.85) !important;
+        color: #ffffff !important;
+        border: 1.5px solid var(--glass-border) !important;
+        border-radius: 14px !important;
+        padding: 12px 16px !important;
+        font-weight: 700 !important;
+        transition: all 0.25s ease;
+    }
+
+    .form-control-neon:focus, .form-select-neon:focus {
+        border-color: var(--neon-cyan) !important;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.25) !important;
+    }
+
+    .type-selector-btn {
+        background: rgba(30, 41, 59, 0.6);
+        border: 1.5px solid var(--glass-border);
+        color: #94a3b8;
+        border-radius: 16px;
+        padding: 14px 20px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        text-align: center;
+        width: 100%;
+    }
+
+    .type-selector-btn:hover {
+        border-color: var(--neon-cyan);
+        color: #ffffff;
+    }
+
+    .btn-check:checked + .type-selector-btn {
+        background: rgba(56, 189, 248, 0.18) !important;
+        border-color: var(--neon-cyan) !important;
+        color: var(--neon-cyan) !important;
+        box-shadow: 0 0 20px rgba(56, 189, 248, 0.3) inset;
+    }
+
+    .recent-table-container {
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid var(--glass-border);
+        background: rgba(15, 23, 42, 0.6);
+    }
+
+    .recent-table th {
+        background: #020617 !important;
+        color: var(--neon-cyan);
+        font-weight: 900;
+        padding: 14px;
+        text-align: center;
+        border-bottom: 2px solid rgba(56, 189, 248, 0.2);
+    }
+
+    .recent-table td {
+        padding: 12px;
+        vertical-align: middle;
+        text-align: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+</style>
+
+<div class="container-fluid px-3 max-w-1200 mx-auto mt-3">
+
+    <!-- عرض التنبيهات والرسائل -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show fw-bold fs-6 rounded-4 shadow mb-4" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- 1. كارت إدخال إذن التوريد الجديد -->
+    <div class="glass-card p-4 p-md-5 mb-5 animate__animated animate__fadeInDown">
+        <h5 class="fw-black text-warning mb-4 d-flex align-items-center gap-2">
+            <i class="bi bi-box-arrow-in-down-right fs-3"></i> نموذج تسجيل التوريد والشراء الإضافي
+        </h5>
+
+        <form method="POST" action="{% url 'admin_add_restock' %}" id="restockForm">
+            {% csrf_token %}
+
+            <!-- الخطوة 1: تحديد نوع الصنف -->
+            <div class="mb-4">
+                <label class="form-label fw-bold text-white mb-2">1. حدد قسم الصنف المراد توريده:</label>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <input type="radio" class="btn-check" name="item_type" id="type_book" value="book" checked onchange="toggleItemType('book')">
+                        <label class="type-selector-btn" for="type_book">
+                            <i class="bi bi-book-half fs-4 d-block mb-1 text-info"></i>
+                            📚 كتب ومقررات دراسية
+                        </label>
+                    </div>
+                    <div class="col-md-6">
+                        <input type="radio" class="btn-check" name="item_type" id="type_uniform" value="uniform" onchange="toggleItemType('uniform')">
+                        <label class="type-selector-btn" for="type_uniform">
+                            <i class="bi bi-person-workspace fs-4 d-block mb-1 text-warning"></i>
+                            👔 زي مدرسي وملابس
+                        </label>
+                    </div>
                 </div>
-                
-                <div class="card-body p-4">
-                    <form method="post" id="restockForm" class="needs-validation" novalidate>
-                        {% csrf_token %}
-                        
-                        <div class="mb-4">
-                            <label class="form-label fw-bold text-info">
-                                <i class="bi bi-search me-1"></i> اختر الصنف المراد تزويده:
-                            </label>
-                            <select name="item_id" class="form-select select2" required>
-                                <option value="">--- ابحث عن كتاب أو زي مدرسي بالاسم ---</option>
-                                {% for item in items %}
-                                    <option value="{{ item.id }}">
-                                        {% if item.item_type == 'book' %}
-                                            📚 {{ item.subject.name }} - الصف: {{ item.grade.name }}
-                                        {% else %}
-                                            👕 {{ item.uniform.name }} - الصف: {{ item.grade.name }}
-                                        {% endif %}
-                                        (الرصيد: {{ item.stock_quantity }})
-                                    </option>
-                                {% endfor %}
-                            </select>
-                            <div class="invalid-feedback text-warning">يرجى اختيار صنف من القائمة.</div>
-                        </div>
+            </div>
 
-                        <div class="row">
-                            <div class="col-md-6 mb-4">
-                                <label class="form-label fw-bold text-info"><i class="bi bi-plus-circle me-1"></i> الكمية الموردة:</label>
-                                {{ form.quantity }}
-                            </div>
-                            <div class="col-md-6 mb-4">
-                                <label class="form-label fw-bold text-info"><i class="bi bi-pencil me-1"></i> ملاحظات التوريد:</label>
-                                {{ form.note }}
-                            </div>
-                        </div>
-
-                        <hr class="border-secondary opacity-25">
-
-                        <div class="d-flex gap-3">
-                            <button type="submit" class="btn btn-success btn-lg w-100 fw-bold shadow-sm">
-                                <i class="bi bi-check-all me-2"></i> تأكيد وحفظ في المخزن
-                            </button>
-                            <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-lg px-4">إلغاء</a>
-                        </div>
-                    </form>
+            <div class="row g-3 mb-4">
+                <!-- الخطوة 2: اختيار الصف الدراسي -->
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-white small">2. اختر الصف الدراسي المستهدف:</label>
+                    <select name="grade_id" id="gradeSelect" class="form-select form-select-neon" required>
+                        <option value="">-- اختر الصف الدراسي --</option>
+                        {% for grade in grades %}
+                        <option value="{{ grade.id }}">{{ grade.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
+
+                <!-- الخطوة 3: اختيار المادة الدراسية (للكتب) -->
+                <div class="col-md-6" id="subjectContainer">
+                    <label class="form-label fw-bold text-white small">3. اختر المادة / الكتاب الرسمي:</label>
+                    <select name="subject_id" id="subjectSelect" class="form-select form-select-neon">
+                        <option value="">-- اختر الكتاب/المادة --</option>
+                        {% for sub in subjects %}
+                        <option value="{{ sub.id }}">{{ sub.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- الخطوة 3 البديلة: اختيار صنف الزي (للملابس) -->
+                <div class="col-md-6 d-none" id="uniformContainer">
+                    <label class="form-label fw-bold text-white small">3. اختر صنف الزي الرسمي:</label>
+                    <select name="uniform_id" id="uniformSelect" class="form-select form-select-neon">
+                        <option value="">-- اختر صنف الزي --</option>
+                        {% for u in uniforms %}
+                        <option value="{{ u.id }}">{{ u.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <!-- الخطوة 4: الكمية الموردة -->
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-emerald small">4. الكمية الموردة الجديدة (عدد القطع):</label>
+                    <div class="input-group">
+                        <input type="number" name="quantity" class="form-control form-control-neon fs-4 text-center text-emerald fw-black" value="100" min="1" required>
+                        <span class="input-group-text bg-dark text-emerald border-secondary fw-bold px-3">قطعة</span>
+                    </div>
+                </div>
+
+                <!-- الخطوة 5: بيان الفاتورة / الملاحظات -->
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-white small">5. بيانات التوريد والمورد (اختياري):</label>
+                    <input type="text" name="note" class="form-control form-control-neon" placeholder="مثال: فاتورة مطبعة الشروق رقم 1052 - اسم المورد...">
+                </div>
+            </div>
+
+            <!-- زر التأكيد -->
+            <div class="d-grid mt-2">
+                <button type="submit" class="btn btn-warning btn-lg fw-black text-dark py-3 rounded-3 shadow">
+                    <i class="bi bi-box-arrow-in-down me-2"></i> حفظ وتأكيد إذن التوريد بالمخزن 📥
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 2. جدول أحدث عمليات التوريد السابقة -->
+    <div class="glass-card p-4 animate__animated animate__fadeInUp mb-5">
+        <h5 class="fw-black text-info mb-3 d-flex align-items-center gap-2">
+            <i class="bi bi-clock-history fs-4"></i> سجل أحدث عمليات التوريد والشراء السابقة
+        </h5>
+
+        <div class="recent-table-container">
+            <div class="table-responsive">
+                <table class="table recent-table m-0">
+                    <thead>
+                        <tr>
+                            <th width="50">#</th>
+                            <th width="150">تاريخ ووقت التوريد</th>
+                            <th>الصنف والمادة</th>
+                            <th>الصف الدراسي</th>
+                            <th>الكمية الموردة</th>
+                            <th class="text-start ps-3">ملاحظات وبيان التوريد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for restock in recent_restocks %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td class="small text-white-50">
+                                <div class="fw-bold text-white">{{ restock.restock_date|date:"Y-m-d" }}</div>
+                                <span class="opacity-75">{{ restock.restock_date|date:"I:i A" }}</span>
+                            </td>
+                            <td class="fw-bold text-info">{{ restock.item.display_name }}</td>
+                            <td>
+                                <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary px-3 py-1 fw-bold">
+                                    {{ restock.item.grade.name|default:"عام" }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-25 px-3 py-1 fs-6 fw-black">
+                                    +{{ restock.quantity }} قطعة
+                                </span>
+                            </td>
+                            <td class="text-start ps-3 small text-white-50">{{ restock.note|default:"---" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="py-4 text-muted fw-bold">لا توجد عمليات توريد مسجلة مسبقاً</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+
 </div>
 
-<style>
-    .select2-container--bootstrap-5 .select2-selection {
-        background-color: #1a1d20 !important;
-        color: #0dcaf0 !important;
-        border: 1px solid #495057 !important;
-        height: 50px !important;
-        line-height: 50px !important;
-    }
-    .select2-container--bootstrap-5 .select2-selection__rendered {
-        color: #0dcaf0 !important;
-        line-height: 48px !important;
-    }
-    .select2-dropdown {
-        background-color: #1a1d20 !important;
-        color: white !important;
-        border: 1px solid #198754 !important;
-    }
-    .select2-results__option { color: white !important; }
-    .select2-results__option--highlighted { background-color: #198754 !important; }
-    .select2-search__field { background-color: #2b3035 !important; color: white !important; }
-</style>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
 <script>
-    $(document).ready(function() {
-        // تفعيل Select2 مع الثيم الخاص بـ Bootstrap 5
-        $('.select2').select2({
-            theme: 'bootstrap-5',
-            width: '100%',
-            language: {
-                noResults: function() { return "لا يوجد نتائج مطابقة"; }
-            }
-        });
+// 🟢 التبديل الديناميكي بين خيارات الكتب وخيارات الزي المدرسي
+function toggleItemType(type) {
+    const subjectBox = document.getElementById('subjectContainer');
+    const uniformBox = document.getElementById('uniformContainer');
+    const subjectSel = document.getElementById('subjectSelect');
+    const uniformSel = document.getElementById('uniformSelect');
 
-        // التحقق من صحة النموذج
-        var forms = document.querySelectorAll('.needs-validation');
-        Array.prototype.slice.call(forms).forEach(function (form) {
-            form.addEventListener('submit', function (event) {
-                if (!form.checkValidity()) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }
-                form.classList.add('was-validated');
-            }, false);
-        });
-    });
+    if (type === 'book') {
+        subjectBox.classList.remove('d-none');
+        uniformBox.classList.add('d-none');
+        subjectSel.required = true;
+        uniformSel.required = false;
+        uniformSel.value = '';
+    } else {
+        uniformBox.classList.remove('d-none');
+        subjectBox.classList.add('d-none');
+        uniformSel.required = true;
+        subjectSel.required = false;
+        subjectSel.value = '';
+    }
+}
+
+// ضبط النموذج عند التحميل البدائي
+document.addEventListener('DOMContentLoaded', function() {
+    toggleItemType('book');
+});
 </script>
 {% endblock %}

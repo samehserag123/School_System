@@ -1,7 +1,6 @@
 from django.urls import path
 from . import views
 
-
 urlpatterns = [
     # 📦 المخزن واستلام الكتب
     path('student-inventory/<int:student_id>/', views.student_inventory_view, name='student_inventory_view'),
@@ -20,40 +19,48 @@ urlpatterns = [
     path('mass-assign-plans/', views.mass_assign_plans, name='mass_assign_plans'),
     path('plans/', views.installment_plan_list, name='installment_plan_list'),
     path('generate-installments/<int:account_id>/', views.generate_installments_view, name='generate_installments'),
-    
+
     path('archives/', views.archives_list_view, name='archives_list'),
 
     # 🧾 التحصيل والطباعة
     path('quick-collection/', views.quick_collection, name='quick_collection'),
     path('cancel-receipt/<int:pk>/', views.admin_cancel_receipt, name='admin_cancel_receipt'),
     path('receipt/<int:payment_id>/', views.print_receipt, name='print_receipt'),
+
+    # 🟢 دعم صيغتي رابط طباعة كشف الحساب لمنع 404 تماماً
     path('student/<int:student_id>/print-statement/', views.student_statement_print, name='student_statement_print'),
+    path('statement/print/<int:student_id>/', views.student_statement_print, name='student_statement_print_alt'),
+
     path('student/<int:student_id>/settle-debt/', views.pay_old_debt, name='settle_old_debt'),
     path('receipt-books/', views.receipt_books_list, name='receipt_books_list'),
     path('receipt-books/<int:book_id>/', views.receipt_book_detail, name='receipt_book_detail'),
 
+    path('counter/', views.live_cashier_counter, name='live_cashier_counter'),
+    path('api/student-search/', views.student_search_api, name='student_search_api'),
+    path('api/counter-collect/', views.counter_collect_payment_api, name='counter_collect_payment_api'),
+
     # 🎓 شؤون الطلاب والترقية
     path('students/bulk-promote/', views.bulk_promote_students, name='bulk_promote'),
-    
+
     # 🔒 إغلاق الحسابات والخزينة
     path('close-month/', views.close_month, name='close_month'),
     path('daily-summary/', views.daily_cashier_summary, name='daily_cashier_summary'),
     path('trigger-closure/', views.trigger_daily_closure, name='trigger_daily_closure'),
     path('payments-archive/', views.payments_archive, name='payments_archive'),
     path('student/<int:student_id>/finance/', views.student_finance_detail, name='student_finance_detail'),
-    # ... الروابط السابقة ...
-    
-    # 🔒 إغلاق الحسابات والخزينة (تأكد من إضافة هذه الأسطر)
+
     path('close-accounts/', views.close_daily_accounts_view, name='close_daily_accounts_view'),
-    path('expenses/add/', views.add_expense_view, name='add_expense_view'), # <--- السطر المطلوب لحل الخطأ الحالي
+    path('expenses/add/', views.add_expense_view, name='add_expense_view'),
     path('closures-archive/', views.daily_closures_archive, name='closures_archive'),
     path('closure/<str:closure_id>/', views.closure_detail, name='closure_detail'),
     path('finance-analytics/', views.finance_analytics_view, name='finance_analytics'),
     path('my-treasury/', views.my_treasury_view, name='my_treasury'),
-    
+
     path('offers/create/', views.create_offer_view, name='create_offer'),
     path('api/validate-coupon/', views.validate_coupon_advanced, name='validate_coupon'),
-    
+
     path('reports/print-debts/', views.print_debts_report_view, name='print_debts_report'),
-    # ... باقي الروابط
+
+    path('reports/missing-contacts/', views.missing_contacts_report_view, name='missing_contacts_report'),
+
 ]

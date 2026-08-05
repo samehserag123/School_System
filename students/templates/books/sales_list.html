@@ -1,134 +1,934 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block page_title %}سجل حركة صرف الكتب والزي{% endblock %}
+{% block title %}منظومة إدارة وحركة صرف الكتب والزي المدرسي{% endblock %}
 
-{% block content %}
-<div class="card bg-dark border-secondary shadow-lg mt-2">
-    <div class="card-header border-secondary d-flex justify-content-between align-items-center py-3">
-        <h5 class="mb-0 text-white">
-            <i class="bi bi-journal-check text-info me-2"></i> حركة صرف الكتب والزي
-        </h5>
-        
-        <div class="d-flex gap-2">
-            <a href="{% url 'inventory_report' %}" class="btn btn-outline-warning btn-sm shadow-sm">
-                <i class="bi bi-box-seam me-1"></i> عرض جرد المخزن
-            </a>
-            <a href="{% url 'add_book_sale' %}" class="btn btn-outline-info btn-sm shadow-sm">
-                <i class="bi bi-plus-circle me-1"></i> تسجيل عملية جديدة
-            </a>
+{% block page_title %}
+<div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3 animate__animated animate__fadeIn">
+    <div class="d-flex align-items-center gap-3">
+        <div class="icon-header-box bg-info bg-opacity-10 p-3 rounded-4 border border-info border-opacity-25">
+            <i class="bi bi-box-seam-fill text-info fs-2"></i>
+        </div>
+        <div>
+            <h4 class="fw-black text-white m-0">سجل حركة صرف الكتب والزي المدرسي</h4>
+            <p class="text-info opacity-75 small m-0 fw-semibold">منظومة متابعة التسليمات الفورية للمخزن وتتبع أذونات الصرف</p>
         </div>
     </div>
+    <!-- 🏠 زر الرجوع المباشر لشاشة الهوم الرئيسية -->
+    <div>
+        <a href="/" class="btn btn-outline-light btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 border-opacity-25">
+            <i class="bi bi-house-door-fill text-info fs-5"></i> العودة للشاشة الرئيسية
+        </a>
+    </div>
+</div>
+{% endblock %}
 
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0 table-dark align-middle">
-                <thead>
-                    <tr class="text-muted small text-uppercase" style="border-bottom: 2px solid #333;">
-                        <th class="px-4 py-3">التاريخ</th>
-                        <th>اسم الطالب</th>
-                        <th>الصنف المصروف</th>
-                        <th class="text-center">الكمية</th>
-                        <th class="text-center px-4">إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for sale in sales %}
-                    <tr style="border-bottom: 1px solid #2d3238;">
-                        <td class="px-4 text-muted small">
-                            {{ sale.sale_date|date:"Y-m-d" }}<br>
-                            <span class="opacity-50">{{ sale.sale_date|date:"H:i" }}</span>
-                        </td>
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-                        <td>
-                            <span class="text-white fw-bold">{{ sale.student.get_full_name }}</span>
-                            <br>
-                            <span class="badge bg-secondary bg-opacity-10 text-secondary-emphasis" style="font-size: 0.7rem;">
-                                {{ sale.student.grade.name }}
-                            </span>
-                        </td>
+<style>
+    :root {
+        --bg-main: #030712;
+        --glass-surface: rgba(15, 23, 42, 0.85);
+        --glass-card: rgba(30, 41, 59, 0.75);
+        --glass-border: rgba(255, 255, 255, 0.12);
+        --glass-border-hover: rgba(56, 189, 248, 0.4);
 
-                        <td>
-                            {% if sale.book_item.item_type == 'book' %}
-                                <div class="d-flex align-items-center">
-                                    <div class="item-icon-box bg-primary bg-opacity-10 text-primary me-2">
-                                        <i class="bi bi-book"></i>
-                                    </div>
-                                    <div>
-                                        <span class="d-block text-white fw-semibold mb-0" style="font-size: 0.9rem;">
-                                            {{ sale.book_item.subject.name|default:"None" }}
-                                        </span>
-                                        <span class="text-info opacity-75 small" style="font-size: 0.75rem;">: {{ sale.book_item.grade.name|default:"None" }}</span>
-                                    </div>
-                                </div>
-                            {% else %}
-                                <div class="d-flex align-items-center">
-                                    <div class="item-icon-box bg-warning bg-opacity-10 text-warning me-2">
-                                        <i class="bi bi-universal-access"></i>
-                                    </div>
-                                    <div>
-                                        <span class="d-block text-white fw-semibold mb-0" style="font-size: 0.9rem;">
-                                            {{ sale.book_item.uniform.name|default:"None" }}
-                                        </span>
-                                        <span class="text-warning opacity-75 small" style="font-size: 0.75rem;">: {{ sale.book_item.grade.name|default:"None" }}</span>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        </td>
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --text-muted: #64748b;
 
-                        <td class="text-center">
-                            <span class="badge rounded-pill border border-info text-info px-3">
-                                {{ sale.quantity }}
-                            </span>
-                        </td>
+        --neon-cyan: #38bdf8;
+        --neon-emerald: #34d399;
+        --neon-amber: #fbbf24;
+        --neon-rose: #f87171;
+    }
 
-                        <td class="text-center px-4">
-                            <a href="{% url 'print_book_receipt' sale.id %}" class="btn btn-sm btn-outline-light border-secondary shadow-sm" target="_blank">
-                                <i class="bi bi-printer me-1"></i> طباعة
-                            </a>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center py-5 text-muted fst-italic">
-                             <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
-                            لا توجد عمليات صرف مسجلة حالياً.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    body {
+        background-color: var(--bg-main) !important;
+        color: var(--text-primary) !important;
+    }
+
+    /* 📊 1. كروت شريط الإحصائيات الزجاجية */
+    .stats-bar {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 25px;
+        overflow-x: auto;
+        padding-bottom: 8px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--neon-cyan) transparent;
+    }
+
+    .stat-item {
+        background: var(--glass-card);
+        backdrop-filter: blur(20px) saturate(190%);
+        -webkit-backdrop-filter: blur(20px) saturate(190%);
+        border: 1px solid var(--glass-border);
+        border-radius: 18px;
+        padding: 16px 20px;
+        min-width: 175px;
+        flex: 1;
+        text-align: center;
+        transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .stat-item::before {
+        content: '';
+        position: absolute;
+        top: 0; right: 0;
+        width: 4px; height: 100%;
+        background: var(--neon-cyan);
+        box-shadow: 0 0 12px var(--neon-cyan);
+        border-radius: 4px;
+    }
+
+    .stat-item:hover {
+        transform: translateY(-5px) scale(1.02);
+        background: rgba(30, 41, 59, 0.95);
+        border-color: var(--glass-border-hover);
+        box-shadow: 0 15px 35px rgba(56, 189, 248, 0.2);
+    }
+
+    .stat-item.active-filter {
+        background: rgba(56, 189, 248, 0.18) !important;
+        border-color: var(--neon-cyan) !important;
+        box-shadow: 0 0 25px rgba(56, 189, 248, 0.35) inset, 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    .stat-item .small-label {
+        color: var(--text-secondary);
+        font-weight: 700;
+        font-size: 0.85rem;
+        display: block;
+        margin-bottom: 6px;
+    }
+
+    .stat-item .stat-value {
+        font-weight: 900;
+        font-size: 1.6rem;
+        letter-spacing: -0.5px;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    .glass-card {
+        background: var(--glass-surface) !important;
+        backdrop-filter: blur(20px) saturate(190%);
+        -webkit-backdrop-filter: blur(20px) saturate(190%);
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 20px !important;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    /* 📑 2. جدول الحركة الرئيسي */
+    .modern-table-container {
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        background: var(--glass-surface);
+        backdrop-filter: blur(20px);
+    }
+
+    #salesTable {
+        background: transparent !important;
+        color: var(--text-primary) !important;
+        margin-bottom: 0;
+        transition: opacity 0.25s ease;
+    }
+
+    #salesTable thead {
+        background: #020617 !important;
+        border-bottom: 2px solid rgba(56, 189, 248, 0.35);
+    }
+
+    #salesTable th {
+        color: var(--neon-cyan) !important;
+        font-weight: 900 !important;
+        font-size: 0.88rem !important;
+        padding: 16px 12px !important;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    #salesTable tbody tr {
+        background: rgba(15, 23, 42, 0.55);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.2s ease-in-out;
+    }
+
+    #salesTable tbody tr:hover {
+        background: rgba(30, 41, 59, 0.95) !important;
+    }
+
+    #salesTable td {
+        padding: 12px 10px !important;
+        vertical-align: middle !important;
+        font-size: 0.88rem;
+    }
+
+    .item-icon-box {
+        width: 38px; height: 38px;
+        min-width: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-size: 1.15rem;
+    }
+
+    /* 🏷️ 3. البادجات والأزرار */
+    .badge-status {
+        padding: 7px 15px;
+        border-radius: 30px;
+        font-weight: 800;
+        font-size: 0.78rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .badge-delivered {
+        background: rgba(16, 185, 129, 0.2) !important;
+        color: #34d399 !important;
+        border: 1px solid rgba(16, 185, 129, 0.5) !important;
+    }
+
+    .badge-partial-amber {
+        background: rgba(251, 191, 36, 0.2) !important;
+        color: #fbbf24 !important;
+        border: 1px solid rgba(251, 191, 36, 0.5) !important;
+    }
+
+    .badge-pending-red {
+        background: rgba(239, 68, 68, 0.2) !important;
+        color: #f87171 !important;
+        border: 1px solid rgba(239, 68, 68, 0.5) !important;
+    }
+
+    .badge-paid-solid {
+        background-color: #10b981 !important;
+        color: #ffffff !important;
+        font-weight: 900 !important;
+        font-size: 0.82rem !important;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    }
+
+    .badge-due-solid {
+        background-color: #dc2626 !important;
+        color: #ffffff !important;
+        font-weight: 900 !important;
+        font-size: 0.82rem !important;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+    }
+
+    .btn-action-icon {
+        width: 34px; height: 34px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-action-icon:hover:not(:disabled) {
+        transform: translateY(-2px) scale(1.1);
+    }
+
+    .pagination-custom .page-link {
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid var(--glass-border);
+        color: var(--neon-cyan);
+        border-radius: 12px;
+        margin: 0 3px;
+        font-weight: 800;
+        padding: 8px 14px;
+        transition: all 0.25s ease;
+    }
+
+    .pagination-custom .page-link:hover {
+        background: var(--neon-cyan);
+        color: #020617;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+    }
+
+    .pagination-custom .page-item.active .page-link {
+        background: var(--neon-cyan) !important;
+        color: #020617 !important;
+        font-weight: 900 !important;
+        box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+        border-color: var(--neon-cyan) !important;
+    }
+
+    /* 📦 4. تنسيقات النافذة المنبثقة (المودال) - عالية التباين والوضوح التام */
+    .modal-content {
+        background-color: #090d16 !important;
+        border: 1.5px solid rgba(56, 189, 248, 0.35) !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85) !important;
+        color: #ffffff !important;
+    }
+
+    .modal-student-box {
+        background: #0f172a !important;
+        border: 1.5px solid var(--neon-cyan) !important;
+        border-radius: 16px !important;
+        padding: 16px 20px !important;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .modal-student-name {
+        color: #fbbf24 !important;
+        font-weight: 900 !important;
+        font-size: 1.25rem !important;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal-student-info {
+        color: #38bdf8 !important;
+        font-weight: 700 !important;
+        font-size: 0.88rem !important;
+    }
+
+    .delivery-section-title {
+        font-size: 0.9rem !important;
+        font-weight: 900 !important;
+        letter-spacing: 0.5px;
+        margin-top: 16px !important;
+        margin-bottom: 10px !important;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .delivery-item-row,
+    .delivery-item-card {
+        background: #1e293b !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        border-radius: 14px !important;
+        padding: 14px 18px !important;
+        margin-bottom: 10px !important;
+        transition: all 0.25s ease !important;
+        color: #ffffff !important;
+    }
+
+    .delivery-item-row:hover,
+    .delivery-item-card:hover {
+        border-color: var(--neon-cyan) !important;
+        background: #334155 !important;
+        box-shadow: 0 4px 15px rgba(56, 189, 248, 0.15);
+    }
+
+    .delivery-item-row.already-done,
+    .delivery-item-card.already-done {
+        background: rgba(16, 185, 129, 0.15) !important;
+        border-color: rgba(52, 211, 153, 0.4) !important;
+    }
+
+    .delivery-item-row label,
+    .delivery-item-card label,
+    .modal-item-label {
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        font-size: 0.98rem !important;
+        cursor: pointer;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    }
+
+    .form-check-input {
+        width: 1.25em !important;
+        height: 1.25em !important;
+        cursor: pointer;
+    }
+
+    .form-check-input:checked {
+        background-color: var(--neon-cyan) !important;
+        border-color: var(--neon-cyan) !important;
+    }
+
+    .stock-badge {
+        font-size: 0.8rem !important;
+        font-weight: 800 !important;
+        padding: 5px 14px !important;
+        border-radius: 20px !important;
+    }
+</style>
+
+<!-- 1. شريط الإحصائيات الفورية (KPIs) -->
+<div class="stats-bar px-1 animate__animated animate__fadeIn">
+    <div class="stat-item {% if not selected_item_type and not selected_status %}active-filter{% endif %}" onclick="updateUrlParam('status', '')">
+        <span class="small-label">إجمالي إزونات الصرف</span>
+        <div class="stat-value text-info" id="stat-total">{{ total_sales_count|default:0 }}</div>
+    </div>
+
+    <div class="stat-item {% if selected_item_type == 'book' %}active-filter{% endif %}" onclick="updateUrlParam('item_type', 'book')">
+        <span class="small-label">كتب مسلّمة 📚</span>
+        <div class="stat-value text-primary" id="stat-books">{{ books_delivered_count|default:0 }}</div>
+    </div>
+
+    <div class="stat-item {% if selected_item_type == 'uniform' %}active-filter{% endif %}" onclick="updateUrlParam('item_type', 'uniform')">
+        <span class="small-label">زي مسلّم 👔</span>
+        <div class="stat-value text-warning" id="stat-uniforms">{{ uniforms_delivered_count|default:0 }}</div>
+    </div>
+
+    <div class="stat-item {% if selected_status == 'pending_delivery' %}active-filter{% endif %}" onclick="updateUrlParam('status', 'pending_delivery')">
+        <span class="small-label">في انتظار التسليم ⏳</span>
+        <div class="stat-value text-danger" id="stat-pending">{{ pending_delivery_count|default:0 }}</div>
+    </div>
+</div>
+
+<!-- 2. كارت الفلاتر والأزرار الرئيسية الممتدة بالكامل -->
+<div class="glass-card p-3 mb-4 animate__animated animate__fadeInDown">
+    <div class="row g-2 align-items-center">
+        <!-- حقل البحث -->
+        <div class="col-lg-3 col-md-4">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-dark border-secondary text-info"><i class="bi bi-search"></i></span>
+                <input type="text" id="salesSearch" onkeyup="instantSalesSearch()"
+                       class="form-control bg-dark text-white border-secondary fw-bold"
+                       placeholder="ابحث باسم الطالب أو الكود..."
+                       value="{{ search_query|default:'' }}" autofocus>
+            </div>
+        </div>
+
+        <div class="col-lg-2 col-md-2">
+            <select id="f-item-type" class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" onchange="updateUrlParam('item_type', this.value)">
+                <option value="">نوع الصنف (الكل)</option>
+                <option value="book" {% if selected_item_type == 'book' %}selected{% endif %}>📚 كتب دراسية</option>
+                <option value="uniform" {% if selected_item_type == 'uniform' %}selected{% endif %}>👔 زي مدرسي</option>
+            </select>
+        </div>
+
+        <div class="col-lg-2 col-md-2">
+            <select id="f-grade" class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" onchange="updateUrlParam('grade_id', this.value)">
+                <option value="">الصف الدراسي</option>
+                {% for grade in all_grades %}
+                <option value="{{ grade.id }}" {% if selected_grade == grade.id|stringformat:"i" %}selected{% endif %}>
+                    {{ grade.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-lg-2 col-md-2">
+            <select id="f-status" class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" onchange="updateUrlParam('status', this.value)">
+                <option value="">حالة التسليم</option>
+                <option value="delivered" {% if selected_status == 'delivered' %}selected{% endif %}>✅ تم التسليم</option>
+                <option value="pending_delivery" {% if selected_status == 'pending_delivery' %}selected{% endif %}>⏳ في انتظار التسليم</option>
+            </select>
+        </div>
+
+        <!-- 🟢 أزرار الإجراءات ومسح الفلاتر بتوزيع متساوٍ وممتد لتغطية كامل شريط الفلاتر دون فراغات -->
+        <div class="col-lg-3 col-md-12 d-flex gap-2">
+            <a href="{% url 'add_book_sale' %}" class="btn btn-info btn-sm fw-bold shadow-sm text-dark px-2 flex-fill text-center d-inline-flex align-items-center justify-content-center" title="إصدار إذن صرف جديد">
+                <i class="bi bi-plus-circle-fill me-1"></i> عملية جديدة
+            </a>
+            <a href="{% url 'inventory_report' %}" class="btn btn-outline-warning btn-sm fw-bold shadow-sm px-2 flex-fill text-center d-inline-flex align-items-center justify-content-center" title="عرض جرد وقوائم المخزن">
+                <i class="bi bi-box-seam me-1"></i> الجرد
+            </a>
+            <button type="button" onclick="clearAllFilters()" class="btn btn-outline-danger btn-sm fw-bold shadow-sm px-2 flex-fill text-center d-inline-flex align-items-center justify-content-center" title="إعادة تعليق ومسح كافة الفلاتر والبحث">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> مسح
+            </button>
         </div>
     </div>
 </div>
 
-<style>
-    /* صندوق الأيقونات الصغير */
-    .item-icon-box {
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 10px;
-        font-size: 1.1rem;
-        border: 1px solid rgba(255,255,255,0.05);
+<!-- 3. جدول عرض حركة صرف الكتب والزي -->
+<div class="modern-table-container shadow-lg animate__animated animate__fadeInUp mb-4">
+    <div class="table-responsive">
+        <table class="table text-center align-middle mb-0" id="salesTable">
+            <thead>
+                <tr>
+                    <th width="40">#</th>
+                    <th width="130">التاريخ والوقت</th>
+                    <th class="text-end pe-4" width="220">بيانات الطالب</th>
+                    <th>الصنف والمادة</th>
+                    <th width="70">الكمية</th>
+                    <th width="150">موقف السداد (المالي)</th>
+                    <th width="160">حالة التسليم بالمخزن</th>
+                    <th width="110">إجراءات</th>
+                </tr>
+            </thead>
+            <tbody id="salesTableBody">
+                {% for sale in sales %}
+                <tr id="sale-row-{{ sale.id }}">
+                    <td class="fw-bold text-white-50">{{ forloop.counter }}</td>
+
+                    <!-- التاريخ والوقت -->
+                    <td class="small text-white-50">
+                        <div class="fw-bold text-white">{{ sale.sale_date|date:"Y-m-d" }}</div>
+                        <span class="opacity-75"><i class="bi bi-clock me-1"></i>{{ sale.sale_date|date:"h:i A" }}</span>
+                    </td>
+
+                    <!-- الطالب والصف -->
+                    <td class="text-end pe-4">
+                        <div class="fw-black text-info text-decoration-none">
+                            {{ sale.student.get_full_name }}
+                        </div>
+                        <div class="small mt-1">
+                            <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary px-2 py-0">
+                                {{ sale.student.grade.name }}
+                            </span>
+                            <small class="text-muted ms-1"><i class="bi bi-hash"></i> {{ sale.student.student_code }}</small>
+                        </div>
+                    </td>
+
+                    <!-- الصنف (كتاب أم زي) -->
+                    <td class="text-start ps-3">
+                        {% if sale.item.item_type == 'book' %}
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="item-icon-box bg-primary bg-opacity-25 text-info border border-info border-opacity-25">
+                                    <i class="bi bi-book-half"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-white">{{ sale.item.display_name }}</div>
+                                    <small class="text-info opacity-75">الكتب الدراسية المقررة</small>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="item-icon-box bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25">
+                                    <i class="bi bi-person-workspace"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-white">{{ sale.item.display_name }}</div>
+                                    <small class="text-warning opacity-75">الزي المدرسي المقرر</small>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </td>
+
+                    <!-- الكمية -->
+                    <td>
+                        <span class="badge rounded-pill bg-dark border border-info text-info px-3 py-2 fw-black fs-6">
+                            {{ sale.quantity }}
+                        </span>
+                    </td>
+
+                    <!-- موقف السداد المالي -->
+                    <td>
+                        {% if sale.remaining_amount <= 0 %}
+                            <span class="badge badge-paid-solid px-3 py-2 rounded-pill">
+                                <i class="bi bi-check-all me-1"></i> خالص السداد
+                            </span>
+                        {% else %}
+                            <span class="badge badge-due-solid px-3 py-2 rounded-pill">
+                                <i class="bi bi-exclamation-circle me-1"></i> متبقي: {{ sale.remaining_amount }} ج.م
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <!-- 🟢 حالة التسليم بالمخزن (تتبع ذكي يمنع أي تناقض ويظهر الصنف المسلم بالاسم) -->
+                    <td id="status-cell-{{ sale.id }}">
+                        {% if sale.delivery_state == 'full' or sale.is_delivered %}
+                            <span class="badge-status badge-delivered">
+                                <i class="bi bi-check-circle-fill"></i> تم التسليم بالكامل
+                            </span>
+                            {% if sale.delivered_by %}
+                                <div class="small text-muted mt-1" style="font-size:0.7rem;">بواسطة: {{ sale.delivered_by.get_full_name|default:sale.delivered_by.username }}</div>
+                            {% endif %}
+                        {% elif sale.delivery_state == 'partial' %}
+                            <span class="badge-status badge-partial-amber">
+                                <i class="bi bi-pie-chart-fill"></i> تسليم جزئي ({{ sale.delivered_count_display }})
+                            </span>
+                            <div class="small text-warning mt-1 fw-bold" style="font-size:0.72rem;">
+                                متبقي: {{ sale.remaining_items_list }}
+                            </div>
+                        {% else %}
+                            <span class="badge-status badge-pending-red">
+                                <i class="bi bi-hourglass-split"></i> في انتظار التسليم
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <!-- أزرار الإجراءات -->
+                    <td>
+                        <div class="d-flex justify-content-center gap-1" id="action-btns-{{ sale.id }}">
+                            <button type="button" class="btn btn-sm btn-success fw-bold px-2 py-1 rounded-2 shadow-sm" 
+                                    onclick="openDetailedDeliveryModal('{{ sale.id }}')" title="تأكيد تسليم مقتنيات ومقررات الطالب المتاحة بالمخزن">
+                                <i class="bi bi-box-arrow-up-right me-1"></i> تسليم المخزن
+                            </button>
+
+                            {% if sale.remaining_amount <= 0 %}
+                                <a href="{% url 'print_book_receipt' sale.id %}" class="btn btn-action-icon btn-outline-info shadow-sm" target="_blank" title="طباعة إذن الاستلام الرسمى">
+                                    <i class="bi bi-printer-fill"></i>
+                                </a>
+                            {% else %}
+                                <button type="button" class="btn btn-action-icon btn-outline-secondary opacity-50 shadow-sm" title="الطباعة محظورة بانتظار استكمال سداد المبلغ بالخزينة" disabled style="cursor: not-allowed;">
+                                    <i class="bi bi-printer-fill"></i>
+                                </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-5 text-muted fw-bold">
+                        <i class="bi bi-inbox fs-1 d-block mb-2 text-info opacity-50"></i>
+                        لا توجد عمليات صرف مسجلة مطابقة لمعايير البحث حالياً.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 4. أزرار التنقل الاحترافي بين الصفحات (Max 20 طلاب لكل صفحة) -->
+<div id="paginationContainer" class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3 mt-4 px-2 animate__animated animate__fadeInUp">
+    <div class="text-white-50 small fw-bold">
+        <i class="bi bi-info-circle text-info me-1"></i>
+        عرض الصفحة <span class="text-info fw-black">{{ sales.number }}</span> من أصل <span class="text-white fw-black">{{ sales.paginator.num_pages }}</span> 
+        (إجمالي <span class="text-warning fw-black">{{ sales.paginator.count }}</span> إذن صرف)
+    </div>
+
+    {% if sales.has_other_pages %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination pagination-custom m-0">
+
+            {% if sales.has_previous %}
+            <li class="page-item">
+                <a class="page-link shadow-sm" href="javascript:void(0)" onclick="goToPage(1)" title="الصفحة الأولى">
+                    <i class="bi bi-chevron-double-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link shadow-sm" href="javascript:void(0)" onclick="goToPage({{ sales.previous_page_number }})" title="السابق">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-double-right"></i></span></li>
+            <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-right"></i></span></li>
+            {% endif %}
+
+            {% for i in sales.paginator.page_range %}
+                {% if sales.number == i %}
+                    <li class="page-item active" aria-current="page"><span class="page-link shadow-sm">{{ i }}</span></li>
+                {% elif i > sales.number|add:'-3' and i < sales.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link shadow-sm" href="javascript:void(0)" onclick="goToPage({{ i }})">{{ i }}</a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if sales.has_next %}
+            <li class="page-item">
+                <a class="page-link shadow-sm" href="javascript:void(0)" onclick="goToPage({{ sales.next_page_number }})" title="التالي">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link shadow-sm" href="javascript:void(0)" onclick="goToPage({{ sales.paginator.num_pages }})" title="الصفحة الأخيرة">
+                    <i class="bi bi-chevron-double-left"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i></span></li>
+            <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-double-left"></i></span></li>
+            {% endif %}
+
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- 📦 الشاشة المنبثقة التفاعلية المتطورة والاحترافية جداً (Detailed Item Delivery Modal) -->
+<div class="modal fade" id="detailedDeliveryModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-dark text-white border border-secondary rounded-4 shadow-lg p-3">
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <h5 class="fw-black text-info m-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-boxes fs-4"></i> شاشة تسليم المقررات والكتب الدراسية
+                    </h5>
+                    <small class="text-white-50">حدد الكتب المتوفرة بالمخزن للتسليم الآن، وسيتبقى غير المتوفر لحين التوريد</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body py-3">
+                <!-- كارت بيانات الطالب ونسبة الإنجاز -->
+                <div class="modal-student-box mb-3">
+                    <div class="row align-items-center g-2">
+                        <div class="col-md-7">
+                            <h6 class="modal-student-name m-0" id="mStudentName">---</h6>
+                            <div class="modal-student-info mt-1" id="mStudentMeta">---</div>
+                        </div>
+                        <div class="col-md-5 text-end">
+                            <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-25 px-3 py-2 rounded-pill fw-bold" id="mProgressBadge">
+                                استلم 0 من 0 كتب
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- أزرار الإجراءات السريعة -->
+                <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                    <span class="fw-bold text-white small">بيان كتب ومقررات الطالب المعتمدة:</span>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-link text-info text-decoration-none p-0 me-3 fw-bold" onclick="toggleAvailableCheckboxes(true)">تحديد كل المتوفر</button>
+                        <button type="button" class="btn btn-sm btn-link text-muted text-decoration-none p-0 fw-bold" onclick="toggleAvailableCheckboxes(false)">تفريغ التحديد</button>
+                    </div>
+                </div>
+
+                <!-- حاوية المقررات المقسمة -->
+                <div id="modalItemsContainer" style="max-height: 320px; overflow-y: auto;" class="pe-1">
+                    <!-- يتم جلب وقسمة العناصر بالـ AJAX -->
+                </div>
+
+                <div id="modalErrorAlert" class="alert alert-danger fw-bold small rounded-3 mt-3 d-none m-0"></div>
+            </div>
+
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary rounded-3 px-4 fw-bold" data-bs-dismiss="modal">إغلاق</button>
+                <button type="button" id="btnSubmitDelivery" class="btn btn-info fw-black rounded-3 px-5 text-dark" onclick="submitPartialDelivery()">
+                    <i class="bi bi-check2-circle me-1"></i> تأكيد تسليم الكتب المحددة
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let searchTimer;
+let currentActiveSaleId = null;
+
+// 🟢 1. دالة البحث والفلترة اللحظية (No-Reload Live Search)
+function instantSalesSearch(pageNumber = 1) {
+    clearTimeout(searchTimer);
+    let q = document.getElementById('salesSearch').value.trim();
+    let itemType = document.getElementById('f-item-type').value;
+    let gradeId = document.getElementById('f-grade').value;
+    let statusVal = document.getElementById('f-status').value;
+    let tableBody = document.getElementById('salesTableBody');
+
+    if (tableBody) tableBody.style.opacity = '0.35';
+
+    searchTimer = setTimeout(() => {
+        let url = new URL(window.location.pathname, window.location.origin);
+        let params = url.searchParams;
+
+        if (q) params.set('q', q);
+        else params.delete('q');
+
+        if (itemType) params.set('item_type', itemType);
+        else params.delete('item_type');
+
+        if (gradeId) params.set('grade_id', gradeId);
+        else params.delete('grade_id');
+
+        if (statusVal) params.set('status', statusVal);
+        else params.delete('status');
+
+        params.set('page', pageNumber);
+
+        window.history.replaceState({}, '', url.toString());
+
+        fetch(url.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(response => response.text())
+        .then(html => {
+            let parser = new DOMParser();
+            let doc = parser.parseFromString(html, 'text/html');
+
+            let newTableBody = doc.getElementById('salesTableBody');
+            if (newTableBody && tableBody) {
+                tableBody.innerHTML = newTableBody.innerHTML;
+            }
+
+            let newPagination = doc.getElementById('paginationContainer');
+            let curPagination = document.getElementById('paginationContainer');
+            if (newPagination && curPagination) {
+                curPagination.innerHTML = newPagination.innerHTML;
+            }
+
+            ['stat-total', 'stat-books', 'stat-uniforms', 'stat-pending'].forEach(id => {
+                let newStat = doc.getElementById(id);
+                let curStat = document.getElementById(id);
+                if (newStat && curStat) curStat.innerText = newStat.innerText;
+            });
+
+            if (tableBody) tableBody.style.opacity = '1';
+        })
+        .catch(err => {
+            console.error('حدث خطأ أثناء البحث اللحظي:', err);
+            if (tableBody) tableBody.style.opacity = '1';
+        });
+    }, 250);
+}
+
+// 🟢 2. دالة مسح جميع الفلاتر دفعة واحدة
+function clearAllFilters() {
+    document.getElementById('salesSearch').value = '';
+    document.getElementById('f-item-type').value = '';
+    document.getElementById('f-grade').value = '';
+    document.getElementById('f-status').value = '';
+
+    let url = new URL(window.location.pathname, window.location.origin);
+    window.history.replaceState({}, '', url.pathname);
+
+    instantSalesSearch(1);
+}
+
+// 🟢 3. دالة تحديث الفلاتر دون فقدان معايير البحث
+function updateUrlParam(key, value) {
+    let el = null;
+    if (key === 'item_type') el = document.getElementById('f-item-type');
+    else if (key === 'grade_id') el = document.getElementById('f-grade');
+    else if (key === 'status') el = document.getElementById('f-status');
+
+    if (el) el.value = value;
+    instantSalesSearch(1);
+}
+
+function goToPage(page) {
+    instantSalesSearch(page);
+}
+
+// 🟢 4. فتح المودال التفاعلي واستدعاء جرد المخزن مفصلاً
+function openDetailedDeliveryModal(saleId) {
+    currentActiveSaleId = saleId;
+    document.getElementById('modalErrorAlert').classList.add('d-none');
+    document.getElementById('modalItemsContainer').innerHTML = '<div class="text-center py-5 text-info"><div class="spinner-border spinner-border-sm me-2"></div>جاري استخراج كشف أسماء الكتب ورصيد المخزن الحقيقي...</div>';
+
+    const deliveryModal = new bootstrap.Modal(document.getElementById('detailedDeliveryModal'));
+    deliveryModal.show();
+
+    fetch(`/students/sales/api/delivery-details/${saleId}/`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('mStudentName').innerText = data.student_name;
+                document.getElementById('mStudentMeta').innerText = `الصف: ${data.grade_name} | التخصص: ${data.specialization || 'شعبة عامة'}`;
+                document.getElementById('mProgressBadge').innerText = `استلم ${data.delivered_count} من أصل ${data.total_count} ${data.item_type_label}`;
+
+                const container = document.getElementById('modalItemsContainer');
+                container.innerHTML = '';
+
+                let pendingHtml = '';
+                let deliveredHtml = '';
+
+                data.items.forEach(item => {
+                    if (item.is_delivered) {
+                        // 🟢 الكتب المسلمة سابقاً
+                        deliveredHtml += `
+                            <div class="delivery-item-row already-done d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center gap-2 fw-black text-success">
+                                    <i class="bi bi-check-circle-fill fs-5"></i>
+                                    <span class="fs-6">${item.name}</span>
+                                </div>
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-25 stock-badge">
+                                    تم الاستلام سابقاً ✅
+                                </span>
+                            </div>
+                        `;
+                    } else {
+                        // ⏳ الكتب المتبقية للتسليم
+                        const isAvailable = item.is_available;
+                        const stockBadge = isAvailable
+                            ? `<span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-25 stock-badge"><i class="bi bi-box-seam me-1"></i> متاح بالرفوف: ${item.stock} قطعة</span>`
+                            : `<span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-25 stock-badge"><i class="bi bi-x-circle me-1"></i> نفد من المخزن (0)</span>`;
+
+                        const disabledAttr = !isAvailable ? 'disabled' : '';
+                        const checkedAttr = isAvailable ? 'checked' : '';
+
+                        pendingHtml += `
+                            <div class="delivery-item-row d-flex justify-content-between align-items-center">
+                                <div class="form-check m-0">
+                                    <input class="form-check-input modal-item-checkbox" type="checkbox" value="${item.id}" id="chk_item_${item.id}" ${checkedAttr} ${disabledAttr}>
+                                    <label class="form-check-label modal-item-label ms-2" for="chk_item_${item.id}">
+                                        ${item.name}
+                                    </label>
+                                </div>
+                                <div>${stockBadge}</div>
+                            </div>
+                        `;
+                    }
+                });
+
+                let finalHtml = '';
+                if (pendingHtml) {
+                    finalHtml += `<div class="delivery-section-title text-warning"><i class="bi bi-hourglass-split me-1"></i> المقررات المتبقية لـ (تسليم الآن):</div>` + pendingHtml;
+                }
+                if (deliveredHtml) {
+                    finalHtml += `<div class="delivery-section-title text-success"><i class="bi bi-check2-all me-1"></i> المقررات المستلمة سابقاً:</div>` + deliveredHtml;
+                }
+
+                container.innerHTML = finalHtml || '<div class="text-center py-4 text-muted">لا توجد كتب مسجلة لهذه الباقة بداخل إعدادات المخزن</div>';
+            } else {
+                document.getElementById('modalItemsContainer').innerHTML = `<div class="alert alert-danger m-0">${data.error}</div>`;
+            }
+        })
+        .catch(err => {
+            document.getElementById('modalItemsContainer').innerHTML = '<div class="alert alert-danger m-0">حدث خطأ أثناء جلب تفاصيل الجرد من الخادم!</div>';
+        });
+}
+
+function toggleAvailableCheckboxes(status) {
+    document.querySelectorAll('.modal-item-checkbox:not([disabled])').forEach(chk => {
+        chk.checked = status;
+    });
+}
+
+// 🟢 5. إرسال الأصناف المحددة وحفظ التسليم بالمخزن
+function submitPartialDelivery() {
+    if (!currentActiveSaleId) return;
+
+    const selectedCheckboxes = document.querySelectorAll('.modal-item-checkbox:checked');
+    const selectedIds = Array.from(selectedCheckboxes).map(chk => parseInt(chk.value));
+
+    const btn = document.getElementById('btnSubmitDelivery');
+    const errAlert = document.getElementById('modalErrorAlert');
+    errAlert.classList.add('d-none');
+
+    if (selectedIds.length === 0) {
+        errAlert.innerText = 'يرجى تحديد كتاب واحد على الأقل لتسليمه الآن!';
+        errAlert.classList.remove('d-none');
+        return;
     }
 
-    /* تأثير تمرير الماوس على الصفوف */
-    .table-hover tbody tr:hover {
-        background-color: rgba(255, 255, 255, 0.03) !important;
-        transition: all 0.3s ease;
-    }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></div>جاري التوثيق وتحديث المخزن...';
 
-    /* تحسين شكل البادج */
-    .badge.bg-opacity-10 {
-        border: 1px solid rgba(255,255,255,0.1);
-    }
+    fetch(`/students/sales/api/save-delivery/${currentActiveSaleId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ selected_items: selectedIds })
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> تأكيد تسليم الكتب المحددة';
 
-    /* تنسيق النصوص الفارغة */
-    .text-muted.small {
-        font-size: 0.8rem;
-    }
-</style>
+        if (data.success) {
+            const modalEl = document.getElementById('detailedDeliveryModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            modalInstance.hide();
+
+            instantSalesSearch();
+        } else {
+            errAlert.innerText = data.error;
+            errAlert.classList.remove('d-none');
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> تأكيد تسليم الكتب المحددة';
+        errAlert.innerText = 'حدث خطأ غير متوقع أثناء الاتصال بالسيرفر!';
+        errAlert.classList.remove('d-none');
+    });
+}
+</script>
 {% endblock %}

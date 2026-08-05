@@ -6,13 +6,13 @@
 <div class="container py-5" dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            
+
             <div class="card shadow-lg border-0 mb-4" style="background: linear-gradient(135deg, #1e1e1e, #2a0808); border-right: 5px solid #dc3545 !important; border-radius: 15px;">
                 <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div>
                         <h3 class="text-danger fw-900 mb-2"><i class="bi bi-person-x-fill me-2"></i> إدارة سحب الملفات (للإدارة فقط)</h3>
                         <p class="text-white-50 mb-0 fs-5 d-flex align-items-center">
-                            <i class="bi bi-person-badge me-2 text-secondary"></i> الطالب: 
+                            <i class="bi bi-person-badge me-2 text-secondary"></i> الطالب:
                             <span class="text-white fw-bold ms-2">{{ student.get_full_name }}</span>
                         </p>
                     </div>
@@ -24,14 +24,14 @@
 
             <div class="card bg-black shadow-lg border-secondary border-opacity-50" style="border-radius: 15px;">
                 <div class="card-body p-4 p-md-5 bg-dark" style="border-radius: 15px;">
-                    
+
                     <div class="alert mb-4 shadow-sm" style="background: rgba(13, 202, 240, 0.05); border: 1px solid rgba(13, 202, 240, 0.2); border-radius: 12px;">
                         <div class="d-flex align-items-center">
                             <div class="fs-1 text-info me-3"><i class="bi bi-info-circle-fill"></i></div>
                             <div>
                                 <h5 class="text-info fw-bold mb-1">الرصيد المالي الحالي</h5>
                                 <p class="text-light mb-0 fs-6">
-                                    إجمالي ما دفعه الطالب فعلياً هذا العام: 
+                                    إجمالي ما دفعه الطالب فعلياً هذا العام:
                                     <strong class="text-white fs-4 ms-1">{{ total_paid|default:"0.00" }} <small class="fs-6">ج.م</small></strong>
                                 </p>
                             </div>
@@ -40,20 +40,23 @@
 
                     <form method="POST" id="withdrawForm">
                         {% csrf_token %}
-                        
+
+                        <!-- 🟢 الحقل المخفي لتمرير الشاشة القادم منها الموظف (كاونتر / تحصيل سريع) -->
+                        <input type="hidden" name="from_screen" value="{{ from_screen }}">
+
                         <div class="mb-4">
                             <label class="form-label text-white fw-bold fs-5 mb-3">
                                 <i class="bi bi-cash-coin text-warning me-2"></i> المبلغ المراد استرداده (رده من الخزينة)
                             </label>
                             <div class="input-group input-group-lg shadow-sm">
-                                <input type="number" name="refund_amount" id="refund_amount" 
-                                       class="form-control bg-black text-warning fw-bold border-secondary text-center" 
-                                       value="0" min="0" step="0.01" max="{{ total_paid|default:'0' }}" required 
+                                <input type="number" name="refund_amount" id="refund_amount"
+                                       class="form-control bg-black text-warning fw-bold border-secondary text-center"
+                                       value="0" min="0" step="0.01" max="{{ total_paid|default:'0' }}" required
                                        style="font-size: 1.8rem; letter-spacing: 2px;">
                                 <span class="input-group-text bg-secondary text-white border-secondary fw-bold px-4">ج.م</span>
                             </div>
                             <div class="form-text text-white-50 mt-2 fs-6">
-                                <i class="bi bi-lightbulb text-warning me-1"></i> 
+                                <i class="bi bi-lightbulb text-warning me-1"></i>
                                 إذا لم يتم استرداد مبالغ، اترك الرقم <strong class="text-white">0</strong> وسيتم فقط إسقاط باقي الأقساط وتجميد الملف.
                             </div>
                         </div>
@@ -62,7 +65,7 @@
                             <label class="form-label text-white fw-bold fs-5 mb-3">
                                 <i class="bi bi-card-text text-info me-2"></i> سبب سحب الملف / الاسترداد
                             </label>
-                            <textarea name="reason" class="form-control bg-black text-white border-secondary p-3 shadow-inner" 
+                            <textarea name="reason" class="form-control bg-black text-white border-secondary p-3 shadow-inner"
                                       rows="3" required placeholder="اكتب سبب سحب الملف بدقة للرجوع إليه في التقارير (مثال: نقل لمدرسة أخرى)...">سحب ملف نهائي وتصفية حسابات</textarea>
                         </div>
 
@@ -95,12 +98,12 @@
     .shadow-inner { box-shadow: inset 0 2px 10px rgba(0,0,0,0.5); }
     .hover-scale { transition: transform 0.2s ease-in-out; }
     .hover-scale:hover { transform: translateY(-2px); }
-    
+
     /* إخفاء أسهم الأرقام داخل الـ input number ليكون شكله أنظف */
-    input[type=number]::-webkit-inner-spin-button, 
-    input[type=number]::-webkit-outer-spin-button { 
-        -webkit-appearance: none; 
-        margin: 0; 
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
     }
     input[type=number] {
         -moz-appearance: textfield;
@@ -112,9 +115,9 @@
 function confirmWithdrawal() {
     const refundAmt = document.getElementById('refund_amount').value;
     const isRefunding = parseFloat(refundAmt) > 0;
-    
+
     let htmlContent = `<div class="text-danger fw-bold mb-3 fs-5">أنت على وشك سحب ملف الطالب وإسقاط جميع ديونه المتبقية نهائياً!</div>`;
-    
+
     if (isRefunding) {
         htmlContent += `<div class="text-white bg-black p-3 rounded-3 border border-secondary shadow-inner mt-3">
                             سيتم رد مبلغ من الخزينة قدره: <br>

@@ -1,123 +1,580 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% load static %}
 
-{% block title %}تقرير المتأخرات الحرجة{% endblock %}
+{% block title %}مركز متابعة الكول سنتر CRM{% endblock %}
 
-{% block content %}
+{% block extra_css %}
 <style>
-    /* تحسينات بصرية للتقرير */
-    .report-card { border-radius: 20px; overflow: hidden; border: none; background-color: #1a1a1a; } /* خلفية داكنة للبطاقة */
-    .status-badge { padding: 6px 12px; border-radius: 50px; font-weight: 600; font-size: 0.8rem; }
-    .bg-soft-danger { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; }
-    .table-hover tbody tr:hover { background-color: rgba(255, 255, 255, 0.05); transition: 0.3s; }
-    
-    /* تنسيق خاص لأيام التأخير حسب خطورتها */
-    .delay-critical { color: #ff4b2b; font-weight: 900; animation: blinker 1.5s linear infinite; }
-    @keyframes blinker { 50% { opacity: 0.5; } }
-
-    .stat-box {
-        background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
-        color: white;
-        border-radius: 15px;
-        transition: transform 0.3s;
+    :root {
+        --bg-main: #020617;
+        --glass-surface: rgba(15, 23, 42, 0.95);
+        --glass-border: rgba(255, 255, 255, 0.15);
+        --neon-cyan: #38bdf8;
     }
-    .stat-box:hover { transform: scale(1.02); }
 
-    @media print {
-        .sidebar, .top-navbar, .d-print-none, .btn-group { display: none !important; }
-        .main-content { margin-right: 0 !important; padding: 0 !important; width: 100% !important; }
-        body { background-color: white !important; font-size: 12pt; }
-        .report-card { box-shadow: none !important; border: 1px solid #eee !important; background-color: white !important; }
-        .table { width: 100% !important; border-collapse: collapse !important; }
-        .table th, .table td { border: 1px solid #ddd !important; padding: 8px !important; color: black !important; }
+    body { background-color: var(--bg-main) !important; color: #f8fafc !important; }
+
+    .premium-card {
+        background: var(--glass-surface) !important;
+        backdrop-filter: blur(25px);
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 20px !important;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+        overflow: hidden;
+    }
+
+    .kpi-main-card {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95)) !important;
+        border: 2px solid var(--neon-cyan) !important;
+        border-radius: 20px;
+        padding: 22px 30px;
+        box-shadow: 0 10px 30px rgba(56, 189, 248, 0.15);
+    }
+
+    .table-premium {
+        --bs-table-bg: transparent;
+        color: #f8fafc;
+        margin-bottom: 0;
+    }
+    .table-premium thead th {
+        color: var(--neon-cyan) !important;
+        font-size: 0.95rem;
+        border-bottom: 2px solid #334155;
+        font-weight: 800;
+        padding: 16px;
+        background: #000000;
+        white-space: nowrap;
+    }
+    .table-premium tbody tr { 
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08); 
+        transition: all 0.2s;
+    }
+    .table-premium tbody tr:hover { background: rgba(56, 189, 248, 0.12) !important; }
+    .table-premium td { padding: 16px; vertical-align: middle; color: #ffffff !important; }
+
+    .btn-whatsapp {
+        background: rgba(37, 211, 102, 0.2);
+        color: #25D366 !important;
+        border: 1px solid #25D366;
+        border-radius: 50px;
+        font-weight: 700;
+    }
+    .btn-whatsapp:hover {
+        background: #25D366;
+        color: #000000 !important;
+    }
+
+    .search-input-custom {
+        background-color: #000000 !important;
+        color: #ffffff !important;
+        border: 1px solid var(--neon-cyan) !important;
+        border-radius: 12px 0 0 12px !important;
+        padding: 12px 18px !important;
+        font-weight: 700 !important;
+    }
+
+    .modal-content-glass {
+        background: #0f172a !important;
+        border: 1px solid var(--neon-cyan) !important;
+        border-radius: 20px !important;
+        color: #fff !important;
+    }
+
+    .note-bubble {
+        background: rgba(30, 41, 59, 0.9);
+        border-right: 4px solid var(--neon-cyan);
+        border-radius: 10px;
+        padding: 12px 15px;
+        margin-bottom: 12px;
+    }
+
+    .quick-status-btn {
+        font-size: 0.85rem;
+        font-weight: 700;
+        border-radius: 8px;
+        padding: 8px 14px;
+    }
+
+    .pagination-custom .page-link {
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid var(--glass-border);
+        color: #38bdf8;
+        font-weight: bold;
+        border-radius: 8px;
+        margin: 0 3px;
+        padding: 8px 14px;
+        transition: all 0.3s;
+    }
+    .pagination-custom .page-item.active .page-link {
+        background: var(--neon-cyan);
+        color: #000000;
+        border-color: var(--neon-cyan);
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    }
+    .pagination-custom .page-link:hover {
+        background: rgba(56, 189, 248, 0.2);
+        color: #fff;
     }
 </style>
+{% endblock %}
 
+{% block content %}
 <div class="container-fluid py-4" dir="rtl">
-    <div class="d-flex justify-content-between align-items-center mb-4 bg-white p-4 rounded-4 shadow-sm border-start border-danger border-5 glass-header">
+
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
         <div>
-            <h3 class="fw-bold text-danger m-0"><i class="bi bi-radar ms-2"></i>رادار المديونيات المتأخرة</h3>
-            <p class="text-muted small mb-0 mt-1">
-                <i class="bi bi-calendar-event me-1"></i> تاريخ التقرير: <strong>{{ today|date:"Y-m-d" }}</strong>
-            </p>
+            <h3 class="fw-black text-white m-0 d-flex align-items-center gap-2">
+                <i class="bi bi-headset text-danger fs-2"></i>
+                مركز متابعة اتصالات الكول سنتر (Call Center CRM)
+            </h3>
+            <p class="text-info small m-0 fw-semibold">تسجيل نتائج الاتصالات اليومية، الملاحظات، وإرسال التذكيرات</p>
         </div>
-        <div class="d-print-none btn-group shadow-sm">
-            <button onclick="window.print()" class="btn btn-dark px-4 py-2">
-                <i class="bi bi-printer-fill me-2"></i> طباعة التقرير
-            </button>
+        
+        <div class="kpi-main-card d-flex align-items-center gap-4">
+            <div>
+                <span class="text-white-50 fw-bold d-block mb-1">إجمالي الحالات المتأخرة للمتابعة</span>
+                <h2 class="fw-black text-warning m-0 fs-1" id="totalCasesCount">{{ total_cases_count }} <small class="fs-5 text-white-50">حالة طالب</small></h2>
+            </div>
+            <i class="bi bi-telephone-outbound-fill text-info fs-1"></i>
         </div>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card stat-box border-0 shadow">
-                <div class="card-body p-4 text-center">
-                    <i class="bi bi-cash-coin fs-1 opacity-50 mb-2"></i>
-                    <h6 class="text-uppercase small fw-bold opacity-75">إجمالي المبالغ المتأخرة</h6>
-                    <h2 class="fw-bold m-0">{{ total_overdue|floatformat:0 }} <small class="fs-6">ج.م</small></h2>
+    <!-- نموذج الفلترة والبحث اللحظي -->
+    <div class="premium-card p-4 mb-4">
+        <form method="GET" action="" id="searchForm" autocomplete="off" onsubmit="return false;" class="row g-3 align-items-center">
+            <div class="col-lg-6 col-md-6">
+                <label class="form-label text-info fw-bold small"><i class="bi bi-search me-1"></i> البحث الفوري الشامل (اسم / كود / قومي / تليفون / ولي أمر / واتساب):</label>
+                <div class="input-group">
+                    <input type="text" id="searchInput" name="q" value="{{ search_q }}" autocomplete="off" class="form-control search-input-custom" placeholder="اكتب اسم أو رقم تليفون الطالب للبحث اللحظي...">
+                    <button type="button" onclick="doInstantSearch(1)" class="btn btn-info font-weight-bold px-4" style="border-radius: 0 12px 12px 0;">
+                        <i class="bi bi-search me-1"></i> بحث
+                    </button>
                 </div>
             </div>
-        </div>
+
+            <div class="col-lg-3 col-md-3">
+                <label class="form-label text-info fw-bold small">الفلترة بالصف الدراسي:</label>
+                <select name="grade_id" id="gradeSelect" class="form-select search-input-custom" style="border-radius: 12px !important;">
+                    <option value="">-- جميع الصفوف --</option>
+                    {% for g in all_grades %}
+                        <option value="{{ g.id }}" {% if selected_grade == g.id|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-lg-2 col-md-3">
+                <label class="form-label text-info fw-bold small">الفلترة بالتخصص:</label>
+                <select name="specialization" id="specSelect" class="form-select search-input-custom" style="border-radius: 12px !important;">
+                    <option value="">-- جميع الشعب --</option>
+                    {% for code, spec_name in all_specs %}
+                        <option value="{{ code }}" {% if selected_spec == code %}selected{% endif %}>{{ spec_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-lg-1 col-md-12 d-flex align-self-end">
+                <button type="button" onclick="resetSearchFilters()" class="btn btn-outline-danger fw-bold py-2 w-100" title="مسح الفلاتر وإعادة الضبط">
+                    <i class="bi bi-arrow-counterclockwise fs-5"></i>
+                </button>
+            </div>
+        </form>
     </div>
 
-    <div class="card report-card shadow-sm border-0">
+    <!-- جدول الكول سنتر -->
+    <div class="premium-card">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 text-center">
-                <thead class="bg-dark text-white">
+            <table class="table table-premium text-center align-middle" id="overdueTable">
+                <thead>
                     <tr>
-                        <th class="py-3">#</th>
-                        <th class="py-3 text-end px-4">اسم الطالب وبياناته</th>
-                        <th class="py-3">الصف</th>
-                        <th class="py-3">تاريخ الاستحقاق</th>
-                        <th class="py-3 text-light">قيمة القسط</th> 
-                        <th class="py-3 text-success">المسدد</th> 
-                        <th class="py-3 text-warning">المتبقي المتأخر</th> 
-                        <th class="py-3">تأخير</th>
-                        <th class="py-3 d-print-none">إجراء</th>
+                        <th class="text-start pe-4">كود واسم الطالب</th>
+                        <th>الصف الدراسي</th>
+                        <th>التخصص</th>
+                        <th>آخر نتيجة مكالمة / موقف الاتصال</th>
+                        <th>التواصل المباشر</th>
+                        <th>سجل وتحديث الملاحظات</th>
                     </tr>
                 </thead>
-
-                <tbody>
-                    {% for item in overdue_items %}
-                    <tr>
-                        <td class="text-white-50">{{ forloop.counter }}</td>
-                        <td class="text-end px-4">
-                            <div class="fw-bold text-white fs-6">
-                                <a href="{% url 'student_finance_detail' item.student.id %}" class="text-white text-decoration-none border-bottom border-secondary border-opacity-25 pb-1">
-                                    {{ item.student.get_full_name }}
-                                </a>
-                            </div>
+                <tbody id="crmTableBody">
+                    {% for s in students_list %}
+                    <tr id="student-row-{{ s.id }}">
+                        <td class="text-start pe-4">
+                            <div class="fw-black text-warning fs-6">{{ s.full_name }}</div>
+                            <div class="text-white-50 small mt-1"><i class="bi bi-hash text-info"></i> كود: {{ s.student_code }}</div>
                         </td>
-                        <td class="text-white-50">{{ item.student.grade.name }}</td>
-                        <td class="text-white fw-bold">{{ item.due_date|date:"Y-m-d" }}</td>
-                        
-                        <td class="text-white-50">{{ item.amount_due|floatformat:0 }}</td>
-                        
-                        <td class="text-success fw-bold">{{ item.display_paid|floatformat:0 }} ج.م</td>
-                        
-                        <td class="fw-bold text-danger fs-5">
-                            {{ item.display_remaining|floatformat:0 }} <small class="fs-6">ج.م</small>
-                        </td>
-                        
+                        <td><span class="badge bg-primary px-3 py-2 fs-6">{{ s.grade }}</span></td>
                         <td>
-                            <div class="{% if item.days_overdue > 30 %}delay-critical{% else %}text-warning fw-bold{% endif %}">
-                                <i class="bi bi-clock-history me-1"></i>
-                                {{ item.days_overdue }} يوم
+                            <span class="badge bg-info text-dark font-weight-bold px-3 py-2 fs-6 border border-light">
+                                {{ s.specialization }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="small fw-bold text-info bg-black p-2 rounded border border-secondary text-truncate" style="max-width: 250px;" id="latest-note-{{ s.id }}" title="{{ s.latest_note }}">
+                                <i class="bi bi-chat-left-dots-fill text-warning me-1"></i> {{ s.latest_note }}
                             </div>
                         </td>
-                        <td class="d-print-none">
-                            <a href="{% url 'quick_collection' %}?student_id={{ item.student.id }}" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm">
-                                <i class="bi bi-wallet2 ms-1"></i> تحصيل
-                            </a>
+                        <td>
+                            <div class="d-flex justify-content-center gap-2">
+                                {% if s.phone and s.phone != '---' %}
+                                    <a href="tel:{{ s.phone }}" class="btn btn-sm btn-outline-info fw-bold px-3">
+                                        <i class="bi bi-telephone-fill me-1"></i> {{ s.phone }}
+                                    </a>
+                                {% endif %}
+                                
+                                {% if s.whatsapp_number and s.whatsapp_number != '---' %}
+                                    <a href="https://wa.me/2{{ s.whatsapp_number }}?text={% if s.overdue_count > 1 %}{{ 'السلام عليكم ولي أمر الطالب/ة ' }}{{ s.full_name }}{{ '، نذكركم بسداد الأقساط المستحقة وقيمة المبلغ المتأخر ' }}{{ s.total_required|floatformat:2 }}{{ ' ج.م.'|urlencode }}{% else %}{{ 'السلام عليكم ولي أمر الطالب/ة ' }}{{ s.full_name }}{{ '، نذكركم بسداد القسط المستحق وقيمة المبلغ المتأخر ' }}{{ s.total_required|floatformat:2 }}{{ ' ج.م.'|urlencode }}{% endif %}" 
+                                       target="_blank" class="btn btn-sm btn-whatsapp px-3">
+                                        <i class="bi bi-whatsapp me-1"></i> واتساب
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex justify-content-center gap-2">
+                                <button type="button" onclick="openNotesModal({{ s.id }}, '{{ s.full_name|escapejs }}')" class="btn btn-sm btn-warning fw-bold px-3 position-relative">
+                                    <i class="bi bi-journal-plus me-1"></i> تسجيل/عرض المكالمات
+                                    {% if s.notes_count > 0 %}
+                                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notes-badge-{{ s.id }}">
+                                            {{ s.notes_count }}
+                                        </span>
+                                    {% endif %}
+                                </button>
+                                <button type="button" onclick="openStudentDetailsModal({{ s.id }})" class="btn btn-sm btn-outline-light fw-bold px-3" title="تفاصيل الأقساط والماليات">
+                                    <i class="bi bi-eye-fill"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="py-5 text-white-50">لا يوجد متأخرات حالياً</td>
+                        <td colspan="6" class="py-5 text-center text-muted">
+                            <i class="bi bi-shield-check text-success" style="font-size: 4rem;"></i>
+                            <h4 class="mt-3 text-white fw-bold">لا توجد أي حالات متأخرة مطابقة لخيارات الفلترة! 🎉</h4>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+
+        <!-- حاوي الباجنيشن المحدث -->
+        <div id="paginationContainer">
+            {% if students_list.has_other_pages %}
+            <div class="p-4 bg-black border-top border-secondary border-opacity-25 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <span class="text-info small fw-bold"><i class="bi bi-file-earmark-text me-1"></i> عرض صفحة {{ students_list.number }} من إجمالي {{ students_list.paginator.num_pages }} صفحة</span>
+                <ul class="pagination pagination-custom m-0">
+                    {% if students_list.has_previous %}
+                        <li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="doInstantSearch(1)"><i class="bi bi-chevron-double-right"></i> الأولى</a></li>
+                        <li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="doInstantSearch({{ students_list.previous_page_number }})">السابق</a></li>
+                    {% endif %}
+
+                    <li class="page-item active"><span class="page-link">{{ students_list.number }}</span></li>
+
+                    {% if students_list.has_next %}
+                        <li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="doInstantSearch({{ students_list.next_page_number }})">التالي</a></li>
+                        <li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="doInstantSearch({{ students_list.paginator.num_pages }})">الأخيرة <i class="bi bi-chevron-double-left"></i></a></li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
     </div>
 </div>
+
+<div class="modal fade" id="callNotesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content modal-content-glass">
+            <div class="modal-header border-bottom border-secondary pb-3">
+                <h5 class="modal-title fw-black text-info" id="notesStudentName">سجل اتصالات وملاحظات الكول سنتر</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-4">
+                <div class="mb-4 bg-black p-3 rounded-3 border border-secondary">
+                    <label class="form-label text-warning fw-bold small mb-2">اختر نتيجة المكالمة السريعة أو اكتب ملاحظة:</label>
+                    
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button type="button" onclick="setQuickNote('الهاتف مغلق / غير متاح 📵')" class="btn btn-outline-danger quick-status-btn">📵 الهاتف مغلق</button>
+                        <button type="button" onclick="setQuickNote('لم يتم الرد على المكالمة 🤙')" class="btn btn-outline-warning quick-status-btn">🤙 لم يرد</button>
+                        <button type="button" onclick="setQuickNote('تعهد ولي الأمر بالسداد قريبًا 🤝')" class="btn btn-outline-success quick-status-btn">🤝 تعهد بالسداد</button>
+                        <button type="button" onclick="setQuickNote('طلب ولي الأمر مهلة لإجراء السداد ⏳')" class="btn btn-outline-info quick-status-btn">⏳ طلب مهلة</button>
+                        <button type="button" onclick="setQuickNote('تم إرسال رسالة تذكير على الواتساب 💬')" class="btn btn-outline-success quick-status-btn">💬 تم إرسال رسالة على الواتس</button>
+                        <button type="button" onclick="setQuickNote('الرقم خاطئ / ليس لولي الأمر ❌')" class="btn btn-outline-secondary quick-status-btn">❌ رقم خاطئ</button>
+                    </div>
+
+                    <textarea id="newCallNoteText" class="form-control bg-dark text-white border-secondary mb-3" rows="3" placeholder="اكتب التفاصيل الكاملة لنص المكالمة هنا..."></textarea>
+                    
+                    <button type="button" onclick="saveCallNote()" id="btnSaveNote" class="btn btn-success fw-bold w-100 py-2">
+                        <i class="bi bi-check-circle-fill me-1"></i> حفظ وتثبيت نتيجة المكالمة بالسجل
+                    </button>
+                </div>
+
+                <h6 class="fw-bold text-white-50 mb-3"><i class="bi bi-clock-history me-1"></i> الأرشيف الزمني لكافة اتصالات الطالب:</h6>
+                <div id="notesHistoryList" style="max-height: 280px; overflow-y: auto;">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="installmentsDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content modal-content-glass">
+            <div class="modal-header border-bottom border-secondary pb-3">
+                <h5 class="modal-title fw-black text-warning" id="modalStudentName">تفاصيل أقساط الطالب</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-4">
+                <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+                    <table class="table table-dark table-bordered text-center align-middle">
+                        <thead class="bg-black text-info">
+                            <tr>
+                                <th>رقم القسط</th>
+                                <th>تاريخ الاستحقاق</th>
+                                <th>أصل القسط</th>
+                                <th>المسدد</th>
+                                <th>غرامة التأخير</th>
+                                <th>المستحق الصافي</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalInstallmentsBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="row g-2 mt-3 pt-3 border-top border-secondary text-center">
+                    <div class="col-md col-6">
+                        <div class="p-2 rounded bg-black border border-secondary">
+                            <small class="text-white-50 d-block fw-bold mb-1">إجمالي المصروفات</small>
+                            <strong id="modalTotalFees" class="text-info fs-6">0.00 ج.م</strong>
+                        </div>
+                    </div>
+                    <div class="col-md col-6">
+                        <div class="p-2 rounded bg-black border border-secondary">
+                            <small class="text-white-50 d-block fw-bold mb-1">المديونية القديمة</small>
+                            <strong id="modalOldDebt" class="text-danger fs-6">0.00 ج.م</strong>
+                        </div>
+                    </div>
+                    <div class="col-md col-6">
+                        <div class="p-2 rounded bg-black border border-secondary">
+                            <small class="text-white-50 d-block fw-bold mb-1">المدفوع</small>
+                            <strong id="modalTotalPaid" class="text-success fs-6">0.00 ج.م</strong>
+                        </div>
+                    </div>
+                    <div class="col-md col-6">
+                        <div class="p-2 rounded bg-black border border-secondary">
+                            <small class="text-white-50 d-block fw-bold mb-1">غرامات التأخير</small>
+                            <strong id="modalTotalLate" class="text-warning fs-6">0.00 ج.م</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-12 col-12 mt-2">
+                        <div class="p-2 rounded bg-black border border-warning">
+                            <small class="text-warning d-block fw-black fs-6">المستحق الشامل</small>
+                            <strong id="modalTotalObligation" class="text-warning fs-4 fw-black">0.00 ج.م</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary">
+                <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentActiveStudentId = null;
+let liveSearchTimer = null;
+
+// 🟢 دالة البحث اللحظي الخفي السريع جداً مع بقاء مؤشر الكتابة 100%
+function doInstantSearch(pageNumber = 1) {
+    const searchInput = document.getElementById('searchInput');
+    const gradeSelect = document.getElementById('gradeSelect');
+    const specSelect = document.getElementById('specSelect');
+
+    const q = searchInput ? searchInput.value.trim() : '';
+    const grade_id = gradeSelect ? gradeSelect.value : '';
+    const spec = specSelect ? specSelect.value : '';
+
+    const params = new URLSearchParams({
+        'q': q,
+        'grade_id': grade_id,
+        'specialization': spec,
+        'page': pageNumber
+    });
+
+    const url = '?' + params.toString();
+
+    fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(res => res.text())
+    .then(html => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        // تحديث محتوى الجدول فقط (بدون مساس بـ searchInput) للحفاظ على تركيز المؤشر
+        const newTbody = doc.getElementById('crmTableBody');
+        const oldTbody = document.getElementById('crmTableBody');
+        if (newTbody && oldTbody) {
+            oldTbody.innerHTML = newTbody.innerHTML;
+        }
+
+        // تحديث إجمالي عدد الحالات
+        const newKpi = doc.getElementById('totalCasesCount');
+        const oldKpi = document.getElementById('totalCasesCount');
+        if (newKpi && oldKpi) {
+            oldKpi.innerHTML = newKpi.innerHTML;
+        }
+
+        // تحديث شريط الترقيم
+        const newPaging = doc.getElementById('paginationContainer');
+        const oldPaging = document.getElementById('paginationContainer');
+        if (newPaging && oldPaging) {
+            oldPaging.innerHTML = newPaging.innerHTML;
+        }
+
+        // مزامنة عنوان URL دون ريلود
+        window.history.replaceState({}, '', url);
+    })
+    .catch(err => console.error(err));
+}
+
+function resetSearchFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('gradeSelect').value = '';
+    document.getElementById('specSelect').value = '';
+    doInstantSearch(1);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const gradeSelect = document.getElementById('gradeSelect');
+    const specSelect = document.getElementById('specSelect');
+
+    if (searchInput) {
+        // تركيز المؤشر داخل الخانة فور الفتح
+        searchInput.focus();
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(liveSearchTimer);
+            // جلب النتائج بعد 300 ملي ثانية من التوقف عن الضغط على الأحرف
+            liveSearchTimer = setTimeout(() => doInstantSearch(1), 300);
+        });
+    }
+
+    if (gradeSelect) gradeSelect.addEventListener('change', () => doInstantSearch(1));
+    if (specSelect) specSelect.addEventListener('change', () => doInstantSearch(1));
+});
+
+function setQuickNote(text) {
+    document.getElementById('newCallNoteText').value = text;
+}
+
+function openNotesModal(studentId, studentName) {
+    currentActiveStudentId = studentId;
+    document.getElementById('notesStudentName').innerText = 'سجل اتصالات وملاحظات: ' + studentName;
+    document.getElementById('newCallNoteText').value = '';
+    
+    loadStudentCallNotes(studentId);
+    let modal = new bootstrap.Modal(document.getElementById('callNotesModal'));
+    modal.show();
+}
+
+function loadStudentCallNotes(studentId) {
+    let container = document.getElementById('notesHistoryList');
+    container.innerHTML = '<p class="text-info text-center py-2"><span class="spinner-border spinner-border-sm"></span> جاري جلب السجل...</p>';
+
+    fetch('?action=get_notes&student_id=' + studentId)
+        .then(res => res.json())
+        .then(data => {
+            container.innerHTML = '';
+            if (data.status === 'success' && data.notes && data.notes.length > 0) {
+                data.notes.forEach(note => {
+                    let bubble = `
+                        <div class="note-bubble">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-info fw-bold"><i class="bi bi-person-badge-fill me-1"></i> ${note.author}</small>
+                                <small class="text-white-50 font-monospace">${note.time}</small>
+                            </div>
+                            <p class="m-0 text-white small fw-semibold">${note.text}</p>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', bubble);
+                });
+            } else {
+                container.innerHTML = '<p class="text-muted text-center py-3 small">لا توجد نتائج اتصالات مسجلة مسبقاً لهذا الطالب.</p>';
+            }
+        });
+}
+
+function saveCallNote() {
+    let text = document.getElementById('newCallNoteText').value.trim();
+    if (!text) {
+        alert('يرجى اختيار أو كتابة نتيجة المكالمة أولاً.');
+        return;
+    }
+
+    let btn = document.getElementById('btnSaveNote');
+    btn.disabled = true;
+
+    let formData = new FormData();
+    formData.append('action', 'add_note');
+    formData.append('student_id', currentActiveStudentId);
+    formData.append('note_text', text);
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        if (data.status === 'success') {
+            document.getElementById('newCallNoteText').value = '';
+            let noteCell = document.getElementById('latest-note-' + currentActiveStudentId);
+            if (noteCell) {
+                noteCell.innerHTML = '<i class="bi bi-chat-left-dots-fill text-warning me-1"></i> ' + data.latest_note;
+            }
+            loadStudentCallNotes(currentActiveStudentId);
+        } else {
+            alert(data.message || 'حدث خطأ أثناء الحفظ.');
+        }
+    });
+}
+
+function openStudentDetailsModal(studentId) {
+    fetch('?action=get_student_details&student_id=' + studentId)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                document.getElementById('modalStudentName').innerText = 'تفاصيل مستحقات الطالب: ' + data.student_name;
+                let tbody = document.getElementById('modalInstallmentsBody');
+                tbody.innerHTML = '';
+
+                data.installments.forEach(inst => {
+                    let row = `
+                        <tr>
+                            <td><span class="badge bg-secondary font-monospace">قسط #${inst.number}</span></td>
+                            <td class="text-info fw-bold">${inst.due_date}</td>
+                            <td>${inst.amount_due.toFixed(2)} ج.م</td>
+                            <td class="text-success">${inst.paid_amount.toFixed(2)} ج.م</td>
+                            <td class="text-danger fw-bold">${inst.late_fee.toFixed(2)} ج.م</td>
+                            <td class="text-warning fw-black fs-6">${inst.total_required.toFixed(2)} ج.م</td>
+                        </tr>
+                    `;
+                    tbody.insertAdjacentHTML('beforeend', row);
+                });
+
+                document.getElementById('modalTotalFees').innerText = data.total_fees.toFixed(2) + ' ج.م';
+                document.getElementById('modalOldDebt').innerText = data.old_debt.toFixed(2) + ' ج.م';
+                document.getElementById('modalTotalPaid').innerText = data.total_paid.toFixed(2) + ' ج.م';
+                document.getElementById('modalTotalLate').innerText = data.total_late_fee.toFixed(2) + ' ج.م';
+                document.getElementById('modalTotalObligation').innerText = data.total_obligation.toFixed(2) + ' ج.م';
+
+                let modal = new bootstrap.Modal(document.getElementById('installmentsDetailModal'));
+                modal.show();
+            }
+        });
+}
+</script>
 {% endblock %}

@@ -1,159 +1,236 @@
 {% extends 'base.html' %}
 
-{% block page_title %}التحليل الإحصائي العام{% endblock %}
+{% block page_title %}التحليل الإحصائي العام للاشتراكات والمدرسين{% endblock %}
 
 {% block content %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- تحميل المكتبات الرسمية المعتمدة -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <style>
-    /* تنسيق كروت الإحصائيات الفاخرة - Dark Mode Premium */
+    :root {
+        --bg-deep: #000000;
+        --dark-glass: rgba(15, 23, 42, 0.85);
+        --border-glass: rgba(56, 189, 248, 0.25);
+        
+        --neon-cyan: #38bdf8;
+        --neon-emerald: #34d399;
+        --neon-yellow: #fbbf24;
+        --neon-rose: #f87171;
+    }
+
+    body {
+        background-color: var(--bg-deep) !important;
+        font-family: 'Cairo', sans-serif;
+        color: #f8fafc;
+        min-height: 100vh;
+    }
+
     .stat-card {
-        background: linear-gradient(145deg, #0f172a, #020617);
-        border: 1px solid #1e293b;
+        background: var(--dark-glass);
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border: 1.5px solid var(--border-glass);
         border-radius: 20px;
         padding: 25px;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        height: 100%;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .stat-card::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; width: 100%; height: 4px;
-        background: transparent;
         transition: all 0.3s ease;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8);
+        height: 100%;
     }
 
-    .stat-card:hover { 
-        transform: translateY(-5px); 
-        border-color: #38bdf8; 
-        box-shadow: 0 15px 35px rgba(56, 189, 248, 0.15);
+    .stat-card:hover {
+        border-color: var(--neon-cyan);
+        transform: translateY(-3px);
     }
-    
-    /* ألوان الكروت التفاعلية */
-    .card-primary:hover::before { background: #38bdf8; }
-    .card-success:hover::before { background: #39ff14; }
-    .card-danger:hover::before { background: #ff3131; }
 
-    /* النصوص المشعة (Neon) بدرجة احترافية وغير مزعجة */
-    .neon-text-info { color: #38bdf8; text-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
-    .neon-text-success { color: #39ff14; text-shadow: 0 0 15px rgba(57, 255, 20, 0.4); }
-    .neon-text-danger { color: #ff3131; text-shadow: 0 0 15px rgba(255, 49, 49, 0.4); }
-    
-    /* أشرطة التقدم المخصصة للجدول */
+    .neon-text-info { color: var(--neon-cyan); text-shadow: 0 0 12px rgba(56, 189, 248, 0.4); }
+    .neon-text-success { color: var(--neon-emerald); text-shadow: 0 0 12px rgba(52, 211, 153, 0.4); }
+    .neon-text-danger { color: var(--neon-rose); text-shadow: 0 0 12px rgba(248, 113, 113, 0.4); }
+
     .progress-custom { 
-        background: #000000; 
+        background: rgba(2, 6, 23, 0.8); 
         height: 10px; 
-        border-radius: 10px; 
-        border: 1px solid #1e293b;
+        border-radius: 20px; 
+        border: 1px solid rgba(255,255,255,0.1);
         overflow: hidden;
     }
     
     .progress-custom .progress-bar {
-        background: linear-gradient(90deg, #0ea5e9, #38bdf8);
-        border-radius: 10px;
+        background: linear-gradient(90deg, #0284c7, var(--neon-cyan));
+        border-radius: 20px;
     }
 
-    /* تنسيق التبويبات (Tabs) بشكل عصري */
-    .nav-pills { background: #020617; padding: 5px; border-radius: 15px; border: 1px solid #1e293b; }
+    .nav-pills { 
+        background: #020617; 
+        padding: 5px; 
+        border-radius: 50px; 
+        border: 1px solid var(--border-glass); 
+    }
     .nav-pills .nav-link {
         color: #94a3b8;
-        border-radius: 10px;
-        padding: 10px 30px;
-        transition: all 0.3s;
-        font-weight: 800;
-    }
-    .nav-pills .nav-link:hover { color: #e2e8f0; }
-    .nav-pills .nav-link.active {
-        background-color: #38bdf8 !important;
-        color: #000000 !important;
-        box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
-    }
-    
-    /* الجداول الاحترافية */
-    .table-premium { --bs-table-bg: transparent; color: #e2e8f0; margin-bottom: 0; }
-    .table-premium thead th { 
-        color: #64748b; 
-        font-size: 0.9rem; 
-        border-bottom: 2px solid #1e293b; 
-        font-weight: 800;
-        padding: 15px;
-    }
-    .table-premium tbody tr { border-bottom: 1px solid #0f172a; transition: all 0.2s; }
-    .table-premium tbody tr:hover { background: rgba(56, 189, 248, 0.05); }
-    .table-premium td { padding: 15px; vertical-align: middle; }
-
-    /* روابط الطلاب */
-    .student-link {
-        color: #e2e8f0 !important;
-        text-decoration: none !important;
-        transition: all 0.2s ease;
-        font-weight: 700;
-    }
-    .student-link:hover { color: #38bdf8 !important; }
-
-    /* حاوية الرسوم البيانية */
-    .chart-container { position: relative; height: 320px; width: 100%; margin-top: 20px; }
-    
-    /* زر العودة */
-    .btn-return {
-        background: transparent;
-        color: #94a3b8;
-        border: 1px solid #334155;
         border-radius: 50px;
-        padding: 8px 25px;
-        font-weight: 700;
-        transition: 0.3s;
-        text-decoration: none;
+        padding: 8px 22px;
+        transition: all 0.3s ease;
+        font-weight: 800;
     }
-    .btn-return:hover {
-        background: #1e293b;
-        color: #fff;
-        border-color: #38bdf8;
+    .nav-pills .nav-link.active {
+        background-color: var(--neon-cyan) !important;
+        color: #000000 !important;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    }
+    
+    .table-premium { --bs-table-bg: transparent; color: #f8fafc; margin-bottom: 0; }
+    .table-premium thead th { 
+        color: var(--neon-cyan); 
+        font-size: 0.9rem; 
+        border-bottom: 2px solid rgba(56, 189, 248, 0.3); 
+        font-weight: 900;
+        padding: 15px;
+        background: rgba(2, 6, 23, 0.6);
+        text-align: center;
+    }
+    .table-premium tbody tr { border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
+    .table-premium tbody tr:hover { background: rgba(56, 189, 248, 0.08); }
+    .table-premium td { padding: 14px; text-align: center; }
+
+    .student-link-btn {
+        color: #fbbf24 !important;
+        background: rgba(251, 191, 36, 0.12);
+        border: 1px solid rgba(251, 191, 36, 0.3);
+        padding: 6px 18px;
+        border-radius: 50px;
+        font-weight: 800;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        display: inline-block;
+    }
+    .student-link-btn:hover { 
+        background: rgba(251, 191, 36, 0.25);
+        color: #ffffff !important;
+        border-color: var(--neon-cyan);
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    }
+
+    .chart-container { position: relative; height: 280px; width: 100%; margin-top: 15px; }
+
+    .search-filter-box {
+        background: #000;
+        border: 1px solid var(--border-glass);
+        border-radius: 16px;
+        padding: 15px 20px;
+    }
+
+    .pagination-custom .page-link {
+        background-color: #020617;
+        color: var(--neon-cyan);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        font-weight: 800;
+        padding: 6px 14px;
+        border-radius: 8px;
+        margin: 0 2px;
+    }
+    .pagination-custom .page-item.active .page-link {
+        background-color: var(--neon-cyan) !important;
+        color: #000000 !important;
+        border-color: var(--neon-cyan) !important;
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    }
+
+    .modal-glass {
+        background: rgba(2, 6, 23, 0.98) !important;
+        border: 2px solid var(--neon-cyan) !important;
+        border-radius: 24px !important;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95) !important;
+    }
+
+    .modal-header-glass {
+        border-bottom: 1px solid rgba(56, 189, 248, 0.2) !important;
+        padding: 20px 25px !important;
+    }
+
+    .modal-kpi-card {
+        background: #090d16;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 15px;
+        text-align: center;
+    }
+
+    .tab-pane-transition {
+        transition: opacity 0.2s ease-in-out;
     }
 </style>
 
 <div class="container-fluid py-4" dir="rtl">
     
-    <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
-        <h2 class="fw-900 text-white m-0 d-flex align-items-center">
-            <i class="bi bi-pie-chart-fill neon-text-info me-3 fs-1"></i>
-            التحليل الإحصائي العام
-        </h2>
-        <a href="{% url 'course_prices' %}" class="btn-return d-flex align-items-center gap-2">
-            العودة للمجموعات <i class="bi bi-arrow-left-circle fs-5"></i>
+    <!-- الهيدر والتحكم -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 p-4 rounded-4" style="background: var(--dark-glass); border: 1.5px solid var(--border-glass); border-right: 6px solid var(--neon-cyan) !important;">
+        <h3 class="fw-900 text-white m-0 d-flex align-items-center">
+            <i class="bi bi-pie-chart-fill neon-text-info me-3 fs-2"></i>
+            شاشة التحليل الإحصائي والمالي للاشتراكات والمدرسين
+        </h3>
+        <a href="{% url 'course_prices' %}" class="btn btn-outline-info rounded-pill px-4 fw-bold shadow-sm d-inline-flex align-items-center">
+            العودة للمجموعات <i class="bi bi-arrow-left-circle ms-2 fs-5"></i>
         </a>
     </div>
 
-    <div class="row g-4 mb-5">
+    <!-- شريط الفلاتر والتصفية -->
+    <div class="search-filter-box mb-4 shadow-lg">
+        <form method="GET" class="row g-3 align-items-center">
+            <div class="col-md-5 d-flex flex-wrap gap-1 align-items-center">
+                <span class="text-secondary small fw-bold me-1"><i class="bi bi-funnel-fill text-info"></i> المدى الزمني:</span>
+                <a href="?time_filter=all{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}" class="btn btn-sm {% if not current_filter or current_filter == 'all' %}btn-info text-dark fw-black{% else %}btn-outline-secondary text-white{% endif %} rounded-pill px-3">الكل</a>
+                <a href="?time_filter=today{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}" class="btn btn-sm {% if current_filter == 'today' %}btn-info text-dark fw-black{% else %}btn-outline-secondary text-white{% endif %} rounded-pill px-3">اليوم</a>
+                <a href="?time_filter=week{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}" class="btn btn-sm {% if current_filter == 'week' %}btn-info text-dark fw-black{% else %}btn-outline-secondary text-white{% endif %} rounded-pill px-3">الأسبوع</a>
+                <a href="?time_filter=month{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}" class="btn btn-sm {% if current_filter == 'month' %}btn-info text-dark fw-black{% else %}btn-outline-secondary text-white{% endif %} rounded-pill px-3">الشهر</a>
+            </div>
+
+            <div class="col-md-3">
+                <select name="grade_id" class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" onchange="this.form.submit()">
+                    <option value="">-- جميع الصفوف الدراسية --</option>
+                    {% for g in all_grades %}
+                        <option value="{{ g.id }}" {% if selected_grade == g.id|stringformat:"i" %}selected{% endif %}>{{ g.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-4 d-flex align-items-center gap-1 justify-content-end">
+                <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm bg-dark text-white border-secondary" style="width: 120px;">
+                <span class="text-white">-</span>
+                <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm bg-dark text-white border-secondary" style="width: 120px;">
+                <button type="submit" class="btn btn-sm btn-info text-dark fw-bold rounded-pill px-3">تطبيق</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- كروت البيانات الإحصائية -->
+    <div class="row g-4 mb-4 text-center">
         <div class="col-md-4">
-            <div class="stat-card card-primary text-center d-flex flex-column justify-content-center">
-                <div class="text-secondary fw-bold mb-2 fs-6">إجمالي طلاب المدرسة النشطين</div>
-                <div class="display-4 fw-900 text-white">{{ total_students }}</div>
+            <div class="stat-card">
+                <div class="text-secondary fw-bold mb-2 small"><i class="bi bi-people-fill text-info me-1"></i> إجمالي الطلاب النشطين بالمدرسة</div>
+                <div class="display-5 fw-900 text-white">{{ total_students }}</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stat-card card-success text-center d-flex flex-column justify-content-center">
-                <div class="fw-bold mb-2 text-success fs-6"><i class="bi bi-check-circle-fill me-1"></i> طلاب لديهم اشتراكات</div>
-                <div class="display-4 fw-900 neon-text-success">{{ enrolled_count }}</div>
+            <div class="stat-card">
+                <div class="fw-bold mb-2 small text-success"><i class="bi bi-check-circle-fill me-1"></i> طلاب لديهم اشتراكات فعالة</div>
+                <div class="display-5 fw-900 neon-text-success">{{ enrolled_count }}</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stat-card card-danger text-center d-flex flex-column justify-content-center">
-                <div class="fw-bold mb-2 text-danger fs-6"><i class="bi bi-exclamation-circle-fill me-1"></i> طلاب بدون أي اشتراك</div>
-                <div class="display-4 fw-900 neon-text-danger">{{ non_enrolled_count }}</div>
+            <div class="stat-card">
+                <div class="fw-bold mb-2 small text-danger"><i class="bi bi-exclamation-circle-fill me-1"></i> طلاب مستحقين بدون اشتراك</div>
+                <div class="display-5 fw-900 neon-text-danger">{{ non_enrolled_count }}</div>
             </div>
         </div>
     </div>
 
-    <div class="row g-4 mb-5">
+    <!-- قسم الرسوم البيانية -->
+    <div class="row g-4 mb-4">
         <div class="col-xl-4 col-lg-5">
-            <div class="stat-card h-100">
-                <h6 class="text-white fw-bold mb-2"><i class="bi bi-bullseye text-info me-2"></i> معدل الاستحواذ العام</h6>
-                <p class="small text-secondary mb-0">نسبة الطلاب المشتركين في الدورات مقارنة بإجمالي المدرسة.</p>
+            <div class="stat-card">
+                <h6 class="text-white fw-bold mb-1"><i class="bi bi-pie-chart text-info me-2"></i> نسبة التسكين والاستحواذ</h6>
+                <p class="small text-secondary mb-0">نسبة الطلاب المشتركين مقارنة بإجمالي القيد.</p>
                 <div class="chart-container">
                     <canvas id="enrollmentStatusChart"></canvas>
                 </div>
@@ -161,9 +238,9 @@
         </div>
         
         <div class="col-xl-8 col-lg-7">
-            <div class="stat-card h-100">
-                <h6 class="text-info fw-bold mb-2"><i class="bi bi-graph-up-arrow me-2"></i> المواد الدراسية الأكثر طلباً</h6>
-                <p class="small text-secondary mb-0">تحليل حي لقاعدة البيانات لأكثر المواد التي يشترك بها الطلاب.</p>
+            <div class="stat-card">
+                <h6 class="text-info fw-bold mb-1"><i class="bi bi-bar-chart-line me-2"></i> المواد الأكثر إقبالاً وطلباً</h6>
+                <p class="small text-secondary mb-0">توزيع عدد الاشتراكات الفعلية بداخل كل مادة دراسية.</p>
                 <div class="chart-container">
                     <canvas id="subjectsChart"></canvas>
                 </div>
@@ -171,17 +248,67 @@
         </div>
     </div>
 
-    <div class="stat-card mb-5 p-0 overflow-hidden">
-        <div class="p-4 border-bottom border-secondary border-opacity-25 bg-dark bg-opacity-50">
-            <h5 class="text-white fw-bold m-0"><i class="bi bi-table text-info me-2"></i> تقرير كثافة الاشتراكات حسب المادة</h5>
+    <!-- جدول تحليل انتشار المدرسين -->
+    <div class="stat-card mb-4 p-0 overflow-hidden">
+        <div class="p-3 border-bottom border-secondary border-opacity-25 bg-black d-flex justify-content-between align-items-center">
+            <h6 class="text-warning fw-bold m-0"><i class="bi bi-person-badge text-warning me-2"></i> تقرير انتشار وإيرادات المدرسين (حساب النسب المستحقة)</h6>
+            <span class="badge bg-warning text-dark fw-bold">تحليل الأداء الفردي</span>
         </div>
         <div class="table-responsive">
             <table class="table table-premium">
                 <thead>
                     <tr>
                         <th style="width: 5%;">#</th>
-                        <th style="width: 35%;">المادة الدراسية</th>
-                        <th style="width: 20%; text-align: center;">عدد المشتركين</th>
+                        <th style="width: 25%; text-align: start;" class="ps-4">اسم المدرس المسؤول</th>
+                        <th style="width: 15%;">عدد المشتركين</th>
+                        <th style="width: 20%;">إجمالي المطلوب (إيراد)</th>
+                        <th style="width: 20%;">المحصل كاش بالخزينة</th>
+                        <th style="width: 20%;">نسبة الانتشار الإحصائي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in teacher_analysis %}
+                    <tr>
+                        <td class="text-secondary fw-bold">{{ forloop.counter }}</td>
+                        <td class="fw-bold text-warning text-start ps-4">{{ t.teacher_name }}</td>
+                        <td>
+                            <span class="badge bg-warning bg-opacity-25 border border-warning text-warning px-3 py-1.5 rounded-pill fw-bold">
+                                {{ t.total_students }} طالب
+                            </span>
+                        </td>
+                        <td class="fw-bold text-info">{{ t.total_required }} ج.م</td>
+                        <td class="fw-bold text-success">{{ t.total_collected }} ج.م</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="progress progress-custom w-100">
+                                    <div class="progress-bar bg-warning" style="width: {% widthratio t.total_students total_students 100 %}%"></div>
+                                </div>
+                                <span class="small fw-bold text-secondary text-nowrap">
+                                    {% widthratio t.total_students total_students 100 %} %
+                                </span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="py-4 text-secondary text-center fw-bold">لا توجد سجلات مدرسين مطابقة للفترة.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- جدول كثافة الاشتراكات الموزعة حسب المادة -->
+    <div class="stat-card mb-4 p-0 overflow-hidden">
+        <div class="p-3 border-bottom border-secondary border-opacity-25 bg-black">
+            <h6 class="text-white fw-bold m-0"><i class="bi bi-book text-info me-2"></i> تقرير كثافة الاشتراكات الموزعة حسب المادة</h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-premium">
+                <thead>
+                    <tr>
+                        <th style="width: 5%;">#</th>
+                        <th style="width: 35%; text-align: start;" class="ps-4">المادة الدراسية</th>
+                        <th style="width: 20%;">المشتركين</th>
                         <th style="width: 40%;">مؤشر الإقبال (نسبة مئوية)</th>
                     </tr>
                 </thead>
@@ -189,9 +316,9 @@
                     {% for item in subject_analysis %}
                     <tr>
                         <td class="text-secondary fw-bold">{{ forloop.counter }}</td>
-                        <td class="fw-bold text-info fs-6">{{ item.course_info__subject__name }}</td>
-                        <td class="text-center">
-                            <span class="badge bg-primary bg-opacity-25 border border-primary text-light px-3 py-2 rounded-pill fs-6">
+                        <td class="fw-bold text-info text-start ps-4">{{ item.subject_name }}</td>
+                        <td>
+                            <span class="badge bg-info bg-opacity-25 border border-info text-info px-3 py-1.5 rounded-pill fw-bold">
                                 {{ item.total }} طالب
                             </span>
                         </td>
@@ -208,10 +335,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center py-5 text-secondary">
-                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                            لا توجد بيانات اشتراكات في الكورسات حالياً.
-                        </td>
+                        <td colspan="4" class="text-center py-4 text-secondary fw-bold">لا توجد بيانات اشتراكات مسجلة في الكورسات حالياً.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -219,189 +343,454 @@
         </div>
     </div>
 
+    <!-- تبويبات قوائم الطلاب -->
     <div class="stat-card p-0 overflow-hidden">
-        <div class="p-4 border-bottom border-secondary border-opacity-25 d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <h5 class="text-white fw-bold m-0"><i class="bi bi-people-fill text-warning me-2"></i> السجل التحليلي للطلاب</h5>
+        <div class="p-3 border-bottom border-secondary border-opacity-25 d-flex justify-content-between align-items-center flex-wrap gap-2 bg-black">
+            <h6 class="text-white fw-bold m-0"><i class="bi bi-people-fill text-warning me-2"></i> السجل التحليلي السريع للطلاب</h6>
             <ul class="nav nav-pills m-0" id="studentTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#enrolledList" type="button" role="tab">
-                        المشتركين <span class="badge bg-dark text-white ms-1">{{ enrolled_count }}</span>
+                <li class="nav-item">
+                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#enrolledList" type="button">
+                        المشتركين <span class="badge bg-dark text-info ms-1">{{ enrolled_count }}</span>
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#nonEnrolledList" type="button" role="tab">
-                        غير المشتركين <span class="badge bg-dark text-white ms-1">{{ non_enrolled_count }}</span>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#nonEnrolledList" type="button">
+                        بدون اشتراك <span class="badge bg-dark text-danger ms-1">{{ non_enrolled_count }}</span>
                     </button>
                 </li>
             </ul>
         </div>
 
         <div class="tab-content">
-            <div class="tab-pane fade show active" id="enrolledList" role="tabpanel">
-                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-                    <table class="table table-premium m-0">
-                        <thead style="position: sticky; top: 0; background: #0f172a; z-index: 1;">
+            <!-- قائمة المشتركين -->
+            <div class="tab-pane fade show active tab-pane-transition" id="enrolledList">
+                <div class="table-responsive">
+                    <table class="table table-premium">
+                        <thead>
                             <tr>
                                 <th>كود الطالب</th>
-                                <th>الاسم بالكامل</th>
-                                <th>المرحلة الدراسية</th>
-                                <th class="text-center">السنة الدراسية</th>
+                                <th style="text-align: start;" class="ps-4">الاسم بالكامل (اضغط لفتح النافذة المنبثقة)</th>
+                                <th>الصف الدراسي</th>
+                                <th>العام الدراسي</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for student in enrolled_students %}
                             <tr>
                                 <td class="text-info fw-bold">{{ student.student_code|default:"-" }}</td>
-                                <td>
-                                    <a href="{% url 'student_dashboard' student.id %}" class="student-link">
-                                        {{ student.first_name }} {{ student.last_name }}
-                                    </a>
+                                <td style="text-align: start;" class="ps-4">
+                                    <button type="button" class="student-link-btn" data-bs-toggle="modal" data-bs-target="#studentQuickModal" onclick="fetchStudentAnalytics('{{ student.id }}')">
+                                        <i class="bi bi-pie-chart-fill me-1"></i> {{ student.get_full_name }}
+                                    </button>
                                 </td>
-                                <td>{{ student.grade.name|default:"غير محدد" }}</td>
-                                <td class="text-center">
-                                    <span class="badge bg-dark border border-secondary text-secondary">
-                                        {{ student.academic_year.name|default:"-" }}
-                                    </span>
-                                </td>
+                                <td><span class="badge bg-dark border border-secondary text-white-50 px-3 py-1">{{ student.grade.name|default:"غير محدد" }}</span></td>
+                                <td><span class="badge bg-dark border border-secondary text-info px-3 py-1">{{ student.academic_year.name|default:"-" }}</span></td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="4" class="text-center py-4 text-muted">لا يوجد طلاب مشتركين.</td></tr>
+                            <tr><td colspan="4" class="text-center py-4 text-secondary">لا يوجد طلاب مشتركين في السجلات حتى الآن.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+
+                {% if enrolled_students.has_other_pages %}
+                <div class="p-3 border-top border-secondary border-opacity-25 bg-black">
+                    <ul class="pagination pagination-custom justify-content-center m-0">
+                        {% if enrolled_students.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?page_e=1{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}">الأولى</a></li>
+                            <li class="page-item"><a class="page-link" href="?page_e={{ enrolled_students.previous_page_number }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}">السابق</a></li>
+                        {% endif %}
+
+                        {% for i in enrolled_students.paginator.page_range %}
+                            {% if enrolled_students.number == i %}
+                                <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                            {% elif i > enrolled_students.number|add:'-3' and i < enrolled_students.number|add:'3' %}
+                                <li class="page-item"><a class="page-link" href="?page_e={{ i }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}">{{ i }}</a></li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if enrolled_students.has_next %}
+                            <li class="page-item"><a class="page-link" href="?page_e={{ enrolled_students.next_page_number }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}">التالي</a></li>
+                            <li class="page-item"><a class="page-link" href="?page_e={{ enrolled_students.paginator.num_pages }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}">الأخيرة</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% endif %}
             </div>
 
-            <div class="tab-pane fade" id="nonEnrolledList" role="tabpanel">
-                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-                    <table class="table table-premium m-0">
-                        <thead style="position: sticky; top: 0; background: #0f172a; z-index: 1;">
+            <!-- قائمة غير المشتركين -->
+            <div class="tab-pane fade tab-pane-transition" id="nonEnrolledList">
+                <div class="table-responsive">
+                    <table class="table table-premium">
+                        <thead>
                             <tr>
                                 <th>كود الطالب</th>
-                                <th>الاسم بالكامل</th>
-                                <th>المرحلة الدراسية</th>
-                                <th class="text-center">إجراءات المتابعة</th>
+                                <th style="text-align: start;" class="ps-4">الاسم بالكامل</th>
+                                <th>الصف الدراسي</th>
+                                <th>الإجراء</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for student in non_enrolled_students %}
                             <tr>
                                 <td class="text-warning fw-bold">{{ student.student_code|default:"-" }}</td>
-                                <td>{{ student.first_name }} {{ student.last_name }}</td>
-                                <td>{{ student.grade.name|default:"غير محدد" }}</td>
-                                <td class="text-center">
-                                    <a href="{% url 'course_prices' %}" class="btn btn-sm btn-outline-info rounded-pill px-3 fw-bold">
-                                        <i class="bi bi-telephone-plus me-1"></i> تواصل وتسكين
+                                <td style="text-align: start;" class="ps-4 fw-bold">{{ student.get_full_name }}</td>
+                                <td><span class="badge bg-dark border border-secondary text-white-50 px-3 py-1">{{ student.grade.name|default:"غير محدد" }}</span></td>
+                                <td>
+                                    <a href="{% url 'course_prices' %}" class="btn btn-sm btn-outline-info rounded-pill px-3 fw-bold py-1">
+                                        <i class="bi bi-plus-circle me-1"></i> تسكين الطالب
                                     </a>
                                 </td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="4" class="text-center py-4 text-muted">جميع طلاب المدرسة لديهم اشتراكات (ممتاز!).</td></tr>
+                            <tr><td colspan="4" class="text-center py-4 text-success fw-bold">جميع طلاب المدرسة لديهم اشتراكات مفعلة!</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+
+                {% if non_enrolled_students.has_other_pages %}
+                <div class="p-3 border-top border-secondary border-opacity-25 bg-black">
+                    <ul class="pagination pagination-custom justify-content-center m-0">
+                        {% if non_enrolled_students.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?page_ne=1{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}">الأولى</a></li>
+                            <li class="page-item"><a class="page-link" href="?page_ne={{ non_enrolled_students.previous_page_number }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}">السابق</a></li>
+                        {% endif %}
+
+                        {% for i in non_enrolled_students.paginator.page_range %}
+                            {% if non_enrolled_students.number == i %}
+                                <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                            {% elif i > non_enrolled_students.number|add:'-3' and i < non_enrolled_students.number|add:'3' %}
+                                <li class="page-item"><a class="page-link" href="?page_ne={{ i }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}">{{ i }}</a></li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if non_enrolled_students.has_next %}
+                            <li class="page-item"><a class="page-link" href="?page_ne={{ non_enrolled_students.next_page_number }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}">التالي</a></li>
+                            <li class="page-item"><a class="page-link" href="?page_ne={{ non_enrolled_students.paginator.num_pages }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}">الأخيرة</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🟢 النافذة المنبثقة الذكية لتحليل الطالب (Pop-up Analytics Modal) -->
+<div class="modal fade" id="studentQuickModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content modal-glass text-white">
+            <div class="modal-header modal-header-glass">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="p-3 bg-info bg-opacity-10 border border-info rounded-circle text-info">
+                        <i class="bi bi-person-bounding-box fs-2"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-900 m-0 text-info" id="modalStudentName">جاري التحميل...</h4>
+                        <div class="small text-white-50 mt-1">
+                            <span class="badge bg-dark text-info border border-info me-1" id="modalStudentCode">كود: ---</span>
+                            <span class="badge bg-dark text-warning border border-warning me-1" id="modalStudentNatId">قومي: ---</span>
+                            <span class="badge bg-dark text-light border border-secondary" id="modalStudentGrade">الصف: ---</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body p-4" id="modalBodyContent">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-info fs-3" role="status"></div>
+                    <p class="mt-2 text-info fw-bold">جاري جلب تحليل المواد والاشتراكات والمديونيات...</p>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- 🟢 تحويل بيانات دجانجو إلى JSON معزول بأمان تام -->
+{{ subject_analysis|json_script:"subject-analysis-data" }}
+
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    
-    // إعدادات عامة للـ Dark Theme
-    Chart.defaults.color = '#94a3b8';
-    Chart.defaults.font.family = "'Cairo', sans-serif";
-    Chart.defaults.font.weight = 'bold';
-    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(2, 6, 23, 0.9)';
-    Chart.defaults.plugins.tooltip.titleColor = '#38bdf8';
-    Chart.defaults.plugins.tooltip.padding = 12;
-    Chart.defaults.plugins.tooltip.borderColor = '#1e293b';
-    Chart.defaults.plugins.tooltip.borderWidth = 1;
+// 🟢 1. جلب وبناء مصفوفات الشارت بطريقة معزولة 100%
+let subjectLabels = [];
+let subjectData = [];
 
-    // 1. رسم الاستحواذ العام (Doughnut)
-    const ctxStatus = document.getElementById('enrollmentStatusChart').getContext('2d');
-    new Chart(ctxStatus, {
-        type: 'doughnut',
-        data: {
-            labels: ['طلاب تم تسكينهم', 'طلاب بدون اشتراك'],
-            datasets: [{
-                data: [{{ enrolled_count|default:0 }}, {{ non_enrolled_count|default:0 }}],
-                backgroundColor: [
-                    'rgba(57, 255, 20, 0.8)', // أخضر نجاح
-                    'rgba(255, 49, 49, 0.8)'  // أحمر تنبيه
-                ],
-                borderColor: ['#0f172a', '#0f172a'],
-                borderWidth: 4,
-                hoverOffset: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 20 } }
-            },
-            cutout: '75%'
-        }
-    });
-
-    // 2. تجميع بيانات المواد من Django (استخراج ديناميكي من Loop)
-    const subjectLabels = [];
-    const subjectData = [];
-    
-    {% for item in subject_analysis %}
-        // الاعتماد بالكامل على الداتابيز، بدون أي أسماء وهمية
-        subjectLabels.push("{{ item.course_info__subject__name|escapejs }}");
-        subjectData.push({{ item.total }});
-    {% endfor %}
-
-    // 3. رسم المواد الأكثر طلباً (Horizontal Bar Chart)
-    const ctxSubjects = document.getElementById('subjectsChart').getContext('2d');
-    
-    // إذا لم تكن هناك بيانات، نعرض رسالة فارغة عبر الشارت
-    if (subjectLabels.length === 0) {
-        ctxSubjects.font = "16px Cairo";
-        ctxSubjects.fillStyle = "#64748b";
-        ctxSubjects.textAlign = "center";
-        ctxSubjects.fillText("لا توجد بيانات متاحة لعرضها حالياً.", ctxSubjects.canvas.width / 2, ctxSubjects.canvas.height / 2);
-    } else {
-        new Chart(ctxSubjects, {
-            type: 'bar', // bar + indexAxis='y' يعطي رسم أفقي احترافي
-            data: {
-                labels: subjectLabels,
-                datasets: [{
-                    label: 'عدد الطلاب',
-                    data: subjectData,
-                    backgroundColor: 'rgba(56, 189, 248, 0.7)', // أزرق شفاف
-                    borderColor: '#38bdf8',
-                    borderWidth: 1,
-                    borderRadius: 4,
-                    hoverBackgroundColor: '#0ea5e9'
-                }]
-            },
-            options: {
-                indexAxis: 'y', // يحول الأعمدة لتكون أفقية لسهولة قراءة أسماء المواد
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: { 
-                        beginAtZero: true, 
-                        grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
-                        ticks: { stepSize: 1 } // تجنب الكسور في عدد الطلاب
-                    },
-                    y: { 
-                        grid: { display: false },
-                        ticks: { color: '#e2e8f0', font: { size: 13 } }
-                    }
-                },
-                plugins: {
-                    legend: { display: false } // إخفاء المربع العلوي لأنه لون واحد
-                }
+try {
+    const rawDataElement = document.getElementById('subject-analysis-data');
+    if (rawDataElement) {
+        const parsedSubjectData = JSON.parse(rawDataElement.textContent);
+        parsedSubjectData.forEach(item => {
+            if (item.subject_name) {
+                subjectLabels.push(item.subject_name);
+                subjectData.push(item.total || 0);
             }
         });
     }
+} catch (e) {
+    console.error("JSON Parsing Error:", e);
+}
 
+// 🟢 2. رسم الشارتات بأمان
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        if (typeof Chart !== 'undefined') {
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = "'Cairo', sans-serif";
+
+            // Doughnut Chart
+            const statusCanvas = document.getElementById('enrollmentStatusChart');
+            if (statusCanvas) {
+                new Chart(statusCanvas.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['مشتركين', 'بدون اشتراك'],
+                        datasets: [{
+                            data: [{{ enrolled_count|default:0 }}, {{ non_enrolled_count|default:0 }}],
+                            backgroundColor: ['#34d399', '#f87171'],
+                            borderColor: ['#020617', '#020617'],
+                            borderWidth: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { color: '#f8fafc' } } },
+                        cutout: '70%'
+                    }
+                });
+            }
+
+            // Bar Chart
+            const subjectsCanvas = document.getElementById('subjectsChart');
+            if (subjectsCanvas && subjectLabels.length > 0) {
+                new Chart(subjectsCanvas.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: subjectLabels,
+                        datasets: [{
+                            label: 'المشتركين',
+                            data: subjectData,
+                            backgroundColor: 'rgba(56, 189, 248, 0.7)',
+                            borderColor: '#38bdf8',
+                            borderWidth: 1,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                            y: { grid: { display: false } }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+    } catch(err) {
+        console.error("Chart Rendering Error:", err);
+    }
 });
+
+// 🟢 3. دالة جلب بيانات الطالب وتعبئة المودال المفتوح تلقائياً
+function fetchStudentAnalytics(studentId) {
+    document.getElementById('modalStudentName').innerText = "جاري التحميل...";
+    document.getElementById('modalStudentCode').innerText = "كود: ---";
+    document.getElementById('modalStudentNatId').innerText = "قومي: ---";
+    document.getElementById('modalStudentGrade').innerText = "الصف: ---";
+
+    document.getElementById('modalBodyContent').innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-info fs-3" role="status"></div>
+            <p class="mt-2 text-info fw-bold">جاري جلب تحليل المواد والاشتراكات والمديونيات...</p>
+        </div>
+    `;
+
+    const apiUrl = `{% url 'api_student_quick_analytics' 0 %}`.replace('/0/', '/' + studentId + '/');
+
+    fetch(apiUrl)
+        .then(res => {
+            if (!res.ok) throw new Error("HTTP Status " + res.status);
+            return res.json();
+        })
+        .then(data => {
+            if (data.success) {
+                const st = data.student;
+                const sum = data.summary;
+
+                document.getElementById('modalStudentName').innerText = st.name;
+                document.getElementById('modalStudentCode').innerText = `كود: ${st.code}`;
+                document.getElementById('modalStudentNatId').innerText = `قومي: ${st.national_id}`;
+                document.getElementById('modalStudentGrade').innerText = `الصف: ${st.grade}`;
+
+                let debtColorClass = sum.total_debt > 0 ? 'text-danger' : 'text-success';
+                let debtLabel = sum.total_debt > 0 ? `${sum.total_debt} ج.م (مديونية)` : 'مسدد بالكامل ✅';
+
+                let coursesHtml = '';
+                if (data.courses && data.courses.length > 0) {
+                    data.courses.forEach((c) => {
+                        let cDebtBadge = c.remaining_debt > 0 
+                            ? `<span class="badge bg-danger bg-opacity-25 text-danger border border-danger px-3 py-1">متبقي ${c.remaining_debt} ج.م</span>`
+                            : `<span class="badge bg-success bg-opacity-25 text-success border border-success px-3 py-1">مسدد بالكامل ✅</span>`;
+
+                        let datesBadges = c.recent_dates && c.recent_dates.length > 0
+                            ? c.recent_dates.map(d => `<span class="badge bg-dark border border-secondary text-info me-1">${d}</span>`).join('')
+                            : '<span class="text-white-50 small">لا يوجد حضور مسجل</span>';
+
+                        coursesHtml += `
+                        <tr>
+                            <td class="text-start ps-3">
+                                <strong class="text-info fs-6 d-block">${c.subject}</strong>
+                                <small class="text-warning">المدرس: ${c.teacher}</small>
+                            </td>
+                            <td><span class="badge bg-black border border-secondary text-light">${c.reg_date}</span></td>
+                            <td>${cDebtBadge}</td>
+                            <td style="min-width: 180px;">
+                                <div class="d-flex justify-content-between small text-white-50 mb-1">
+                                    <span>حضر ${c.attended_sessions} من ${c.total_sessions}</span>
+                                    <strong class="text-info">باقي ${c.remaining_sessions} حصة</strong>
+                                </div>
+                                <div class="progress progress-custom">
+                                    <div class="progress-bar" style="width: ${c.progress_pct}%"></div>
+                                </div>
+                            </td>
+                            <td><div class="d-flex flex-wrap gap-1 justify-content-center">${datesBadges}</div></td>
+                        </tr>`;
+                    });
+                } else {
+                    coursesHtml = `<tr><td colspan="5" class="py-4 text-center text-secondary fw-bold">الطالب غير مشترك في أي كورسات حتى الآن.</td></tr>`;
+                }
+
+                document.getElementById('modalBodyContent').innerHTML = `
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="modal-kpi-card">
+                                <span class="text-white-50 small d-block mb-1">عدد المواد المقيدة</span>
+                                <strong class="fs-4 text-info fw-900">${sum.total_courses} مواد</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="modal-kpi-card">
+                                <span class="text-white-50 small d-block mb-1">المديونية المتبقية</span>
+                                <strong class="fs-4 fw-900 ${debtColorClass}">${debtLabel}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="modal-kpi-card">
+                                <span class="text-white-50 small d-block mb-1">إجمالي الحصص المحضرة</span>
+                                <strong class="fs-4 text-success fw-900">${sum.total_attended} حصة</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="modal-kpi-card">
+                                <span class="text-white-50 small d-block mb-1">رصيد الحصص المتبقية</span>
+                                <strong class="fs-4 text-warning fw-900">${sum.total_remaining_sessions} حصة</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive rounded-4 border border-secondary border-opacity-25">
+                        <table class="table table-premium m-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-start ps-3">المادة والمدرس المسؤول</th>
+                                    <th>تاريخ الاشتراك</th>
+                                    <th>الموقف المالي والديون</th>
+                                    <th>رصيد الحصص المتبقية</th>
+                                    <th>سجل أحدث الحصص المحضرة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${coursesHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+        })
+        .catch(err => {
+            console.error("Fetch Analytics Error:", err);
+            document.getElementById('modalBodyContent').innerHTML = `
+                <div class="alert alert-danger text-center m-0 fw-bold py-4">
+                    <i class="bi bi-exclamation-triangle-fill fs-2 d-block mb-2"></i>
+                    عذراً، تعذر جلب التقرير التحليلي للطالب في الوقت الحالي!
+                </div>`;
+        });
+}
+
+// 🟢 4. المحرك السحري المباشر والآمن للباجنيشن دون إعادة تحميل الصفحة نهائياً
+document.body.addEventListener('click', function(e) {
+    let target = e.target;
+    while (target && target !== document) {
+        if (target.tagName === 'A' && target.closest('.pagination-custom')) {
+            // 🛑 إيقاف الريلود الافتراضي للمتصفح فوراً وبشكل قاطع
+            e.preventDefault();
+            
+            const targetUrl = target.getAttribute('href');
+            if (!targetUrl || targetUrl === '#') return;
+
+            const tabPane = target.closest('.tab-pane');
+            if (!tabPane) return;
+
+            const tabId = tabPane.id;
+            
+            // إعطاء مؤشر بصري خفيف على جدول التبويب أنه يحمل
+            tabPane.style.opacity = '0.35';
+            tabPane.style.pointerEvents = 'none';
+
+            // 🚀 جلب صفحة الباجنيشن عبر AJAX في الخلفية بصمت
+            fetch(targetUrl, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("HTTP error " + res.status);
+                return res.text();
+            })
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newTabPane = doc.getElementById(tabId);
+
+                if (newTabPane) {
+                    // استبدال محتوى التبويب (الجدول والباجنيشن فقط) دون المساس بباقي الصفحة
+                    tabPane.innerHTML = newTabPane.innerHTML;
+                    
+                    // تحديث الرابط في شريط المتصفح برقم الصفحة الجديد (بدون ريلود)
+                    window.history.pushState({}, '', targetUrl);
+                }
+            })
+            .catch(err => console.error("Pagination Error:", err))
+            .finally(() => {
+                // إعادة الشفافية للجدول وتفعيل الأزرار
+                tabPane.style.opacity = '1';
+                tabPane.style.pointerEvents = 'auto';
+            });
+
+            return; // الخروج من الدالة بمجرد معالجة الرابط
+        }
+        target = target.parentNode;
+    }
+});
+
+// 🟢 5. حفظ التبويب النشط في الذاكرة لمنع الخروج منه عند أي تحديث للصفحة
+document.querySelectorAll('#studentTabs button[data-bs-toggle="pill"]').forEach(tabBtn => {
+    tabBtn.addEventListener('shown.bs.tab', event => {
+        sessionStorage.setItem('activeStudentAnalyticsTab', event.target.dataset.bsTarget);
+    });
+});
+
+const activeTabTarget = sessionStorage.getItem('activeStudentAnalyticsTab');
+if (activeTabTarget) {
+    const tabToActivate = document.querySelector(`button[data-bs-target="${activeTabTarget}"]`);
+    if (tabToActivate) {
+        const tabInstance = new bootstrap.Tab(tabToActivate);
+        tabInstance.show();
+    }
+}
 </script>
 {% endblock %}

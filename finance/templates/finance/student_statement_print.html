@@ -13,7 +13,7 @@
         
         .summary-container {
             display: grid;
-            grid-template-columns: repeat(4, 1fr); /* تعديل لعرض 4 أعمدة */
+            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
             margin-bottom: 15px;
         }
@@ -98,6 +98,7 @@
             <span class="summary-value text-primary">{{ current_required|default:"0.00"|floatformat:2 }}</span>
         </div>
 
+        <!-- 🟢 إظهار غرامات التأخير بدقة في الكارت العلوي -->
         <div class="summary-box-item">
             <span class="summary-label">إجمالي غرامات التأخير</span>
             <span class="summary-value text-danger" style="text-decoration: underline;">
@@ -110,6 +111,7 @@
             <span class="summary-value text-success">{{ current_paid|default:"0.00"|floatformat:2 }}</span>
         </div>
 
+        <!-- 🟢 المستحق الصافي المحصن من السوالب -->
         <div class="total-final-box">
             <div class="total-final-label">إجمالي المتبقي المستحق (شامل الغرامات والقديم)</div>
             <div class="total-final-value">
@@ -133,7 +135,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for installment in student.installments.all %}
+            {% for installment in installments %}
                 {% if installment.late_fee > 0 %}
                 <tr>
                     <td>{{ installment.due_date|date:"d/m/Y" }}</td>
@@ -160,14 +162,13 @@
         </thead>
         <tbody>
             {% for entry in all_history %}
-                {# تم إزالة شرط الـ if لعرض جميع البيانات الممررة في all_history #}
                 <tr>
                     <td>{{ entry.payment_date|date:"d/m/Y" }}</td>
                     <td style="text-align: right;">
                         {{ entry.revenue_category.name|default:"مصروفات دراسية" }}
                         {% if entry.notes %}<br><small style="color:#666">({{ entry.notes }})</small>{% endif %}
                     </td>
-                    <td>#{{ entry.id }}</td>
+                    <td>#{{ entry.receipt_number|default:entry.id }}</td>
                     <td style="font-weight: bold;" class="text-success">
                         {{ entry.amount_paid|floatformat:2 }} ج.م
                     </td>

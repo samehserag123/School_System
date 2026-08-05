@@ -1,0 +1,610 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}شاشة الكاونتر والتحصيل المباشر السريع (POS){% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<style>
+    :root {
+        --bg-main: #020617;
+        --glass-surface: rgba(15, 23, 42, 0.95);
+        --glass-card: rgba(30, 41, 59, 0.85);
+        --glass-border: rgba(255, 255, 255, 0.15);
+        --neon-cyan: #38bdf8;
+        --neon-emerald: #34d399;
+        --neon-amber: #fbbf24;
+    }
+
+    body { background-color: var(--bg-main) !important; color: #f8fafc !important; }
+
+    .glass-card {
+        background: var(--glass-surface) !important;
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 20px !important;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+    }
+
+    .search-glass-card {
+        position: relative !important;
+        z-index: 1050 !important;
+        overflow: visible !important;
+    }
+
+    .custom-search-input {
+        background-color: #020617 !important;
+        color: #ffffff !important;
+        border: 2px solid var(--neon-cyan) !important;
+        border-radius: 14px !important;
+        padding: 16px 20px !important;
+        font-size: 1.25rem !important;
+        font-weight: 800 !important;
+        direction: rtl !important;
+        text-align: right !important;
+    }
+
+    .custom-search-input:focus {
+        box-shadow: 0 0 30px rgba(56, 189, 248, 0.6) !important;
+        border-color: #38bdf8 !important;
+        outline: none !important;
+    }
+
+    .search-results-dropdown {
+        position: absolute !important;
+        top: 100% !important;
+        right: 0 !important;
+        left: 0 !important;
+        z-index: 999999 !important;
+        background-color: #090d16 !important;
+        border: 2px solid var(--neon-cyan) !important;
+        border-radius: 16px !important;
+        margin-top: 8px !important;
+        max-height: 420px !important;
+        overflow-y: auto !important;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.98) !important;
+    }
+
+    .student-search-card {
+        padding: 14px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+    }
+
+    .student-search-card:hover {
+        background: rgba(56, 189, 248, 0.25) !important;
+        padding-right: 25px;
+    }
+
+    /* 🟢 تصميم كروت الإحصائيات مع تفتيح الألوان */
+    .stat-badge {
+        border-radius: 14px;
+        padding: 12px 10px;
+        text-align: center;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        transition: transform 0.2s, border-color 0.2s;
+    }
+    
+    .clickable-card {
+        cursor: pointer;
+    }
+    .clickable-card:hover {
+        transform: translateY(-3px);
+        border-color: #f87171 !important;
+        background: rgba(220, 38, 38, 0.2) !important;
+    }
+
+    /* 🟢 توضيح وتفتيح ألوان عناوين الكروت لمنع الغموض */
+    .stat-label-old { color: #fca5a5 !important; font-weight: 800; font-size: 0.95rem; }
+    .stat-label-current { color: #7dd3fc !important; font-weight: 800; font-size: 0.95rem; }
+    .stat-label-late { color: #f87171 !important; font-weight: 800; font-size: 0.95rem; }
+    .stat-label-paid { color: #6ee7b7 !important; font-weight: 800; font-size: 0.95rem; }
+    .stat-label-remaining { color: #fde047 !important; font-weight: 900; font-size: 1rem; }
+</style>
+
+<div class="container-fluid py-3" dir="rtl">
+
+    <!-- 1. الهيدر -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h3 class="fw-black text-white m-0 d-flex align-items-center gap-2">
+                <i class="bi bi-lightning-charge-fill text-warning fs-2"></i>
+                نقطة التحصيل والخدمات المباشرة السريعة (POS)
+            </h3>
+            <p class="text-info small m-0 fw-semibold">ابحث عن الطالب، استعرض الموقف المالي الحقيقي، وسدد الإيصال مباشرة</p>
+        </div>
+        <div class="badge bg-dark border border-secondary p-3 rounded-3 text-white fs-6">
+            <i class="bi bi-calendar3 me-1 text-info"></i> تاريخ اليوم: {{ today|date:"Y-m-d" }}
+        </div>
+    </div>
+
+    <!-- 🟢 2. محرك البحث الذكي -->
+    <div class="glass-card search-glass-card p-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <label for="studentSearchInput" class="form-label text-info fw-black fs-5 m-0">
+                <i class="bi bi-search me-1"></i> ابحث عن الطالب (الاسم الرباعي / الكود / القومي / هاتف ولي الأمر):
+            </label>
+            <button class="btn btn-outline-danger btn-sm font-weight-bold px-3" type="button" onclick="resetCounterForm()">
+                <i class="bi bi-eraser-fill me-1"></i> مسح وتفريغ
+            </button>
+        </div>
+
+        <div class="position-relative">
+            <input type="text" id="studentSearchInput"
+                   class="form-control custom-search-input"
+                   placeholder="اكتب اسم الطالب أو الكود هنا للبحث الفوري..."
+                   autocomplete="off" autofocus>
+
+            <div id="searchResultsList" class="search-results-dropdown d-none"></div>
+        </div>
+    </div>
+
+    <!-- 🟢 3. منطقة كارت الطالب المختار والتحصيل السريع -->
+    <div id="studentWorkspace" class="d-none animate__animated animate__fadeIn mb-4">
+        <div class="row g-3">
+
+            <div class="col-lg-8">
+                <div class="glass-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-3 mb-3">
+                        <div>
+                            <h4 id="dispName" class="fw-black text-warning m-0 fs-3">---</h4>
+                            <div class="mt-2 text-white-50 small">
+                                <span><i class="bi bi-hash"></i> كود الطالب: <strong id="dispCode" class="text-white fs-6">---</strong></span>
+                                <span class="mx-3">|</span>
+                                <span><i class="bi bi-card-heading"></i> القومي: <strong id="dispNational" class="text-white fs-6">---</strong></span>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span id="dispGrade" class="badge bg-primary fs-6 mb-1 d-block px-3 py-2">---</span>
+                            <span id="dispAssignedBadge" class="badge bg-success px-3 py-1">مسكن ماليًا ✅</span>
+                        </div>
+                    </div>
+
+                    <!-- 🟢 الكروت الـ 5 بعناوين واضحة ناصعة وإمكانية الضغط للتحويل لصفحة تسوية المديونية -->
+                    <div class="row g-2 mb-4">
+                        <div class="col-6 col-md">
+                            <div class="stat-badge border-danger clickable-card" onclick="payOldDebtDirectly()" title="اضغط للانتثال لصفحة تسوية المديونية القديمة">
+                                <span class="stat-label-old d-block mb-1">
+                                    <i class="bi bi-clock-history me-1"></i> مديونية قديمة
+                                </span>
+                                <strong id="dispOldDebt" class="text-danger fs-5 fw-black">0.00</strong>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md">
+                            <div class="stat-badge border-info">
+                                <span class="stat-label-current d-block mb-1">
+                                    <i class="bi bi-receipt me-1"></i> المطلوب حالياً
+                                </span>
+                                <strong id="dispFees" class="text-info fs-5 fw-black">0.00</strong>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md">
+                            <div class="stat-badge border-danger">
+                                <span class="stat-label-late d-block mb-1">
+                                    <i class="bi bi-exclamation-octagon me-1"></i> غرامة تأخير
+                                </span>
+                                <strong id="dispLateFine" class="text-danger fs-5 fw-black">0.00</strong>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md">
+                            <div class="stat-badge border-success">
+                                <span class="stat-label-paid d-block mb-1">
+                                    <i class="bi bi-check-circle me-1"></i> المحصل المسدد
+                                </span>
+                                <strong id="dispPaid" class="text-success fs-5 fw-black">0.00</strong>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md">
+                            <div class="stat-badge border-warning">
+                                <span class="stat-label-remaining d-block mb-1">
+                                    <i class="bi bi-wallet2 me-1"></i> المتبقي الشامل
+                                </span>
+                                <strong id="dispRemaining" class="text-warning fs-4 fw-black">0.00</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap pt-2">
+                        <a id="btnPrintStatement" href="#" target="_blank" class="btn btn-sm btn-outline-primary fw-bold px-3">
+                            <i class="bi bi-printer-fill me-1"></i> كشف حساب مالي
+                        </a>
+                        <a id="btnAssignPlan" href="#" class="btn btn-sm btn-outline-info fw-bold px-3">
+                            <i class="bi bi-pencil-square me-1"></i> تعديل التسكين
+                        </a>
+                        <a id="btnWithdraw" href="#" class="btn btn-sm btn-outline-danger fw-bold px-3">
+                            <i class="bi bi-box-seam me-1"></i> سحب الملف
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- نموذج التحصيل السريع -->
+            <div class="col-lg-4">
+                <div class="glass-card p-4 border-success">
+                    <h5 class="fw-bold text-success mb-3 border-bottom border-secondary pb-2">
+                        <i class="bi bi-cash-stack me-1"></i> استلام نقدية وإصدار إيصال
+                    </h5>
+                    <form id="paymentCounterForm">
+                        {% csrf_token %}
+                        <input type="hidden" name="student" id="formStudentId">
+
+                        <div class="mb-3">
+                            <label class="form-label text-white-50 small font-weight-bold">فئة الإيراد:</label>
+                            <select name="category" id="formCategory" class="form-select bg-black text-white border-secondary fw-bold" required>
+                                {% for cat in categories %}
+                                    <option value="{{ cat.id }}" {% if "اساس" in cat.name or "أساس" in cat.name or "مصروف" in cat.name %}selected{% endif %}>
+                                        {{ cat.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-white-50 small font-weight-bold">المبلغ المحصل (ج.م):</label>
+                            <input type="number" name="amount" id="formAmount" step="0.01" min="0.01" class="form-control form-control-lg bg-black text-success border-success fw-black text-center" placeholder="0.00" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-white-50 small font-weight-bold">رقم الإيصال الورقي:</label>
+                            <input type="number" name="receipt_number" id="formReceiptNumber" value="{{ next_receipt_number|default:'' }}" class="form-control bg-black text-white border-secondary text-center fw-bold" required>
+                        </div>
+
+                        <button type="submit" id="btnSubmitPayment" class="btn btn-success btn-lg w-100 fw-black shadow-lg">
+                            <i class="bi bi-check-circle-fill me-1"></i> تأكيد ودفع وإسقاط باليومية
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 🟢 4. جدول حركات اليوم الموحد -->
+    <div class="glass-card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-black text-info m-0 d-flex align-items-center gap-2">
+                <i class="bi bi-clock-history"></i>
+                سجل حركات اليومية الموحد (مؤقت لليوم الحالي فقط)
+            </h5>
+            <span id="todayCountBadge" class="badge bg-black border border-secondary text-secondary px-3 py-2">
+                إجمالي عمليات اليوم: {{ today_payments.count }} إيصال
+            </span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-dark table-hover text-center align-middle mb-0" id="todayPaymentsTable">
+                <thead class="bg-black text-info border-bottom border-secondary">
+                    <tr>
+                        <th>#</th>
+                        <th>التاريخ / الوقت</th>
+                        <th>رقم الإيصال</th>
+                        <th class="text-start ps-3">اسم الطالب</th>
+                        <th>فئة الإيراد</th>
+                        <th>المبلغ المحصل</th>
+                        <th>المحصل / الموظف</th>
+                    </tr>
+                </thead>
+                <tbody id="todayPaymentsBody">
+                    {% for p in today_payments %}
+                    <tr>
+                        <td class="text-muted fw-bold row-num">{{ forloop.counter }}</td>
+                        <td class="text-white-50 small">
+                            {{ p.payment_date|date:"Y-m-d" }}
+                        </td>
+                        <td><span class="badge bg-primary bg-opacity-20 text-info border border-info px-2 py-1 font-monospace">#{{ p.receipt_number }}</span></td>
+                        <td class="text-start ps-3 fw-bold text-white">{{ p.student.get_full_name }}</td>
+                        <td><span class="badge bg-secondary text-white">{{ p.revenue_category.name }}</span></td>
+                        <td class="text-success fw-black fs-6">+{{ p.amount_paid|floatformat:2 }} ج.م</td>
+                        <td class="text-muted small">@{{ p.collected_by.username }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr id="emptyRow">
+                        <td colspan="7" class="py-5 text-muted fw-bold">
+                            <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
+                            لم يتم تسجيل أي عمليات تحصيل حتى الآن اليوم.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+let searchTimeout;
+let currentStudentData = null;
+
+// 🟢 التركيز الفوري على خانة المبلغ
+function focusAmountInput() {
+    setTimeout(() => {
+        const amountField = document.getElementById('formAmount');
+        if (amountField && !amountField.disabled) {
+            amountField.focus();
+            amountField.select();
+        }
+    }, 120);
+}
+
+// 🟢 عند الضغط على كارت المديونية القديمة يتم التوجيه المباشر لصفحة التسوية
+function payOldDebtDirectly() {
+    if (currentStudentData && currentStudentData.old_debt > 0) {
+        window.location.href = `/finance/student/${currentStudentData.id}/settle-debt/?from=counter`;
+    } else if (currentStudentData) {
+        Swal.fire({
+            icon: 'info',
+            title: 'تنبيه',
+            text: 'هذا الطالب خالِص المديونية القديمة بالكامل ولا توجد عليه أي مستحقات سابقة.',
+            confirmButtonText: 'مفهوم',
+            confirmButtonColor: '#38bdf8',
+            background: '#0f172a',
+            color: '#fff'
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    {% if selected_student %}
+        const studentData = {
+            id: "{{ selected_student.id }}",
+            full_name: "{{ selected_student.get_full_name }}",
+            code: "{{ selected_student.student_code|default:'---' }}",
+            national_id: "{{ selected_student.national_id|default:'---' }}",
+            grade: "{{ selected_student.grade.name|default:'' }}",
+            classroom: "{{ selected_student.classroom.name|default:'' }}",
+            is_assigned: {% if account and account.installment_plan %}true{% else %}false{% endif %},
+            old_debt: parseFloat("{{ account.previous_balance|default:0 }}") || 0,
+            fees: parseFloat("{{ account.total_fees|default:0 }}") || 0,
+            late_fine: parseFloat("{{ account.late_fines|default:0 }}") || 0,
+            paid: parseFloat("{{ account.paid_amount|default:0 }}") || 0,
+            total_obligation: parseFloat("{{ account.remaining_balance|default:0 }}") || 0
+        };
+        selectStudent(studentData);
+    {% else %}
+        const urlParams = new URLSearchParams(window.location.search);
+        const studentId = urlParams.get('student_id');
+
+        if (studentId) {
+            fetch(`/finance/api/student-search/?q=${encodeURIComponent(studentId)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success' && data.results.length > 0) {
+                        const matchedStudent = data.results.find(s => s.id == studentId) || data.results[0];
+                        if (matchedStudent) {
+                            selectStudent(matchedStudent);
+                        }
+                    }
+                })
+                .catch(err => console.error('خطأ أثناء تحميل بيانات الطالب من الرابط:', err));
+        }
+    {% endif %}
+});
+
+document.getElementById('studentSearchInput').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const query = this.value.trim();
+    const resultsBox = document.getElementById('searchResultsList');
+
+    if (query.length < 2) {
+        resultsBox.classList.add('d-none');
+        return;
+    }
+
+    searchTimeout = setTimeout(() => {
+        fetch(`/finance/api/student-search/?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                resultsBox.innerHTML = '';
+                if (data.status === 'success' && data.results.length > 0) {
+                    data.results.forEach(student => {
+                        const div = document.createElement('div');
+                        div.className = 'student-search-card d-flex justify-content-between align-items-center';
+
+                        let totalDue = student.total_obligation;
+                        let debtBadge = totalDue > 0
+                            ? `<span class="badge bg-danger text-white border border-danger px-3 py-2 fw-black fs-6">مستحق: ${totalDue.toFixed(2)} ج.م</span>`
+                            : `<span class="badge bg-success text-white border border-success px-3 py-2 fw-black fs-6">خالص ✅</span>`;
+
+                        let assignedText = student.is_assigned
+                            ? `<span class="badge bg-success bg-opacity-20 text-success border border-success px-2 py-1 ms-1">مسكن ماليًا ✅</span>`
+                            : `<span class="badge bg-warning bg-opacity-20 text-warning border border-warning px-2 py-1 ms-1">غير مسكن ⚠️</span>`;
+
+                        div.innerHTML = `
+                            <div>
+                                <strong class="text-warning d-block fs-5 mb-1">${student.full_name}</strong>
+                                <div class="d-flex align-items-center gap-2 flex-wrap text-white small fw-bold">
+                                    <span class="badge bg-primary px-2 py-1">${student.grade} - ${student.classroom}</span>
+                                    ${assignedText}
+                                    <span class="text-info">| كود: ${student.code}</span>
+                                    <span class="text-white-50">| قومي: ${student.national_id}</span>
+                                </div>
+                            </div>
+                            <div class="text-end ms-3">
+                                ${debtBadge}
+                            </div>
+                        `;
+                        div.onclick = () => selectStudent(student);
+                        resultsBox.appendChild(div);
+                    });
+
+                    if (data.has_more) {
+                        const moreDiv = document.createElement('div');
+                        moreDiv.className = 'p-3 text-center text-info bg-black fw-bold small border-top border-secondary';
+                        moreDiv.innerHTML = `<i class="bi bi-info-circle-fill text-warning me-1"></i> يظهر أعلى 15 نتيجة فقط.. اكتب اسم الأب أو كود الطالب للتحديد بدقة.`;
+                        resultsBox.appendChild(moreDiv);
+                    }
+
+                    resultsBox.classList.remove('d-none');
+                } else {
+                    resultsBox.innerHTML = '<div class="p-4 text-center text-warning fw-black fs-5"><i class="bi bi-exclamation-triangle-fill me-2"></i> لا توجد نتائج مطابقة لبحثك</div>';
+                    resultsBox.classList.remove('d-none');
+                }
+            })
+            .catch(err => console.error('خطأ في البحث:', err));
+    }, 250);
+});
+
+function selectStudent(s) {
+    currentStudentData = s;
+    document.getElementById('searchResultsList').classList.add('d-none');
+    document.getElementById('studentSearchInput').value = s.full_name;
+
+    document.getElementById('dispName').innerText = s.full_name;
+    document.getElementById('dispCode').innerText = s.code;
+    document.getElementById('dispNational').innerText = s.national_id;
+    document.getElementById('dispGrade').innerText = `${s.grade} - ${s.classroom}`;
+
+    const assignedBadge = document.getElementById('dispAssignedBadge');
+    if (s.is_assigned) {
+        assignedBadge.className = "badge bg-success px-3 py-1";
+        assignedBadge.innerText = "مسكن ماليًا ✅";
+    } else {
+        assignedBadge.className = "badge bg-warning text-dark px-3 py-1";
+        assignedBadge.innerText = "غير مسكن ماليًا ⚠️";
+    }
+
+    document.getElementById('dispOldDebt').innerText = s.old_debt.toFixed(2);
+    document.getElementById('dispFees').innerText = s.fees.toFixed(2);
+    document.getElementById('dispLateFine').innerText = s.late_fine.toFixed(2);
+    document.getElementById('dispPaid').innerText = s.paid.toFixed(2);
+    document.getElementById('dispRemaining').innerText = s.total_obligation.toFixed(2);
+
+    document.getElementById('formStudentId').value = s.id;
+
+    document.getElementById('btnPrintStatement').href = `/finance/student/${s.id}/print-statement/`;
+    document.getElementById('btnAssignPlan').href = `/finance/assign-plan/${s.id}/?from=counter`;
+    document.getElementById('btnWithdraw').href = `/finance/student-inventory/${s.id}/?from=counter`;
+
+    document.getElementById('studentWorkspace').classList.remove('d-none');
+
+    focusAmountInput();
+}
+
+document.getElementById('paymentCounterForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const globalLoader = document.getElementById("global-loader");
+    if (globalLoader) globalLoader.classList.remove("active");
+
+    const form = this;
+    const formData = new FormData(form);
+    const btnSubmit = document.getElementById('btnSubmitPayment');
+
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> جاري الحفظ...`;
+
+    fetch('/finance/api/counter-collect/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+        },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> تأكيد ودفع وإسقاط باليومية`;
+
+        if (data.status === 'success') {
+            Swal.fire({
+                icon: 'success',
+                title: 'تم التحصيل بنجاح!',
+                text: data.message,
+                timer: 1500,
+                showConfirmButton: false,
+                background: '#0f172a',
+                color: '#fff'
+            });
+
+            document.getElementById('formAmount').value = '';
+            if (data.next_receipt_number) {
+                document.getElementById('formReceiptNumber').value = data.next_receipt_number;
+            }
+
+            document.getElementById('dispPaid').innerText = data.new_paid.toFixed(2);
+            document.getElementById('dispLateFine').innerText = data.new_late_fine.toFixed(2);
+            document.getElementById('dispRemaining').innerText = data.new_total_obligation.toFixed(2);
+
+            if (currentStudentData) {
+                currentStudentData.paid = data.new_paid;
+                currentStudentData.late_fine = data.new_late_fine;
+                currentStudentData.total_obligation = data.new_total_obligation;
+            }
+
+            const emptyRow = document.getElementById('emptyRow');
+            if (emptyRow) emptyRow.remove();
+
+            const tbody = document.getElementById('todayPaymentsBody');
+            const newRow = document.createElement('tr');
+            newRow.className = 'animate__animated animate__fadeInDown';
+            newRow.innerHTML = `
+                <td class="text-muted fw-bold">#</td>
+                <td class="text-white-50 small">${data.payment.time}</td>
+                <td><span class="badge bg-primary bg-opacity-20 text-info border border-info px-2 py-1 font-monospace">#${data.payment.receipt_number}</span></td>
+                <td class="text-start ps-3 fw-bold text-white">${data.payment.student_name}</td>
+                <td><span class="badge bg-secondary text-white">${data.payment.category_name}</span></td>
+                <td class="text-success fw-black fs-6">+${data.payment.amount_paid.toFixed(2)} ج.م</td>
+                <td class="text-muted small">@${data.payment.collector}</td>
+            `;
+            tbody.insertBefore(newRow, tbody.firstChild);
+
+            const countBadge = document.getElementById('todayCountBadge');
+            const currentCount = tbody.querySelectorAll('tr').length;
+            countBadge.innerText = `إجمالي عمليات اليوم: ${currentCount} إيصال`;
+
+            focusAmountInput();
+
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'تنبيه!',
+                text: data.message,
+                confirmButtonText: 'مفهوم',
+                confirmButtonColor: '#38bdf8',
+                background: '#0f172a',
+                color: '#fff'
+            }).then(() => {
+                focusAmountInput();
+            });
+        }
+    })
+    .catch(err => {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> تأكيد ودفع وإسقاط باليومية`;
+        Swal.fire({
+            icon: 'error',
+            title: 'خطأ تقني',
+            text: 'حدث خطأ أثناء الحفظ، يرجى إعادة المحاولة.',
+            background: '#0f172a',
+            color: '#fff'
+        }).then(() => {
+            focusAmountInput();
+        });
+    });
+});
+
+function resetCounterForm() {
+    document.getElementById('studentSearchInput').value = '';
+    document.getElementById('searchResultsList').classList.add('d-none');
+    document.getElementById('studentWorkspace').classList.add('d-none');
+    document.getElementById('formAmount').value = '';
+    currentStudentData = null;
+    document.getElementById('studentSearchInput').focus();
+}
+
+document.addEventListener('click', function(e) {
+    const searchInput = document.getElementById('studentSearchInput');
+    const resultsBox = document.getElementById('searchResultsList');
+    if (e.target !== searchInput && !resultsBox.contains(e.target)) {
+        resultsBox.classList.add('d-none');
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4" dir="rtl">
+    
+    <!-- الهيدر الرئيسي -->
+    <div class="d-flex justify-content-between align-items-center mb-4 p-4 rounded-4 bg-dark border border-secondary text-white flex-wrap gap-3">
+        <div>
+            <h3 class="fw-bold m-0 text-warning"><i class="bi bi-calendar-check-fill me-2"></i> رصد الحضور بالمادة والدكتور والتيرم</h3>
+            <p class="text-white-50 small m-0 mt-1">اختر المادة والدكتور والتاريخ لفتح كشف تسجيل الحضور والغياب المباشر للطلاب</p>
+        </div>
+        <button class="btn btn-warning fw-bold rounded-pill px-4 shadow" data-bs-toggle="collapse" data-bs-target="#addLectureBox">
+            <i class="bi bi-plus-circle-fill me-1"></i> رصد حضور يوم جديد
+        </button>
+    </div>
+
+    <!-- نموذج اختيار المادة والتاريخ (بدون أي كتابة يدوية) -->
+    <div class="collapse show mb-4" id="addLectureBox">
+        <div class="card card-body bg-black border-secondary text-white rounded-4 shadow-lg p-4">
+            <h5 class="text-info fw-bold mb-3"><i class="bi bi-person-video3 me-1"></i> حدد المادة والتاريخ لفتح الكشف:</h5>
+            <form method="POST" class="row g-3 align-items-end">
+                {% csrf_token %}
+                <div class="col-md-7">
+                    <label class="form-label small text-info fw-bold">اختر (الدبلومة - التيرم - المادة - الدكتور المحاضر)</label>
+                    <select name="term_subject" class="form-select bg-dark text-white border-secondary fw-bold fs-6 py-2" required>
+                        <option value="">-- اختر المادة والدكتور المخصص بالتيرم --</option>
+                        {% for ts in term_subjects %}
+                            <option value="{{ ts.id }}">
+                                {{ ts.course.name }} | تيرم {{ ts.term_number }}: {{ ts.subject.name }} (د. {{ ts.doctor.name }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-info fw-bold">تاريخ المحاضرة / اليوم</label>
+                    <input type="date" name="lecture_date" class="form-control bg-dark text-white border-secondary fw-bold py-2" required>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success w-100 fw-bold py-2"><i class="bi bi-arrow-right-circle me-1"></i> فتح الكشف</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- سجل الكشوف السابقة -->
+    <div class="card bg-black border-secondary rounded-4 overflow-hidden shadow">
+        <div class="card-header bg-dark border-secondary text-white fw-bold py-3">
+            <i class="bi bi-clock-history me-1 text-warning"></i> سجل كشوف الحضور المحفوظة سابقاً
+        </div>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover m-0 text-center align-middle">
+                <thead class="table-secondary">
+                    <tr>
+                        <th class="text-start ps-4">الدبلومة / القسم</th>
+                        <th>التيرم والمادة</th>
+                        <th>الدكتور المحاضر</th>
+                        <th>تاريخ المحاضرة</th>
+                        <th>الإجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lec in lectures %}
+                    <tr>
+                        <td class="text-start ps-4 fw-bold text-info">{{ lec.term_subject.course.name }}</td>
+                        <td><span class="badge bg-dark border border-warning text-warning fs-6">تيرم {{ lec.term_subject.term_number }}: {{ lec.term_subject.subject.name }}</span></td>
+                        <td><span class="fw-bold text-white">د. {{ lec.term_subject.doctor.name }}</span></td>
+                        <td class="text-white-50 fw-bold">{{ lec.lecture_date|date:"Y-m-d" }}</td>
+                        <td>
+                            <a href="{% url 'take_lecture_attendance' lec.id %}" class="btn btn-sm btn-outline-warning rounded-pill px-4 fw-bold">
+                                <i class="bi bi-clipboard-check me-1"></i> تعديل / رصد الحضور
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="py-5 text-muted">لا توجد كشوف حضور سابقة. اختر المادة والتاريخ من الأعلى لفتح كشف جديد.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

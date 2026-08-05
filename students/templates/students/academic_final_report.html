@@ -1,176 +1,254 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
-    <!-- خط Cairo -->
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    <!-- Bootstrap 5 -->
+    <!-- خط Cairo الفخم -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 & Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     
     <style>
         :root {
-            --primary-gradient: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            --bg-light: #f8fafc;
-            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+            --primary-gradient: linear-gradient(-45deg, #0f172a, #1e3a8a, #2563eb, #1e40af);
+            --dark-glass: rgba(15, 23, 42, 0.65);
+            --darker-glass: rgba(2, 6, 23, 0.85);
+            --border-glass: rgba(255, 255, 255, 0.1);
             
-            /* ألوان الحالات */
+            /* ألوان الحالات والاعتمادات الرسمية */
             --success-color: #10b981;
-            --success-bg: #d1fae5;
+            --success-bg: rgba(16, 185, 129, 0.15);
             --warning-color: #f59e0b;
-            --warning-bg: #fef3c7;
+            --warning-bg: rgba(245, 158, 11, 0.15);
             --danger-color: #ef4444;
-            --danger-bg: #fee2e2;
+            --danger-bg: rgba(239, 68, 68, 0.15);
         }
 
         body {
             font-family: 'Cairo', sans-serif;
-            background-color: #f1f5f9;
-            color: #334155;
+            background: linear-gradient(-45deg, #0f172a, #1e3a8a, #1d4ed8, #0f172a);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: #f8fafc;
+            min-height: 100vh;
             padding: 30px 15px;
+            overflow-x: hidden;
         }
 
-        /* الهيدر الداكن الفخم */
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* الهيدر الزجاجي العصري */
         .dashboard-header {
-            background: var(--primary-gradient);
-            border-radius: 20px;
+            background: var(--dark-glass);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid var(--border-glass);
+            border-radius: 24px;
             padding: 35px;
-            color: white;
-            box-shadow: 0 15px 40px rgba(15, 23, 42, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
             margin-bottom: 35px;
-            position: relative;
-            overflow: hidden;
+            border-right: 6px solid #0dcaf0 !important;
         }
 
-        .dashboard-title { font-weight: 800; font-size: 2.2rem; margin-bottom: 5px; color: #f8fafc; }
+        .dashboard-title { 
+            font-weight: 900; 
+            font-size: 2.3rem; 
+            color: #fff;
+            text-shadow: 0 0 20px rgba(13, 202, 240, 0.3);
+        }
         
+        /* كارت الفلترة الزجاجي */
         .filter-card {
-            background: white; border-radius: 18px; box-shadow: var(--card-shadow); padding: 25px; margin-bottom: 30px;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 18px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
+            padding: 25px; 
+            margin-bottom: 35px;
+            border: 1px solid var(--border-glass);
         }
 
-        .form-select, .btn-filter {
-            border-radius: 12px; padding: 12px; font-weight: 700; font-size: 1rem;
+        .form-label {
+            font-weight: 700;
+            color: #0dcaf0;
+        }
+
+        .form-select {
+            background-color: rgba(2, 6, 23, 0.6) !important;
+            color: #fff !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 12px; 
+            padding: 12px; 
+            font-weight: 700; 
+            font-size: 1rem;
+        }
+        .form-select option {
+            background: #0f172a !important;
+            color: #fff;
         }
 
         .btn-filter {
-            background: #3b82f6; color: white; border: none; width: 100%; transition: all 0.3s;
+            background: #0dcaf0; 
+            color: #0f172a; 
+            border: none; 
+            width: 100%; 
+            padding: 12px;
+            font-weight: 800;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(13, 202, 240, 0.2);
         }
-        .btn-filter:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); }
+        .btn-filter:hover { 
+            background: #0baccc; 
+            transform: translateY(-2px); 
+            box-shadow: 0 8px 25px rgba(13, 202, 240, 0.4); 
+            color: #0f172a;
+        }
 
-        /* تصميم الكارت الخاص بكل طالب (Grid System بدلاً من الجداول) */
+        /* شبكة عرض كروت الطلاب الذكية */
         .report-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 25px;
         }
 
         .student-card {
-            background: white;
-            border-radius: 16px;
+            background: var(--dark-glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 20px;
             padding: 25px;
-            box-shadow: var(--card-shadow);
-            border: 1px solid #e2e8f0;
-            transition: all 0.3s ease;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            border: 1px solid var(--border-glass);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
         }
 
         .student-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 35px rgba(0,0,0,0.08);
-            border-color: #cbd5e1;
+            transform: translateY(-5px) scale(1.01);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            border-color: rgba(255, 255, 255, 0.25);
         }
 
-        /* شريط الحالة الجانبي الملون */
+        /* شريط التقييم الجانبي الملون */
         .status-bar { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; }
-        .status-passed .status-bar { background-color: var(--success-color); }
-        .status-second_session .status-bar { background-color: var(--warning-color); }
-        .status-failed .status-bar { background-color: var(--danger-color); }
+        .status-passed .status-bar { background-color: var(--success-color); box-shadow: -4px 0 15px var(--success-color); }
+        .status-second_session .status-bar { background-color: var(--warning-color); box-shadow: -4px 0 15px var(--warning-color); }
+        .status-failed .status-bar { background-color: var(--danger-color); box-shadow: -4px 0 15px var(--danger-color); }
 
-        .student-name { font-weight: 800; font-size: 1.25rem; color: #0f172a; margin-bottom: 5px; }
-        .student-code { font-size: 0.9rem; color: #64748b; font-weight: 600; }
+        .student-name { font-weight: 800; font-size: 1.3rem; color: #fff; margin-bottom: 5px; letter-spacing: -0.3px; }
+        .student-code { font-size: 0.9rem; color: #94a3b8; font-weight: 700; display: flex; align-items: center; gap: 5px; }
 
-        /* باجات الحالة (Status Badges) */
+        /* باجات الحالة الديناميكية المضيئة */
         .badge-status {
             padding: 8px 16px; border-radius: 30px; font-weight: 800; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;
         }
-        .badge-passed { background-color: var(--success-bg); color: #065f46; border: 1px solid #a7f3d0; }
-        .badge-second_session { background-color: var(--warning-bg); color: #92400e; border: 1px solid #fde68a; }
-        .badge-failed { background-color: var(--danger-bg); color: #991b1b; border: 1px solid #fecaca; }
+        .status-passed .badge-status { background-color: var(--success-bg); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); }
+        .status-second_session .badge-status { background-color: var(--warning-bg); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+        .status-failed .badge-status { background-color: var(--danger-bg); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3); }
 
-        /* وسوم المواد الراسب فيها (Tags) */
+        /* صندوق المواد التي تحتاج لمعالجة وملاحق */
         .failed-subjects-box {
-            margin-top: 15px; padding-top: 15px; border-top: 1px dashed #e2e8f0;
+            margin-top: 18px; padding-top: 15px; border-top: 1px dashed rgba(255, 255, 255, 0.15);
         }
         .subject-tag {
-            background: #f1f5f9; color: #475569; font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: 8px; display: inline-block; margin: 3px; border: 1px solid #e2e8f0;
+            background: rgba(2, 6, 23, 0.4); 
+            color: #cbd5e1; 
+            font-size: 0.85rem; 
+            font-weight: 700; 
+            padding: 6px 12px; 
+            border-radius: 10px; 
+            display: inline-flex; 
+            align-items: center;
+            gap: 5px;
+            margin: 4px; 
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .subject-tag span.score { color: var(--danger-color); font-weight: 800; }
+        .subject-tag span.score { color: #f87171; font-weight: 900; background: rgba(239, 68, 68, 0.1); padding: 1px 6px; border-radius: 4px; }
+        
+        /* تأثير لودر جانبي خفيف */
+        .max-width-1400 { max-width: 1400px; margin: 0 auto; }
     </style>
 </head>
 <body>
 
-<div class="container-fluid max-width-1400">
-    <div class="dashboard-header d-flex justify-content-between align-items-start flex-wrap gap-3">
+<div class="container-fluid max-width-1400 animate__animated animate__fadeIn">
+    <!-- الهيدر الزجاجي المطور -->
+    <div class="dashboard-header d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
-            <h1 class="dashboard-title">التقرير الأكاديمي النهائي للكنترول</h1>
-            <p class="m-0 text-white-50 mb-3">تحليل ذكي لنتائج الطلاب، وتحديد الناجحين والملاحق تلقائياً بناءً على لوائح النجاح</p>
-            
-            <div class="mt-2">
-                <a href="{% url 'home' %}" class="btn btn-light btn-sm fw-bold rounded-pill shadow-sm px-4" style="color: #1e293b;">
-                    <i class="bi bi-house-door-fill me-1"></i> العودة للرئيسية
-                </a>
-                <button onclick="history.back()" class="btn btn-outline-light btn-sm fw-bold rounded-pill px-4 ms-2">
-                    <i class="bi bi-arrow-right-circle me-1"></i> رجوع للخلف
-                </button>
-            </div>
+            <h1 class="dashboard-title"><i class="bi bi-graph-up-arrow text-info me-2"></i> التقرير الأكاديمي النهائي للكنترول</h1>
+            <p class="m-0 text-white-50 fw-semibold">تحليل ذكي فوري لنتائج الطلاب، وتحديد الناجحين والملاحق تلقائياً بناءً على لوائح النجاح والرسوب الوزارية.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'home' %}" class="btn btn-light btn-sm fw-bold rounded-pill shadow-sm px-4 py-2" style="color: #0f172a;">
+                <i class="bi bi-house-door-fill me-1"></i> العودة للرئيسية
+            </a>
+            <button onclick="history.back()" class="btn btn-outline-light btn-sm fw-bold rounded-pill px-4 py-2">
+                <i class="bi bi-arrow-right-circle me-1"></i> رجوع للخلف
+            </button>
         </div>
     </div>
 
+    <!-- كارت الفلترة والاختيار المسرع -->
     <div class="filter-card">
         <form method="GET" action="">
             <div class="row align-items-end justify-content-center g-3">
-                <div class="col-md-5">
-                    <label class="form-label text-muted fw-bold mb-2">اختر الصف الدراسي لاستخراج النتيجة</label>
-                    <select name="grade_id" class="form-select" required>
-                        <option value="">-- اختر الصف --</option>
+                <div class="col-md-6">
+                    <label class="form-label mb-2"><i class="bi bi-filter-square me-1"></i> اختر الصف الدراسي المستهدف لاستخراج النتيجة والفرز:</label>
+                    <select name="grade_id" class="form-select fw-bold shadow-none" required>
+                        <option value="">-- اضغط هنا لاختيار الصف الدراسي --</option>
                         {% for grade in all_grades %}
-                            <option value="{{ grade.id }}" {% if selected_grade == grade.id|stringformat:"s" %}selected{% endif %}>{{ grade.name }}</option>
+                            <option value="{{ grade.id }}" {% if selected_grade == grade.id|stringformat:"s" or selected_grade == grade.id|stringformat:"i" %}selected{% endif %}>{{ grade.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn-filter">استخراج التقرير</button>
+                <div class="col-md-3">
+                    <button type="submit" class="btn-filter fw-bold"><i class="bi bi-cpu-fill me-1"></i> استخراج التقرير الفوري</button>
                 </div>
             </div>
         </form>
     </div>
 
+    <!-- عرض شبكة نتائج الطلاب في حالة توفر البيانات -->
     {% if results_summary %}
         <div class="report-grid">
             {% for result in results_summary %}
-            <div class="student-card status-{{ result.status }}">
+            <div class="student-card status-{{ result.status }} animate__animated animate__fadeInUp" style="animation-delay: {{ forloop.counter0|stringformat:'s' }}ms; max-height: 320px; overflow-y: auto;">
                 <div class="status-bar"></div>
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <div>
                         <h3 class="student-name">{{ result.student.get_full_name }}</h3>
-                        <div class="student-code">كود: {{ result.student.student_code|default:"--" }}</div>
+                        <div class="student-code">
+                            <i class="bi bi-person-vcard text-info"></i> كود الطالب الأكاديمي: {{ result.student.student_code|default:"--" }}
+                        </div>
                     </div>
-                    <!-- باج الحالة الديناميكي -->
-                    <span class="badge-status badge-{{ result.status }}">
+                    <!-- باج الحالة المضيء الملون زجاجياً -->
+                    <span class="badge-status">
+                        {% if result.status == 'passed' %}<i class="bi bi-check-circle-fill"></i>
+                        {% elif result.status == 'second_session' %}<i class="bi bi-exclamation-triangle-fill"></i>
+                        {% else %}<i class="bi bi-x-circle-fill"></i>{% endif %}
                         {{ result.status_label }}
                     </span>
                 </div>
 
                 {% if result.failed_count > 0 %}
                 <div class="failed-subjects-box">
-                    <p class="mb-2" style="font-size: 0.85rem; font-weight: 700; color: #64748b;">المواد التي تحتاج لمعالجة ({{ result.failed_count }}):</p>
-                    <div>
+                    <p class="mb-2 fw-bold text-info" style="font-size: 0.85rem;"><i class="bi bi-bookmark-x-fill text-danger me-1"></i> المواد التي تحتاج لمعالجة ورصد ({{ result.failed_count }}):</p>
+                    <div class="d-flex flex-wrap">
                         {% for sub in result.failed_subjects %}
                             <span class="subject-tag">
-                                {{ sub.subject_name }} 
-                                (جاب <span class="score">{{ sub.score|floatformat:0 }}</span> من {{ sub.passing_limit|floatformat:0 }})
+                                <i class="bi bi-book text-secondary"></i> {{ sub.subject_name }} 
+                                (حصل على <span class="score">{{ sub.score|floatformat:0 }}</span> من {{ sub.passing_limit|floatformat:0 }})
                             </span>
                         {% endfor %}
                     </div>
@@ -179,9 +257,28 @@
             </div>
             {% endfor %}
         </div>
+        
+        <!-- المحرك الإحتياطي للـ Pagination لمنع أي ثقل أو تهنيج في المستقبل -->
+        {% if results_summary.has_other_pages %}
+        <div class="d-flex justify-content-center mt-5">
+            <nav>
+                <ul class="pagination pagination-sm gap-1">
+                    {% if results_summary.has_previous %}
+                        <li class="page-item"><a class="page-link bg-dark text-info border-secondary fw-bold" href="?grade_id={{ selected_grade }}&page={{ results_summary.previous_page_number }}">السابق</a></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link bg-info text-dark border-info fw-bold">صفحة {{ results_summary.number }} من {{ results_summary.paginator.num_pages }}</span></li>
+                    {% if results_summary.has_next %}
+                        <li class="page-item"><a class="page-link bg-dark text-info border-secondary fw-bold" href="?grade_id={{ selected_grade }}&page={{ results_summary.next_page_number }}">التالي</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
     {% elif selected_grade %}
-        <div class="alert alert-info text-center rounded-4 shadow-sm p-4">
-            <h5 class="fw-bold m-0">لم يتم رصد درجات كافية لطلاب هذا الصف لإصدار تقرير نهائي حتى الآن.</h5>
+        <div class="alert text-center rounded-4 p-4 animate__animated animate__shakeX" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--danger-color); color: #f87171; backdrop-filter: blur(10px);">
+            <i class="bi bi-exclamation-octagon-fill fs-2 mb-2 d-block"></i>
+            <h5 class="fw-bold m-0">تنبيه: لم يتم رصد درجات كافية لطلاب هذا الصف لإصدار تقرير الفرز النهائي حتى الآن.</h5>
         </div>
     {% endif %}
 </div>

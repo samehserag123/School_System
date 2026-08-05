@@ -6,23 +6,24 @@
 {% block content %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
 <style>
     .student-row {
         animation: fadeIn 0.4s ease-in-out;
     }
     .stats-grid {
-        display: flex; 
-        justify-content: space-between; 
-        gap: 10px; 
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
         margin-bottom: 25px;
-        flex-wrap: nowrap; 
-        overflow-x: auto; 
+        flex-wrap: nowrap;
+        overflow-x: auto;
         padding-bottom: 10px;
     }
 
     .stat-card {
-        flex: 1; 
-        min-width: 120px; 
+        flex: 1;
+        min-width: 120px;
         background: linear-gradient(145deg, #1e2227, #252a30);
         border: 1px solid #343a40;
         border-radius: 12px;
@@ -155,13 +156,15 @@
 <div class="container-fluid px-3">
     <div class="filter-section animate__animated animate__fadeInUp">
         <div class="row g-3">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="input-group">
-                    <span class="input-group-text bg-transparent border-secondary text-muted"><i class="bi bi-search"></i></span>
-                    <input type="text" id="tableSearch" onkeyup="runFilters()" class="form-control" placeholder="ابحث باسم الطالب أو الرقم القومي..." value="{{ search_query|default:'' }}" autofocus>
+                    <input type="text" id="tableSearch" onkeyup="debouncedSearch()" class="form-control" placeholder="ابحث باسم الطالب أو الرقم القومي..." value="{{ search_query|default:'' }}" autofocus>
+                    <button class="btn btn-outline-danger fw-bold" type="button" onclick="clearFilters()" title="إعادة تعيين ومسح كافة الفلاتر">
+                        <i class="bi bi-eraser-fill"></i> مسح
+                    </button>
                 </div>
             </div>
-            <div class="col-md-9">
+            <div class="col-md-8">
                 <div class="row g-2">
                     <div class="col-md-2">
                         <select id="f-grade" onchange="runFilters()" class="form-select form-select-sm">
@@ -183,9 +186,12 @@
                         <select id="f-spec" onchange="runFilters()" class="form-select form-select-sm">
                             <option value="">التخصص</option>
                             <option value="General" {% if selected_specialization == 'General' %}selected{% endif %}>شعبة عامة</option>
-                            <option value="Restaurant" {% if selected_specialization == 'Restaurant' %}selected{% endif %}>فني مضيف</option>
-                            <option value="Kitchen" {% if selected_specialization == 'Kitchen' %}selected{% endif %}>فن طاهي</option>
+                            <option value="Host" {% if selected_specialization == 'Host' %}selected{% endif %}>فني مضيف</option>
+                            <option value="Chef" {% if selected_specialization == 'Chef' %}selected{% endif %}>فن طاهي</option>
                             <option value="Internal" {% if selected_specialization == 'Internal' %}selected{% endif %}>مشرف غرف</option>
+                            <option value="Kitchen" {% if selected_specialization == 'Kitchen' %}selected{% endif %}>مطبخ</option>
+                            <option value="Restaurant" {% if selected_specialization == 'Restaurant' %}selected{% endif %}>مطعم</option>
+                            <option value="Tourism Services" {% if selected_specialization == 'Tourism Services' %}selected{% endif %}>خدمات سياحية</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -214,6 +220,26 @@
         </div>
     </div>
 
+    <!-- 🟢 شريط الإجراءات السريعة (تحديد الكل، التشعيب الجماعي، الناجحين، الراسبين) -->
+    <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-dark rounded border border-secondary shadow-sm flex-wrap gap-2 animate__animated animate__fadeInUp">
+        <div>
+            <i class="bi bi-gear-fill text-warning me-2"></i><strong class="text-white">إجراءات النتيجة والتشعيب السريعة للكنترول:</strong>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <!-- 🟢 زر التشعيب الجماعي بمنتصف العام (الترم الثاني) -->
+            <button type="button" class="btn btn-info btn-sm fw-bold text-dark shadow-sm" onclick="openSpecializationModal()">
+                <i class="bi bi-diagram-3-fill me-1"></i> تشعيب الطلاب المحددين (الترم الثاني)
+            </button>
+
+            <button type="button" class="btn btn-outline-danger btn-sm fw-bold" onclick="bulkMarkFailed()">
+                <i class="bi bi-x-circle-fill"></i> تسجيل المحددين (كراسب)
+            </button>
+            <button type="button" class="btn btn-success btn-sm fw-bold shadow-sm pulse-btn" onclick="promoteRemaining()">
+                <i class="bi bi-check-all"></i> اعتماد نجاح باقي طلاب الصف المفلتر
+            </button>
+        </div>
+    </div>
+
     <!-- 3. جدول عرض بيانات الطلاب الرئيسي المطور -->
     <div class="card bg-dark border-secondary rounded-3 shadow animate__animated animate__fadeInUp">
         <div class="card-body p-0">
@@ -222,7 +248,7 @@
                     <thead class="table-secondary text-dark fw-bold">
                         <tr>
                             <th width="40"><input type="checkbox" id="selectAllStudents" class="form-check-input"></th>
-                            <th>كود الطالب</th>
+                            <th>كود وقيد الطالب</th>
                             <th class="text-end">اسم الطالب بالكامل</th>
                             <th>الصف الدراسي</th>
                             <th>الفصل</th>
@@ -231,6 +257,7 @@
                             <th>الديانة</th>
                             <th>حالة الدمج</th>
                             <th>الرقم القومي</th>
+                            <th>حالة الطالب</th>
                             <th width="150">الإجراءات والعمليات</th>
                         </tr>
                     </thead>
@@ -238,7 +265,15 @@
                         {% for student in students %}
                         <tr id="student-{{ student.id }}" class="student-row">
                             <td><input type="checkbox" class="form-check-input student-checkbox" value="{{ student.id }}"></td>
-                            <td class="text-info fw-bold">{{ student.student_code }}</td>
+                            
+                            <!-- 🟢 عرض كود الطالب مع رقم القيد الدفتري أسفله -->
+                            <td>
+                                <strong class="text-info d-block">{{ student.student_code }}</strong>
+                                {% if student.registration_number %}
+                                    <small class="badge bg-black border border-warning text-warning px-1 py-0 font-monospace">قيد: {{ student.registration_number }}</small>
+                                {% endif %}
+                            </td>
+
                             <td class="text-end fw-bold text-white">
                                 <a href="javascript:void(0)" onclick="navigateToEdit('{{ student.id }}')" class="text-decoration-none text-white text-white-hover">
                                     {{ student.first_name }} {{ student.last_name }}
@@ -246,12 +281,12 @@
                             </td>
                             <td><span class="badge bg-secondary px-2 py-1">{{ student.grade.name }}</span></td>
                             <td><span class="badge bg-dark border border-secondary px-2 py-1">{{ student.classroom.name|default:"غير محدد" }}</span></td>
-                            <td>{{ student.get_specialization_display }}</td>
+                            <td><span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1">{{ student.get_specialization_display }}</span></td>
                             <td>
                                 {% if student.gender == 'Male' %}
-                                    <span class="text-info"><i class="bi bi-gender-male me-1"></i>بنين</span>
+                                    <span class="text-info fw-bold">بنين</span>
                                 {% else %}
-                                    <span class="text-danger"><i class="bi bi-gender-female me-1"></i>بنات</span>
+                                    <span class="text-danger fw-bold">بنات</span>
                                 {% endif %}
                             </td>
                             <td>{{ student.get_religion_display }}</td>
@@ -263,12 +298,44 @@
                                 {% endif %}
                             </td>
                             <td class="font-monospace text-muted">{{ student.national_id }}</td>
+
+                            <!-- 🟢 عمود حالة الطالب الحالية مع الإشارة لحالة فتح الملف والملاحظات -->
+                            <td>
+                                <div class="d-flex flex-column align-items-center justify-content-center">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <select class="form-select form-select-sm bg-dark border-secondary status-dropdown fw-bold"
+                                                data-student-id="{{ student.id }}"
+                                                style="width: 125px; font-size: 0.8rem; color: {% if student.enrollment_status == 'Promoted' or student.enrollment_status == 'Graduated' %}#2ecc71{% elif student.enrollment_status == 'Retained' or student.enrollment_status == 'Dismissed' %}#e74c3c{% elif student.enrollment_status == 'New' or student.enrollment_status == 'Transferred' %}#38bdf8{% else %}#f1c40f{% endif %};">
+                                            <option value="New" class="text-info fw-bold" {% if student.enrollment_status == 'New' %}selected{% endif %}>مستجد</option>
+                                            <option value="Promoted" class="text-success fw-bold" {% if student.enrollment_status == 'Promoted' %}selected{% endif %}>منقول</option>
+                                            <option value="Retained" class="text-danger fw-bold" {% if student.enrollment_status == 'Retained' %}selected{% endif %}>باق</option>
+                                            <option value="Transferred" class="text-info fw-bold" {% if student.enrollment_status == 'Transferred' %}selected{% endif %}>محول</option>
+                                            <option value="Dismissed" class="text-danger fw-bold" {% if student.enrollment_status == 'Dismissed' %}selected{% endif %}>مفصول</option>
+                                            <option value="First_Round" class="text-warning fw-bold" {% if student.enrollment_status == 'First_Round' %}selected{% endif %}>دور أول</option>
+                                            <option value="Second_Round" class="text-warning fw-bold" {% if student.enrollment_status == 'Second_Round' %}selected{% endif %}>دور ثان</option>
+                                            <option value="Graduated" class="text-primary fw-bold" {% if student.enrollment_status == 'Graduated' %}selected{% endif %}>إتمام مرحلة 🎓</option>
+                                        </select>
+
+                                        {% if student.enrollment_notes %}
+                                            <i class="bi bi-chat-left-text-fill text-warning" title="ملاحظات القيد: {{ student.enrollment_notes }}"></i>
+                                        {% endif %}
+                                        <span class="status-indicator" id="indicator-{{ student.id }}" style="display:none;"></span>
+                                    </div>
+
+                                    <!-- 🟢 إشارة مرجعية لحالة فتح الملف الأولى الثابتة -->
+                                    {% if student.initial_status %}
+                                        <small class="text-muted" style="font-size: 0.68rem;" title="حالة القيد المعتمدة عند فتح الملف أول مرة">
+                                            بداية: <span class="text-warning fw-semibold">{{ student.get_initial_status_display }}</span>
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            </td>
+
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <!-- 🛑 زر الحظر الديناميكي المطور بالتواريخ ورفع الحظر بنجاح -->
-                                    <button type="button" 
-                                            class="btn {% if student.is_blocked_at_gate %}btn-danger{% else %}btn-outline-danger{% endif %}" 
-                                            title="إدارة حظر بوابة الأمن والتصاريح" 
+                                    <button type="button"
+                                            class="btn {% if student.is_blocked_at_gate %}btn-danger{% else %}btn-outline-danger{% endif %}"
+                                            title="إدارة حظر بوابة الأمن والتصاريح"
                                             onclick="openGateBlockModal('{{ student.id }}', '{{ student.first_name }} {{ student.last_name }}', '{% if student.is_blocked_at_gate %}true{% else %}false{% endif %}', '{{ student.gate_block_reason|default_if_none:''|escapejs }}', '{{ student.gate_blocked_from|date:'Y-m-d' }}', '{{ student.gate_blocked_to|date:'Y-m-d' }}')">
                                         {% if student.is_blocked_at_gate %}
                                             <i class="bi bi-lock-fill"></i>
@@ -276,14 +343,12 @@
                                             <i class="bi bi-shield-slash-fill"></i>
                                         {% endif %}
                                     </button>
-                                    
-                                    <!-- 📞 زر المتابعة والتحصيل والاقساط المتأخرة -->
+
                                     <a href="{% url 'overdue_calls' %}?student_id={{ student.id }}" class="btn btn-outline-warning" title="قائمة المتابعة والأقساط المتأخرة">
                                         <i class="bi bi-telephone-outbound-fill"></i>
                                     </a>
 
                                     {% if not is_archive %}
-                                        <!-- 🩺 زر التسكين اللحظي للبرنامج العلاجي بمودال سريع -->
                                         <button type="button" class="btn btn-outline-success" title="تسكين سريع في برنامج علاجي" onclick="openRemedialModal('{{ student.id }}', '{{ student.first_name }} {{ student.last_name }}')">
                                             <i class="bi bi-heart-pulse-fill"></i>
                                         </button>
@@ -293,7 +358,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="11" class="text-center text-muted py-5">
+                            <td colspan="12" class="text-center text-muted py-5">
                                 <i class="bi bi-people-fill fs-1 d-block mb-3 text-secondary"></i>
                                 لا توجد سجلات طلاب مطابقة لمعايير التصفية والبحث المحددة حالياً.
                             </td>
@@ -303,13 +368,13 @@
                 </table>
             </div>
         </div>
-        
+
         <!-- الترقيم والملخص الأسفل -->
         <div class="card-footer bg-transparent border-secondary d-flex justify-content-between align-items-center flex-wrap gap-2 py-3">
             <div class="text-white-50 small">
                 عرض الطلاب من <b>{{ students.start_index }}</b> إلى <b>{{ students.end_index }}</b> من أصل <b>{{ students.paginator.count }}</b> طالب مفلتر ومسجل.
             </div>
-            
+
             {% if students.has_other_pages %}
             <nav aria-label="Page navigation" class="mb-0">
                 <ul class="pagination pagination-sm mb-0 justify-content-center">
@@ -325,7 +390,6 @@
                         </li>
                     {% endif %}
 
-                    <!-- 🟢 تم إرجاع الحلقة الأصلية الخاصة بك هنا لمنع الخطأ البرمجي تماماً -->
                     {% for i in students.paginator.page_range %}
                         {% if students.number == i %}
                             <li class="page-item active">
@@ -356,7 +420,50 @@
     </div>
 </div>
 
-<!-- 🆕 المودال المطور المخصص لإدارة حظر الطلاب وتحديد فترات الحظر ورفعها يدوياً -->
+<!-- 🟢 مودال التشعيب والتخصص الجماعي المطور للترم الثاني -->
+<div class="modal fade animate__animated animate__fadeIn" id="specializationModal" tabindex="-1" aria-labelledby="specializationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-info shadow-lg" style="border-width: 2px;">
+            <div class="modal-header border-secondary bg-black">
+                <h5 class="modal-title fw-bold text-info" id="specializationModalLabel">
+                    <i class="bi bi-diagram-3-fill me-2"></i>تشعيب وتخصيص الطلاب المحددين (الترم الثاني)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{% url 'bulk_update_specialization' %}" id="specializationForm">
+                {% csrf_token %}
+                <input type="hidden" name="selected_ids" id="specModalSelectedIds" value="">
+                <div class="modal-body py-4">
+                    <div class="alert alert-info border-0 bg-info bg-opacity-10 text-info mb-3 small">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        يتيح هذا الإجراء تحويل شعبة الطلاب المحددين (مثلاً من <b>شعبة عامة</b> بالترم الأول إلى <b>تخصص فندقي</b> بالترم الثاني) دون تغيير الصف أو ترحيل السنة.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-white small">التخصص / الشعبة المستهدفة:</label>
+                        <select name="new_specialization" class="form-select bg-black text-white border-secondary fw-bold" required>
+                            <option value="">-- اختر التخصص الجديد --</option>
+                            <option value="General">شعبة عامة</option>
+                            <option value="Chef">فن طاهي</option>
+                            <option value="Host">فني مضيف</option>
+                            <option value="Internal">مشرف غرف</option>
+                            <option value="Kitchen">مطبخ</option>
+                            <option value="Restaurant">مطعم</option>
+                            <option value="Tourism Services">خدمات سياحية</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary bg-black d-flex justify-content-between">
+                    <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-info fw-bold text-dark px-4 shadow">
+                        <i class="bi bi-check-lg me-1"></i>تطبيق التشعيب والتخصيص
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- المودال المطور المخصص لإدارة حظر الطلاب -->
 <div class="modal fade animate__animated animate__fadeIn" id="gateBlockModal" tabindex="-1" aria-labelledby="gateBlockModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark text-white border-danger" style="border-width: 2px;">
@@ -366,14 +473,13 @@
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            
+
             <form id="gateBlockForm" method="POST" action="{% url 'save_student_gate_block' %}">
                 {% csrf_token %}
                 <input type="hidden" name="student_id" id="block_student_id">
                 <input type="hidden" name="action_type" id="block_action_type" value="block">
-                
+
                 <div class="modal-body">
-                    <!-- كرت توضيح الحالة الحالية للطالب -->
                     <div id="block_current_status_card" class="alert mb-3 text-center py-2 fw-bold">
                         الحالة الحالية: <span id="lbl_current_status_text">--</span>
                     </div>
@@ -383,13 +489,11 @@
                         <h5 id="block_student_name" class="fw-bold text-white border-bottom border-secondary pb-2">--</h5>
                     </div>
 
-                    <!-- حقل إدخال سبب الحظر -->
                     <div class="mb-3">
                         <label for="block_reason" class="form-label fw-bold small text-warning">سبب الحظر من دخول المدرسة</label>
                         <textarea name="gate_block_reason" id="block_reason" class="form-control bg-black border-secondary text-white small" rows="3" placeholder="اكتب هنا سبب المنع بوضوح ليظهر على جهاز الأمن فوراً عند البوابة..." required></textarea>
                     </div>
 
-                    <!-- 🟢 تم إبراز العناوين وتفتيح الألوان للأبيض الناصع لتظهر (من يوم / إلى يوم) بوضوح تام -->
                     <div class="row g-2 mb-2">
                         <div class="col-6">
                             <label for="block_from" class="form-label fw-bold small text-white"><i class="bi bi-calendar-range text-info me-1"></i>الحظر من تاريخ (يوم):</label>
@@ -401,11 +505,10 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="modal-footer border-secondary bg-black d-flex justify-content-between">
                     <div>
                         <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                        <!-- زر رفع الحظر يظهر حركياً بالجافاسكريبت فقط لو كان الطالب محظوراً بالفعل -->
                         <button type="button" id="btnLiftBlock" onclick="submitLiftBlock()" class="btn btn-sm btn-success fw-bold" style="display: none;">
                             <i class="bi bi-shield-check me-1"></i> رفع الحظر فوراً
                         </button>
@@ -481,22 +584,158 @@
 </div>
 
 <script>
+let debounceTimer;
+function debouncedSearch() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+        runFilters(1);
+    }, 400);
+}
 
-// دالة جافاسكريبت المخصصة لتشغيل وتحضير مودال الحظر وتوزيع البيانات والتواريخ بدقة
+function clearFilters() {
+    document.getElementById("tableSearch").value = "";
+    document.getElementById("f-grade").value = "";
+    document.getElementById("f-class").value = "";
+    document.getElementById("f-spec").value = "";
+    document.getElementById("f-gender").value = "";
+    document.getElementById("f-religion").value = "";
+    document.getElementById("f-integ").value = "";
+    runFilters(1);
+}
+
+// 🟢 دالة لتنسيق ألوان حالات القيد بالـ JS اللحظية
+function getStatusColor(status) {
+    switch(status) {
+        case 'Promoted':
+        case 'Graduated':
+            return '#2ecc71'; // أخضر
+        case 'Retained':
+        case 'Dismissed':
+            return '#e74c3c'; // أحمر
+        case 'New':
+        case 'Transferred':
+            return '#38bdf8'; // أزرق/سماوي
+        case 'First_Round':
+        case 'Second_Round':
+            return '#f1c40f'; // أصفر
+        default:
+            return '#ffffff';
+    }
+}
+
+// 🟢 فتح مودال التشعيب وتجميع المعرفات المحددة
+function openSpecializationModal() {
+    let selectedIds = Array.from(document.querySelectorAll('.student-checkbox:checked')).map(cb => cb.value);
+
+    if (selectedIds.length === 0) {
+        alert('⚠️ يرجى تحديد الطلاب المراد تشعيبهم وتعديل تخصصهم أولاً من المربعات جانب الاسم!');
+        return;
+    }
+
+    document.getElementById('specModalSelectedIds').value = selectedIds.join(',');
+    var specModal = new bootstrap.Modal(document.getElementById('specializationModal'));
+    specModal.show();
+}
+
+// 🟢 تحديث ألوان حالة الطالب فوراً عند التغيير
+document.body.addEventListener('change', function(e) {
+    if (e.target && e.target.classList.contains('status-dropdown')) {
+        let select = e.target;
+        let studentId = select.getAttribute('data-student-id');
+        let newStatus = select.value;
+        let indicator = document.getElementById(`indicator-${studentId}`);
+
+        select.style.color = getStatusColor(newStatus);
+
+        indicator.innerHTML = '<div class="spinner-border spinner-border-sm text-warning" role="status"></div>';
+        indicator.style.display = 'inline-block';
+
+        fetch("{% url 'ajax_update_status' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ student_id: studentId, status: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                indicator.innerHTML = '<i class="bi bi-check-circle-fill text-success fs-6"></i>';
+                setTimeout(() => { indicator.style.display = 'none'; }, 2000);
+            } else {
+                alert('حدث خطأ: ' + data.error);
+                indicator.style.display = 'none';
+            }
+        });
+    }
+});
+
+function bulkMarkFailed() {
+    let selectedIds = Array.from(document.querySelectorAll('.student-checkbox:checked')).map(cb => cb.value);
+
+    if (selectedIds.length === 0) {
+        alert('يرجى تحديد الطلاب الراسبين أولاً من المربعات جانب الاسم!');
+        return;
+    }
+
+    if(confirm(`هل أنت متأكد من تسجيل (${selectedIds.length}) طالب كراسبين؟`)) {
+        fetch("{% url 'ajax_bulk_status' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ action: 'mark_failed', student_ids: selectedIds })
+        }).then(res => res.json()).then(data => {
+            if(data.success) {
+                alert(data.message);
+                runFilters();
+            } else alert(data.error);
+        });
+    }
+}
+
+function promoteRemaining() {
+    let currentGradeId = document.getElementById("f-grade").value;
+
+    if(!currentGradeId) {
+        alert('⚠️ يجب عليك اختيار "الصف الدراسي" من فلتر البحث بالأعلى أولاً لكي يعرف النظام أي صف سيعتمد نتيجته.');
+        return;
+    }
+
+    if(confirm('هل قمت بتسجيل الطلاب الراسبين أولاً؟ \n\nهذا الإجراء سيقوم بتحويل كل طلاب هذا الصف (الذين لم يسجلوا كراسبين) إلى "منقول" بضغطة واحدة. هل أنت متأكد؟')) {
+        let btn = document.querySelector('.pulse-btn');
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري الاعتماد...';
+
+        fetch("{% url 'ajax_bulk_status' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ action: 'promote_rest', grade_id: currentGradeId })
+        }).then(res => res.json()).then(data => {
+            if(data.success) {
+                alert('🎉 ممتاز! ' + data.message);
+                btn.innerHTML = '<i class="bi bi-check-all"></i> اعتماد نجاح باقي طلاب الصف المفلتر';
+                runFilters();
+            } else {
+                alert('خطأ: ' + data.error);
+                btn.innerHTML = '<i class="bi bi-check-all"></i> اعتماد نجاح باقي طلاب الصف المفلتر';
+            }
+        });
+    }
+}
+
 function openGateBlockModal(studentId, studentName, isBlocked, reason, fromDate, toDate) {
     document.getElementById('block_student_id').value = studentId;
     document.getElementById('block_student_name').innerText = studentName;
     document.getElementById('block_reason').value = reason;
-    
+
     const todayStr = new Date().toISOString().split('T')[0];
     document.getElementById('block_from').value = fromDate && fromDate !== 'None' ? fromDate : todayStr;
     document.getElementById('block_to').value = toDate && toDate !== 'None' ? toDate : todayStr;
-    
+
     const statusCard = document.getElementById('block_current_status_card');
     const statusText = document.getElementById('lbl_current_status_text');
     const btnLift = document.getElementById('btnLiftBlock');
     const btnApply = document.getElementById('btnApplyBlock');
-    
+
     if (isBlocked === 'true') {
         statusCard.className = "alert alert-danger mb-3 text-center py-2 fw-bold animate__animated animate__flash";
         statusText.innerText = "🛑 محظور حالياً من دخول المدرسة بقرار إداري";
@@ -510,12 +749,11 @@ function openGateBlockModal(studentId, studentName, isBlocked, reason, fromDate,
         btnApply.innerHTML = '<i class="bi bi-slash-circle me-1"></i> حفظ وتطبيق حظر البوابة';
         document.getElementById('block_action_type').value = "block";
     }
-    
+
     var myModal = new bootstrap.Modal(document.getElementById('gateBlockModal'));
     myModal.show();
 }
 
-// دالة رفع الحظر الفوري وتعديل قيمة الأكشن قبل الإرسال
 function submitLiftBlock() {
     if (confirm("هل أنت متأكد من رغبتك في رفع الحظر فوراً عن هذا الطالب والسماح له بالمرور؟")) {
         document.getElementById('block_action_type').value = "unblock";
@@ -523,19 +761,17 @@ function submitLiftBlock() {
     }
 }
 
-// دالة الانتقال للتعديل مع الحفاظ على الفلاتر الحالية ورقم الصفحة في الرابط
 function navigateToEdit(studentId) {
     const currentParams = new URLSearchParams(window.location.search);
     currentParams.set('edit_id', studentId);
-    
+
     if (!currentParams.has('page')) {
         currentParams.set('page', '1');
     }
-    
+
     window.location.href = "{% url 'add_student' %}?" + currentParams.toString();
 }
 
-// كود التحديد البصري بعد العودة من التعديل
 window.addEventListener("load", function() {
     const lastEditedId = localStorage.getItem('last_edited_student_id');
     if (lastEditedId) {
@@ -548,13 +784,13 @@ window.addEventListener("load", function() {
 
             document.getElementById('successModalStudentName').innerText = studentName;
             document.getElementById('successModalStudentInfo').innerText = `كود الطالب: ${studentCode} | الصف: ${studentGrade}`;
-            
+
             const successModal = new bootstrap.Modal(document.getElementById('editSuccessModal'));
             successModal.show();
-            
+
             targetRow.style.transition = "background-color 0.4s ease-in-out";
             targetRow.style.backgroundColor = "rgba(13, 202, 240, 0.3)";
-            
+
             setTimeout(() => {
                 targetRow.style.backgroundColor = "";
             }, 4000);
@@ -567,7 +803,7 @@ window.addEventListener("load", function() {
                     setTimeout(() => targetRow.style.backgroundColor = "", 2000);
                 }, 300);
             };
-            
+
             localStorage.removeItem('last_edited_student_id');
         }
     }
@@ -602,7 +838,7 @@ function runFilters(pageNumber = 1) {
 
     const url = new URL(window.location.pathname, window.location.origin);
     const params = url.searchParams;
-    
+
     if (search) params.set('q', search);
     if (fGrade) params.set('grade_id', fGrade);
     if (fClass) params.set('classroom_id', fClass);
@@ -610,7 +846,7 @@ function runFilters(pageNumber = 1) {
     if (fGender) params.set('gender', fGender);
     if (fRelig) params.set('religion', fRelig);
     if (fInteg) params.set('is_disability', fInteg);
-    
+
     params.set('page', pageNumber);
 
     window.history.replaceState({}, '', url.toString());
@@ -622,11 +858,11 @@ function runFilters(pageNumber = 1) {
     .then(html => {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        
+
         const currentTable = document.getElementById("tableBody");
         const newTable = doc.getElementById("tableBody");
         if (currentTable && newTable) currentTable.innerHTML = newTable.innerHTML;
-        
+
         updateCounter("count-all", doc.getElementById("count-all")?.innerText || "0");
         updateCounter("count-male", doc.getElementById("count-male")?.innerText || "0");
         updateCounter("count-female", doc.getElementById("count-female")?.innerText || "0");
@@ -649,7 +885,7 @@ function runFilters(pageNumber = 1) {
         } else if (oldPagination && !newPagination) {
             oldPagination.remove();
         }
-        
+
         const oldInfo = document.querySelector('.text-white-50.small');
         const newInfo = doc.querySelector('.text-white-50.small');
         if (oldInfo && newInfo) oldInfo.innerHTML = newInfo.innerHTML;
@@ -679,7 +915,7 @@ function updateCounter(id, newValue) {
     if (!el) return;
     const oldValue = parseInt(el.innerText) || 0;
     const parsedNew = parseInt(newValue) || 0;
-    
+
     if (oldValue !== parsedNew) {
         animateValue(el, oldValue, parsedNew, 350);
         const card = el.closest('.stat-card');
@@ -695,7 +931,7 @@ function openRemedialModal(studentId, studentName) {
     document.getElementById('modal_student_name').innerText = studentName;
     document.getElementById('modal_subjects_count').value = 1;
     document.getElementById('modal_notes').value = '';
-    
+
     var myModal = new bootstrap.Modal(document.getElementById('quickRemedialModal'));
     myModal.show();
 }
@@ -706,7 +942,7 @@ document.addEventListener("DOMContentLoaded", function() {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             const formData = new FormData(this);
-            
+
             fetch("{% url 'save_remedial_from_registry' %}", {
                 method: 'POST',
                 body: formData,
@@ -741,15 +977,5 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 });
-
-setTimeout(function() {
-    $('#student_select').select2('open');
-    setTimeout(function() {
-        const searchField = document.querySelector('.select2-search__field');
-        if (searchField) {
-            searchField.focus();
-        }
-    }, 100);
-}, 400);
 </script>
 {% endblock %}

@@ -1,194 +1,158 @@
 {% extends "base.html" %}
-{% load static %}
 
-{% block extra_css %}
+{% block title %}إذن استلام - {{ sale.student.get_full_name }}{% endblock %}
+
+{% block content %}
 <style>
-    /* تنسيق الشاشة العادية */
-    body { background-color: #f8f9fa !important; }
-    
-    .receipt-container {
-        background-color: #ffffff !important;
-        color: #000 !important;
-        padding: 30px;
+    @media print {
+        .no-print { display: none !important; }
+        body { background: white !important; color: black !important; padding: 0 !important; }
+        .receipt-card { border: 2px solid #000 !important; box-shadow: none !important; margin: 0 auto !important; }
+    }
+    .receipt-card {
+        background: #ffffff;
+        color: #000000;
+        border: 2px solid #1e293b;
+        border-radius: 12px;
+        padding: 35px;
         max-width: 800px;
         margin: 20px auto;
-        border: 1px solid #000;
-        font-family: 'Cairo', sans-serif;
-        position: relative;
+        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
     }
-
-    .item-name-bold {
-        color: #000 !important;
-        font-weight: 900 !important;
-        font-size: 1.3rem !important;
-        display: block;
-    }
-
-    /* علامة مائية للحالة المالية */
-    .status-watermark {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) rotate(-45deg);
-        font-size: 5rem;
-        opacity: 0.1;
-        font-weight: bold;
-        z-index: 0;
-        pointer-events: none;
-        width: 100%;
-        text-align: center;
-    }
-
-    /* ألوان الحالة في العلامة المائية */
-    .text-paid { color: #198754; opacity: 0.15; }
-    .text-pending { color: #dc3545; opacity: 0.15; }
-
-    /* --- تنسيق الطباعة الاحترافي --- */
-    @media print {
-        nav, .sidebar, .navbar, .no-print, footer, .sidebar-wrapper, aside, .btn {
-            display: none !important;
-        }
-
-        body, html, .main-panel, .content-wrapper, .main-content {
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-            background-color: #fff !important;
-        }
-
-        .receipt-container {
-            border: 1px solid #000 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-        }
-
-        @page {
-            size: A4;
-            margin: 1cm;
-        }
-    }
-
     .table-receipt {
+        border: 2px solid #000 !important;
         width: 100%;
-        border-collapse: collapse;
         margin-top: 15px;
+        border-collapse: collapse;
     }
     .table-receipt th, .table-receipt td {
         border: 1px solid #000 !important;
-        padding: 10px;
+        padding: 12px;
         text-align: center;
         color: #000 !important;
     }
+    .text-status-pending {
+        color: #dc3545 !important;
+        font-weight: 900;
+    }
 </style>
-{% endblock %}
 
-{% block content %}
-<div class="no-print text-center mb-3">
-    {% if remaining_amount <= 0 %}
-        <button onclick="window.print()" class="btn btn-success btn-lg shadow">
-            <i class="bi bi-printer-fill me-2"></i> طباعة الإيصال (تم السداد)
+<!-- أزرار التحكم والطباعة -->
+<div class="text-center my-3 no-print">
+    {% if sale.remaining_amount_val > 0 or sale.remaining_amount > 0 %}
+        <!-- زر طباعة معطل في حالة وجود متبقي مالي -->
+        <button disabled class="btn btn-secondary btn-lg fw-bold px-4 shadow opacity-50" style="cursor: not-allowed;">
+            <i class="bi bi-slash-circle me-2"></i> الطباعة محظورة (متبقي: {{ sale.remaining_amount_val|default:sale.remaining_amount }} ج.م)
         </button>
-    {% else %}
-        <div class="alert alert-danger d-inline-block p-3 fw-bold shadow-sm border-2">
-            <i class="bi bi-exclamation-octagon-fill me-2"></i> 
-            لا يمكن الطباعة: بانتظار سداد المبلغ بالخزينة (المتبقي للقسم: {{ remaining_amount }} ج.م)
+        <div class="alert alert-danger d-inline-block ms-2 m-0 py-2 px-3 fw-bold align-middle rounded-3">
+            🛑 لا يمكن الطباعة: بانتظار استكمال سداد المبلغ بالخزينة
         </div>
-        <br>
-        <p class="text-muted small mt-2">يرجى التأكد من تسجيل المبلغ في الخزينة مع كتابة <strong>#{{ sale.id }}</strong> في الملاحظات</p>
+    {% else %}
+        <!-- زر الطباعة مفعل عند التمام والكمال -->
+        <button onclick="window.print()" class="btn btn-success btn-lg fw-bold px-4 shadow">
+            <i class="bi bi-printer-fill me-2"></i> طباعة الإذن
+        </button>
     {% endif %}
-    <a href="{% url 'book_sales_list' %}" class="btn btn-outline-dark btn-lg ms-2">العودة للسجل</a>
+
+    <!-- 🟢 زر العودة النظيف والمحمي من أخطاء الـ HTML -->
+    <a href="{% url 'book_sales_list' %}" onclick="showReturnLoading(this)" class="btn btn-secondary btn-lg fw-bold px-4 ms-2 shadow">
+        العودة لسجل الصرف
+    </a>
 </div>
 
-<div class="receipt-container">
-    <div class="status-watermark {% if remaining_amount <= 0 %}text-paid{% else %}text-pending{% endif %}">
-        {% if remaining_amount <= 0 %} تم السداد {% else %} قيد الانتظار {% endif %}
-    </div>
-
-    <div class="d-flex justify-content-between align-items-center border-bottom border-2 border-dark pb-2 mb-3">
+<div class="receipt-card">
+    <!-- الهيدر الرسمى -->
+    <div class="d-flex justify-content-between align-items-center border-bottom border-2 border-dark pb-3 mb-3">
         <div>
-            <h4 class="fw-bold mb-0">نظام الإدارة المدرسية</h4>
-            <p class="small mb-0">قسم المخازن وشؤون الطلاب</p>
-            <p class="small mb-0">العام الدراسي: {{ sale.student.academic_year.name }}</p>
+            <h3 class="fw-bold m-0 text-dark">نظام الإدارة المدرسية</h3>
+            <span class="text-muted fw-bold">قسم المخازن وشؤون الطلاب</span><br>
+            <span class="fw-bold">العام الدراسي: {{ sale.student.academic_year.name }}</span>
         </div>
-        <div class="text-end">
-            <h5 class="fw-bold mb-0">إيصال استلام عهدة</h5>
-            <p class="small mb-0 fw-bold">رقم العملية: <span class="badge bg-dark text-white">#{{ sale.id }}</span></p>
+        <div class="text-center">
+            <h4 class="fw-black border border-2 border-dark px-4 py-2 rounded bg-light">إذن استلام</h4>
+            <span class="fw-bold">رقم العملية: #{{ sale.id }}</span>
         </div>
     </div>
 
-    <div class="row mb-3">
+    <!-- بيانات الطالب والمستلم -->
+    <div class="row g-2 mb-4 fs-6 text-dark">
         <div class="col-7">
-            <p class="mb-1"><strong>الطالب / المستلم:</strong> {{ sale.student.get_full_name }}</p>
-            <p class="mb-0"><strong>الصف الدراسي:</strong> {{ sale.student.grade.name }}</p>
-            <p class="mb-0"><strong>كود الطالب:</strong> {{ sale.student.student_code }}</p>
+            <strong>الطالب / المستلم:</strong> <span class="fs-5 fw-bold">{{ sale.student.get_full_name }}</span>
         </div>
-        <div class="col-5 text-end small">
-            <p class="mb-0">تاريخ العملية: {{ sale.sale_date|date:"Y-m-d" }}</p>
-            <p class="mb-0">وقت الطباعة: {% now "Y-m-d H:i A" %}</p>
+        <div class="col-5 text-end">
+            <strong>تاريخ العملية:</strong> {{ sale.sale_date|date:"Y-m-d" }}
+        </div>
+        <div class="col-7">
+            <strong>الصف الدراسي:</strong> {{ sale.student.grade.name }}<br>
+            <strong>التخصص:</strong> <span class="fw-bold text-dark">{{ sale.student.get_specialization_display|default:"شعبة عامة" }}</span>
+        </div>
+        <div class="col-5 text-end">
+            <strong>وقت الطباعة:</strong> {{ sale.sale_date|date:"h:i A" }}<br>
+            <strong>كود الطالب:</strong> {{ sale.student.student_code }}
         </div>
     </div>
 
+    <!-- جدول بيان الأصناف المنصرفة -->
     <table class="table-receipt">
-        <thead style="background-color: #f2f2f2;">
+        <thead class="table-light">
             <tr>
-                <th>بيان الصنف المنصرف</th>
-                <th style="width: 15%;">الكمية</th>
-                <th style="width: 30%;">الموقف المالي للقسم</th>
+                <th width="50">#</th>
+                <th class="text-start ps-4">بيان الصنف المنصرف</th>
+                <th width="100">الكمية</th>
+                <th width="150">حالة التسليم</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td class="text-start px-3">
-                    <span class="small fw-bold text-muted">
-                        {% if sale.item.item_type == 'book' %} [ باقة الكتب الدراسية ] {% else %} [ باقة الزي المدرسي ] {% endif %}
-                    </span>
-                    <span class="item-name-bold my-1">
-                        {% if sale.item.item_type == 'book' and sale.item.subject %}
-                            مادة: {{ sale.item.subject.name }}
-                        {% elif sale.item.item_type == 'uniform' and sale.item.uniform %}
-                            {{ sale.item.uniform.name }}
+                <td class="fw-bold">1</td>
+                <td class="text-start ps-4 py-3">
+                    <strong class="fs-5 d-block text-dark">
+                        {% if sale.item.item_type == 'book' %}
+                            الكتب الدراسية
                         {% else %}
-                            {{ sale.item.display_name }}
+                            الزي المدرسي
                         {% endif %}
-                    </span>
-                    <span class="small"> إصدار: {{ sale.student.academic_year.name }}</span>
+                    </strong>
+                    <span class="small text-muted d-block mt-1">العام الدراسي الحالي: {{ sale.student.academic_year.name }}</span>
                 </td>
-                <td><span class="fs-2 fw-bold">{{ sale.quantity }}</span></td>
+                <td class="fw-bold fs-4">{{ sale.quantity }}</td>
                 <td>
-                    <div class="small fw-bold text-end px-2">
-                        <div class="d-flex justify-content-between"><span>إجمالي المطلوب:</span> <span>{{ total_required }}</span></div>
-                        <div class="d-flex justify-content-between text-success"><span>المسدد بالخزينة:</span> <span>{{ total_paid }}</span></div>
-                        <div class="d-flex justify-content-between border-top border-dark mt-1 pt-1 {% if remaining_amount > 0 %}text-danger{% endif %}">
-                            <span>المتبقي:</span> 
-                            <span>{{ remaining_amount }} ج.م</span>
-                        </div>
-                    </div>
+                    {% if sale.is_delivered %}
+                        <span class="fw-bold text-success">تم التسليم فعلياً</span>
+                        {% if sale.delivered_by %}
+                            <div class="small text-muted" style="font-size:0.75rem;">بواسطة: {{ sale.delivered_by.get_full_name|default:sale.delivered_by.username }}</div>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-status-pending">معلق بالمخزن</span>
+                    {% endif %}
                 </td>
             </tr>
         </tbody>
     </table>
 
-    <div class="mt-4">
-        <p class="small fw-bold mb-1 border-bottom d-inline-block">تفاصيل التحصيل المالي:</p>
-        <p class="small text-muted mb-0">تم الربط آلياً مع الخزينة العامة عبر الإشارة المرجعية (#{{ sale.id }})</p>
-    </div>
-
-    <div class="row mt-5">
-        <div class="col-6 text-center">
-            <p class="mb-4 fw-bold">توقيع ولي الأمر / المستلم</p>
-            <p class="mt-5">____________________</p>
+    <!-- التوقيعات الرسمية -->
+    <div class="d-flex justify-content-between text-center mt-5 pt-4 fs-6">
+        <div>
+            <p class="fw-bold mb-5">توقيع ولي الأمر / المستلم</p>
+            <p>.......................................</p>
         </div>
-        <div class="col-6 text-center">
-            <p class="mb-4 fw-bold">اعتماد مسؤول العهدة</p>
-            <p class="mt-5">____________________</p>
+        <div>
+            <p class="fw-bold mb-5">اعتماد مسؤول الاستلام والمخزن</p>
+            <p>.......................................</p>
         </div>
     </div>
 
-    <div class="mt-5 pt-3 border-top text-center small">
-        <p class="mb-0 fw-bold">تنبيه: يعتبر هذا الإيصال مستند صرف رسمي للعهدة، ولا يعتد به في حال وجود كشط أو تعديل يدوي.</p>
-        <p class="mb-0 text-muted">تم الاستخراج بواسطة: {{ user.get_full_name|default:user.username }} | نظام الإدارة المتكامل 2026</p>
+    <!-- التنبيه السفلي -->
+    <div class="text-center border-top border-dark pt-3 mt-4 text-muted small">
+        تنبيـه: يعتبر هذا الإيصال مستند صرف رسمي، ولا يعتد به في حال وجود كشط أو تعديل يدوي.
     </div>
 </div>
+
+<script>
+function showReturnLoading(el) {
+    el.style.pointerEvents = 'none';
+    el.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> جاري العودة...';
+}
+</script>
 {% endblock %}

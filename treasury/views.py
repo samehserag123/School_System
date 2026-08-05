@@ -11,96 +11,108 @@ from .models import GeneralLedger, Product, ScanHistory
 from .forms import TreasuryEntryForm
 
 # -- تنبيه: قم بفك التعليق عن هذا السطر وتأكد من المسار الصحيح لتطبيق الطلاب --
-# from students.models import Student, CourseGroup 
+# from students.models import Student, CourseGroup
 
 # دالة مساعدة للتحقق من الصلاحيات (تمنع الخط الأصفر تحت is_manager)
 def is_manager(user):
     return user.is_authenticated and (user.is_staff or user.is_superuser)
 
 
-
-
-def is_manager(user):
-    return user.is_authenticated and (user.is_staff or user.is_superuser)
-
 @login_required
 @user_passes_test(is_manager)
 def daily_closure_report(request):
     today = timezone.now().date()
-    
-    # 1. جلب كافة الحركات المالية (الإيرادات) غير المغلقة 
+
+    # 1. جلب كافة الحركات المالية غير المغلقة
     base_qs = GeneralLedger.objects.filter(
         is_closed=False,
         amount__gt=0,
         is_discount=False
-    ).select_related('collected_by')
+    ).select_related('collected_by', 'student')
 
     unique_base = base_qs.values('receipt_number').annotate(amt=Max('amount'))
     total_revenues = sum(item['amt'] for item in unique_base) if unique_base else Decimal('0.00')
 
-    # --- 3. معالجة المصروفات والمرتجعات المعلقة ---
+    # 2. المصروفات والمرتجعات المعلقة
     total_expenses = Decimal('0.00')
-    total_refunds = Decimal('0.00') # 🟢 متغير المرتجعات
+    total_refunds = Decimal('0.00')
     petty_expenses = []
     general_expenses = []
 
     try:
-        from finance.models import Expense, StudentRefund # 🟢 استدعاء المرتجعات
+        from finance.models import Expense, StudentRefund
         open_expenses = Expense.objects.filter(is_closed=False)
         petty_expenses = open_expenses.filter(expense_type='petty')
         general_expenses = open_expenses.filter(expense_type='general')
         total_expenses = open_expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-        
-        # 🟢 حساب المرتجعات المفتوحة لخصمها
         total_refunds = StudentRefund.objects.filter(is_closed=False).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
     except (ImportError, AttributeError):
         pass
 
-    # 4. 🟢 حساب صافي الخزينة الدفتري (الإيرادات - المصروفات - المرتجعات)
     total_day = Decimal(total_revenues) - (Decimal(total_expenses) + Decimal(total_refunds))
 
-    # 5. تجميع عهدة الموظفين
-    user_summary = []
+    # 🟢 3. تجميع عهد الموظفين واستخراج قائمة الإيصالات لكل موظف تفصيلياً
+    cashiers_summary = []
     user_stats = base_qs.values(
-        'collected_by__id', 
-        'collected_by__username', 
-        'collected_by__first_name', 
+        'collected_by__id',
+        'collected_by__username',
+        'collected_by__first_name',
         'collected_by__last_name'
     ).annotate(
         receipts_count=Count('receipt_number', distinct=True)
     )
-    
+
     for stat in user_stats:
         uid = stat['collected_by__id']
-        username = stat['collected_by__username']
-        full_name = f"{stat['collected_by__first_name']} {stat['collected_by__last_name']}".strip()
-        
-        u_receipts = base_qs.filter(collected_by_id=uid).values('receipt_number').annotate(amt=Max('amount'))
+        username = stat['collected_by__username'] or 'admin'
+        f_name = stat['collected_by__first_name'] or ''
+        l_name = stat['collected_by__last_name'] or ''
+        full_name = f"{f_name} {l_name}".strip() or username
+
+        # استخراج كافة حركات هذا الموظف بالكامل
+        u_entries = base_qs.filter(collected_by_id=uid).order_by('-date')
+
+        u_receipts = u_entries.values('receipt_number').annotate(amt=Max('amount'))
         user_total = sum(item['amt'] for item in u_receipts) if u_receipts else Decimal('0.00')
-        
-        user_summary.append({
-            'user_display': full_name or username,
-            'username': username, 
-            'total_collected': user_total,
-            'receipts_count': stat['receipts_count']
+
+        # 🟢 بناء قائمة الإيصالات المجهزة للعرض داخل الـ Modal
+        receipts_list = []
+        for entry in u_entries:
+            student_disp = entry.student.get_full_name() if entry.student else (entry.notes or "إيراد خزينة مباشر")
+            receipts_list.append({
+                'receipt_number': entry.receipt_number,
+                'student_name': student_disp,
+                'category': entry.category,
+                'amount': entry.amount,
+                'time': entry.date.strftime('%I:%M %p') if entry.date else '---'
+            })
+
+        cashiers_summary.append({
+            'user_id': uid or 0,
+            'user_display': full_name,
+            'username': username,
+            'total_amount': user_total,
+            'receipts_count': stat['receipts_count'],
+            'receipts_list': receipts_list,  # 👈 تمرير قائمة الإيصالات للمودال
         })
 
-    detailed_entries = base_qs.order_by('-date')
+    all_expenses = list(petty_expenses) + list(general_expenses)
 
     context = {
         'today': today,
         'total_day': total_day,
         'total_revenues': total_revenues,
         'total_expenses': total_expenses,
-        'total_refunds': total_refunds, # 🟢 تمرير المرتجعات
-        'petty_expenses': petty_expenses,
-        'general_expenses': general_expenses,
-        'user_summary': user_summary,
-        'detailed_entries': detailed_entries,
-        'denominations': [200, 100, 50, 20, 10, 5, 1],
+        'total_refunds': total_refunds,
+        'expenses': all_expenses,
+        'cashiers_summary': cashiers_summary,
     }
-    
-    return render(request, 'treasury/daily_closure.html', context)
+
+    return render(request, 'finance/daily_summary.html', context)
+
+
+
+
 
 
 @login_required
@@ -131,11 +143,11 @@ def students_analytics_view(request):
 def treasury_dashboard(request):
     today = timezone.now().date()
     entries = GeneralLedger.objects.all().order_by('-date')
-    
+
     today_qs = GeneralLedger.objects.filter(date__date=today)
     unique_receipts = today_qs.values('receipt_number').annotate(amt=Max('amount'))
     today_total = sum(item['amt'] for item in unique_receipts)
-    
+
     # 🟢 خصم المرتجعات من إجمالي اليوم في الداشبورد الخاص بالخزينة
     try:
         from finance.models import StudentRefund
@@ -143,7 +155,7 @@ def treasury_dashboard(request):
         today_total -= today_refunds
     except ImportError:
         pass
-    
+
     return render(request, 'treasury/dashboard.html', {
         'entries': entries,
         'today_total': today_total,
@@ -156,13 +168,13 @@ def add_treasury_entry(request):
         form = TreasuryEntryForm(request.POST)
         if form.is_valid():
             entry = form.save(commit=False)
-            entry.collected_by = request.user  
+            entry.collected_by = request.user
             entry.save()
             messages.success(request, "تم تسجيل الإيراد بنجاح")
-            return redirect(request.path) 
+            return redirect(request.path)
     else:
         form = TreasuryEntryForm(initial={'collected_by': request.user})
-    
+
     return render(request, 'treasury/add_entry.html', {'form': form})
 
 
@@ -170,9 +182,9 @@ def add_treasury_entry(request):
 def daily_revenue_report(request):
     today = timezone.now().date()
     daily_entries = GeneralLedger.objects.filter(date__date=today)
-    
+
     unique_data = daily_entries.values('receipt_number', 'category').annotate(amt=Max('amount'))
-    
+
     category_totals = {}
     grand_total = Decimal('0.00')
     for item in unique_data:
@@ -208,7 +220,7 @@ def get_client_ip(request):
 def verify_product(request, serial_number):
     try:
         product = Product.objects.get(serial_number=serial_number)
-        
+
         if product.is_currently_disabled:
             context = {
                 'status': 'disabled',
@@ -217,31 +229,31 @@ def verify_product(request, serial_number):
                 'disabled_until': product.disabled_until
             }
             return render(request, 'verify.html', context)
-        
+
         client_ip = get_client_ip(request)
         ScanHistory.objects.create(
             product=product,
-            scanned_at=timezone.now(), 
+            scanned_at=timezone.now(),
             ip_address=client_ip
         )
-        
+
         product.scan_count += 1
         product.save()
-        
+
         latest_scan = product.scans.first()
-            
+
         context = {
             'status': 'success',
             'product': product,
             'serial': serial_number,
-            'current_scan_time': latest_scan.scanned_at, 
+            'current_scan_time': latest_scan.scanned_at,
         }
     except Product.DoesNotExist:
         context = {
             'status': 'fail',
             'serial': serial_number
         }
-    
+
     return render(request, 'verify.html', context)
 
 
@@ -250,12 +262,12 @@ def verify_product(request, serial_number):
 def treasury_dashboard(request):
     today = timezone.now().date()
     entries = GeneralLedger.objects.all().order_by('-date')
-    
+
     # 🛡️ تصفية التكرار في العداد الكبير لليوم
     today_qs = GeneralLedger.objects.filter(date__date=today)
     unique_receipts = today_qs.values('receipt_number').annotate(amt=Max('amount'))
     today_total = sum(item['amt'] for item in unique_receipts)
-    
+
     return render(request, 'treasury/dashboard.html', {
         'entries': entries,
         'today_total': today_total,
@@ -271,15 +283,15 @@ def add_treasury_entry(request):
         if form.is_valid():
             entry = form.save(commit=False)
             # ربط الحركة بالموظف الذي قام بالإدخال آلياً
-            entry.collected_by = request.user  
+            entry.collected_by = request.user
             entry.save()
             messages.success(request, "تم تسجيل الإيراد بنجاح")
             # تم التعديل هنا: البقاء في نفس الصفحة بعد الحفظ
-            return redirect(request.path) 
+            return redirect(request.path)
     else:
         # إرسال مستخدم الجلسة الحالي كقيمة افتراضية للموظف المستلم
         form = TreasuryEntryForm(initial={'collected_by': request.user})
-    
+
     return render(request, 'treasury/add_entry.html', {'form': form})
 
 
@@ -288,10 +300,10 @@ def add_treasury_entry(request):
 def daily_revenue_report(request):
     today = timezone.now().date()
     daily_entries = GeneralLedger.objects.filter(date__date=today)
-    
+
     # 🛡️ الحساب الصافي بدون تكرار السجنالز
     unique_data = daily_entries.values('receipt_number', 'category').annotate(amt=Max('amount'))
-    
+
     # حساب إجمالي الفئات بدقة
     category_totals = {}
     grand_total = 0
@@ -323,7 +335,7 @@ def get_client_ip(request):
 def verify_product(request, serial_number):
     try:
         product = Product.objects.get(serial_number=serial_number)
-        
+
         # 1. الفحص أولاً: هل الـ QR معطل حالياً؟
         if product.is_currently_disabled:
             context = {
@@ -333,7 +345,7 @@ def verify_product(request, serial_number):
                 'disabled_until': product.disabled_until
             }
             return render(request, 'verify.html', context)
-        
+
         # 2. تسجيل المسحة الجديدة فوراً (حتى لو تكررت من نفس التليفون)
         client_ip = get_client_ip(request)
         ScanHistory.objects.create(
@@ -341,14 +353,14 @@ def verify_product(request, serial_number):
             scanned_at=timezone.now(), # ضبط الوقت الحالي بدقة بالثواني
             ip_address=client_ip
         )
-        
+
         # 3. تحديث العداد الإجمالي في جدول المنتج
         product.scan_count += 1
         product.save()
-        
+
         # جلب آخر مسحة قمنا بتسجيلها لعرض توقيتها للمستخدم في الصفحة
         latest_scan = product.scans.first()
-            
+
         context = {
             'status': 'success',
             'product': product,
@@ -360,5 +372,5 @@ def verify_product(request, serial_number):
             'status': 'fail',
             'serial': serial_number
         }
-    
+
     return render(request, 'verify.html', context)

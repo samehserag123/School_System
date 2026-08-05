@@ -1,0 +1,402 @@
+{% extends 'base.html' %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+    :root {
+        --neon-cyan: #0ea5e9; --neon-emerald: #10b981; --neon-yellow: #f59e0b; --neon-rose: #ef4444;
+        --glass-bg: rgba(15, 23, 42, 0.75);
+        --glass-border: rgba(255, 255, 255, 0.08);
+    }
+    body { background: radial-gradient(circle at top, #0b1224 0%, #05070d 60%) !important; font-family: 'Cairo', sans-serif; color: #f8fafc; }
+
+    .fade-up { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    @keyframes fadeUp { from { opacity:0; transform: translateY(20px);} to { opacity:1; transform: translateY(0);} }
+
+    .glass-card {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border); 
+        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6);
+    }
+
+    .stat-card { transition: all 0.3s ease; border-radius: 20px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); }
+    /* تم إلغاء الـ Scale لمنع الاهتزاز */
+    .stat-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); z-index: 10; }
+    .stat-card::after { content:''; position:absolute; top:-50%; right:-50%; width:200%; height:200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); opacity: 0; transition: opacity 0.3s; pointer-events:none; }
+    .stat-card:hover::after { opacity: 1; }
+    
+    .grad-total { background: linear-gradient(135deg, #0284c7, #1e3a8a); }
+    .grad-present { background: linear-gradient(135deg, #059669, #064e3b); }
+    .grad-absent { background: linear-gradient(135deg, #dc2626, #7f1d1d); }
+    .grad-rate { background: linear-gradient(135deg, #d97706, #78350f); }
+
+    /* تصميم الجدول - تم إزالة الـ Transform من الـ TR لمنع اهتزاز الجدول تماماً */
+    .table-dark { --bs-table-bg: transparent; }
+    .table-hover tbody tr { transition: all 0.2s ease; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .table-hover tbody tr:hover { background-color: rgba(14, 165, 233, 0.08); box-shadow: inset 0 0 15px rgba(14, 165, 233, 0.15); }
+    .table thead th { position: sticky; top: 0; z-index: 10; background: rgba(9,13,22,0.95) !important; font-weight: 800; color: #94a3b8; border-bottom: 2px solid var(--border-soft); text-transform: uppercase; letter-spacing: 1px; padding-top: 20px !important; padding-bottom: 20px !important; }
+
+    .student-avatar {
+        width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(135deg, rgba(14,165,233,0.2), rgba(14,165,233,0.05)); border: 1px solid rgba(14,165,233,0.3);
+        color: var(--neon-cyan); font-weight: 900; font-size: 1.4rem; flex-shrink: 0; box-shadow: inset 0 0 10px rgba(14,165,233,0.15);
+    }
+
+    /* الشارات المضيئة (Glowing Badges) */
+    .glow-badge { padding: 6px 12px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0.5px; }
+    .badge-course { background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.4); color: #38bdf8; }
+    .badge-term { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; }
+    .badge-code { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: #cbd5e1; font-family: monospace; font-size: 0.95rem; }
+
+    /* أزرار الحضور والغياب */
+    .attendance-toggle { display: flex; gap: 10px; justify-content: center; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); display: inline-flex; }
+    .attendance-toggle .btn { border-radius: 12px !important; width: 65px; height: 42px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; transition: all 0.2s ease; border: none; background: transparent; color: #64748b; }
+    /* تم تقليل الـ scale هنا ليكون آمناً ولا يغير حجم الصف */
+    .btn-check:checked + .btn-outline-success { background-color: #10b981; color: #fff; box-shadow: 0 0 20px rgba(16, 185, 129, 0.5); transform: scale(1.02); }
+    .btn-check:checked + .btn-outline-danger { background-color: #ef4444; color: #fff; box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); transform: scale(1.02); }
+
+    /* شريط البحث */
+    .search-box { background: rgba(0,0,0,0.4) !important; border: 2px solid rgba(14,165,233,0.3) !important; border-radius: 16px !important; color: #fff !important; padding: 18px 55px 18px 20px !important; font-size: 1.1rem; transition: 0.3s; font-weight: 600; }
+    .search-box:focus { background: rgba(0,0,0,0.7) !important; box-shadow: 0 0 0 4px rgba(14,165,233,0.15); border-color: var(--neon-cyan) !important; }
+    .search-icon { top: 50%; right: 22px; transform: translateY(-50%); position: absolute; color: var(--neon-cyan); font-size: 1.3rem; }
+
+    /* الباجينشن */
+    .pagination-bar { border-top: 1px solid var(--glass-border); padding-top: 20px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+    .page-btn { min-width: 42px; height: 42px; border-radius: 12px !important; font-weight: 800 !important; background: rgba(2,6,23,0.8) !important; border: 1px solid rgba(255,255,255,0.1) !important; color: #fff !important; transition: all .2s ease; display: flex; align-items: center; justify-content: center; }
+    .page-btn:hover:not(.disabled) { border-color: var(--neon-cyan) !important; color: var(--neon-cyan) !important; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(14,165,233,0.2); }
+    .page-btn.active-page { background: var(--neon-cyan) !important; color: #020617 !important; border-color: var(--neon-cyan) !important; box-shadow: 0 0 20px rgba(14,165,233,0.4); }
+    .page-btn.disabled { opacity: .3; pointer-events: none; }
+
+    /* زر الحفظ المضيء - تم إزالة الـ Scale لمنع اهتزاز الشاشة من الأسفل */
+    .save-btn-glow { background: linear-gradient(135deg, #0ea5e9, #2563eb) !important; border: none !important; box-shadow: 0 15px 35px rgba(37, 99, 235, 0.4) !important; transition: all .3s ease; letter-spacing: 0.5px; position: relative; overflow: hidden; }
+    .save-btn-glow:hover { transform: translateY(-3px); box-shadow: 0 20px 45px rgba(37, 99, 235, 0.6) !important; }
+    .save-btn-glow::after { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: rgba(255,255,255,0.1); transform: rotate(45deg) translateY(100%); transition: transform 0.6s ease; }
+    .save-btn-glow:hover::after { transform: rotate(45deg) translateY(-100%); }
+
+    .toast-popup { position: fixed; bottom: 30px; left: 30px; z-index: 999999; display: none; padding: 18px 28px; border-radius: 18px; font-weight: 800; font-size: 1.1rem; box-shadow: 0 20px 40px rgba(0,0,0,0.7); animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; gap: 14px; }
+    .toast-success { background: rgba(16, 185, 129, 0.95); color: #fff; border-color: #34d399; }
+    .toast-error { background: rgba(239, 68, 68, 0.95); color: #fff; border-color: #f87171; }
+    @keyframes slideIn { from { transform: translateX(-120%) scale(0.8); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
+</style>
+
+<div class="container py-4" dir="rtl">
+    
+    <!-- النافيجيشن العلوي -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 glass-card p-4 fade-up">
+        <div>
+            <h3 class="fw-900 m-0 text-white"><i class="bi bi-person-bounding-box text-success me-2"></i> رصد الغياب والحضور الذكي</h3>
+            <p class="text-info small fw-bold m-0 mt-2"><i class="bi bi-lightning-charge-fill text-warning me-1"></i> حفظ وتحديث لحظي | بدون إعادة تحميل للصفحة</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'academy_study_plan' %}" class="btn btn-dark border-secondary rounded-pill px-4 fw-bold shadow-sm py-2"><i class="bi bi-diagram-3-fill text-info me-1"></i> الخطة الدراسية</a>
+            <a href="{% url 'academy_dashboard' %}" class="btn btn-dark border-secondary rounded-pill px-4 fw-bold shadow-sm py-2"><i class="bi bi-speedometer2 text-warning me-1"></i> الأكاديمية</a>
+        </div>
+    </div>
+
+    <!-- الفلتر لفتح الكشف -->
+    <div class="glass-card p-4 mb-4 fade-up" style="animation-delay: 0.1s;">
+        <form method="GET" class="row g-4 align-items-end">
+            <div class="col-md-7">
+                <label class="form-label text-secondary fw-bold mb-2"><i class="bi bi-funnel-fill text-info me-1"></i> حدد المادة لفتح الكشف:</label>
+                <select name="term_subject_id" class="form-select bg-black text-white border-secondary fw-bold fs-6 py-3 rounded-4 shadow-sm" required>
+                    <option value="">-- اضغط للاختيار --</option>
+                    {% for ts in term_subjects %}
+                        <option value="{{ ts.id }}" {% if selected_ts and selected_ts.id == ts.id %}selected{% endif %}>
+                            {{ ts.course.name }} | تيرم {{ ts.term_number }}: {{ ts.subject.name }} (د. {{ ts.doctor.name }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-secondary fw-bold mb-2"><i class="bi bi-calendar-event text-info me-1"></i> تاريخ المحاضرة:</label>
+                <input type="date" name="lecture_date" value="{{ lecture_date }}" class="form-control bg-black text-white border-secondary fw-bold py-3 rounded-4 shadow-sm" required>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100 fw-bold py-3 rounded-4 shadow-lg"><i class="bi bi-folder2-open me-1"></i> فتح الكشف</button>
+            </div>
+        </form>
+    </div>
+
+    {% if selected_ts %}
+    <!-- الإحصائيات الحية -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3 col-6 fade-up" style="animation-delay: 0.2s;"><div class="stat-card grad-total p-4 text-center"><div class="text-white-50 fw-bold fs-6 mb-1"><i class="bi bi-people-fill me-1"></i>إجمالي المسجلين</div><div class="display-4 fw-900" id="statTotal">{{ stats.total }}</div></div></div>
+        <div class="col-md-3 col-6 fade-up" style="animation-delay: 0.3s;"><div class="stat-card grad-present p-4 text-center"><div class="text-white-50 fw-bold fs-6 mb-1"><i class="bi bi-check-circle-fill me-1"></i>الحاضرين</div><div class="display-4 fw-900" id="statPresent">{{ stats.present }}</div></div></div>
+        <div class="col-md-3 col-6 fade-up" style="animation-delay: 0.4s;"><div class="stat-card grad-absent p-4 text-center"><div class="text-white-50 fw-bold fs-6 mb-1"><i class="bi bi-x-circle-fill me-1"></i>الغائبين</div><div class="display-4 fw-900" id="statAbsent">{{ stats.absent }}</div></div></div>
+        <div class="col-md-3 col-6 fade-up" style="animation-delay: 0.5s;"><div class="stat-card grad-rate p-4 text-center"><div class="text-white-50 fw-bold fs-6 mb-1"><i class="bi bi-graph-up me-1"></i>نسبة الحضور</div><div class="display-4 fw-900" id="statRate">{{ stats.rate }}%</div></div></div>
+    </div>
+
+    <!-- كشف الحضور والبحث -->
+    <div class="glass-card p-4 mb-5 fade-up" style="animation-delay: 0.6s;">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 border-bottom border-secondary pb-4">
+            <div>
+                <h3 class="fw-900 text-white m-0 d-flex align-items-center gap-2">
+                    <span class="p-2 bg-dark rounded-3 border border-secondary d-flex shadow"><i class="bi bi-journal-text text-warning"></i></span> 
+                    رصد حضور: <span class="text-info">{{ selected_ts.subject.name }}</span>
+                </h3>
+                <div class="mt-2 text-secondary fw-bold fs-6 d-flex align-items-center gap-3">
+                    <span class="badge bg-dark border border-secondary p-2"><i class="bi bi-person-badge text-warning me-1"></i> د. {{ selected_ts.doctor.name }}</span>
+                    <span class="badge bg-dark border border-secondary p-2"><i class="bi bi-calendar-check text-info me-1"></i> {{ lecture_date }}</span>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-success fw-bold px-4 py-2 rounded-pill shadow-sm" style="border-width: 2px;" onclick="markAll('present')"><i class="bi bi-check-all me-1 fs-5 align-middle"></i> تحضير الكل</button>
+                <button type="button" class="btn btn-outline-danger fw-bold px-4 py-2 rounded-pill shadow-sm" style="border-width: 2px;" onclick="markAll('absent')"><i class="bi bi-x-square me-1 fs-5 align-middle"></i> تغييب الكل</button>
+            </div>
+        </div>
+
+        <!-- خانة البحث السريع -->
+        <div class="mb-4 position-relative">
+            <i class="bi bi-search search-icon"></i>
+            <input type="text" id="searchInput" onkeyup="filterTable()" autocomplete="off" class="form-control search-box w-100" placeholder="ابحث فوراً باسم الطالب، أو القسم، أو التيرم، أو الكود...">
+        </div>
+
+        <!-- نموذج الإرسال مخفي السلوك لمنع الريلود -->
+        <form id="attendanceForm" onsubmit="event.preventDefault(); return false;">
+            {% csrf_token %}
+            
+            <div class="table-responsive rounded-4 mb-3 shadow-lg pb-3" style="border: 1px solid var(--glass-border); max-height: 700px; overflow-y: auto;">
+                <table class="table table-dark table-hover align-middle text-center m-0">
+                    <thead>
+                        <tr>
+                            <th class="text-start ps-4 py-3"><i class="bi bi-person-vcard text-info me-2"></i>بيانات الطالب الأكاديمية</th>
+                            <th class="py-3"><i class="bi bi-mortarboard text-warning me-2"></i>القسم / الدبلومة</th>
+                            <th class="py-3"><i class="bi bi-bookmark-star text-success me-2"></i>التيرم</th>
+                            <th class="py-3" style="width: 220px;"><i class="bi bi-toggle-on text-primary me-2"></i>حالة الحضور</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentTableBody">
+                        {% for st in students_data %}
+                        <tr class="student-row" data-search="{{ st.student_name }} {{ st.student_code }} {{ selected_ts.course.name }} {{ selected_ts.term_number }}">
+                            <td class="text-start ps-4 py-4">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="student-avatar shadow">{{ st.student_name|first }}</div>
+                                    <div>
+                                        <div class="fw-900 text-white fs-5 mb-1">{{ st.student_name }}</div>
+                                        <div class="glow-badge badge-code"><i class="bi bi-upc-scan text-info me-1"></i>الكود: {{ st.student_code }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-4">
+                                <span class="glow-badge badge-course shadow-sm"><i class="bi bi-book-half"></i> {{ selected_ts.course.name }}</span>
+                            </td>
+                            <td class="py-4">
+                                <span class="glow-badge badge-term shadow-sm"><i class="bi bi-star-fill"></i> تيرم {{ selected_ts.term_number }}</span>
+                            </td>
+                            <td class="py-4">
+                                <div class="attendance-toggle shadow-sm">
+                                    <input type="radio" class="btn-check attendance-radio" name="status_{{ st.enrollment_id }}" id="pres_{{ st.enrollment_id }}" value="present" {% if st.status == 'present' %}checked{% endif %} onchange="updateLiveStats()">
+                                    <label class="btn btn-outline-success" for="pres_{{ st.enrollment_id }}"><i class="bi bi-check-lg"></i></label>
+
+                                    <input type="radio" class="btn-check attendance-radio" name="status_{{ st.enrollment_id }}" id="abs_{{ st.enrollment_id }}" value="absent" {% if st.status == 'absent' %}checked{% endif %} onchange="updateLiveStats()">
+                                    <label class="btn btn-outline-danger" for="abs_{{ st.enrollment_id }}"><i class="bi bi-x-lg"></i></label>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="py-5 text-center text-muted"><i class="bi bi-folder-x fs-1 d-block mb-3"></i> لم يتم العثور على أي طلاب مسجلين في هذه المادة.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- الباجينشن الثابت الذكي -->
+            <div id="paginationControls" class="pagination-bar"></div>
+
+            {% if students_data %}
+            <div class="text-center mt-5 pt-3 border-top border-secondary" style="border-color: rgba(255,255,255,0.05) !important;">
+                <!-- الزر يعمل عبر JS فقط لمنع الريلود - type="button" -->
+                <button type="button" id="saveBtn" onclick="saveDataAjax(event)" class="btn save-btn-glow btn-lg px-5 py-3 fw-900 rounded-pill w-50 text-white fs-4">
+                    <i class="bi bi-cloud-arrow-up-fill me-2 align-middle"></i> اعتماد وحفظ الكشف بالكامل
+                </button>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- نظام الإشعارات الذكي (Toast) -->
+<div id="toastPopup" class="toast-popup" style="display: none;"></div>
+
+<script>
+    // ==========================================
+    // 1. نظام الباجينشن المستقل تماماً (يحتفظ بالصفحة)
+    // ==========================================
+    const PAGE_SIZE = 10; 
+    let currentPage = 1;
+
+    function filterTable() {
+        currentPage = 1; 
+        renderPage();
+    }
+
+    function getMatchedRows() {
+        const query = document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase().trim() : '';
+        return Array.from(document.querySelectorAll('.student-row')).filter(row =>
+            row.getAttribute('data-search').toLowerCase().includes(query)
+        );
+    }
+
+    function renderPage() {
+        const allRows = Array.from(document.querySelectorAll('.student-row'));
+        if(allRows.length === 0) return;
+
+        const matched = getMatchedRows();
+        const totalPages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE));
+        
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        allRows.forEach(r => r.style.display = 'none');
+
+        const startIdx = (currentPage - 1) * PAGE_SIZE;
+        matched.slice(startIdx, startIdx + PAGE_SIZE).forEach(r => r.style.display = '');
+
+        renderPaginationControls(totalPages, matched.length);
+    }
+
+    function renderPaginationControls(totalPages, totalMatched) {
+        const container = document.getElementById('paginationControls');
+        if (!container) return;
+        if (totalMatched === 0) { container.innerHTML = ''; return; }
+
+        const rangeStart = totalMatched === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+        const rangeEnd = Math.min(currentPage * PAGE_SIZE, totalMatched);
+
+        let html = `<span class="text-secondary fs-6 fw-bold"><i class="bi bi-layers me-1 text-info"></i> عرض ${rangeStart} - ${rangeEnd} من إجمالي <span class="text-white">${totalMatched}</span> طالب</span>`;
+
+        if (totalPages > 1) {
+            html += `<div class="d-flex gap-2">`;
+            html += `<button type="button" class="btn btn-sm page-btn ${currentPage === 1 ? 'disabled' : ''}" onclick="goToPage(${currentPage - 1})"><i class="bi bi-chevron-right fs-5"></i></button>`;
+
+            getPageNumbers(currentPage, totalPages).forEach(p => {
+                if (p === '...') {
+                    html += `<span class="px-2 text-secondary align-self-center fs-5">…</span>`;
+                } else {
+                    html += `<button type="button" class="btn btn-sm page-btn fs-5 ${p === currentPage ? 'active-page shadow-lg' : ''}" onclick="goToPage(${p})">${p}</button>`;
+                }
+            });
+
+            html += `<button type="button" class="btn btn-sm page-btn ${currentPage === totalPages ? 'disabled' : ''}" onclick="goToPage(${currentPage + 1})"><i class="bi bi-chevron-left fs-5"></i></button>`;
+            html += `</div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function getPageNumbers(current, total) {
+        const delta = 1; const range = [];
+        for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) range.push(i);
+        if (current - delta > 2) range.unshift('...');
+        if (current + delta < total - 1) range.push('...');
+        range.unshift(1);
+        if (total > 1) range.push(total);
+        return [...new Set(range)];
+    }
+
+    function goToPage(p) {
+        const matched = getMatchedRows();
+        const totalPages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE));
+        if (p < 1 || p > totalPages) return;
+        
+        currentPage = p; 
+        renderPage(); 
+        document.querySelector('.table-responsive').scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    document.addEventListener('DOMContentLoaded', renderPage);
+
+    // ==========================================
+    // 2. تحديث الإحصائيات الحية اللحظية
+    // ==========================================
+    function updateLiveStats() {
+        let total = 0, present = 0, absent = 0;
+        document.querySelectorAll('.student-row').forEach(row => {
+            total++;
+            const checked = row.querySelector('.attendance-radio:checked');
+            if(checked) { checked.value === 'present' ? present++ : absent++; }
+        });
+        const stTotal = document.getElementById('statTotal');
+        if(stTotal) {
+            stTotal.innerText = total;
+            document.getElementById('statPresent').innerText = present;
+            document.getElementById('statAbsent').innerText = absent;
+            document.getElementById('statRate').innerText = total ? Math.round((present/total)*100)+'%' : '0%';
+        }
+    }
+
+    function markAll(status) {
+        document.querySelectorAll(`.attendance-radio[value="${status}"]`).forEach(r => r.checked = true);
+        updateLiveStats();
+    }
+
+    // ==========================================
+    // 3. الحفظ الصامت بنسبة 100% بدون ريلود إطلاقاً
+    // ==========================================
+    function saveDataAjax(event) {
+        if(event) {
+            event.preventDefault(); 
+            event.stopPropagation();
+        }
+        
+        const form = document.getElementById('attendanceForm');
+        const btn = document.getElementById('saveBtn');
+        const originalText = btn.innerHTML;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2 fs-4 align-middle"></span> جاري تأمين وحفظ البيانات بالخادم...';
+
+        const formData = new FormData(form);
+
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' } 
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'success') {
+                showToast('تم اعتماد الكشف بنجاح! تم الحفظ في الخلفية.', 'toast-success');
+            }
+        })
+        .catch(err => {
+            showToast('حدث خطأ في الاتصال. الرجاء المحاولة مجدداً.', 'toast-error');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            
+            const globalLoader = document.getElementById('global-loader');
+            if(globalLoader) globalLoader.classList.remove('active');
+        });
+        
+        return false; 
+    }
+
+    // ==========================================
+    // 4. نظام الإشعارات (Toast) المخصص
+    // ==========================================
+    function showToast(msg, typeClass) {
+        const t = document.getElementById('toastPopup');
+        t.className = `toast-popup ${typeClass} show`;
+        t.innerHTML = typeClass === 'toast-success' 
+            ? `<i class="bi bi-shield-check fs-4"></i> <span>${msg}</span>`
+            : `<i class="bi bi-shield-exclamation fs-4"></i> <span>${msg}</span>`;
+        
+        t.style.display = 'flex';
+        
+        t.style.animation = 'none';
+        t.offsetHeight; 
+        t.style.animation = null;
+
+        setTimeout(() => {
+            t.style.display = 'none';
+        }, 4000);
+    }
+</script>
+{% endblock %}

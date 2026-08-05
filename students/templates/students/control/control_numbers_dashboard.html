@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container-fluid py-4 animate__animated animate__fadeIn" dir="rtl">
+    <div class="row g-4">
+        <!-- لوحة التحكم بالتوليد والسعة الزجاجية الفاخرة -->
+        <div class="col-xl-4">
+            <div class="card border-0 shadow-lg sticky-top" style="top: 100px; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1) !important;">
+                <div class="card-header bg-dark bg-opacity-50 text-info fw-bold py-3 border-bottom border-secondary d-flex align-items-center gap-2">
+                    <i class="bi bi-sliders text-info fs-5"></i> لوحة التوزيع والتحكم في السعة
+                </div>
+                <div class="card-body text-white">
+                    <form method="POST" action="">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-info">سعة اللجنة (عدد الطلاب بكل فصل):</label>
+                            <input type="number" name="students_per_committee" class="form-control fw-bold text-center border-secondary text-white bg-dark bg-opacity-50" value="{{ config.students_per_committee|default:20 }}" min="1">
+                            <div class="form-text text-light opacity-50 small mt-2">بناءً على هذا العدد، سيقوم السيستم بقفل اللجنة تلقائياً وفتح لجنة جديدة متسلسلة للطلاب.</div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-info">اختر الترم المستهدف للتوليد:</label>
+                            <select name="term" class="form-select fw-bold bg-dark bg-opacity-50 text-white border-secondary">
+                                <option value="term1">الترم الأول</option>
+                                <option value="term2">الترم الثاني</option>
+                                <option value="second_session">الدور الثاني (طلاب الملاحق فقط) ⚠️</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-info w-100 fw-bold py-2 shadow-sm text-dark transition-all">
+                            <i class="bi bi-lightning-charge-fill"></i> تشغيل الخوارزمية الذكية وتوليد الأرقام
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- شيت المعاينة السريع الحقيقي للطلاب -->
+        <div class="col-xl-8">
+            <div class="card border-0 shadow-lg" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1) !important;">
+                <div class="card-header bg-dark bg-opacity-20 d-flex justify-content-between align-items-center py-3 border-bottom border-secondary">
+                    <h5 class="mb-0 fw-bold text-white d-flex align-items-center gap-2">
+                        <i class="bi bi-table text-info"></i> شيت أرقام الجلوس واللجان الموزعة حالياً
+                    </h5>
+                    <a href="{% url 'print_committees_roster' %}" target="_blank" class="btn btn-outline-info btn-sm fw-bold rounded-pill px-3">
+                        <i class="bi bi-printer-fill me-1"></i> كشوف المناداة للطباعة
+                    </a>
+                </div>
+                <div class="table-responsive" style="max-height: 600px;">
+                    <table class="table table-dark table-hover align-middle mb-0 text-center text-nowrap">
+                        <thead class="table-dark sticky-top border-bottom border-secondary">
+                            <tr>
+                                <th>رقم الجلوس</th>
+                                <th>الرقم السري</th>
+                                <th class="text-start">اسم الطالب الرياضي</th>
+                                <th>الصف</th>
+                                <th>اللجنة</th>
+                                <th>رقم المقعد</th>
+                                <th>الترم</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-0">
+                            {% for num in generated_numbers %}
+                            <tr>
+                                <td class="fw-bold text-info fs-5">{{ num.seating_number }}</td>
+                                <td class="text-warning fw-bold fs-6">{{ num.secret_number }}</td>
+                                <td class="text-start fw-bold text-white-50">{{ num.student.get_full_name }}</td>
+                                <td><span class="badge bg-secondary bg-opacity-50 text-white px-2 py-1">{{ num.student.grade.name }}</span></td>
+                                <td><span class="badge bg-info text-dark fw-bold px-3 py-1.5">لجنة {{ num.committee_number }}</span></td>
+                                <td class="fw-bold text-white fs-6">{{ num.seat_number_in_committee }}</td>
+                                <td class="text-white-50">{{ num.get_term_display }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="py-5 text-white-50">
+                                    <i class="bi bi-folder-x fs-2 d-block mb-2 text-secondary"></i>
+                                    لا توجد أرقام جلوس مولدة للعام الدراسي الحالي حتى الآن، اضغط على زر التوليد الذكي.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- أزرار الانتقال بين الصفحات لضمان عدم حدوث بطء نهائياً بالسيرفر -->
+                {% if generated_numbers.has_other_pages %}
+                <div class="card-footer bg-transparent border-top border-secondary py-3 d-flex justify-content-center">
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0 gap-1">
+                            {% if generated_numbers.has_previous %}
+                                <li class="page-item"><a class="page-link bg-dark text-info border-secondary fw-bold" href="?page={{ generated_numbers.previous_page_number }}">السابق</a></li>
+                            {% endif %}
+                            <li class="page-item active"><span class="page-link bg-info text-dark border-info fw-bold">صفحة {{ generated_numbers.number }} من {{ generated_numbers.paginator.num_pages }}</span></li>
+                            {% if generated_numbers.has_next %}
+                                <li class="page-item"><a class="page-link bg-dark text-info border-secondary fw-bold" href="?page={{ generated_numbers.next_page_number }}">التالي</a></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

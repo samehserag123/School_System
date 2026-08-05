@@ -1,0 +1,796 @@
+{% extends 'base.html' %}
+
+{% block page_title %}لوحة تحكم الأكاديمية والدبلومات{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+    :root {
+        --bg-deep: #05070d;
+        --dark-glass: rgba(15, 23, 42, 0.75);
+        --neon-cyan: #38bdf8;
+        --neon-emerald: #34d399;
+        --neon-yellow: #fbbf24;
+        --neon-rose: #f87171;
+        --border-soft: rgba(148, 163, 184, 0.15);
+    }
+    body { background: radial-gradient(circle at top, #0b1224 0%, #05070d 55%) !important; font-family: 'Cairo', sans-serif; color: #f8fafc; }
+
+    .fade-up { animation: fadeUp .4s ease both; }
+    @keyframes fadeUp { from { opacity:0; transform: translateY(10px);} to { opacity:1; transform: translateY(0);} }
+
+    .stat-card {
+        background: linear-gradient(160deg, rgba(15,23,42,0.9), rgba(9,13,22,0.9));
+        border: 1px solid var(--border-soft);
+        border-radius: 22px; padding: 20px;
+        box-shadow: 0 20px 45px rgba(0,0,0,0.55);
+        transition: transform .25s ease;
+    }
+    .stat-card:hover { transform: translateY(-3px); }
+
+    .stat-icon-badge {
+        width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+        font-size: 1.3rem; margin-bottom: 8px;
+    }
+
+    .page-header {
+        background: linear-gradient(120deg, rgba(15,23,42,0.95), rgba(9,13,22,0.85));
+        border: 1px solid var(--border-soft);
+        border-right: 6px solid var(--neon-yellow);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+    }
+
+    .table-premium { color: #f8fafc; }
+    .table-premium thead th {
+        color: var(--neon-cyan); border-bottom: 2px solid rgba(56, 189, 248, 0.25);
+        background: rgba(2, 6, 23, 0.75); font-weight: 800; padding: 14px 10px;
+        position: sticky; top: 0; z-index: 2;
+    }
+    .table-premium tbody tr:hover { background: rgba(56, 189, 248, 0.06); }
+    .table-premium tbody td { padding: 12px 10px; border-color: rgba(148,163,184,0.08); }
+
+    .student-avatar {
+        width: 35px; height: 38px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;
+        background: linear-gradient(135deg, rgba(56,189,248,0.25), rgba(56,189,248,0.05));
+        color: var(--neon-cyan); font-weight: 900; margin-left: 8px; flex-shrink: 0;
+    }
+
+    .filters-single-row {
+        background: linear-gradient(160deg, rgba(15,23,42,0.9), rgba(9,13,22,0.9));
+        border: 1px solid var(--border-soft); border-radius: 18px;
+        padding: 12px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    .filter-inline-label { font-size: .78rem; color: #94a3b8; font-weight: 800; white-space: nowrap; }
+    .filters-single-row .form-select, .filters-single-row .form-control {
+        background-color: #020617 !important; color: #fff !important;
+        border: 1.5px solid rgba(148,163,184,0.2) !important; border-radius: 10px !important;
+        font-weight: 700 !important; height: 38px !important; font-size: 0.85rem !important;
+    }
+    .quick-filter-btn { border-radius: 999px !important; font-weight: 800 !important; padding: 5px 14px !important; border: 1.5px solid rgba(148,163,184,0.25) !important; background: transparent !important; color: #fff !important; font-size: 0.8rem !important; }
+    .quick-filter-btn:hover { border-color: var(--neon-cyan) !important; color: var(--neon-cyan) !important; }
+    .quick-filter-btn.active-quick-filter { background: var(--neon-cyan) !important; color: #04202e !important; border-color: var(--neon-cyan) !important; }
+
+    .financial-pos-card {
+        background: rgba(2, 6, 23, 0.85);
+        border: 1.5px solid rgba(148, 163, 184, 0.2);
+        border-radius: 16px;
+        padding: 15px;
+        text-align: center;
+    }
+    .financial-pos-card.card-required { border-color: var(--neon-cyan); background: rgba(56, 189, 248, 0.05); }
+    .financial-pos-card.card-paid { border-color: var(--neon-emerald); background: rgba(52, 211, 153, 0.05); }
+    .financial-pos-card.card-remaining { border-color: var(--neon-yellow); background: rgba(251, 191, 36, 0.05); }
+
+    .pagination-custom .page-link {
+        background-color: #020617; color: var(--neon-cyan); border: 1px solid rgba(56, 189, 248, 0.3); font-weight: 800; padding: 5px 12px; border-radius: 8px; margin: 0 2px; cursor: pointer; text-decoration: none;
+    }
+    .pagination-custom .page-item.active .page-link { background-color: var(--neon-cyan) !important; color: #000000 !important; border-color: var(--neon-cyan) !important; }
+
+    .live-search-container { position: relative; }
+    .live-search-input { background-color: #020617 !important; color: #ffffff !important; border: 2px solid var(--neon-cyan) !important; height: 45px; border-radius: 12px !important; font-weight: 800 !important; padding-right: 40px; }
+    .live-search-icon { position: absolute; right: 14px; top: 12px; color: var(--neon-cyan); z-index: 5; }
+    .search-results-overlay { position: absolute; top: 105%; right: 0; left: 0; background: #090d16; border: 2px solid var(--neon-cyan); border-radius: 14px; max-height: 300px; overflow-y: auto; z-index: 1050; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.95); }
+    .student-search-item { padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer; }
+    .student-search-item:hover { background: rgba(56, 189, 248, 0.18); }
+    .st-name { color: var(--neon-yellow) !important; font-weight: 900; }
+
+    .academy-modal-glass { background: rgba(2, 6, 23, 0.98) !important; border: 2px solid var(--neon-yellow) !important; border-radius: 24px !important; }
+    .progress-14m { height: 15px; border-radius: 20px; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); }
+    .progress-14m .progress-bar { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+    .att-present { color: var(--neon-emerald); background: rgba(52, 211, 153, 0.1); padding: 4px 12px; border-radius: 5px; }
+    .att-absent { color: var(--neon-rose); background: rgba(248, 113, 113, 0.1); padding: 4px 12px; border-radius: 5px; }
+</style>
+
+<div class="container-fluid py-4" dir="rtl">
+    
+    <!-- الهيدر وزر الإدخال -->
+    <div class="d-flex justify-content-between align-items-center mb-4 p-4 rounded-4 flex-wrap gap-3 page-header fade-up">
+        <div>
+            <h3 class="fw-900 text-white m-0"><i class="bi bi-mortarboard-fill text-warning me-2"></i> إدارة الأكاديمية</h3>
+            <p class="text-secondary small fw-bold m-0 mt-1">متابعة تسجيلات برامج الدبلومات والحضور والغياب في مكان واحد</p>
+        </div>
+        <button class="btn btn-warning fw-black text-dark rounded-pill px-4 shadow-sm" data-bs-toggle="collapse" data-bs-target="#addAcademyEnrollment">
+            <i class="bi bi-plus-circle-fill me-1"></i> تسجيل متدرب جديد بالأكاديمية
+        </button>
+    </div>
+
+    <!-- نموذج الإدخال السريع والمطور مع حماية الاشتراك المكرر والتسجيل المالي -->
+    <div class="collapse mb-4" id="addAcademyEnrollment">
+        <div class="card card-body bg-black border-secondary rounded-4 shadow-lg p-4" style="background-color: #090d16 !important;">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-secondary border-opacity-25 pb-3 mb-3">
+                <h5 class="text-warning fw-bold m-0"><i class="bi bi-person-plus-fill me-1"></i> تسجيل متدرب في الدبلومات التدريبية ونقطة التحصيل المباشر</h5>
+                <span class="badge bg-info text-dark fw-bold">POS Counter Active</span>
+            </div>
+
+            <!-- 🟢 شريط تنبيه الاشتراك المكرر -->
+            <div id="duplicate_enrollment_alert" class="alert alert-warning text-dark fw-bold d-none my-2 rounded-3 shadow"></div>
+
+            <form method="POST" class="row g-3" id="academyEnrollmentForm">
+                {% csrf_token %}
+                
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold text-info"><i class="bi bi-search me-1"></i> ابحث عن الطالب (الاسم / الكود / القومي):</label>
+                    <div class="live-search-container">
+                        <i class="bi bi-search live-search-icon"></i>
+                        <input type="text" id="student_search_input" class="form-control live-search-input" placeholder="اكتب للبحث السريع..." autocomplete="off">
+                        {{ form.student }}
+                        <div id="student_search_results" class="search-results-overlay d-none"></div>
+                    </div>
+                    <div id="selected_student_box" class="mt-2 d-none p-2 rounded bg-dark border border-warning text-warning small fw-bold"></div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-info"><i class="bi bi-journal-bookmark-fill me-1"></i> اختر الكورس / الدبلومة</label>
+                    {{ form.course }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-info"><i class="bi bi-calendar-event me-1"></i> تاريخ بدء الدراسة</label>
+                    {{ form.enrollment_date }}
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-secondary"><i class="bi bi-tag-fill me-1"></i> سعر مخصص (اختياري)</label>
+                    {{ form.custom_price }}
+                </div>
+
+                <div class="col-12 mt-3">
+                    <div class="p-3 rounded-4 bg-dark bg-opacity-50 border border-secondary border-opacity-25">
+                        <div class="row g-3 align-items-center">
+                            
+                            <div class="col-md-3">
+                                <div class="financial-pos-card card-required">
+                                    <span class="small text-secondary fw-bold d-block mb-1"><i class="bi bi-cash me-1"></i> إجمالي سعر الدبلومة</span>
+                                    <span class="fs-4 fw-900 text-info" id="pos_total_price">0.00</span> <small class="text-white-50">ج.م</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="financial-pos-card card-paid">
+                                    <span class="small text-success fw-bold d-block mb-1"><i class="bi bi-wallet2 me-1"></i> المبلغ المحصل الآن (نقداً)</span>
+                                    {{ form.pay_now }}
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="financial-pos-card card-remaining">
+                                    <span class="small text-warning fw-bold d-block mb-1"><i class="bi bi-calculator me-1"></i> المتبقي المطلوب</span>
+                                    <span class="fs-4 fw-900 text-warning" id="pos_remaining_price">0.00</span> <small class="text-white-50">ج.م</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="financial-pos-card border-secondary">
+                                    <span class="small text-white-50 fw-bold d-block mb-1"><i class="bi bi-receipt me-1"></i> رقم الإيصال الورقي</span>
+                                    {{ form.receipt_number }}
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="row g-3 mt-1 align-items-center">
+                            <div class="col-md-8">
+                                {{ form.notes }}
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button type="submit" id="btnSubmitEnrollment" class="btn btn-success w-100 py-2 fw-900 shadow-lg fs-6">
+                                    <i class="bi bi-check2-circle me-1"></i> تأكيد التسجيل وإسقاط النقدية بالخزينة
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- شريط الفلاتر الأفقي الموحد -->
+    <div class="filters-single-row mb-4 fade-up">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2" id="filtersForm">
+
+            <div class="d-flex align-items-center gap-1">
+                <span class="filter-inline-label"><i class="bi bi-search text-info me-1"></i>بحث شامل:</span>
+                <input type="text" id="tableSearchInput" class="form-control form-control-sm" placeholder="اسم / كود / قومي..." style="width: 170px !important;">
+            </div>
+
+            <div class="d-flex align-items-center gap-1">
+                <span class="filter-inline-label me-1"><i class="bi bi-clock-history text-info me-1"></i>المدى:</span>
+                <div class="d-flex gap-1" id="quickFilterBtns">
+                    <button type="button" data-time="all" class="btn btn-sm quick-filter-btn active-quick-filter">الكل</button>
+                    <button type="button" data-time="today" class="btn btn-sm quick-filter-btn">اليوم</button>
+                    <button type="button" data-time="week" class="btn btn-sm quick-filter-btn">الأسبوع</button>
+                    <button type="button" data-time="month" class="btn btn-sm quick-filter-btn">الشهر</button>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-1">
+                <span class="filter-inline-label"><i class="bi bi-journal-bookmark text-warning me-1"></i>الكورس:</span>
+                <select id="filterCourse" class="form-select form-select-sm" style="min-width: 130px;">
+                    <option value="">-- الكل --</option>
+                    {% for c in all_courses %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="d-flex align-items-center gap-1">
+                <span class="filter-inline-label"><i class="bi bi-person-badge text-info me-1"></i>الدكتور:</span>
+                <select id="filterDoctor" class="form-select form-select-sm" style="min-width: 130px;">
+                    <option value="">-- الكل --</option>
+                    {% for d in all_doctors %}
+                        <option value="{{ d.id }}">د. {{ d.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="d-flex align-items-center gap-1">
+                <span class="filter-inline-label"><i class="bi bi-calendar-range text-info me-1"></i>فترة:</span>
+                <input type="date" id="filterDateFrom" class="form-control form-control-sm" style="width: 120px !important;">
+                <span class="text-secondary small">-</span>
+                <input type="date" id="filterDateTo" class="form-control form-control-sm" style="width: 120px !important;">
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span id="filterLoadingHint" class="text-info small fw-bold" style="display:none;">
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                </span>
+                <button type="button" id="clearFiltersBtn" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold text-nowrap">
+                    <i class="bi bi-x-lg me-1"></i> مسح
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- كروت الإحصائيات -->
+    <div class="row g-4 mb-4 text-center" id="statsCardsRow">
+        <div class="col-md-4">
+            <div class="stat-card fade-up" style="border-top: 4px solid var(--neon-cyan);">
+                <div class="stat-icon-badge mx-auto" style="background: rgba(56,189,248,0.12); color: var(--neon-cyan);"><i class="bi bi-people-fill"></i></div>
+                <div class="text-secondary fw-bold mb-1 small">إجمالي المتدربين</div>
+                <div class="display-6 fw-900 text-info" id="statStudents">{{ total_students }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card fade-up" style="border-top: 4px solid var(--neon-emerald);">
+                <div class="stat-icon-badge mx-auto" style="background: rgba(52,211,153,0.12); color: var(--neon-emerald);"><i class="bi bi-award-fill"></i></div>
+                <div class="text-secondary fw-bold mb-1 small">الخريجين والشهادات الممنوحة</div>
+                <div class="display-6 fw-900 text-success" id="statGraduates">{{ total_graduates }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card fade-up" style="border-top: 4px solid var(--neon-yellow);">
+                <div class="stat-icon-badge mx-auto" style="background: rgba(251,191,36,0.12); color: var(--neon-yellow);"><i class="bi bi-journal-bookmark-fill"></i></div>
+                <div class="text-secondary fw-bold mb-1 small">الكورسات المفتوحة</div>
+                <div class="display-6 fw-900 text-warning" id="statCourses">{{ active_courses }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- جدول المتدربين -->
+    <div class="stat-card p-0 overflow-hidden fade-up" id="tableCardContainer">
+        <div class="table-responsive" style="max-height: 60vh;">
+            <table class="table table-premium m-0 text-center">
+                <thead>
+                    <tr>
+                        <th class="text-start ps-4">المتدرب</th>
+                        <th>الكورس الأكاديمي</th>
+                        <th>الدكتور المحاضر</th>
+                        <th>تاريخ البدء</th>
+                        <th>حالة الشهادة</th>
+                        <th>ملف الطالب (سجل الغياب والماليات)</th>
+                    </tr>
+                </thead>
+                <tbody id="enrollmentsTableBody">
+                    {% for enr in enrollments %}
+                    <tr>
+                        <td class="text-start ps-4 fw-bold text-white">
+                            <div class="d-flex align-items-center">
+                                <span class="student-avatar">{{ enr.student.get_full_name|first }}</span>
+                                <div>
+                                    <span class="d-block">{{ enr.student.get_full_name }}</span>
+                                    <small class="mt-1 d-inline-block">
+                                        <span class="badge badge-code-sm me-1">كود: {{ enr.student.student_code|default:"---" }}</span>
+                                        <span class="badge badge-natid-sm">قومي: {{ enr.student.national_id|default:"---" }}</span>
+                                    </small>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-info fw-bold">{{ enr.course.name }}</td>
+                        <td><span class="badge bg-dark border border-secondary text-warning">د. {{ enr.course.doctor.name }}</span></td>
+                        <td class="text-white-50">{{ enr.enrollment_date|date:"Y-m-d" }}</td>
+                        <td>
+                            {% if enr.is_graduated %}
+                                <span class="badge bg-success"><i class="bi bi-patch-check"></i> تم التخرج</span>
+                            {% else %}
+                                <span class="badge bg-secondary">قيد الدراسة (14 شهر)</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-info rounded-pill fw-bold" onclick="openAcademyModal({{ enr.id }})">
+                                <i class="bi bi-person-lines-fill"></i> فتح الملف
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <i class="bi bi-inbox"></i>
+                                لا يوجد متدربين مسجلين مطابقين للبحث أو الفترة المحددة.
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div id="paginationContainer" class="p-3 border-top border-secondary border-opacity-25 bg-black d-flex justify-content-between align-items-center flex-wrap gap-2" {% if enrollments.paginator.num_pages <= 1 %}style="display:none;"{% endif %}>
+            <div class="small text-white-50" id="paginationInfo">
+                عرض الصفحة {{ enrollments.number }} من إجمالي {{ enrollments.paginator.num_pages }} صفحة (20 متدرب/صفحة)
+            </div>
+            <ul class="pagination pagination-custom justify-content-center m-0" id="paginationList">
+                {% if enrollments.has_previous %}
+                    <li class="page-item"><a class="page-link" onclick="changePage(1); return false;">الأولى</a></li>
+                    <li class="page-item"><a class="page-link" onclick="changePage({{ enrollments.previous_page_number }}); return false;">السابق</a></li>
+                {% endif %}
+
+                {% for i in enrollments.paginator.page_range %}
+                    {% if enrollments.number == i %}
+                        <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                    {% elif i > enrollments.number|add:'-3' and i < enrollments.number|add:'3' %}
+                        <li class="page-item"><a class="page-link" onclick="changePage({{ i }}); return false;">{{ i }}</a></li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if enrollments.has_next %}
+                    <li class="page-item"><a class="page-link" onclick="changePage({{ enrollments.next_page_number }}); return false;">التالي</a></li>
+                    <li class="page-item"><a class="page-link" onclick="changePage({{ enrollments.paginator.num_pages }}); return false;">الأخيرة</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- النافذة المنبثقة العملاقة لملف الأكاديمية (محدثة بالموقف المالي والحضور) -->
+<div class="modal fade" id="academyStudentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content academy-modal-glass text-white">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 p-4">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="p-3 bg-warning bg-opacity-10 border border-warning rounded-circle text-warning">
+                        <i class="bi bi-mortarboard fs-1"></i>
+                    </div>
+                    <div>
+                        <h3 class="fw-900 m-0 text-warning" id="modalStName">جاري التحميل...</h3>
+                        <div class="text-white-50 mt-1" id="modalCourseInfo">كورس: --- | دكتور: ---</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <div class="modal-body p-4" id="modalBodyWrapper">
+                <div class="text-center py-5"><div class="spinner-border text-warning"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 🟢 1. فحص الاشتراك المكرر ومنع التدبيل
+    function checkDuplicateEnrollment() {
+        const studentId = $('#id_student_hidden').val();
+        const courseId = $('#id_course_select').val();
+
+        if (studentId && courseId) {
+            fetch(`/students/academy/api/check-enrollment/?student_id=${studentId}&course_id=${courseId}`)
+                .then(res => res.json())
+                .then(data => {
+                    const alertBox = $('#duplicate_enrollment_alert');
+                    const submitBtn = $('#btnSubmitEnrollment');
+
+                    if (data.exists) {
+                        alertBox.removeClass('d-none').html(`<i class="bi bi-exclamation-octagon-fill me-1"></i> ${data.message}`);
+                        submitBtn.prop('disabled', true).addClass('opacity-50');
+                    } else {
+                        alertBox.addClass('d-none').empty();
+                        submitBtn.prop('disabled', false).removeClass('opacity-50');
+                    }
+                })
+                .catch(err => console.error("Enrollment check error:", err));
+        }
+    }
+
+    $('#id_course_select').on('change', checkDuplicateEnrollment);
+
+    // 🟢 2. حساب الموقف المالي أوتوماتيكياً بنقطة POS
+    const coursePricesMap = JSON.parse('{{ course_prices_json|escapejs }}');
+
+    function calculatePosFinancials() {
+        const courseId = $('#id_course_select').val();
+        const customPriceVal = parseFloat($('#id_custom_price').val()) || 0;
+        let totalPrice = 0;
+
+        if (customPriceVal > 0) {
+            totalPrice = customPriceVal;
+        } else if (courseId && coursePricesMap[courseId]) {
+            totalPrice = coursePricesMap[courseId];
+        }
+
+        const payNowVal = parseFloat($('#id_pay_now').val()) || 0;
+        const remainingPrice = Math.max(0, totalPrice - payNowVal);
+
+        $('#pos_total_price').text(totalPrice.toFixed(2));
+        $('#pos_remaining_price').text(remainingPrice.toFixed(2));
+    }
+
+    $(document).ready(function() {
+        $('#id_course_select, #id_custom_price, #id_pay_now').on('change input', function() {
+            calculatePosFinancials();
+            checkDuplicateEnrollment();
+        });
+        calculatePosFinancials();
+    });
+
+    // 🟢 3. محرك الفلاتر والباجنيشن عبر AJAX
+    let currentFilters = { q: '', time_filter: 'all', course_id: '', doctor_id: '', date_from: '', date_to: '', page: 1 };
+    let filterFetchDebounce = null;
+
+    function changePage(page) {
+        currentFilters.page = page;
+        applyFilters(false);
+    }
+
+    function resetPageAndApply() {
+        currentFilters.page = 1;
+        applyFilters(true);
+    }
+
+    function applyFilters(resetScroll = false) {
+        clearTimeout(filterFetchDebounce);
+        filterFetchDebounce = setTimeout(() => {
+            document.getElementById('filterLoadingHint').style.display = 'inline-block';
+
+            const params = new URLSearchParams(currentFilters).toString();
+            fetch(`{% url 'academy_dashboard' %}?ajax=1&${params}`)
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then(data => {
+                    document.getElementById('filterLoadingHint').style.display = 'none';
+                    document.getElementById('statStudents').innerText = data.total_students;
+                    document.getElementById('statGraduates').innerText = data.total_graduates;
+                    document.getElementById('statCourses').innerText = data.active_courses;
+                    
+                    renderEnrollmentsTable(data.enrollments);
+                    renderPagination(data.pagination);
+                })
+                .catch(err => {
+                    document.getElementById('filterLoadingHint').style.display = 'none';
+                    console.error('خطأ تحديث الفلاتر:', err);
+                });
+        }, 100);
+    }
+
+    function renderEnrollmentsTable(rows) {
+        const tbody = document.getElementById('enrollmentsTableBody');
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="bi bi-inbox"></i>لا يوجد متدربين مسجلين مطابقين للفلاتر والبحث المباشر.</div></td></tr>`;
+            return;
+        }
+        tbody.innerHTML = rows.map(r => `
+            <tr>
+                <td class="text-start ps-4 fw-bold text-white">
+                    <div class="d-flex align-items-center">
+                        <span class="student-avatar">${r.student_first_letter}</span>
+                        <div>
+                            <span class="d-block">${r.student_name}</span>
+                            <small class="mt-1 d-inline-block">
+                                <span class="badge badge-code-sm me-1">كود: ${r.student_code}</span>
+                                <span class="badge badge-natid-sm">قومي: ${r.national_id}</span>
+                            </small>
+                        </div>
+                    </div>
+                </td>
+                <td class="text-info fw-bold">${r.course_name}</td>
+                <td><span class="badge bg-dark border border-secondary text-warning">د. ${r.doctor_name}</span></td>
+                <td class="text-white-50">${r.enrollment_date}</td>
+                <td>${r.is_graduated
+                    ? '<span class="badge bg-success"><i class="bi bi-patch-check"></i> تم التخرج</span>'
+                    : '<span class="badge bg-secondary">قيد الدراسة (14 شهر)</span>'}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-info rounded-pill fw-bold" onclick="openAcademyModal(${r.id})">
+                        <i class="bi bi-person-lines-fill"></i> فتح الملف
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function renderPagination(p) {
+        const container = document.getElementById('paginationContainer');
+        if (!p || p.num_pages <= 1) {
+            container.style.display = 'none';
+            return;
+        }
+        container.style.display = 'flex';
+
+        document.getElementById('paginationInfo').innerText = `عرض الصفحة ${p.current_page} من إجمالي ${p.num_pages} صفحة (20 متدرب/صفحة)`;
+
+        let html = '';
+        if (p.has_previous) {
+            html += `<li class="page-item"><a class="page-link" onclick="changePage(1); return false;">الأولى</a></li>`;
+            html += `<li class="page-item"><a class="page-link" onclick="changePage(${p.previous_page_number}); return false;">السابق</a></li>`;
+        }
+
+        p.page_range.forEach(item => {
+            if (item === '…') {
+                html += `<li class="page-item disabled"><span class="page-link">…</span></li>`;
+            } else {
+                let pageNum = parseInt(item);
+                if (pageNum === p.current_page) {
+                    html += `<li class="page-item active"><span class="page-link">${pageNum}</span></li>`;
+                } else {
+                    html += `<li class="page-item"><a class="page-link" onclick="changePage(${pageNum}); return false;">${pageNum}</a></li>`;
+                }
+            }
+        });
+
+        if (p.has_next) {
+            html += `<li class="page-item"><a class="page-link" onclick="changePage(${p.next_page_number}); return false;">التالي</a></li>`;
+            html += `<li class="page-item"><a class="page-link" onclick="changePage(${p.num_pages}); return false;">الأخيرة</a></li>`;
+        }
+
+        document.getElementById('paginationList').innerHTML = html;
+    }
+
+    document.getElementById('tableSearchInput').addEventListener('input', function() {
+        currentFilters.q = this.value.trim();
+        resetPageAndApply();
+    });
+
+    document.getElementById('quickFilterBtns').addEventListener('click', function(e) {
+        const btn = e.target.closest('[data-time]');
+        if (!btn) return;
+        document.querySelectorAll('#quickFilterBtns .quick-filter-btn').forEach(b => b.classList.remove('active-quick-filter'));
+        btn.classList.add('active-quick-filter');
+        currentFilters.time_filter = btn.dataset.time;
+        resetPageAndApply();
+    });
+
+    document.getElementById('filterCourse').addEventListener('change', function() {
+        currentFilters.course_id = this.value;
+        resetPageAndApply();
+    });
+    document.getElementById('filterDoctor').addEventListener('change', function() {
+        currentFilters.doctor_id = this.value;
+        resetPageAndApply();
+    });
+
+    document.getElementById('filterDateFrom').addEventListener('change', function() {
+        currentFilters.date_from = this.value;
+        if (currentFilters.date_from && currentFilters.date_to) resetPageAndApply();
+    });
+    document.getElementById('filterDateTo').addEventListener('change', function() {
+        currentFilters.date_to = this.value;
+        if (currentFilters.date_from && currentFilters.date_to) resetPageAndApply();
+    });
+
+    document.getElementById('clearFiltersBtn').addEventListener('click', function() {
+        currentFilters = { q: '', time_filter: 'all', course_id: '', doctor_id: '', date_from: '', date_to: '', page: 1 };
+        document.getElementById('tableSearchInput').value = '';
+        document.getElementById('filterCourse').value = '';
+        document.getElementById('filterDoctor').value = '';
+        document.getElementById('filterDateFrom').value = '';
+        document.getElementById('filterDateTo').value = '';
+        document.querySelectorAll('#quickFilterBtns .quick-filter-btn').forEach(b => b.classList.remove('active-quick-filter'));
+        document.querySelector('#quickFilterBtns [data-time="all"]').classList.add('active-quick-filter');
+        applyFilters();
+    });
+</script>
+
+<script>
+    // 🟢 محرك البحث السريع عند اختيار الطالب
+    let searchDebounce = null;
+    $('#student_search_input').on('input focus', function() {
+        clearTimeout(searchDebounce);
+        const query = $(this).val().trim();
+        const resultsContainer = $('#student_search_results');
+
+        if (query.length < 2) {
+            resultsContainer.addClass('d-none').empty();
+            return;
+        }
+
+        resultsContainer.removeClass('d-none').html(
+            '<div class="p-3 text-center text-info"><span class="spinner-border spinner-border-sm me-2"></span> جاري البحث...</div>'
+        );
+
+        searchDebounce = setTimeout(() => {
+            fetch(`/students/api/search-students-sale/?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.students && data.students.length > 0) {
+                        let html = '';
+                        data.students.forEach(st => {
+                            html += `
+                            <div class="student-search-item" onclick="selectStudent('${st.id}', '${escapeJs(st.name)}', '${st.code}', '${st.national_id}')">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="st-name">${st.name}</div>
+                                        <div class="small text-white-50 mt-1">
+                                            <span class="badge bg-info text-dark me-1">كود: ${st.code}</span>
+                                            <span class="badge bg-warning text-dark">قومي: ${st.national_id}</span>
+                                        </div>
+                                    </div>
+                                    <span class="btn btn-sm btn-outline-warning fw-bold">اختيار</span>
+                                </div>
+                            </div>`;
+                        });
+                        resultsContainer.html(html);
+                    } else {
+                        resultsContainer.html('<div class="p-3 text-center text-muted fw-bold">لم يتم العثور على طالب مطابق</div>');
+                    }
+                })
+                .catch(() => {
+                    resultsContainer.html('<div class="p-3 text-center text-danger fw-bold">تعذر الاتصال بالسيرفر</div>');
+                });
+        }, 150);
+    });
+
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.live-search-container').length) {
+            $('#student_search_results').addClass('d-none');
+        }
+    });
+
+    function escapeJs(str) {
+        return (str || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+
+    function selectStudent(id, name, code, natId) {
+        $('#id_student_hidden').val(id);
+        $('#student_search_input').val(name);
+        $('#student_search_results').addClass('d-none').empty();
+        $('#selected_student_box').removeClass('d-none').html(`الطالب المختار: ${name} (كود: ${code})`).show();
+        checkDuplicateEnrollment();
+    }
+
+    // 🟢 4. عرض التقرير الأكاديمي والمالي الشامل بداخل المودال
+    function openAcademyModal(enrollmentId) {
+        const modalEl = document.getElementById('academyStudentModal');
+        if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+        
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        document.getElementById('modalStName').innerText = "جاري جلب ملف الأكاديمية والماليات...";
+        document.getElementById('modalBodyWrapper').innerHTML = '<div class="text-center py-5"><div class="spinner-border text-warning"></div></div>';
+
+        fetch(`/students/academy/api/student-details/${enrollmentId}/`)
+            .then(res => {
+                if (!res.ok) throw new Error("HTTP Status " + res.status);
+                return res.json();
+            })
+            .then(data => {
+                if(data.success) {
+                    document.getElementById('modalStName').innerText = data.student.name;
+                    document.getElementById('modalCourseInfo').innerHTML = `
+                        <span class="badge bg-dark border border-info text-info me-2 fs-6">${data.course.name}</span>
+                        <span class="text-warning me-2"><i class="bi bi-person-badge"></i> د. ${data.course.doctor}</span>
+                        <span class="badge bg-${data.financials.status_badge} fs-6">${data.financials.status_label}</span>
+                    `;
+
+                    let historyHtml = '';
+                    if(data.attendance.history.length > 0) {
+                        data.attendance.history.forEach(att => {
+                            let spanClass = att.is_present ? 'att-present' : 'att-absent';
+                            let icon = att.is_present ? 'bi-check-circle' : 'bi-x-circle';
+                            historyHtml += `
+                                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary border-opacity-25 py-2">
+                                    <div><strong class="text-white">${att.lecture_title}</strong> <small class="text-white-50 ms-2">${att.date}</small></div>
+                                    <span class="${spanClass} fw-bold"><i class="bi ${icon}"></i> ${att.status}</span>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        historyHtml = '<div class="text-center text-white-50 py-3">لم يتم تسجيل أي حضور حتى الآن.</div>';
+                    }
+
+                    document.getElementById('modalBodyWrapper').innerHTML = `
+                        <div class="bg-black p-3 rounded-4 border border-secondary border-opacity-25 mb-4">
+                            <div class="d-flex justify-content-between text-white-50 mb-2 small fw-bold">
+                                <span>تاريخ البدء: ${data.student.enrollment_date}</span>
+                                <span class="text-warning">تاريخ التخرج المتوقع: ${data.student.expected_graduation}</span>
+                            </div>
+                            <div class="progress progress-14m mb-2">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: ${data.course.progress_pct}%"></div>
+                            </div>
+                            <div class="text-center text-info fw-bold small">تم إنجاز ${data.course.progress_pct}% من البرنامج التدريبي (14 شهراً)</div>
+                        </div>
+
+                        <div class="row g-4">
+                            <div class="col-md-7">
+                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-card-checklist text-info"></i> السجل التفصيلي للحضور والغياب</h5>
+                                <div class="bg-black p-3 rounded-4 border border-secondary border-opacity-25" style="max-height: 280px; overflow-y: auto;">
+                                    ${historyHtml}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-5">
+                                <div class="bg-black p-4 rounded-4 border border-secondary border-opacity-25 h-100 text-center">
+                                    <h6 class="text-white-50 mb-2">الموقف المالي الشامل للدبلومة</h6>
+                                    
+                                    <div class="p-3 rounded-3 bg-dark border border-secondary mb-3 text-start small">
+                                        <div class="d-flex justify-content-between text-white-50 mb-2">
+                                            <span>سعر الدبلومة المتفق عليه:</span>
+                                            <strong class="text-info fs-6">${data.financials.price} ج.م</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between text-white-50 mb-2">
+                                            <span>المبلغ المسدد بالخزينة:</span>
+                                            <strong class="text-success fs-6">${data.financials.total_paid} ج.م</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between text-white-50">
+                                            <span>المتبقي غير المسدد:</span>
+                                            <strong class="text-warning fs-6">${data.financials.remaining} ج.م</strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <div class="p-2 rounded border border-success border-opacity-25 bg-success bg-opacity-10">
+                                                <div class="fs-4 fw-bold text-success">${data.attendance.total_attended}</div>
+                                                <div class="small text-white-50">إجمالي الحضور</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="p-2 rounded border border-danger border-opacity-25 bg-danger bg-opacity-10">
+                                                <div class="fs-4 fw-bold text-danger">${data.attendance.total_absent}</div>
+                                                <div class="small text-white-50">إجمالي الغياب</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            })
+            .catch(err => {
+                console.error("Modal Error:", err);
+                document.getElementById('modalBodyWrapper').innerHTML = `
+                    <div class="alert alert-danger text-center fw-bold py-4">
+                        <i class="bi bi-exclamation-triangle-fill fs-2 d-block mb-2"></i>
+                        عذراً، تعذر جلب التقرير الأكاديمي للطالب في الوقت الحالي!
+                    </div>`;
+            });
+    }
+</script>
+{% endblock %}

@@ -1,168 +1,498 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ title|default:"تقرير الجرد والرقابة المخزنية الموحدة" }}{% endblock %}
+
+{% block page_title %}
+<div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3 animate__animated animate__fadeIn">
+    <div class="d-flex align-items-center gap-3">
+        <div class="icon-header-box bg-warning bg-opacity-10 p-3 rounded-4 border border-warning border-opacity-25">
+            <i class="bi bi-box-seam-fill text-warning fs-2"></i>
+        </div>
+        <div>
+            <h4 class="fw-black text-white m-0">منظومة الجرد والرقابة المخزنية الموحدة</h4>
+            <p class="text-warning opacity-75 small m-0 fw-semibold">متابعة رصيد أول المدة، التوريدات، المنصرف، والمتبقي بالرفوف</p>
+        </div>
+    </div>
+    
+    <!-- أزرار التنقل والرجوع المباشر -->
+    <div class="d-flex gap-2">
+        <a href="{% url 'book_sales_list' %}" class="btn btn-outline-info btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm border-opacity-25">
+            <i class="bi bi-cart-check me-1"></i> سجل أذونات الصرف
+        </a>
+        <a href="/" class="btn btn-outline-light btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm border-opacity-25">
+            <i class="bi bi-house-door-fill text-info me-1"></i> العودة للشاشة الرئيسية
+        </a>
+    </div>
+</div>
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-3">
-    
-    <div class="card bg-dark border-info shadow-lg mb-5">
-        <div class="card-header bg-info bg-opacity-10 border-info d-flex justify-content-between align-items-center py-3">
-            <h5 class="mb-0 text-info">
-                <i class="bi bi-calculator me-2"></i> ملخص حركة المخزن (إجمالي الأصناف الموحد)
-            </h5>
-            <span class="badge bg-info text-dark">إحصاء مجمع</span>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+<style>
+    :root {
+        --bg-main: #030712;
+        --glass-surface: rgba(15, 23, 42, 0.85);
+        --glass-card: rgba(30, 41, 59, 0.75);
+        --glass-border: rgba(255, 255, 255, 0.12);
+        
+        --neon-cyan: #38bdf8;
+        --neon-emerald: #34d399;
+        --neon-amber: #fbbf24;
+        --neon-rose: #f87171;
+    }
+
+    body {
+        background-color: var(--bg-main) !important;
+        color: #f8fafc !important;
+    }
+
+    .glass-card {
+        background: var(--glass-surface) !important;
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 20px !important;
+    }
+
+    /* كروت إحصائيات الجرد الكلي */
+    .kpi-card {
+        background: var(--glass-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 18px;
+        padding: 16px 20px;
+        text-align: center;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-3px);
+        border-color: var(--neon-cyan);
+    }
+
+    .kpi-title {
+        color: #94a3b8;
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+
+    .kpi-value {
+        font-weight: 900;
+        font-size: 1.6rem;
+    }
+
+    /* أزرار التبويبات الرئيسية */
+    .nav-pills-custom .nav-link {
+        color: #94a3b8;
+        background: rgba(30, 41, 59, 0.5);
+        border: 1px solid var(--glass-border);
+        border-radius: 14px;
+        padding: 12px 25px;
+        font-weight: 800;
+        transition: all 0.25s ease;
+    }
+
+    .nav-pills-custom .nav-link.active {
+        background: var(--neon-cyan) !important;
+        color: #020617 !important;
+        font-weight: 900;
+        box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+
+    /* أكورديون الصفوف الدراسية */
+    .accordion-custom .accordion-item {
+        background: rgba(15, 23, 42, 0.6) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 16px !important;
+        margin-bottom: 12px;
+        overflow: hidden;
+    }
+
+    .accordion-custom .accordion-button {
+        background: rgba(30, 41, 59, 0.8) !important;
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        padding: 16px 20px;
+        box-shadow: none !important;
+    }
+
+    .accordion-custom .accordion-button:not(.collapsed) {
+        color: var(--neon-cyan) !important;
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    /* جداول الجرد والأنماط الخطية */
+    .inventory-table {
+        color: #f8fafc;
+        margin: 0;
+    }
+
+    .inventory-table thead th {
+        background: #020617 !important;
+        color: var(--neon-cyan);
+        font-weight: 900;
+        font-size: 0.85rem;
+        padding: 14px 12px;
+        text-align: center;
+        border-bottom: 2px solid rgba(56, 189, 248, 0.2);
+    }
+
+    .inventory-table tbody td {
+        padding: 12px;
+        vertical-align: middle;
+        text-align: center;
+        font-size: 0.9rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .qty-badge {
+        font-weight: 800;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+    }
+
+    .stock-ok {
+        background: rgba(16, 185, 129, 0.18) !important;
+        color: #34d399 !important;
+        border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .stock-zero {
+        background: rgba(239, 68, 68, 0.18) !important;
+        color: #f87171 !important;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .item-click-link {
+        color: #ffffff !important;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .item-click-link:hover {
+        color: var(--neon-cyan) !important;
+        text-decoration: underline;
+    }
+
+    /* تنسيقات نافذة سجل الحركة (History Modal) */
+    .modal-content-custom {
+        background-color: #090d16 !important;
+        border: 1.5px solid rgba(56, 189, 248, 0.35) !important;
+        border-radius: 20px !important;
+        color: #ffffff !important;
+    }
+</style>
+
+<div class="container-fluid px-3">
+
+    <!-- 1. شريط إحصائيات الجرد الكلي (KPIs) -->
+    <div class="row g-3 mb-4 animate__animated animate__fadeIn">
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-title">إجمالي قطع المخزن المتبقية 📦</div>
+                <div class="kpi-value text-warning" id="grandTotalRemaining">{{ stats.grand_remaining|default:0 }} قطعة</div>
+            </div>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-dark table-hover mb-0 text-center align-middle">
-                    <thead class="table-secondary text-dark">
-                        <tr>
-                            <th>النوع</th>
-                            <th>اسم الصنف (بدون صف)</th>
-                            <th>إجمالي الوارد (ثابت)</th>
-                            <th>إجمالي المنصرف</th>
-                            <th class="text-primary">الرصيد الحالي</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for sum in inventory_summary %}
-                    <tr>
-                        <td>
-                            {% if sum.item_type == 'book' %}
-                                <span class="badge bg-primary">📚 كتاب</span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark">👕 زي</span>
-                            {% endif %}
-                        </td>
-                        <td class="fw-bold text-info fs-6">
-                            {{ sum.name }}
-                        </td>
-                        <td class="fw-bold text-white">{{ sum.total_stock }}</td>
-                        <td class="text-danger fw-bold">{{ sum.total_sold }}</td>
-                        <td>
-                            <span class="badge {% if sum.total_remaining > 10 %}bg-success{% else %}bg-danger animate-pulse{% endif %} fs-6">
-                                {{ sum.total_remaining }} 
-                            </span>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-muted py-4">لا توجد بيانات إجمالية</td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-title">المتبقي من الكتب الدراسية 📚</div>
+                <div class="kpi-value text-info">{{ stats.books_remaining|default:0 }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-title">إجمالي المنصرف من الكتب 📑</div>
+                <div class="kpi-value text-primary">{{ stats.books_sold|default:0 }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-title">المتبقي من الزي المدرسي 👔</div>
+                <div class="kpi-value text-success">{{ stats.uniform_remaining|default:0 }}</div>
             </div>
         </div>
     </div>
 
-    <hr class="border-secondary my-4">
+    <!-- 2. أزرار التبويبات الفاصلة والبحث الحي -->
+    <div class="glass-card p-3 mb-4 animate__animated animate__fadeInDown">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <ul class="nav nav-pills nav-pills-custom gap-2 m-0" id="inventoryTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="books-tab" data-bs-toggle="tab" data-bs-target="#books-content" type="button" role="tab">
+                        📚 الكتب الدراسية والمقررات
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="uniform-tab" data-bs-toggle="tab" data-bs-target="#uniform-content" type="button" role="tab">
+                        👔 الزي المدرسي والملابس
+                    </button>
+                </li>
+            </ul>
 
-    <div class="card bg-dark border-secondary shadow-lg">
-        <div class="card-header border-secondary d-flex justify-content-between align-items-center py-3">
-            <h5 class="mb-0 text-white">
-                <i class="bi bi-box-seam text-warning me-2"></i> تفاصيل الجرد (بالصف الدراسي)
-            </h5>
-            <div class="no-print d-flex align-items-center">
-                <span class="text-muted me-2 small">إجمالي المعروض: <b id="grandTotal" class="text-warning">0</b></span>
-                <input type="text" id="searchInventory" onkeyup="filterInventory()"
-                       class="form-control form-control-sm bg-dark text-white border-secondary"
-                       placeholder="بحث سريع بالمادة أو الصف...">
+            <div class="d-flex gap-2">
+                <div class="input-group input-group-sm" style="width: 280px;">
+                    <span class="input-group-text bg-dark border-secondary text-info"><i class="bi bi-search"></i></span>
+                    <input type="text" id="inventorySearch" class="form-control bg-dark text-white border-secondary fw-bold" placeholder="بحث سريع باسم الكتاب أو الصنف..." onkeyup="filterInventoryTable()">
+                </div>
+                <a href="{% url 'admin_add_restock' %}" class="btn btn-warning btn-sm fw-bold text-dark px-3 d-flex align-items-center gap-1 shadow-sm">
+                    <i class="bi bi-plus-circle-fill"></i> توريد جديد
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. محتوى الجرد التفصيلي الموجه بالتبويبات -->
+    <div class="tab-content animate__animated animate__fadeInUp" id="inventoryTabsContent">
+        
+        <!-- 📚 قسم الكتب الدراسية والمقررات (مقسمة بالصفوف الحقيقية) -->
+        <div class="tab-pane fade show active" id="books-content" role="tabpanel">
+            <div class="accordion accordion-custom" id="booksAccordion">
+                {% if books_by_grade %}
+                    {% for grade_name, items in books_by_grade.items %}
+                    <div class="accordion-item grade-block">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#book_grade_{{ forloop.counter }}">
+                                <div class="d-flex justify-content-between align-items-center w-100 pe-3">
+                                    <span class="fs-6"><i class="bi bi-journal-bookmark-fill text-info me-2"></i> {{ grade_name }}</span>
+                                    <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-25 rounded-pill px-3 py-1 small fw-bold">
+                                        {{ items|length }} كتب ومقررات
+                                    </span>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="book_grade_{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#booksAccordion">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table inventory-table">
+                                        <thead>
+                                            <tr>
+                                                <th width="50">#</th>
+                                                <th class="text-start ps-4">اسم الكتاب والمادة الرسمية</th>
+                                                <th>الرصيد الافتتاحي (أول المدة)</th>
+                                                <th>التوريد والشراء الإضافي</th>
+                                                <th>إجمالي الوارد</th>
+                                                <th>إجمالي المنصرف</th>
+                                                <th>الرصيد المتبقي بالرفوف</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in items %}
+                                            <tr class="item-row">
+                                                <td>{{ forloop.counter }}</td>
+                                                <td class="text-start ps-4">
+                                                    <span class="item-click-link item-name" onclick="loadItemDetails(event, '{{ item.id }}', '{{ item.name|escapejs }}')">
+                                                        {{ item.name }}
+                                                    </span>
+                                                    <small class="d-block text-muted style-muted-sm" style="font-size:0.75rem;">انقر لعرض سجل الحركة والتوريدات</small>
+                                                </td>
+                                                <td class="text-secondary fw-bold">{{ item.opening_stock }}</td>
+                                                <td class="text-info fw-bold">+{{ item.restocks_qty }}</td>
+                                                <td class="text-white fw-bold">{{ item.total_incoming }}</td>
+                                                <td class="text-warning fw-bold">{{ item.total_sold }}</td>
+                                                <td>
+                                                    {% if item.remaining > 0 %}
+                                                        <span class="qty-badge stock-ok">
+                                                            <i class="bi bi-check-circle-fill me-1"></i> {{ item.remaining }} قطعة
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="qty-badge stock-zero">
+                                                            <i class="bi bi-x-circle-fill me-1"></i> نفد (0)
+                                                        </span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <!-- طريقة العرض الاحتياطية المباشرة في حال تمرير القائمة المسطحة inventory -->
+                    <div class="glass-card p-0 overflow-hidden">
+                        <div class="table-responsive">
+                            <table class="table inventory-table" id="flatInventoryTable">
+                                <thead>
+                                    <tr>
+                                        <th width="50">#</th>
+                                        <th class="text-start ps-4">اسم الكتاب والمادة</th>
+                                        <th>الصف الدراسي</th>
+                                        <th>إجمالي الوارد</th>
+                                        <th>المنصرف</th>
+                                        <th>الرصيد المتبقي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in inventory %}
+                                    {% if item.item_type == 'book' and item.subject_id %}
+                                    <tr class="item-row">
+                                        <td>{{ forloop.counter }}</td>
+                                        <td class="text-start ps-4">
+                                            <span class="item-click-link item-name" onclick="loadItemDetails(event, '{{ item.id }}', '{{ item.display_name|escapejs }}')">
+                                                {{ item.display_name }}
+                                            </span>
+                                        </td>
+                                        <td><span class="badge bg-primary bg-opacity-20 text-info border border-info border-opacity-25 px-3 py-1">{{ item.grade.name|default:"عام" }}</span></td>
+                                        <td class="text-white fw-bold">{{ item.total_incoming }}</td>
+                                        <td class="text-warning fw-bold">{{ item.total_sold_count }}</td>
+                                        <td>
+                                            {% if item.remaining_qty > 0 %}
+                                                <span class="qty-badge stock-ok">{{ item.remaining_qty }} قطعة</span>
+                                            {% else %}
+                                                <span class="qty-badge stock-zero">نفد (0)</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
 
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-dark table-hover mb-0" id="inventoryTable">
-                    <thead>
-                        <tr class="text-muted small text-center">
-                            <th style="width:35%" class="text-start px-3">اسم الصنف</th>
-                            <th style="width:15%">الصف الدراسي</th>
-                            <th style="width:15%">إجمالي الوارد</th>
-                            <th style="width:15%" class="text-danger">المنصرف</th>
-                            <th style="width:20%" class="text-success">الرصيد الحالي</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr class="table-info text-center">
-                            <td colspan="5" class="fw-bold text-dark py-2">📚 سجل الكتب الدراسية بالتفصيل</td>
-                        </tr>
-                        {% for item in inventory %}
-                        {% if item.item_type == 'book' %}
-                        <tr>
-                            <td class="px-3 py-2 text-start">
-                                <span class="fw-bold text-info hover-warning" 
-                                      onclick="loadItemDetails(event, '{{ item.id }}', '{{ item.display_name|escapejs }}')">
-                                    {{ item.display_name }}
-                                </span>
-                                <br><small class="text-muted small">انقر لعرض سجل الحركة</small>
-                            </td>
-                            <td class="text-center">
-                                <span class="badge bg-primary">{{ item.grade.name|default:"عام" }}</span>
-                            </td>
-                            <td class="text-center fw-bold text-white">{{ item.total_incoming }}</td>
-                            <td class="text-center text-danger fw-bold">{{ item.total_sold_count }}</td>
-                            <td class="text-center">
-                                <span class="badge {% if item.remaining_qty <= 5 %}bg-danger animate-pulse{% else %}bg-success{% endif %}">
-                                    {{ item.remaining_qty }} 
-                                </span>
-                            </td>
-                        </tr>
-                        {% endif %}
-                        {% endfor %}
-
-                        <tr class="table-secondary text-center">
-                            <td colspan="5" class="fw-bold text-dark py-2">👕 سجل الزي المدرسي بالتفصيل</td>
-                        </tr>
-                        {% for item in inventory %}
-                        {% if item.item_type == 'uniform' %}
-                        <tr>
-                            <td class="px-3 py-2 text-start">
-                                <span class="fw-bold text-info hover-warning" 
-                                      onclick="loadItemDetails(event, '{{ item.id }}', '{{ item.display_name|escapejs }}')">
-                                    {{ item.display_name }}
-                                </span>
-                                <br><small class="text-muted small">انقر لعرض سجل الحركة</small>
-                            </td>
-                            <td class="text-center">
-                                <span class="badge bg-secondary">{{ item.grade.name|default:"عام" }}</span>
-                            </td>
-                            <td class="text-center fw-bold text-white">{{ item.total_incoming }}</td>
-                            <td class="text-center text-danger fw-bold">{{ item.total_sold_count }}</td>
-                            <td class="text-center">
-                                <span class="badge {% if item.remaining_qty <= 5 %}bg-danger animate-pulse{% else %}bg-success{% endif %}">
-                                    {{ item.remaining_qty }} 
-                                </span>
-                            </td>
-                        </tr>
-                        {% endif %}
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <!-- 👔 قسم الزي المدرسي والملابس -->
+        <div class="tab-pane fade" id="uniform-content" role="tabpanel">
+            <div class="accordion accordion-custom" id="uniformAccordion">
+                {% if uniform_by_grade %}
+                    {% for grade_name, items in uniform_by_grade.items %}
+                    <div class="accordion-item grade-block">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#uniform_grade_{{ forloop.counter }}">
+                                <div class="d-flex justify-content-between align-items-center w-100 pe-3">
+                                    <span class="fs-6"><i class="bi bi-person-workspace text-warning me-2"></i> {{ grade_name }}</span>
+                                    <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 small fw-bold">
+                                        {{ items|length }} أصناف زي
+                                    </span>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="uniform_grade_{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#uniformAccordion">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table inventory-table">
+                                        <thead>
+                                            <tr>
+                                                <th width="50">#</th>
+                                                <th class="text-start ps-4">اسم صنف الزي الرسمي</th>
+                                                <th>الرصيد الافتتاحي (أول المدة)</th>
+                                                <th>التوريد والشراء الإضافي</th>
+                                                <th>إجمالي الوارد</th>
+                                                <th>إجمالي المنصرف</th>
+                                                <th>الرصيد المتبقي بالرفوف</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in items %}
+                                            <tr class="item-row">
+                                                <td>{{ forloop.counter }}</td>
+                                                <td class="text-start ps-4">
+                                                    <span class="item-click-link item-name" onclick="loadItemDetails(event, '{{ item.id }}', '{{ item.name|escapejs }}')">
+                                                        {{ item.name }}
+                                                    </span>
+                                                </td>
+                                                <td class="text-secondary fw-bold">{{ item.opening_stock }}</td>
+                                                <td class="text-info fw-bold">+{{ item.restocks_qty }}</td>
+                                                <td class="text-white fw-bold">{{ item.total_incoming }}</td>
+                                                <td class="text-warning fw-bold">{{ item.total_sold }}</td>
+                                                <td>
+                                                    {% if item.remaining > 0 %}
+                                                        <span class="qty-badge stock-ok">{{ item.remaining }} قطعة</span>
+                                                    {% else %}
+                                                        <span class="qty-badge stock-zero">نفد (0)</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <!-- عرض احتياطي مسطح للزي -->
+                    <div class="glass-card p-0 overflow-hidden">
+                        <div class="table-responsive">
+                            <table class="table inventory-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">#</th>
+                                        <th class="text-start ps-4">اسم صنف الزي</th>
+                                        <th>الصف الدراسي</th>
+                                        <th>إجمالي الوارد</th>
+                                        <th>المنصرف</th>
+                                        <th>الرصيد المتبقي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in inventory %}
+                                    {% if item.item_type == 'uniform' and item.uniform_id %}
+                                    <tr class="item-row">
+                                        <td>{{ forloop.counter }}</td>
+                                        <td class="text-start ps-4">
+                                            <span class="item-click-link item-name" onclick="loadItemDetails(event, '{{ item.id }}', '{{ item.display_name|escapejs }}')">
+                                                {{ item.display_name }}
+                                            </span>
+                                        </td>
+                                        <td><span class="badge bg-secondary bg-opacity-20 text-warning border border-warning border-opacity-25 px-3 py-1">{{ item.grade.name|default:"عام" }}</span></td>
+                                        <td class="text-white fw-bold">{{ item.total_incoming }}</td>
+                                        <td class="text-warning fw-bold">{{ item.total_sold_count }}</td>
+                                        <td>
+                                            {% if item.remaining_qty > 0 %}
+                                                <span class="qty-badge stock-ok">{{ item.remaining_qty }} قطعة</span>
+                                            {% else %}
+                                                <span class="qty-badge stock-zero">نفد (0)</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
+
     </div>
 </div>
 
-<div class="modal fade" id="detailsModal" tabindex="-1">
+<!-- 📦 النافذة المنبثقة لسجل حركة التوريدات والصرف للصنف (History Modal) -->
+<div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content bg-dark text-white border-secondary shadow-lg">
+        <div class="modal-content modal-content-custom shadow-lg">
             <div class="modal-header border-secondary">
-                <h5 class="modal-title text-info" id="modalTitle">تفاصيل سجل الحركة</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title fw-black text-info d-flex align-items-center gap-2" id="modalTitle">
+                    <i class="bi bi-clock-history fs-4"></i> سجل حركة الصنف
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <div id="modalLoading" class="text-center py-4">
                     <div class="spinner-border text-info" role="status"></div>
-                    <p class="mt-2">جاري جلب البيانات من السيرفر...</p>
+                    <p class="mt-2 text-info fw-bold">جاري استخراج حركة التوريدات والصرف الحقيقية من الخادم...</p>
                 </div>
                 <div id="modalContent" style="display:none;">
-                    <div class="table-responsive">
-                        <table class="table table-dark table-striped text-center align-middle">
-                            <thead class="table-light text-dark">
+                    <div class="table-responsive rounded-3 border border-secondary border-opacity-25">
+                        <table class="table table-dark table-striped text-center align-middle m-0">
+                            <thead class="table-dark text-info border-bottom border-secondary">
                                 <tr>
                                     <th>التاريخ</th>
                                     <th>نوع العملية</th>
                                     <th>الكمية</th>
-                                    <th>التفاصيل / الطالب</th>
+                                    <th class="text-start ps-3">التفاصيل / البيان</th>
                                 </tr>
                             </thead>
                             <tbody id="detailsTableBody"></tbody>
@@ -174,37 +504,26 @@
     </div>
 </div>
 
-<style>
-.animate-pulse { animation: pulse 2s infinite; }
-@keyframes pulse { 50% { opacity: 0.5; } }
-.hover-warning:hover { color: #ffc107 !important; cursor: pointer; text-decoration: underline; }
-#inventoryTable tr { transition: all 0.2s; }
-</style>
-
 <script>
-// دالة البحث وحساب الإجمالي الظاهر
-function filterInventory() {
-    let search = document.getElementById('searchInventory').value.toLowerCase();
-    let rows = document.querySelectorAll('#inventoryTable tbody tr');
-    let total = 0;
+// 🟢 1. دالة تصفية الأصناف بالبحث الفوري
+function filterInventoryTable() {
+    let q = document.getElementById('inventorySearch').value.toLowerCase().trim();
+    let rows = document.querySelectorAll('.item-row');
 
     rows.forEach(row => {
-        // فحص صفوف البيانات فقط وتجاهل صفوف العناوين (table-info, table-secondary)
-        if (row.cells.length === 5 && !row.classList.contains('table-info') && !row.classList.contains('table-secondary')) {
-            let text = row.innerText.toLowerCase();
-            if (text.includes(search)) {
+        let nameEl = row.querySelector('.item-name');
+        if (nameEl) {
+            let text = nameEl.innerText.toLowerCase();
+            if (text.includes(q)) {
                 row.style.display = '';
-                let qtyText = row.cells[4].innerText.trim();
-                total += parseInt(qtyText) || 0;
             } else {
                 row.style.display = 'none';
             }
         }
     });
-    document.getElementById('grandTotal').innerText = total + " قطعة";
 }
 
-// دالة تحميل سجل الحركة عبر Ajax
+// 🟢 2. دالة تحميل سجل الحركة والتوريدات التفصيلية عبر AJAX
 function loadItemDetails(event, itemId, itemName) {
     if(event) event.preventDefault();
 
@@ -225,15 +544,16 @@ function loadItemDetails(event, itemId, itemName) {
         body.innerHTML = '';
 
         if (!data.history || data.history.length === 0) {
-            body.innerHTML = `<tr><td colspan="4" class="py-4 text-muted">لا توجد عمليات مسجلة لهذا الصنف</td></tr>`;
+            body.innerHTML = `<tr><td colspan="4" class="py-4 text-muted fw-bold">لا توجد عمليات توريد أو صرف مسجلة لهذا الصنف حتى الآن</td></tr>`;
         } else {
             data.history.forEach(row => {
+                let badgeClass = row.color === 'success' ? 'bg-success text-success' : 'bg-danger text-danger';
                 body.innerHTML += `
                 <tr>
-                    <td>${row.date}</td>
-                    <td><span class="badge bg-${row.color}">${row.type}</span></td> 
-                    <td class="fw-bold">${row.qty}</td>
-                    <td class="text-start small">${row.note}</td>
+                    <td class="fw-bold text-white-50">${row.date}</td>
+                    <td><span class="badge ${badgeClass} bg-opacity-20 border border-opacity-25 px-3 py-1 fw-bold">${row.type}</span></td> 
+                    <td class="fw-black fs-6">${row.qty}</td>
+                    <td class="text-start ps-3 small text-white">${row.note}</td>
                 </tr>`;
             });
         }
@@ -241,12 +561,10 @@ function loadItemDetails(event, itemId, itemName) {
         document.getElementById('modalContent').style.display = 'block';
     })
     .catch(err => {
-        document.getElementById('modalLoading').innerHTML = `<div class="alert alert-danger">خطأ: لا يمكن الوصول لبيانات هذا الصنف حالياً</div>`;
+        document.getElementById('modalLoading').innerHTML = `<div class="alert alert-danger fw-bold m-0">🛑 خطأ: تعذر الوصول لسجل حركة الصنف حالياً!</div>`;
     });
 
     modal.show();
 }
-
-document.addEventListener("DOMContentLoaded", filterInventory);
 </script>
 {% endblock %}

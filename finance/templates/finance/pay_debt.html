@@ -2,45 +2,142 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تسوية مديونية الطالب - {{ student.get_full_name }}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card-custom { border-radius: 18px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .card-header-custom { background: linear-gradient(135deg, #0d6efd, #0a58ca); border-top-left-radius: 18px !important; border-top-right-radius: 18px !important; }
+        .form-control:focus { border-color: #0d6efd; box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15); }
+    </style>
 </head>
-<body class="bg-light">
+<body>
 
-<div class="container mt-5">
+<div class="container my-5">
     <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0 text-center">تسوية مديونية الطالب</h4>
+        <div class="col-md-7 col-lg-6">
+            <div class="card card-custom">
+                <div class="card-header card-header-custom text-white py-3">
+                    <h4 class="mb-0 text-center font-weight-bold">
+                        <i class="bi bi-cash-coin me-2"></i> تسوية مديونية الطالب
+                    </h4>
                 </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <p><strong>اسم الطالب:</strong> {{ student.get_full_name }}</p>
-                        <p><strong>المديونية القديمة المتبقية:</strong> 
-                            <span class="badge badge-warning p-2">{{ student.previous_debt }} ج.م</span>
+                <div class="card-body p-4">
+
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show text-right font-weight-bold shadow-sm" role="alert">
+                                {{ message }}
+                                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <div class="bg-light p-3 rounded-lg mb-4 text-right border">
+                        <p class="mb-2 fs-5">
+                            <strong class="text-secondary"><i class="bi bi-person-fill"></i> اسم الطالب:</strong> 
+                            <span class="text-primary font-weight-bold ms-1">{{ student.get_full_name }}</span>
+                        </p>
+                        <p class="mb-0">
+                            <strong class="text-secondary"><i class="bi bi-receipt"></i> المديونية القديمة المتبقية:</strong> 
+                            <span class="badge badge-warning text-dark p-2 font-weight-bold ms-1" style="font-size: 1.1rem;">
+                                {{ old_debt }} ج.م
+                            </span>
                         </p>
                     </div>
 
-                    <form method="POST">
+                    <form method="POST" action="" id="settleDebtForm" onsubmit="preventDoubleSubmit(event)">
                         {% csrf_token %}
-                        <div class="form-group">
-                            <label for="amount">المبلغ المراد سداده:</label>
-                            <input type="number" id="amount" name="amount" step="0.01" 
-                                   max="{{ student.previous_debt }}" class="form-control" 
-                                   placeholder="أدخل المبلغ..." required>
-                        </div>
                         
-                        <div class="text-center mt-4">
-                            <button type="submit" class="btn btn-success btn-lg px-4">تأكيد عملية السداد</button>
-                            <a href="{% url 'student_statement_print' student.id %}" class="btn btn-secondary btn-lg px-4">إلغاء</a>
+                        <!-- 🟢 حقل مخفي لنقل اسم الشاشة المرجعية -->
+                        <input type="hidden" name="from_screen" value="{{ from_screen }}">
+
+                        <div class="form-group text-right mb-4">
+                            <label for="amount" class="font-weight-bold text-dark">
+                                <i class="bi bi-currency-pound text-success"></i> المبلغ المراد سداده:
+                            </label>
+                            <input type="number" id="amount" name="amount" step="1" 
+                                   max="{{ old_debt }}" min="1"
+                                   class="form-control form-control-lg text-center font-weight-bold text-success border-success" 
+                                   placeholder="أدخل المبلغ..." required autofocus>
+                        </div>
+
+                        <div class="form-group text-right mb-4">
+                            <label for="receiptNumberInput" class="font-weight-bold text-dark">
+                                <i class="bi bi-journal-check text-primary"></i> رقم الإيصال الورقي المرجعي:
+                            </label>
+                            <div class="input-group">
+                                <input type="number" name="receipt_number" id="receiptNumberInput"
+                                       class="form-control form-control-lg text-center font-weight-bold text-dark"
+                                       value="{{ next_receipt_number|default:'' }}"
+                                       placeholder="أدخل رقم الإيصال المرجعي...">
+                                <div class="input-group-append">
+                                    <button type="button" class="btn btn-outline-danger font-weight-bold" onclick="clearSerialInput()" title="إلغاء السيريال المكتوب">
+                                        <i class="bi bi-trash3-fill"></i> إلغاء السيريال
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {% if has_active_book %}
+                                <small class="text-success font-weight-bold d-block mt-2" id="serialHelpText">
+                                    <i class="bi bi-check-circle-fill"></i> السيريال المتاح التالي بالدفتر النشط.
+                                </small>
+                            {% else %}
+                                <small class="text-danger font-weight-bold d-block mt-2">
+                                    ⚠️ لا يوجد دفتر إيصالات نشط حالياً للمحصل. يمكنك الإدخال يدوياً.
+                                </small>
+                            {% endif %}
+                        </div>
+
+                        <div class="text-center mt-4 pt-2">
+                            <button type="submit" id="submitBtn" class="btn btn-success btn-lg px-5 font-weight-bold shadow-sm">
+                                <i class="bi bi-check2-circle"></i> <span id="btnText">تأكيد عملية السداد</span>
+                            </button>
+                            <!-- 🟢 تحويل زر الإلغاء للعودة الذكية للكاونتر -->
+                            <a href="{% if from_screen == 'counter' %}/finance/counter/?student_id={{ student.id }}{% elif from_screen == 'quick_collection' %}/finance/quick-collection/?student_id={{ student.id }}{% else %}{% url 'student_list' %}{% endif %}" class="btn btn-secondary btn-lg px-4 mr-2">
+                                إلغاء
+                            </a>
                         </div>
                     </form>
+
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+function clearSerialInput() {
+    const input = document.getElementById('receiptNumberInput');
+    const helpText = document.getElementById('serialHelpText');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    if (helpText) {
+        helpText.className = 'text-muted font-weight-bold d-block mt-2';
+        helpText.innerHTML = '<i class="bi bi-info-circle"></i> تم إفراغ السيريال - سيتم الحفظ برقم آلي حر.';
+    }
+}
+
+function preventDoubleSubmit(event) {
+    const btn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    
+    if (btn) {
+        btn.disabled = true;
+        btnText.innerHTML = 'جاري الحفظ والترحيل...';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> ' + btnText.innerHTML;
+    }
+}
+</script>
 
 </body>
 </html>

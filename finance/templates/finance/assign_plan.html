@@ -45,6 +45,9 @@
                     <form method="POST" id="assignmentForm" action="{% if selected_student %}{% url 'assign_plan_with_id' selected_student.id %}{% else %}{% url 'assign_plan' %}{% endif %}">
                         {% csrf_token %}
                         
+                        <!-- 🟢 حفظ مرجع الشاشة القادم منها المستخدم (كاونتر / تحصيل سريع) -->
+                        <input type="hidden" name="from_screen" value="{{ from_screen }}">
+
                         {% if selected_student %}
                             <input type="hidden" name="student" value="{{ selected_student.id }}">
                             <input type="hidden" name="academic_year" value="{{ selected_student.academic_year.id }}">
@@ -103,7 +106,7 @@
                                         </tr>
                                     </thead>
                                     <tbody id="preview_body">
-                                        </tbody>
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
