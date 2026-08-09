@@ -156,7 +156,7 @@
 {% block content %}
 <div class="container py-4" dir="rtl">
     <div class="card student-card shadow-lg">
-        
+
         <h3 class="text-center fw-black text-white mb-4 d-flex align-items-center justify-content-center gap-2">
             <i class="bi bi-person-vcard text-warning fs-2"></i>
             {% if student %} بيانات الطالب: <span class="text-info">{{ student.get_full_name }}</span> {% else %} إضافة طالب جديد {% endif %}
@@ -183,10 +183,12 @@
                 <div class="profile-pic-wrapper" {% if not student_admin_mode %}onclick="document.getElementById('hidden-image-input').click();"{% endif %}>
                     {% if student and student.image %}
                         <img id="image-preview" src="{{ student.image.url }}" alt="preview">
+                    {% elif notification and notification.student_photo %}
+                        <img id="image-preview" src="{{ notification.student_photo.url }}" alt="preview">
                     {% else %}
                         <img id="image-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="preview">
                     {% endif %}
-                    
+
                     {% if not student_admin_mode %}
                     <div class="upload-overlay">
                         <i class="bi bi-camera-fill me-1"></i> تغيير الصورة
@@ -332,7 +334,7 @@
                     </a>
                     {% endif %}
                 </div>
-                
+
                 <div class="col-md-4 text-center">
                     {% if not student_admin_mode %}
                         <button type="submit" class="btn btn-save text-white shadow-lg">
@@ -415,7 +417,7 @@
                 let yearPrefix = (centuryDigit === "3") ? "20" : "19";
                 const fullYear = yearPrefix + yearPart;
                 const formattedDate = `${fullYear}-${monthPart}-${dayPart}`;
-                
+
                 if (dobInput) dobInput.value = formattedDate;
 
                 const govCode = id.substring(7, 9);
@@ -432,10 +434,10 @@
         input.addEventListener("keydown", function(e) {
             if (e.key === "Enter") {
                 if (e.target.tagName.toLowerCase() === "textarea") return;
-                
+
                 e.preventDefault();
                 const nextInput = inputs[index + 1];
-                
+
                 if (nextInput) {
                     nextInput.focus();
                 } else if (input.type === "submit") {

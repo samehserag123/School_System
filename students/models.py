@@ -1785,3 +1785,33 @@ class AcademyAttendance(models.Model):
 
     def __str__(self):
         return f"{self.enrollment.student.first_name} - {self.lecture.title}"
+
+
+
+class PendingAdmissionNotification(models.Model):
+    full_name_ar = models.CharField("اسم الطالب", max_length=250)
+    national_id = models.CharField("الرقم القومي", max_length=14, unique=True)
+    phone = models.CharField("رقم التليفون", max_length=20)
+    whatsapp_number = models.CharField("رقم الواتساب", max_length=20)
+    gender = models.CharField("النوع", max_length=10)
+    birth_date = models.DateField("تاريخ الميلاد", null=True, blank=True)
+    birth_governorate = models.CharField("المحافظة", max_length=100, null=True, blank=True)
+    address = models.TextField("العنوان")
+    current_qualification = models.CharField("المؤهل", max_length=150, null=True, blank=True)
+
+    # 🟢 إضافة حقول الميديا المستهدفة لاستقبال الملفات
+    student_photo = models.ImageField("صورة الطالب", upload_to="pending_students/", null=True, blank=True)
+    parent_id_photo = models.ImageField("بطاقة ولي الأمر", upload_to="pending_docs/", null=True, blank=True)
+    birth_certificate = models.FileField("شهادة الميلاد", upload_to="pending_docs/", null=True, blank=True)
+    qualification_photo = models.FileField("بيان النجاح", upload_to="pending_docs/", null=True, blank=True)
+
+    is_processed = models.BooleanField("تم تسجيله رسمياً", default=False)
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "إشعار طلب التحاق"
+        verbose_name_plural = "إشعارات طلبات الالتحاق المعتمدة"
+        ordering = ['-received_at']
+
+    def __str__(self):
+        return self.full_name_ar

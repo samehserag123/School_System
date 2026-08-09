@@ -1,74 +1,43 @@
+import json
+import time
+import uuid
+import traceback
+import datetime
+import hashlib
+from decimal import Decimal
+from datetime import date, timedelta
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.utils import timezone
 from django.http import JsonResponse
 from django.apps import apps
 from django.core.cache import cache
-
-from rest_framework import generics, filters
-from .models import Student, Grade, ExternalStudent, StudentSession
-from .forms import StudentForm
-from .serializers import StudentSerializer
 from django.urls import reverse
-from finance.models import StudentAccount, AcademicYear, DeliveryRecord
-from finance.utils import get_active_year
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from students.models import Classroom
-
-from finance.models import Payment
-from .forms import CourseGroupForm
-from .models import CourseGroup, CoursePayment
-from django.db.models.functions import Coalesce, Concat
-from .models import BookSale, InventoryItem, InventoryRestock, GradePackagePrice, CourseGroup
-from .forms import RestockForm
-from .forms import BookSaleForm
-import datetime
-import hashlib
-import json
-from students.models import Student, Grade, Classroom
-from finance.models import StudentInstallment
-
-from django.contrib.auth.decorators import login_required
-from treasury.models import GeneralLedger
-import uuid
-from decimal import Decimal
-
-from datetime import date, timedelta
-
-from .models import BusRoute, BusSubscription, BusPayment, MiscellaneousRevenue
-from .models import RemedialFeeSetting
-import time
-import traceback
-from .forms import RemedialProgramForm
-
-from .models import RemedialProgramRecord
-
-from django.db.models import CharField
-from django.db.models import Subquery, OuterRef
-from finance.models import StudentInstallment, StudentAccount, AcademicYear
-from django.db.models import Q, F, Value, Sum, Count, Case, When, DecimalField, ExpressionWrapper, Exists
-
-from .models import AttendanceRecord, ReEnrollmentRecord, SubjectConfig, ExamResult
-from .forms import AttendanceFilterForm, ExamResultFilterForm
 from django.db import transaction
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from .serializers import OnlineAdmissionSerializer
-from .models import ControlRoomConfig, StudentTermControlNumber
-from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db.models.functions import Concat
-
-from decimal import Decimal
-from django.db.models import CharField, Q, Value
+from django.db.models import CharField, Q, F, Value, Sum, Count, DecimalField, ExpressionWrapper, Exists, Subquery, OuterRef
 from django.db.models.functions import Coalesce, Concat
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
+# =========================================================
+# 🟢 استدعاءات Django REST Framework المحدثة (مهمة لمنع تعطل الـ API)
+# =========================================================
+from rest_framework import generics, filters, status
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.response import Response
+
+# =========================================================
+# 📦 استدعاءات النماذج والفورمز (Models & Forms)
+# =========================================================
+from finance.models import StudentAccount, AcademicYear, DeliveryRecord, Payment, StudentInstallment
 from finance.utils import get_active_year
+from treasury.models import GeneralLedger
+
 from .models import (
     Student, Grade, Classroom, Subject, Uniform, Teacher, SubjectPrice,
     InventoryItem, InventoryRestock, GradePackagePrice, BookSale, CourseGroup,
@@ -77,12 +46,93 @@ from .models import (
     BusRoute, BusSubscription, BusPayment, MiscellaneousRevenue, RemedialFeeSetting,
     RemedialProgramRecord, StudentControlSheet, StudentAcademicHistory,
     AcademyDoctor, AcademyCourse, AcademySubject, AcademyTermSubject,
-    AcademyEnrollment, AcademyLecture, AcademyAttendance
+    AcademyEnrollment, AcademyLecture, AcademyAttendance, PendingAdmissionNotification
 )
 
-from datetime import timedelta
+from .forms import (
+    StudentForm, CourseGroupForm, RestockForm, BookSaleForm,
+    AttendanceFilterForm, ExamResultFilterForm, RemedialProgramForm,
+    AcademyEnrollmentForm
+)
+from .serializers import StudentSerializer, OnlineAdmissionSerializer
 
-from .forms import AcademyEnrollmentForm
+@login_required
+def delete_pending_notification(request, pk):
+    """دالة لحذف إشعار تقديم طالب واحد (رفض الطلب)"""
+    if not request.user.is_staff:
+        messages.error(request, "غير مصرح لك بإجراء هذه العملية.")
+        return redirect('talaat_harb_home')
+
+    notification = get_object_or_404(PendingAdmissionNotification, id=pk)
+    student_name = notification.full_name_ar
+    notification.delete()
+
+    messages.success(request, f"🗑️ تم رفض وحذف إشعار الطالب ({student_name}) بنجاح.")
+    return redirect('pending_admissions_list')
+
+@login_required
+def delete_all_pending_notifications(request):
+    """دالة لحذف جميع الإشعارات المعلقة دفعة واحدة"""
+    if not request.user.is_staff:
+        messages.error(request, "غير مصرح لك بإجراء هذه العملية.")
+        return redirect('talaat_harb_home')
+
+    # نحذف فقط الإشعارات التي لم تتم معالجتها (المعلقة)
+    pending_notes = PendingAdmissionNotification.objects.filter(is_processed=False)
+    count = pending_notes.count()
+
+    if count > 0:
+        pending_notes.delete()
+        messages.success(request, f"🗑️ تم رفض وحذف جميع الإشعارات المعلقة ({count} طلب) بنجاح.")
+    else:
+        messages.info(request, "لا توجد إشعارات معلقة لحذفها.")
+
+    return redirect('pending_admissions_list')
+
+
+def pending_admissions_list(request):
+    """شاشة عرض طلبات الالتحاق المقبولة من البوابة الخارجية والجاهزة للتسجيل"""
+    # نجلب الطلبات التي لم يتم تسجيلها بعد
+    notifications = PendingAdmissionNotification.objects.filter(is_processed=False).order_by('-received_at')
+
+    context = {
+        'notifications': notifications,
+        'notifications_count': notifications.count()
+    }
+    return render(request, 'students/pending_notifications.html', context)
+
+
+@csrf_exempt
+def api_receive_approved_student(request):
+    """API لاستقبال الطلاب المقبولين من بوابة التقديم الخارجية"""
+    if request.method == 'POST':
+        # التحقق من التوكن الأمني لضمان عدم اختراق الـ API
+        auth_header = request.headers.get('Authorization')
+        if auth_header != "Token TalaatHarb_SecureToken_2026_X9":
+            return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=403)
+
+        try:
+            data = json.loads(request.body)
+            # حفظ البيانات كإشعار جديد معلق
+            PendingAdmissionNotification.objects.update_or_create(
+                national_id=data.get('national_id'),
+                defaults={
+                    'full_name_ar': data.get('full_name_ar'),
+                    'phone': data.get('phone'),
+                    'whatsapp_number': data.get('whatsapp_number'),
+                    'gender': data.get('gender'),
+                    'birth_date': data.get('birth_date') or None,
+                    'birth_governorate': data.get('birth_governorate'),
+                    'address': data.get('address'),
+                    'current_qualification': data.get('current_qualification'),
+                    'is_processed': False # إرجاعه كمعلق في حال تم إرساله مجدداً
+                }
+            )
+            return JsonResponse({'success': True, 'message': 'Data received and notification created.'}, status=200)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+    return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
 
 
 @login_required
@@ -1475,10 +1525,12 @@ def add_remedial_program(request):
     return render(request, 'students/add_remedial.html', context)
 
 
+@csrf_exempt
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])  # 🟢 السماح بالربط بين السيرفرات دون حظر 403 Forbidden
+@parser_classes([MultiPartParser, FormParser, JSONParser])  # 🟢 تفعيل قراءة واستقبال صور الطالب والمستندات
 def receive_online_admission(request):
-    """استقبال طلبات الحجز القادمة من قاعدة البيانات المنفصلة"""
+    """استقبال طلبات الحجز القادمة من المنظومة الخارجية وتوثيق الصور والمستندات"""
     serializer = OnlineAdmissionSerializer(data=request.data)
 
     if serializer.is_valid():
@@ -3645,13 +3697,34 @@ def student_list(request):
     return render(request, "students/student_list.html", context)
 
 
-
 def add_student(request):
     student_id = request.GET.get('edit_id')
+    notify_id = request.GET.get('notify_id')  # 🟢 استقبال رقم إشعار التقديم
     student = None
 
     if student_id:
         student = get_object_or_404(Student, id=student_id)
+
+    # 🟢 سحب بيانات الطالب من الإشعار (إن وجد) لتعبئة الحقول تلقائياً
+    initial_data = {}
+    pending_notice = None
+
+    if notify_id and not student_id:
+        pending_notice = PendingAdmissionNotification.objects.filter(id=notify_id, is_processed=False).first()
+        if pending_notice:
+            # فصل الاسم الرباعي إلى اسم أول وعائلة
+            name_parts = pending_notice.full_name_ar.strip().split(' ', 1)
+            initial_data = {
+                'first_name': name_parts[0],
+                'last_name': name_parts[1] if len(name_parts) > 1 else '',
+                'national_id': pending_notice.national_id,
+                'phone': pending_notice.phone,
+                'whatsapp_number': pending_notice.whatsapp_number,
+                'address': pending_notice.address,
+                'gender': pending_notice.gender,
+                'birth_place': pending_notice.birth_governorate,
+                'date_of_birth': pending_notice.birth_date,
+            }
 
     search_query = request.GET.get('q', '')
     grade_id = request.GET.get('grade_id', '')
@@ -3682,15 +3755,30 @@ def add_student(request):
                     else:
                         saved_student.application_fee_amount = Decimal('0.00')
 
+                # 🌟 3. نقل الصور والمستندات من الإشعار إلى ملف الطالب الجديد الفعلي (تم تعديل اسم الحقل إلى image)
+                if pending_notice:
+                    if hasattr(pending_notice, 'student_photo') and pending_notice.student_photo:
+                        saved_student.image = pending_notice.student_photo  # 🟢 الربط المباشر بحقل صورة الطالب image
+                    if hasattr(pending_notice, 'parent_id_photo') and pending_notice.parent_id_photo:
+                        saved_student.parent_id_photo = pending_notice.parent_id_photo
+                    if hasattr(pending_notice, 'birth_certificate') and pending_notice.birth_certificate:
+                        saved_student.birth_certificate = pending_notice.birth_certificate
+                    if hasattr(pending_notice, 'qualification_photo') and pending_notice.qualification_photo:
+                        saved_student.qualification_photo = pending_notice.qualification_photo
+
             saved_student.save()
             form.save_m2m()
 
-            # 🟢 3. التسميع الفوري في الخزينة العامة إذا كانت الرسوم أكبر من الصفر
+            # 🟢 إغلاق الإشعار واعتباره "مُعالج" حتى لا يظهر مرة أخرى
+            if pending_notice:
+                pending_notice.is_processed = True
+                pending_notice.save()
+
+            # 🟢 التسميع الفوري في الخزينة العامة إذا كانت الرسوم أكبر من الصفر
             registered_in_treasury = False
-            if is_new and saved_student.application_fee_amount > Decimal('0.00'):
+            if is_new and getattr(saved_student, 'application_fee_amount', Decimal('0.00')) > Decimal('0.00'):
                 try:
                     receipt_code = f"APP-{saved_student.id}-{int(time.time())}"
-
                     GeneralLedger.objects.create(
                         student=saved_student,
                         amount=saved_student.application_fee_amount,
@@ -3703,10 +3791,9 @@ def add_student(request):
                 except Exception as e:
                     print(f"⚠️ تنبيه: تم حفظ الطالب وتعذر تسجيل قيد الخزينة: {e}")
 
-            # 🟢 4. إعداد الرسائل وتنسيق التوجيه
+            # 🟢 إعداد الرسائل وتنسيق التوجيه
             if student:
                 messages.success(request, f"تم تحديث بيانات الطالب {saved_student.get_full_name()} بنجاح.")
-
                 registry_url = reverse('student_registry')
                 redirect_url = f"{registry_url}?page={page}"
                 if search_query: redirect_url += f"&q={search_query}"
@@ -3727,7 +3814,12 @@ def add_student(request):
 
                 return redirect('student_registry')
     else:
-        form = StudentForm(instance=student)
+        # 🟢 إذا كان هناك إشعار، نمرر البيانات المسحوبة للفورم
+        if pending_notice:
+            form = StudentForm(instance=student, initial=initial_data)
+            messages.info(request, "تم سحب بيانات الطالب من بوابة التقديم بنجاح. يرجى مراجعتها وتحديد (الصف والفصل الدراسي) ثم الحفظ.")
+        else:
+            form = StudentForm(instance=student)
 
     grades = Grade.objects.all()
     classrooms = Classroom.objects.all()
@@ -3735,9 +3827,11 @@ def add_student(request):
     context = {
         'form': form,
         'student': student,
+        'notification': pending_notice,  # 🌟 تم تمرير الإشعار لـ HTML بقالب add_student
         'grades': grades,
         'classrooms': classrooms,
         'is_edit': student is not None,
+        'is_from_notification': bool(pending_notice),
         'search_params': {
             'q': search_query, 'grade_id': grade_id, 'classroom_id': classroom_id,
             'specialization': specialization, 'gender': gender, 'religion': religion,
@@ -3746,64 +3840,6 @@ def add_student(request):
     }
     return render(request, 'students/add_student.html', context)
 
-
-# def add_student(request):
-#     student_id = request.GET.get('edit_id')
-#     student = None
-
-#     if student_id:
-#         student = get_object_or_404(Student, id=student_id)
-
-#     search_query = request.GET.get('q', '')
-#     grade_id = request.GET.get('grade_id', '')
-#     classroom_id = request.GET.get('classroom_id', '')
-#     specialization = request.GET.get('specialization', '')
-#     gender = request.GET.get('gender', '')
-#     religion = request.GET.get('religion', '')
-#     is_disability = request.GET.get('is_disability', '')
-#     page = request.GET.get('page', '1')
-
-#     if request.method == 'POST':
-#         form = StudentForm(request.POST, request.FILES, instance=student)
-#         if form.is_valid():
-#             saved_student = form.save()
-#             if student:
-#                 messages.success(request, f"تم تحديث بيانات الطالب {saved_student.get_full_name()} بنجاح.")
-
-#                 registry_url = reverse('student_registry')
-#                 redirect_url = f"{registry_url}?page={page}"
-#                 if search_query: redirect_url += f"&q={search_query}"
-#                 if grade_id: redirect_url += f"&grade_id={grade_id}"
-#                 if classroom_id: redirect_url += f"&classroom_id={classroom_id}"
-#                 if specialization: redirect_url += f"&specialization={specialization}"
-#                 if gender: redirect_url += f"&gender={gender}"
-#                 if religion: redirect_url += f"&religion={religion}"
-#                 if is_disability: redirect_url += f"&is_disability={is_disability}"
-
-#                 redirect_url += f"#student-{saved_student.id}"
-#                 return redirect(redirect_url)
-#             else:
-#                 messages.success(request, f"تم إضافة الطالب الجديد {saved_student.get_full_name()} بنجاح.")
-#                 return redirect('student_registry')
-#     else:
-#         form = StudentForm(instance=student)
-
-#     grades = Grade.objects.all()
-#     classrooms = Classroom.objects.all()
-
-#     context = {
-#         'form': form,
-#         'student': student,
-#         'grades': grades,
-#         'classrooms': classrooms,
-#         'is_edit': student is not None,
-#         'search_params': {
-#             'q': search_query, 'grade_id': grade_id, 'classroom_id': classroom_id,
-#             'specialization': specialization, 'gender': gender, 'religion': religion,
-#             'is_disability': is_disability, 'page': page
-#         }
-#     }
-#     return render(request, 'students/add_student.html', context)
 
 
 from django.contrib.auth.decorators import user_passes_test

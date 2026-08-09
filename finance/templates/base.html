@@ -41,7 +41,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(2, 6, 23, 0.9); /* أسود زجاجي داكن */
+            background: rgba(2, 6, 23, 0.9);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             z-index: 999999;
@@ -336,16 +336,23 @@
         
         <div class="section-title">إدارة الطلاب</div>
         {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name %}
+            <!-- 🟢 إضافة رابط طلبات التقديم الإلكتروني الواردة بالشارة الديناميكية -->
+            <a href="{% url 'pending_admissions_list' %}" class="d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-bell-fill text-info"></i> طلبات التقديم الواردة</span>
+                {% if pending_notifications_count > 0 %}
+                    <span class="badge bg-danger rounded-pill font-monospace px-2 py-1">{{ pending_notifications_count }}</span>
+                {% endif %}
+            </a>
             <a href="{% url 'add_student' %}"><i class="bi bi-person-plus-fill text-warning"></i> إضافة طالب جديد</a>
             <a href="{% url 'student_registry' %}"><i class="bi bi-card-list text-info"></i> السجل المدني للطلاب</a>
             <a href="{% url 'withdrawn_students_report' %}"><i class="bi bi-person-dash-fill text-danger"></i> أرشيف سحب الملفات</a>
         {% else %}
+            <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-bell-fill text-info"></i> طلبات التقديم الواردة <i class="bi bi-lock-fill float-start"></i></a>
             <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-person-plus-fill text-warning"></i> إضافة طالب جديد <i class="bi bi-lock-fill float-start"></i></a>
             <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-card-list text-info"></i> السجل المدني للطلاب <i class="bi bi-lock-fill float-start"></i></a>
             <a href="javascript:void(0);" onclick="showAccessDenied(event)" class="locked-link"><i class="bi bi-person-dash-fill text-danger"></i> أرشيف سحب الملفات <i class="bi bi-lock-fill float-start"></i></a>
         {% endif %}
 
-        {# --- 🟢 قسم الكنترول المدرسي الجديد مدمج بكافة صلاحياته دون حذف أي شيء قديم --- #}
         <div class="section-title">الكنترول المدرسي</div>
         {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
             <a href="{% url 'control_numbers_dashboard' %}"><i class="bi bi-sliders text-danger"></i> إدارة وتوليد أرقام الجلوس</a>
@@ -413,6 +420,17 @@
         <div class="d-flex align-items-center gap-3">
             
             {% if user.is_authenticated %}
+            <!-- 🔔 جرس إشعارات التقديم الإلكتروني التفاعلي في الشريط العلوي -->
+            <a href="{% url 'pending_admissions_list' %}" class="position-relative text-white me-2 d-inline-flex align-items-center justify-content-center text-decoration-none bg-dark border border-secondary p-2 rounded-3 shadow-sm" title="طلبات التقديم الواردة" style="width: 42px; height: 42px;">
+                <i class="bi bi-bell-fill text-info fs-5"></i>
+                {% if pending_notifications_count > 0 %}
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light font-monospace shadow-sm" style="font-size: 0.75rem;">
+                        {{ pending_notifications_count }}
+                        <span class="visually-hidden">طلبات جديدة</span>
+                    </span>
+                {% endif %}
+            </a>
+
             <span class="badge bg-secondary border border-secondary p-2 shadow-sm fs-6 text-light" style="background-color: #2d3238 !important;">
                 <i class="bi bi-person-circle me-1 text-warning"></i> 
                 مرحباً، {{ user.get_full_name|default:user.username }}

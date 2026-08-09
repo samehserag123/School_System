@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    :root {
+        --bg-deep: #070f1e;
+        --card-glass: rgba(11, 23, 42, 0.8);
+        --border-glass: rgba(255, 255, 255, 0.08);
+        --cyan-glow: #38bdf8;
+    }
+
+    body {
+        background-color: var(--bg-deep) !important;
+        color: #f8fafc;
+    }
+
+    /* كارت زجاجي رئيسي */
+    .glass-panel {
+        background: var(--card-glass);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--border-glass);
+        border-radius: 24px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+    }
+
+    /* إحصائيات علوية */
+    .stat-card {
+        background: rgba(4, 9, 20, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        padding: 20px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .stat-card:hover {
+        border-color: rgba(56, 189, 248, 0.4);
+        transform: translateY(-4px);
+        box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.15);
+    }
+
+    /* الجدول الاحترافي */
+    .custom-table {
+        color: #cbd5e1;
+        margin-bottom: 0;
+    }
+
+    .custom-table thead th {
+        background: rgba(2, 6, 23, 0.85);
+        color: #38bdf8;
+        font-weight: 800;
+        font-size: 0.9rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 18px 20px;
+        white-space: nowrap;
+    }
+
+    .custom-table tbody tr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.2s ease;
+    }
+
+    .custom-table tbody tr:hover {
+        background: rgba(56, 189, 248, 0.06) !important;
+    }
+
+    .custom-table tbody td {
+        padding: 16px 20px;
+        vertical-align: middle;
+        font-size: 0.95rem;
+    }
+
+    /* زر إجراء استكمال التسجيل */
+    .btn-complete {
+        background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+        color: #020617;
+        font-weight: 800;
+        border: none;
+        border-radius: 12px;
+        padding: 9px 22px;
+        font-size: 0.88rem;
+        box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+    }
+
+    .btn-complete:hover {
+        transform: translateY(-2px) scale(1.03);
+        box-shadow: 0 8px 22px rgba(56, 189, 248, 0.5);
+        color: #020617;
+    }
+
+    /* 🔴 زر الحذف الفردي (سلة المهملات) */
+    .btn-delete {
+        background: rgba(225, 29, 72, 0.1);
+        color: #f43f5e;
+        border: 1px solid rgba(225, 29, 72, 0.3);
+        border-radius: 12px;
+        padding: 9px 14px;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+    }
+
+    .btn-delete:hover {
+        background: #e11d48;
+        color: #fff;
+        box-shadow: 0 4px 15px rgba(225, 29, 72, 0.4);
+        border-color: #e11d48;
+    }
+
+    /* الحالات الفارغة */
+    .empty-box {
+        padding: 70px 20px;
+        text-align: center;
+    }
+
+    .empty-icon {
+        width: 86px;
+        height: 86px;
+        background: rgba(56, 189, 248, 0.08);
+        border: 2px dashed rgba(56, 189, 248, 0.3);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        color: #38bdf8;
+        font-size: 2.2rem;
+    }
+
+    /* حقل البحث السريع */
+    .search-input-wrapper {
+        position: relative;
+    }
+
+    .search-input-wrapper input {
+        background: rgba(4, 9, 20, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #fff;
+        border-radius: 14px;
+        padding: 12px 45px 12px 18px;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+    }
+
+    .search-input-wrapper input:focus {
+        outline: none;
+        border-color: #38bdf8;
+        box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15);
+    }
+
+    .search-input-wrapper i {
+        position: absolute;
+        top: 50%;
+        right: 16px;
+        transform: translateY(-50%);
+        color: #64748b;
+        font-size: 1.1rem;
+    }
+</style>
+
+<div class="container py-5" dir="rtl">
+    
+    <!-- الترويسة الرئيسية -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-black text-white m-0 d-flex align-items-center gap-3">
+                <i class="bi bi-bell-fill text-info"></i>
+                إشعارات طلبات القبول الإلكتروني
+                <span class="badge bg-danger rounded-pill fs-6 px-3">{{ notifications_count }}</span>
+            </h2>
+            <p class="text-secondary small fw-bold mt-2 m-0">طلبات الالتحاق المعتمدة القادمة من البوابة الخارجية والجاهزة للتسجيل النهائي بالسيستم</p>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <!-- 🔴 زر الحذف الجماعي -->
+            {% if notifications_count > 0 %}
+            <a href="{% url 'delete_all_pending_notifications' %}" onclick="return confirm('⚠️ تحذير: هل أنت متأكد من رفض وحذف جميع الإشعارات المعلقة دفعة واحدة؟ هذا الإجراء لا يمكن التراجع عنه.');" class="btn btn-outline-danger rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center gap-2">
+                <i class="bi bi-trash3-fill"></i> حذف الكل
+            </a>
+            {% endif %}
+            
+            <a href="{% url 'student_registry' %}" class="btn btn-outline-secondary rounded-pill px-4 fw-bold shadow-sm align-self-start align-self-md-auto">
+                <i class="bi bi-card-list me-1"></i> السجل المدني
+            </a>
+        </div>
+    </div>
+
+    <!-- كروت الإحصائيات السريعة -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="stat-card d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small fw-bold d-block mb-1">طلبات معلقة تنتظر التسجيل</span>
+                    <h3 class="fw-black text-info font-monospace m-0">{{ notifications_count }}</h3>
+                </div>
+                <div class="p-3 bg-info bg-opacity-10 text-info rounded-circle fs-3">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="stat-card d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small fw-bold d-block mb-1">تزامن البيانات</span>
+                    <h5 class="fw-bold text-success m-0">تلقائي عبر API <i class="bi bi-check-circle-fill ms-1"></i></h5>
+                </div>
+                <div class="p-3 bg-success bg-opacity-10 text-success rounded-circle fs-3">
+                    <i class="bi bi-[#06b6d4]"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="stat-card d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small fw-bold d-block mb-1">حالة خادم الربط</span>
+                    <h5 class="fw-bold text-warning m-0">متصل وجاهز <i class="bi bi-broadcast ms-1"></i></h5>
+                </div>
+                <div class="p-3 bg-warning bg-opacity-10 text-warning rounded-circle fs-3">
+                    <i class="bi bi-server"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- الكارت الزجاجي وشريط البحث -->
+    <div class="glass-panel overflow-hidden">
+        
+        <div class="p-4 border-bottom border-secondary border-opacity-10 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+            <h5 class="m-0 fw-bold text-white d-flex align-items-center gap-2">
+                <i class="bi bi-list-stars text-info"></i> قائمة الطلبات الواردة
+            </h5>
+            
+            <div class="search-input-wrapper w-100 w-sm-auto" style="min-width: 280px;">
+                <i class="bi bi-search"></i>
+                <input type="text" id="quickSearch" class="w-100" placeholder="تصفية بالاسم أو الرقم القومي..." onkeyup="filterNotifications()">
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table custom-table align-middle" id="notificationsTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>تاريخ الورود</th>
+                        <th>اسم الطالب بالكامل</th>
+                        <th>الرقم القومي</th>
+                        <th>رقم التليفون / واتساب</th>
+                        <th>المحافظة</th>
+                        <th>المؤهل السابق</th>
+                        <th class="text-center">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for note in notifications %}
+                    <tr>
+                        <td class="text-secondary font-monospace fw-bold">{{ forloop.counter }}</td>
+                        <td class="font-monospace text-info small">{{ note.received_at|date:"Y-m-d H:i" }}</td>
+                        <td class="fw-black text-white">{{ note.full_name_ar }}</td>
+                        <td class="font-monospace fw-bold text-light">{{ note.national_id }}</td>
+                        <td>
+                            <div class="font-monospace small text-slate-300">{{ note.phone }}</div>
+                            {% if note.whatsapp_number %}
+                                <a href="https://wa.me/2{{ note.whatsapp_number }}" target="_blank" class="text-success text-decoration-none small font-monospace">
+                                    <i class="bi bi-whatsapp"></i> {{ note.whatsapp_number }}
+                                </a>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge bg-secondary bg-opacity-20 text-info border border-info border-opacity-20 rounded-pill px-3">{{ note.birth_governorate|default:"غير محدد" }}</span></td>
+                        <td class="small text-secondary">{{ note.current_qualification|default:"-" }}</td>
+                        
+                        <!-- 🟢 التعديل: قسم الإجراءات يحتوي على زر الاستكمال وزر الحذف -->
+                        <td class="text-center">
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                <a href="{% url 'add_student' %}?notify_id={{ note.id }}" class="btn-complete" title="قبول واستكمال البيانات">
+                                    <span>استكمال</span>
+                                    <i class="bi bi-arrow-left-short fs-5"></i>
+                                </a>
+                                <!-- زر الحذف الفردي -->
+                                <a href="{% url 'delete_pending_notification' note.id %}" onclick="return confirm('هل أنت متأكد من رفض وحذف إشعار الطالب ({{ note.full_name_ar }}) نهائياً؟');" class="btn-delete" title="رفض وحذف الإشعار">
+                                    <i class="bi bi-trash3-fill"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-box">
+                                <div class="empty-icon">
+                                    <i class="bi bi-inbox-fill"></i>
+                                </div>
+                                <h4 class="fw-black text-white mb-2">لا توجد طلبات قبول معلقة</h4>
+                                <p class="text-secondary small max-w-md mx-auto m-0">جميع طلبات الانضمام الخارجية القادمة من البوابة تم إدراجها ومعالجتها بنجاح بالسجل المدني للطالب.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // سكربت التصفية السريعة والبحث اللحظي داخل الجدول
+    function filterNotifications() {
+        const input = document.getElementById("quickSearch");
+        const filter = input.value.toLowerCase();
+        const table = document.getElementById("notificationsTable");
+        const tr = table.getElementsByTagName("tr");
+
+        for (let i = 1; i < tr.length; i++) {
+            let tdName = tr[i].getElementsByTagName("td")[2];
+            let tdNationalId = tr[i].getElementsByTagName("td")[3];
+            
+            if (tdName || tdNationalId) {
+                let nameValue = tdName.textContent || tdName.innerText;
+                let idValue = tdNationalId.textContent || tdNationalId.innerText;
+                
+                if (nameValue.toLowerCase().indexOf(filter) > -1 || idValue.toLowerCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }
+        }
+    }
+</script>
+{% endblock %}

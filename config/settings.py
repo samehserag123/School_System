@@ -100,24 +100,30 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-            BASE_DIR / "templates",  # المسار العام
-            BASE_DIR / "students/templates/students/books",  # لو عايز Django يشوف القوالب مباشرة هنا
+            BASE_DIR / "templates",
+            BASE_DIR / "students" / "templates" / "students" / "books",
         ],
-
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                # ⚙️ معالجات سياق دجانجو الأساسية
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+
+                # 🏛️ معالجات النظام والأكاديمية والموارد البشرية
                 'config.context_processors.active_academic_year',
                 'students.context_processors.admission_status',
                 'hr.context_processors.hr_notifications',
+
+                # 🔔 معالج إشعارات القبول الإلكتروني الموحد (Microservices Sync)
+                'students.context_processors.pending_notifications_context',
             ],
         },
     },
 ]
+
 WSGI_APPLICATION = 'config.wsgi.application'
 
 if os.environ.get('PYTHONANYWHERE_SITE'):

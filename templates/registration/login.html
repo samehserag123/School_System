@@ -1,71 +1,385 @@
 {% load static %}
-{% load crispy_forms_tags %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تسجيل الدخول | نظام إدارة المدرسة</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول | نظام الإدارة المتكامل</title>
+    <!-- Bootstrap 5 CSS RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <!-- FontAwesome الأيقونات -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- خط القاهرة Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
     <style>
+        :root {
+            --bg-deep: #030712;
+            --card-glass: rgba(15, 23, 42, 0.75);
+            --border-glass: rgba(255, 255, 255, 0.12);
+            --primary-glow: #6366f1;
+            --purple-glow: #a855f7;
+            --cyan-glow: #06b6d4;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            background: linear-gradient(-45deg, #0f172a, #1e3a8a, #1e40af, #0f172a);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
-            font-family: 'Cairo', sans-serif;
-            height: 100vh;
+            background-color: var(--bg-deep);
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0;
+            font-family: 'Cairo', sans-serif;
+            overflow-x: hidden;
+            position: relative;
         }
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+
+        /* شبكة خلفية مستقبلية دقيقة */
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 1;
+            pointer-events: none;
         }
-        .login-card {
-            background: rgba(30, 41, 59, 0.9);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 40px;
+
+        /* كرات الإضاءة المتحركة */
+        .ambient-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            z-index: 2;
+            pointer-events: none;
+            animation: pulseFloat 18s infinite alternate ease-in-out;
+        }
+
+        .blob-1 {
+            width: 450px; height: 450px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, rgba(0,0,0,0) 70%);
+            top: -10%; right: -5%;
+        }
+
+        .blob-2 {
+            width: 550px; height: 550px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, rgba(0,0,0,0) 70%);
+            bottom: -15%; left: -10%;
+            animation-delay: -6s;
+        }
+
+        @keyframes pulseFloat {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(40px, -30px) scale(1.1); }
+            100% { transform: translate(-30px, 40px) scale(0.9); }
+        }
+
+        /* كارت تسجيل الدخول الزجاجي */
+        .login-wrapper {
+            position: relative;
+            z-index: 10;
+            background: var(--card-glass);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--border-glass);
+            border-radius: 28px;
+            box-shadow: 
+                0 30px 60px -12px rgba(0, 0, 0, 0.8),
+                inset 0 1px 1px rgba(255, 255, 255, 0.2);
+            padding: 3.2rem 2.8rem;
             width: 100%;
-            max-width: 400px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
-            color: white;
-            z-index: 100;
+            max-width: 440px;
+            animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        /* تعديل ألوان Crispy Forms لتظهر بوضوح */
-        .mb-3 label { color: #0dcaf0 !important; font-weight: bold; }
-        input.form-control { 
-            background: rgba(255,255,255,0.1) !important; 
-            color: white !important; 
-            border: 1px solid #444 !important;
+
+        @keyframes fadeInUp {
+            0% { opacity: 0; transform: translateY(30px) scale(0.98); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .logo-container {
+            width: 76px;
+            height: 76px;
+            background: linear-gradient(135deg, var(--primary-glow) 0%, var(--purple-glow) 100%);
+            border-radius: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            color: white;
+            box-shadow: 0 12px 28px rgba(99, 102, 241, 0.45);
+            margin: 0 auto 1.25rem;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .login-wrapper:hover .logo-container {
+            transform: scale(1.08) rotate(3deg);
+            box-shadow: 0 16px 35px rgba(168, 85, 247, 0.55);
+        }
+
+        .header-title {
+            color: var(--text-primary);
+            font-weight: 900;
+            font-size: 1.85rem;
+            letter-spacing: -0.5px;
+            margin-bottom: 0.4rem;
+        }
+
+        .header-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+            font-weight: 600;
+            margin-bottom: 2.2rem;
+        }
+
+        /* الحقول التفاعلية */
+        .input-group-custom {
+            position: relative;
+            margin-bottom: 1.3rem;
+        }
+        
+        .input-icon {
+            position: absolute;
+            top: 50%;
+            right: 1.2rem;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            z-index: 10;
+            font-size: 1.05rem;
+            transition: color 0.3s ease;
+            pointer-events: none;
+        }
+
+        .form-control-custom {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--text-primary);
+            padding: 0.95rem 3.2rem 0.95rem 1rem;
+            border-radius: 14px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .form-control-custom::placeholder {
+            color: rgba(148, 163, 184, 0.5);
+            font-weight: 500;
+        }
+
+        .form-control-custom:focus {
+            outline: none;
+            background: rgba(15, 23, 42, 0.95);
+            border-color: var(--primary-glow);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2), 0 10px 20px -5px rgba(0,0,0,0.5);
+        }
+
+        .form-control-custom:focus ~ .input-icon {
+            color: var(--cyan-glow);
+        }
+
+        .toggle-password {
+            position: absolute;
+            top: 50%;
+            left: 1.1rem;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            cursor: pointer;
+            z-index: 10;
+            background: none;
+            border: none;
+            padding: 4px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-password:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .form-check-input {
+            width: 1.15em;
+            height: 1.15em;
+            background-color: rgba(15, 23, 42, 0.8);
+            border-color: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--primary-glow);
+            border-color: var(--primary-glow);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+        }
+
+        .btn-login {
+            background: linear-gradient(135deg, var(--primary-glow) 0%, #4338ca 100%);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            padding: 0.95rem;
+            font-size: 1.05rem;
+            font-weight: 800;
+            width: 100%;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 25px -3px rgba(79, 70, 229, 0.45);
+            margin-top: 0.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px -3px rgba(79, 70, 229, 0.6);
+            color: white;
+            background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        /* رسالة التنبيه بالخطأ */
+        .alert-glass {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            border-radius: 14px;
+            padding: 0.9rem 1.1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9rem;
+            backdrop-filter: blur(10px);
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+
+        .card-footer-text {
+            margin-top: 2rem;
+            padding-top: 1.2rem;
+            border-top: 1px solid var(--border-glass);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
-    <div class="login-card text-center">
-        <i class="bi bi-shield-lock-fill text-info" style="font-size: 3.5rem;"></i>
-        <h3 class="my-4 fw-bold">دخول النظام</h3>
+    <div class="bg-grid"></div>
+    <div class="ambient-blob blob-1"></div>
+    <div class="ambient-blob blob-2"></div>
 
-        <form method="post">
+    <div class="login-wrapper">
+        <div class="text-center">
+            <div class="logo-container">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h1 class="header-title">دخول النظام</h1>
+            <p class="header-subtitle">أدخل بيانات الحساب للوصول إلى لوحة التحكم الإدارية</p>
+        </div>
+
+        <!-- عرض أخطاء تسجيل الدخول بمرونة -->
+        {% if form.errors or form.non_field_errors %}
+            <div class="alert-glass">
+                <i class="fa-solid fa-circle-exclamation fs-5 text-danger"></i>
+                <div>
+                    <strong>فشل تسجيل الدخول!</strong><br>
+                    <span class="small opacity-90">
+                        {% if form.non_field_errors %}
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        {% else %}
+                            يرجى التحقق من اسم المستخدم وكلمة المرور والمحاولة مجدداً.
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- إرسال POST إلى مسار الجلسة الحالي مباشرة لتجنب أخطاء توجيه URLs -->
+        <form method="post" id="loginForm">
             {% csrf_token %}
-            {{ form|crispy }}
             
-            <button type="submit" class="btn btn-info w-100 py-2 mt-3 fw-bold shadow">
-                <i class="bi bi-box-arrow-in-right"></i> تسجيل الدخول
+            <!-- اسم المستخدم -->
+            <div class="input-group-custom">
+                <input type="text" name="username" class="form-control-custom" placeholder="اسم المستخدم" required autocomplete="username" autofocus value="{{ request.POST.username|default:'' }}">
+                <span class="input-icon"><i class="fa-regular fa-user"></i></span>
+            </div>
+
+            <!-- كلمة المرور -->
+            <div class="input-group-custom">
+                <input type="password" name="password" id="passwordField" class="form-control-custom" placeholder="كلمة المرور" required autocomplete="current-password">
+                <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
+                <button type="button" class="toggle-password" onclick="togglePasswordVisibility()" aria-label="إظهار كلمة المرور">
+                    <i class="fa-regular fa-eye" id="toggleIcon"></i>
+                </button>
+            </div>
+
+            <!-- تذكرني -->
+            <div class="d-flex justify-content-between align-items-center mb-3 px-1">
+                <div class="form-check d-flex align-items-center gap-2">
+                    <input class="form-check-input" type="checkbox" name="remember_me" id="rememberMe">
+                    <label class="form-check-label text-secondary small fw-bold" for="rememberMe" style="cursor: pointer;">
+                        تذكر جلسة الدخول
+                    </label>
+                </div>
+            </div>
+
+            <!-- زر الدخول -->
+            <button type="submit" class="btn-login" id="submitBtn">
+                <span>تسجيل الدخول</span>
+                <i class="fa-solid fa-arrow-left"></i>
             </button>
         </form>
 
-        <div class="mt-4 small text-white-50">
-            &copy; 2026 نظام الإدارة المتكامل
+        <div class="card-footer-text">
+            &copy; 2026 نظام الإدارة المتكامل - جميع الحقوق محفوظة
         </div>
     </div>
 
+    <script>
+        function togglePasswordVisibility() {
+            const passwordField = document.getElementById('passwordField');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                passwordField.type = 'password';
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', function() {
+            const btn = document.getElementById('submitBtn');
+            btn.style.opacity = '0.85';
+            btn.style.pointerEvents = 'none';
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> جاري التحقق...';
+        });
+    </script>
 </body>
 </html>

@@ -131,4 +131,23 @@ urlpatterns = [
     path('students/academy/api/check-enrollment/', views.api_check_academy_enrollment),
     path('academy/api/courses-for-term/', views.api_academy_courses_for_term, name='api_academy_courses_for_term'),
     path('academy/api/subjects-for-term-course/', views.api_academy_subjects_for_term_course, name='api_academy_subjects_for_term_course'),
+
+    # =========================================================
+    # 🌐 15. ربط القبول والتسجيل الإلكتروني الخارجي (Microservices & APIs)
+    # =========================================================
+    # شاشة إشعارات الطلبات المقبولة
+    path('pending-admissions/', views.pending_admissions_list, name='pending_admissions_list'),
+    path('students/pending-admissions/', views.pending_admissions_list),
+    
+    # 🔴 مسارات حذف إشعارات التقديم المرفوضة
+    path('pending-admissions/delete/<int:pk>/', views.delete_pending_notification, name='delete_pending_notification'),
+    path('pending-admissions/delete-all/', views.delete_all_pending_notifications, name='delete_all_pending_notifications'),
+
+    # 🟢 مسارات API لاستقبال وتأكيد نقل بيانات الطلاب المقبولين من لوحة الموظف
+    path('api/receive-approved-student/', views.api_receive_approved_student, name='api_receive_approved_student'),
+    path('students/api/receive-approved-student/', views.api_receive_approved_student),
+
+    # 🟢 مسارات API لاستقبال تقديمات الموقع المباشرة (تمنع خطأ 404 Not Found)
+    path('api/online-admission/receive/', views.receive_online_admission, name='receive_online_admission'),
+    path('students/api/online-admission/receive/', views.receive_online_admission),
 ]
