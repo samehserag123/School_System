@@ -47,6 +47,7 @@ urlpatterns = [
 
     # 🔴 مسار توقيع جزاء التحايل (خروج بدون إذن)
     path('attendance/<int:record_id>/fraud-penalty/', views.apply_fraud_penalty, name='apply_fraud_penalty'),
+    path('attendance/<int:record_id>/remove-penalty/', views.remove_fraud_penalty, name='remove_fraud_penalty'),
 
     # 🛡️ مسارات الجزاء الإداري العام (نوع + سبب + أيام خصم يحددها المدير)
     path('penalty/add/', views.penalty_add, name='penalty_add_general'),

@@ -287,8 +287,11 @@ class DailyAttendance(models.Model):
         ('mission', 'مأمورية رسمية'), # 👈 حالة المأمورية الجديدة
         ('holiday', 'عطلة رسمية / استثنائية'),  # 🟢 هذا هو السطر الجديد
     ]
-    administrative_penalty_days = models.FloatField(default=0.0, verbose_name="أيام الجزاء الإداري الصارم")
+    # administrative_penalty_days = models.FloatField(default=0.0, verbose_name="أيام الجزاء الإداري الصارم")
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='daily_attendance_records')
+    administrative_penalty_days = models.FloatField(default=0.0, verbose_name="أيام الجزاء الإداري الصارم")
+    is_manual_override = models.BooleanField(default=False, verbose_name="تعديل يدوي (جزاء تحايل / انصراف يدوي)")
+    # is_manual_override = models.BooleanField(default=False, verbose_name="تعديل يدوي (جزاء تحايل / انصراف يدوي)")
     date = models.DateField(verbose_name="تاريخ اليوم")
     check_in = models.TimeField(null=True, blank=True, verbose_name="وقت الدخول الفعلي")
     check_out = models.TimeField(null=True, blank=True, verbose_name="وقت الخروج الفعلي")
@@ -1036,7 +1039,8 @@ class PenaltyRecord(models.Model):
     )
 
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='penalties', verbose_name="الموظف")
-    date = models.DateField(default=timezone.now, verbose_name="تاريخ توقيع الجزاء")
+    # date = models.DateField(default=timezone.now, verbose_name="تاريخ توقيع الجزاء")
+    date = models.DateField(default=timezone.localdate, verbose_name="تاريخ توقيع الجزاء")
     penalty_type = models.CharField(max_length=30, choices=PENALTY_TYPES, verbose_name="نوع الجزاء")
     deduction_days = models.FloatField(
         default=0.0,

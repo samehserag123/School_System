@@ -298,6 +298,35 @@ def apply_fraud_penalty(request, record_id):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
+@require_POST
+@login_required
+def remove_fraud_penalty(request, record_id):
+    """إلغاء جزاء التحايل وإرجاع اليوم لحالة حاضر"""
+    if not request.user.is_staff:
+        return JsonResponse({'status': 'error', 'message': 'غير مصرح لك باتخاذ هذا الإجراء.'}, status=403)
+
+    try:
+        record = DailyAttendance.objects.select_related('employee').get(id=record_id)
+    except DailyAttendance.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'تعذر العثور على سجل الحضور.'}, status=404)
+
+    record.administrative_penalty_days = 0.0
+
+    # جزاء التحايل لا يضيف خصم غياب، فلو اليوم غياب حقيقي (absence_deduction_days > 0) نتركه غياباً
+    if record.status == 'absent' and record.absence_deduction_days == 0:
+        record.status = 'present'
+
+    # بعد إضافة الحقل الجديد فقط (لو لم تضفه بعد يتجاهل السطر)
+    if hasattr(record, 'is_manual_override'):
+        record.is_manual_override = False
+
+    record.save()
+    return JsonResponse({
+        'status': 'success',
+        'message': f'تم إلغاء الجزاء عن الموظف {record.employee.name}.'
+    })
+
+
 
 @login_required
 def penalty_add(request, employee_id=None):

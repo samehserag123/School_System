@@ -152,9 +152,15 @@
 
                         <!-- الخصم -->
                         <td class="py-3 px-5 text-center">
-                            {% if record.late_minutes > 0 %}
-                                <span class="text-orange-700 font-black text-sm block">{{ record.late_minutes }} دقيقة</span>
-                                <span class="text-xs text-gray-600 block font-bold mt-0.5">(خصم: {{ record.deduction_hours|floatformat:1 }} س)</span>
+                            {% if record.total_day_penalty > 0 %}
+                                <span class="inline-flex items-center justify-center bg-red-100 text-red-800 font-black text-sm px-3 py-1.5 rounded-lg border border-red-300 shadow-sm">
+                                    {{ record.total_day_penalty|floatformat:1 }} يوم
+                                </span>
+                                {% if record.direct_admin_penalty > 0 and record.administrative_penalty_days > 0 %}
+                                    <span class="block text-[11px] text-gray-500 font-bold mt-1">
+                                        (تحايل {{ record.administrative_penalty_days|floatformat:1 }} + إداري {{ record.direct_admin_penalty|floatformat:1 }})
+                                    </span>
+                                {% endif %}
                             {% else %}
                                 <span class="text-gray-300 font-bold">-</span>
                             {% endif %}
@@ -227,11 +233,13 @@
                         <td class="py-3 px-5 text-center">
                             <div class="flex flex-col items-center gap-1.5">
                                 {% if record.administrative_penalty_days == 0 %}
-                                <button onclick="applyFraudPenalty({{ record.id }}, '{{ record.employee.name|escapejs }}')" class="group text-xs bg-white text-red-600 border border-red-200 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-lg transition-all font-bold shadow-sm flex items-center justify-center gap-1.5 mx-auto" title="الموظف خرج بدون إذن وعاد لتبصيم الانصراف">
-                                    <i data-lucide="shield-alert" class="w-4 h-4 transition-transform group-hover:scale-110"></i> جزاء تحايل
-                                </button>
+                                    <button onclick="applyFraudPenalty({{ record.id }}, '{{ record.employee.name|escapejs }}')" class="group text-xs bg-white text-red-600 border border-red-200 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-lg transition-all font-bold shadow-sm flex items-center justify-center gap-1.5 mx-auto" title="الموظف خرج بدون إذن وعاد لتبصيم الانصراف">
+                                        <i data-lucide="shield-alert" class="w-4 h-4 transition-transform group-hover:scale-110"></i> جزاء تحايل
+                                    </button>
                                 {% else %}
-                                    <span class="text-xs text-gray-400 font-bold"><i data-lucide="check-circle" class="w-4 h-4 inline-block text-green-500"></i> تم توقيع جزاء</span>
+                                    <button onclick="removeFraudPenalty({{ record.id }}, '{{ record.employee.name|escapejs }}')" class="group text-xs bg-white text-gray-600 border border-gray-300 hover:bg-gray-700 hover:text-white px-3 py-1.5 rounded-lg transition-all font-bold shadow-sm flex items-center justify-center gap-1.5 mx-auto" title="إلغاء الجزاء وإرجاع اليوم حاضر">
+                                        <i data-lucide="undo-2" class="w-4 h-4"></i> إلغاء الجزاء
+                                    </button>
                                 {% endif %}
                                 <a href="{% url 'hr:penalty_add' employee_id=record.employee.id %}" class="text-xs bg-white text-rose-700 border border-rose-200 hover:bg-rose-700 hover:text-white px-3 py-1.5 rounded-lg transition-all font-bold shadow-sm flex items-center justify-center gap-1.5 mx-auto" title="توقيع جزاء إداري عام بسبب مخصص">
                                     <i data-lucide="gavel" class="w-4 h-4"></i> جزاء إداري
@@ -388,6 +396,38 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             alert('حدث خطأ في الاتصال بالخادم.');
             console.error('Penalty Error:', error);
+        } finally {
+            if (loadingOverlay) loadingOverlay.classList.add('hidden');
+            if (tableContainer) tableContainer.style.opacity = '1';
+        }
+    };
+
+        // 🔵 دالة إلغاء الجزاء
+    window.removeFraudPenalty = async function(recordId, empName) {
+        if (!confirm(`هل تريد إلغاء الجزاء عن الموظف (${empName}) وإرجاع اليوم إلى "حاضر"؟`)) return;
+
+        if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+        if (tableContainer) tableContainer.style.opacity = '0.5';
+
+        try {
+            const response = await fetch(`/hr/attendance/${recordId}/remove-penalty/`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                triggerSearch();
+            } else {
+                alert('خطأ: ' + (data.message || 'حدث خطأ غير متوقع'));
+            }
+        } catch (error) {
+            alert('حدث خطأ في الاتصال بالخادم.');
+            console.error('Remove Penalty Error:', error);
         } finally {
             if (loadingOverlay) loadingOverlay.classList.add('hidden');
             if (tableContainer) tableContainer.style.opacity = '1';
