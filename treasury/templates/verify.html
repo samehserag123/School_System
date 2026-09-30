@@ -6,21 +6,21 @@
     <title>التحقق من المنتج | Shell</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
+
     <style>
         body { background-color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
-        
+
         /* الهيدر العلوي طبق الصورة */
         .shell-navbar { border-bottom: 1px solid #e0e0e0; background: #fff; position: relative; }
         .nav-content {
             display: flex;
             align-items: center;
             padding: 5px 15px;
-            direction: ltr; /* لترتيب اللوجو ثم النص بجانبه مباشرة */
+            direction: ltr;
         }
-        .brand-logo { width: 45px; height: auto; margin-right: 10px; } /* تقريب اللوجو من النص */
+        .brand-logo { width: 45px; height: auto; margin-right: 10px; }
         .brand-text { font-weight: 700; color: #444; font-size: 15px; }
-        
+
         /* الخط الأصفر أسفل الهيدر */
         .shell-yellow-line { width: 100%; height: 4px; background-color: #fbce07; }
 
@@ -42,19 +42,19 @@
         /* حاوية المحتوى */
         .content-body { padding: 40px 25px; }
 
-        /* العنوان: يسار وتحت بعض وبخط عريض */
+        /* العنوان */
         .title-section {
             text-align: left;
             direction: ltr;
             margin-bottom: 50px;
         }
-        .main-title { 
-            font-weight: 900; 
-            color: #444; 
-            font-size: 38px; /* حجم كبير كما في الصورة */
+        .main-title {
+            font-weight: 900;
+            color: #444;
+            font-size: 38px;
             line-height: 1.1;
             display: inline-block;
-            border-bottom: 5px solid #dd1d21; /* الخط الأحمر العريض */
+            border-bottom: 5px solid #dd1d21;
             padding-bottom: 15px;
             width: 100%;
         }
@@ -68,27 +68,27 @@
             justify-content: center;
             margin-top: 60px;
         }
-        
+
         /* دائرة الأيقونة بألوانها الثلاثة حسب الحالة */
         .check-circle {
-            width: 120px; 
-            height: 120px; 
-            color: white; 
+            width: 120px;
+            height: 120px;
+            color: white;
             border-radius: 50%;
-            display: flex; 
-            align-items: center; 
+            display: flex;
+            align-items: center;
             justify-content: center;
             font-size: 60px;
             margin-bottom: 25px;
         }
         .bg-success-shell { background-color: #008a44; } /* أخضر للمنتج الأصلي */
-        .bg-warning-shell { background-color: #fbce07; color: #333 !important; } /* أصفر للتعطيل المؤقت */
-        .bg-danger-shell { background-color: #dd1d21; } /* أحمر للمزور أو غير الموجود */
+        .bg-warning-shell { background-color: #fbce07; color: #333 !important; } /* أصفر للتعطيل أو التحذير */
+        .bg-danger-shell { background-color: #dd1d21; } /* أحمر للمزور */
 
-        .result-text { 
-            font-size: 18px; 
-            color: #555; 
-            font-weight: 500; 
+        .result-text {
+            font-size: 18px;
+            color: #333;
+            font-weight: 500;
             text-align: center;
             line-height: 1.6;
         }
@@ -109,30 +109,37 @@
     </nav>
 
     <div class="content-body">
-        
         <div class="title-section">
             <h1 class="main-title">
                 <span>PRODUCT</span>
                 <span>VERIFICATION</span>
             </h1>
         </div>
-        
+
         <div class="result-section">
-            
+
             {% if status == 'success' %}
                 <div class="check-circle bg-success-shell">
                     <i class="fas fa-check"></i>
                 </div>
-                <div class="result-text">
-                    منتج اصلي. شكرا لشراء منتجات شل الأصلية
+                <div class="result-text" style="color: #008a44; font-weight: bold;">
+                    منتج أصلي. شكراً لشراء منتجات شل الأصلية.
                 </div>
 
             {% elif status == 'disabled' %}
                 <div class="check-circle bg-warning-shell">
                     <i class="fas fa-exclamation-triangle"></i>
                 </div>
-                <div class="result-text">
+                <div class="result-text" style="color: #666;">
                     عذراً، هذا الـ QR كود معطل مؤقتاً حالياً.
+                </div>
+
+            {% elif status == 'warning' %}
+                <div class="check-circle bg-warning-shell">
+                    <i class="fas fa-history"></i>
+                </div>
+                <div class="result-text" style="color: #dd1d21; font-weight: bold;">
+                    تحذير! هذا المنتج تم مسحه والتحقق منه مسبقاً!
                 </div>
 
             {% else %}
@@ -145,7 +152,6 @@
             {% endif %}
 
         </div>
-
     </div>
 
 </body>

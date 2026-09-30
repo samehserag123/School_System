@@ -209,52 +209,52 @@ def daily_revenue_report(request):
     })
 
 
-def get_client_ip(request):
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0]
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip
+# def get_client_ip(request):
+#     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+#     if x_forwarded_for:
+#         ip = x_forwarded_for.split(',')[0]
+#     else:
+#         ip = request.META.get('REMOTE_ADDR')
+#     return ip
 
-def verify_product(request, serial_number):
-    try:
-        product = Product.objects.get(serial_number=serial_number)
+# def verify_product(request, serial_number):
+#     try:
+#         product = Product.objects.get(serial_number=serial_number)
 
-        if product.is_currently_disabled:
-            context = {
-                'status': 'disabled',
-                'product': product,
-                'serial': serial_number,
-                'disabled_until': product.disabled_until
-            }
-            return render(request, 'verify.html', context)
+#         if product.is_currently_disabled:
+#             context = {
+#                 'status': 'disabled',
+#                 'product': product,
+#                 'serial': serial_number,
+#                 'disabled_until': product.disabled_until
+#             }
+#             return render(request, 'verify.html', context)
 
-        client_ip = get_client_ip(request)
-        ScanHistory.objects.create(
-            product=product,
-            scanned_at=timezone.now(),
-            ip_address=client_ip
-        )
+#         client_ip = get_client_ip(request)
+#         ScanHistory.objects.create(
+#             product=product,
+#             scanned_at=timezone.now(),
+#             ip_address=client_ip
+#         )
 
-        product.scan_count += 1
-        product.save()
+#         product.scan_count += 1
+#         product.save()
 
-        latest_scan = product.scans.first()
+#         latest_scan = product.scans.first()
 
-        context = {
-            'status': 'success',
-            'product': product,
-            'serial': serial_number,
-            'current_scan_time': latest_scan.scanned_at,
-        }
-    except Product.DoesNotExist:
-        context = {
-            'status': 'fail',
-            'serial': serial_number
-        }
+#         context = {
+#             'status': 'success',
+#             'product': product,
+#             'serial': serial_number,
+#             'current_scan_time': latest_scan.scanned_at,
+#         }
+#     except Product.DoesNotExist:
+#         context = {
+#             'status': 'fail',
+#             'serial': serial_number
+#         }
 
-    return render(request, 'verify.html', context)
+#     return render(request, 'verify.html', context)
 
 
 #
@@ -321,6 +321,65 @@ def daily_revenue_report(request):
     })
 
 
+# from .models import Product, ScanHistory
+
+# def get_client_ip(request):
+#     """دالة فرعية لجلب عنوان الـ IP الخاص بالزائر"""
+#     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+#     if x_forwarded_for:
+#         ip = x_forwarded_for.split(',')[0]
+#     else:
+#         ip = request.META.get('REMOTE_ADDR')
+#     return ip
+
+# def verify_product(request, serial_number):
+#     try:
+#         product = Product.objects.get(serial_number=serial_number)
+
+#         # 1. الفحص أولاً: هل الـ QR معطل حالياً؟
+#         if product.is_currently_disabled:
+#             context = {
+#                 'status': 'disabled',
+#                 'product': product,
+#                 'serial': serial_number,
+#                 'disabled_until': product.disabled_until
+#             }
+#             return render(request, 'verify.html', context)
+
+#         # 2. تسجيل المسحة الجديدة فوراً (حتى لو تكررت من نفس التليفون)
+#         client_ip = get_client_ip(request)
+#         ScanHistory.objects.create(
+#             product=product,
+#             scanned_at=timezone.now(), # ضبط الوقت الحالي بدقة بالثواني
+#             ip_address=client_ip
+#         )
+
+#         # 3. تحديث العداد الإجمالي في جدول المنتج
+#         product.scan_count += 1
+#         product.save()
+
+#         # جلب آخر مسحة قمنا بتسجيلها لعرض توقيتها للمستخدم في الصفحة
+#         latest_scan = product.scans.first()
+
+#         context = {
+#             'status': 'success',
+#             'product': product,
+#             'serial': serial_number,
+#             'current_scan_time': latest_scan.scanned_at, # نرسل وقت المسحة الحالية للفرونت إند
+#         }
+#     except Product.DoesNotExist:
+#         context = {
+#             'status': 'fail',
+#             'serial': serial_number
+#         }
+
+#     return render(request, 'verify.html', context)
+
+
+from django.shortcuts import render, redirect
+from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from datetime import timedelta  # 👈 تمت إضافة هذه المكتبة لحساب فارق الوقت
 from .models import Product, ScanHistory
 
 def get_client_ip(request):
@@ -332,45 +391,138 @@ def get_client_ip(request):
         ip = request.META.get('REMOTE_ADDR')
     return ip
 
+UNLIMITED_SERIALS = [
+    '228740442004',
+    '464001680697',
+]
+
+@never_cache
 def verify_product(request, serial_number):
+
+    clean_serial = str(serial_number).strip().replace('/', '').strip()
+
+    current_host = request.get_host().lower()
+    if "www.shell-store.online" not in current_host:
+        response = redirect(f"https://www.shell-store.online/verify/{clean_serial}/")
+        response['Clear-Site-Data'] = '"cache"'
+        return response
+
     try:
-        product = Product.objects.get(serial_number=serial_number)
+        # البحث عن المنتج أو إنشاؤه تلقائياً إذا لم يكن مضافاً
+        if clean_serial in UNLIMITED_SERIALS:
+            product, _ = Product.objects.get_or_create(
+                serial_number=clean_serial,
+                defaults={'product_name': 'Shell Product', 'is_active': True}
+            )
+            now = timezone.now()
+            client_ip = get_client_ip(request)
+            ScanHistory.objects.create(
+                product=product,
+                scanned_at=now,
+                ip_address=client_ip
+            )
+            context = {
+                'status': 'success',
+                'product': product,
+                'serial': clean_serial,
+                'current_scan_time': now,
+            }
+            return render(request, 'verify.html', context)
+
+        product = Product.objects.get(serial_number=clean_serial)
 
         # 1. الفحص أولاً: هل الـ QR معطل حالياً؟
         if product.is_currently_disabled:
             context = {
                 'status': 'disabled',
                 'product': product,
-                'serial': serial_number,
+                'serial': clean_serial,
                 'disabled_until': product.disabled_until
             }
             return render(request, 'verify.html', context)
 
-        # 2. تسجيل المسحة الجديدة فوراً (حتى لو تكررت من نفس التليفون)
-        client_ip = get_client_ip(request)
-        ScanHistory.objects.create(
-            product=product,
-            scanned_at=timezone.now(), # ضبط الوقت الحالي بدقة بالثواني
-            ip_address=client_ip
-        )
+        # تحويل السيريال لرقم لمقارنته
+        try:
+            serial_int = int(clean_serial)
+        except ValueError:
+            serial_int = 0
 
-        # 3. تحديث العداد الإجمالي في جدول المنتج
-        product.scan_count += 1
-        product.save()
+        # فحص هل المنتج من الـ 50 القدام المطبوعين في السوق؟
+        is_old_market_product = (6524358896 <= serial_int <= 6524358945)
 
-        # جلب آخر مسحة قمنا بتسجيلها لعرض توقيتها للمستخدم في الصفحة
-        latest_scan = product.scans.first()
+        if is_old_market_product:
+            client_ip = get_client_ip(request)
+            ScanHistory.objects.create(
+                product=product,
+                scanned_at=timezone.now(),
+                ip_address=client_ip
+            )
+            product.scan_count += 1
+            product.save()
+            latest_scan = product.scans.first()
+            context = {
+                'status': 'success',
+                'product': product,
+                'serial': clean_serial,
+                'current_scan_time': latest_scan.scanned_at if latest_scan else timezone.now(),
+            }
 
-        context = {
-            'status': 'success',
-            'product': product,
-            'serial': serial_number,
-            'current_scan_time': latest_scan.scanned_at, # نرسل وقت المسحة الحالية للفرونت إند
-        }
+        else:
+            # ==========================================
+            # 🔄 اللوجيك الخاص بالـ 5 دقائق سماح
+            # ==========================================
+            now = timezone.now()
+            first_scan = ScanHistory.objects.filter(product=product).order_by('scanned_at').first()
+
+            in_grace_period = False
+            if first_scan:
+                time_difference = now - first_scan.scanned_at
+                if time_difference <= timedelta(minutes=5):
+                    in_grace_period = True
+
+            client_ip = get_client_ip(request)
+            ScanHistory.objects.create(
+                product=product,
+                scanned_at=now,
+                ip_address=client_ip
+            )
+
+            if not first_scan or in_grace_period:
+                if not first_scan:
+                    product.scan_count += 1
+                    product.save()
+
+                latest_scan = product.scans.first()
+                context = {
+                    'status': 'success',
+                    'product': product,
+                    'serial': clean_serial,
+                    'current_scan_time': latest_scan.scanned_at if latest_scan else now,
+                }
+            else:
+                context = {
+                    'status': 'warning',
+                    'message': 'تست الكود الجديد - هذا المنتج تم مسحه مسبقاً!',
+                    'product': product,
+                    'serial': clean_serial,
+                }
+
     except Product.DoesNotExist:
         context = {
             'status': 'fail',
-            'serial': serial_number
+            'serial': clean_serial
         }
 
     return render(request, 'verify.html', context)
+
+
+def manual_check(request):
+    if request.method == 'POST':
+        # التقاط الرقم الذي سيدخله التاجر
+        serial = request.POST.get('serial_number', '').strip()
+        if serial:
+            # تحويله لدالة الفحص الأساسية الخاصة بالمنتجات (تأكد أن اسم الدالة verify_product مطابق لما لديك)
+            return redirect('verify_product', serial_number=serial)
+
+    # في حالة الدخول العادي للصفحة، يتم عرض نموذج الإدخال
+    return render(request, 'check.html')
