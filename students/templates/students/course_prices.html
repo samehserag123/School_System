@@ -12,7 +12,7 @@
 
     <style>
         :root {
-            --bg-deep: #000000;          
+            --bg-deep: #000000;
             --card-inner: #020617;
             --form-bg: #090d16;
             --text-main: #f8fafc;
@@ -189,10 +189,10 @@
             border: 1.5px solid var(--neon-emerald);
         }
 
-        .progress { 
-            background-color: #020617; 
-            height: 10px; 
-            border-radius: 20px; 
+        .progress {
+            background-color: #020617;
+            height: 10px;
+            border-radius: 20px;
             border: 1px solid rgba(255,255,255,0.1);
         }
         .progress-bar {
@@ -201,16 +201,16 @@
         }
 
         .table { --bs-table-bg: transparent; color: var(--text-main); margin-top: 15px; }
-        .table thead th { 
-            color: var(--neon-cyan); 
-            font-size: 0.9rem; 
-            border-bottom: 2px solid rgba(56, 189, 248, 0.3); 
+        .table thead th {
+            color: var(--neon-cyan);
+            font-size: 0.9rem;
+            border-bottom: 2px solid rgba(56, 189, 248, 0.3);
             font-weight: 900;
             text-align: center;
         }
-        .table tbody tr { 
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
-            vertical-align: middle; 
+        .table tbody tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            vertical-align: middle;
         }
         .table tbody tr:hover { background: rgba(30, 41, 59, 0.8); }
 
@@ -230,10 +230,10 @@
         .select2-container--default .select2-selection--single {
             background-color: #020617 !important;
             border: 2px solid #334155 !important;
-            height: 45px !important; 
+            height: 45px !important;
             border-radius: 12px !important;
             display: flex !important;
-            align-items: center !important; 
+            align-items: center !important;
         }
 
         .select2-container--default .select2-selection--single .select2-selection__rendered {
@@ -265,7 +265,7 @@
 
 <div class="container-fluid">
     <div class="container-card">
-        
+
         <!-- الهيدر والتحكم -->
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <h2 class="fw-900 m-0 text-info"><i class="bi bi-shield-check me-2"></i> لوحة تحكم المجموعات والاشتراكات</h2>
@@ -285,7 +285,7 @@
             <div class="card card-body bg-black border-secondary rounded-4 shadow-lg p-4" style="background-color: #090d16 !important;">
                 <form method="POST" action="{% url 'course_prices' %}" class="row g-3">
                     {% csrf_token %}
-                    
+
                     <div class="col-md-12 mb-1">
                         <div class="form-check form-switch p-2 rounded-3 border border-secondary border-opacity-25 bg-dark">
                             <input class="form-check-input ms-0" type="checkbox" id="flexSwitchExternal" name="is_external" style="cursor: pointer; transform: scale(1.2);">
@@ -297,9 +297,9 @@
 
                     <!-- حقول الطالب الخارجي -->
                     <div id="external_fields" style="display: none;" class="row g-3 mb-3 border-bottom border-secondary border-opacity-25 pb-3 mx-0">
-                        <div class="col-md-8"> 
+                        <div class="col-md-8">
                             <label class="form-label small fw-bold text-info">اسم الطالب الخارجي بالكامل</label>
-                            <input type="text" name="ext_name" id="ext_name_input" list="external_names_list" class="form-control bg-dark text-white border-secondary fw-bold" placeholder="الاسم الرباعي بالكامل..." autocomplete="off"> 
+                            <input type="text" name="ext_name" id="ext_name_input" list="external_names_list" class="form-control bg-dark text-white border-secondary fw-bold" placeholder="الاسم الرباعي بالكامل..." autocomplete="off">
                             <datalist id="external_names_list">
                                 {% for name in existing_external_names %}
                                     <option value="{{ name }}"></option>
@@ -319,19 +319,21 @@
                             <i class="bi bi-search live-search-icon"></i>
                             <input type="text" id="student_search_input" class="form-control live-search-input" placeholder="اكتب اسم الطالب أو الكود..." autocomplete="off">
                             <input type="hidden" name="student" id="id_student_hidden" required>
-                            
+
                             <div id="student_search_results" class="search-results-overlay d-none"></div>
                         </div>
                         <div id="selected_student_box" class="d-none"></div>
                     </div>
 
-                    <!-- 2. المدرس -->
+                    <!-- 2. المدرس المسؤول -->
                     <div class="col-md-3">
                         <label class="form-label small fw-bold text-white">2. المدرس المسؤول:</label>
                         <select name="teacher" id="id_teacher_select" class="form-select bg-dark text-white border-secondary fw-bold">
                             <option value="">-- اختر المدرس أولاً --</option>
-                            {% for teacher in form.fields.teacher.queryset %}
-                                <option value="{{ teacher.id }}">{{ teacher.name }}</option>
+                            {% for emp in employees %}
+                                <option value="{{ emp.id }}" data-department="{{ emp.department_id|default:'' }}">
+                                    {{ emp.name }}
+                                </option>
                             {% endfor %}
                         </select>
                     </div>
@@ -355,7 +357,7 @@
                     </div>
 
                     <div class="col-md-10"></div>
-                    
+
                     <div class="col-md-2 text-end">
                         <button type="submit" class="btn btn-success w-100 fw-black shadow-lg" style="height: 45px;">
                             <i class="bi bi-check-circle-fill me-1"></i> تأكيد الاشتراك
@@ -392,11 +394,11 @@
         <!-- 🟢 شريط الفلاتر الموحد: خانة البحث جهة اليمين فوراً بعد النص وبخلفية نيون داكنة متناسقة -->
         <div class="mb-4 bg-black p-3 rounded-4 border border-secondary border-opacity-25 shadow-lg">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-                
+
                 <!-- جهة اليمين: جملة التصفية + خانة البحث الجمالية + أزرار التصفية السريعة -->
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     <span class="text-secondary small fw-bold me-1"><i class="bi bi-funnel-fill text-info"></i> تصفية المدى الزمني:</span>
-                    
+
                     <!-- 🟢 خانة البحث المحاذية لليمين بتصميم نيون أنيق خلفيته داكنة زجاجية -->
                     <div class="input-group input-group-sm me-2" style="width: 220px;">
                         <span class="input-group-text search-icon-bg"><i class="bi bi-search"></i></span>
@@ -439,7 +441,7 @@
                 <tbody>
                     {% for course in courses %}
                         <tr class="text-center" id="course-row-{{ course.id }}">
-                            <td class="text-end py-3"> 
+                            <td class="text-end py-3">
                                 <div class="student-box px-2">
                                     <div class="name">
                                         {% if course.student %}
@@ -463,7 +465,8 @@
                                     </div>
                                 </div>
                             </td>
-                            <td><span class="badge teacher-pill">{{ course.course_info.teacher.name }}</span></td>
+                            <!-- الجديد الآمن والسريع -->
+                            <td><span class="badge teacher-pill">{{ course.teacher_name_display }}</span></td>
                             <td>
                                 <div class="session-stats mb-1 small text-end" id="stats-{{ course.id }}">
                                     <span>حضر <b class="text-info" id="attended-cnt-{{ course.id }}">{{ course.attended_count_display }}</b> من {{ course.total_sessions }}</span>
@@ -483,13 +486,13 @@
                             </td>
                             <td>
                                 <div class="d-flex justify-content-center gap-1">
-                                    <button class="btn btn-success btn-sm px-3 fw-bold" 
+                                    <button class="btn btn-success btn-sm px-3 fw-bold"
                                             data-url="{% url 'mark_session_attendance' course.id %}"
-                                            onclick="markAttendance(this, '{{ course.id }}')" 
-                                            {% if course.remaining_sessions_display <= 0 %}disabled{% endif %} 
+                                            onclick="markAttendance(this, '{{ course.id }}')"
+                                            {% if course.remaining_sessions_display <= 0 %}disabled{% endif %}
                                             id="btn-attend-{{ course.id }}">تحضير</button>
 
-                                    <button class="btn btn-outline-info btn-sm" 
+                                    <button class="btn btn-outline-info btn-sm"
                                             data-url="{% url 'session_history_api' course.id %}"
                                             onclick="showHistory(this, '{% if course.student %}{{ course.student.get_full_name|escapejs }}{% else %}{{ course.external_student.full_name|escapejs }}{% endif %}')"><i class="bi bi-clock-history"></i></button>
                                 </div>
@@ -512,7 +515,7 @@
                             <a class="page-link bg-dark text-info border-secondary fw-bold" href="?page={{ courses.previous_page_number }}{% if current_filter %}&time_filter={{ current_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">السابق</a>
                         </li>
                     {% endif %}
-                    
+
                     {% for i in courses.paginator.page_range %}
                         {% if courses.number == i %}
                             <li class="page-item active">
@@ -574,7 +577,7 @@
     // 🟢 1. دالة التحضير الفوري المباشر بالـ AJAX
     function markAttendance(btn, courseId) {
         if (btn.disabled) return;
-        
+
         const originalContent = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> جاري...';
@@ -748,7 +751,7 @@
     function showHistory(btn, studentName) {
         document.getElementById('historyTitle').innerText = 'سجل حضور: ' + studentName;
         document.getElementById('historyBody').innerHTML = '<div class="text-center py-4"><div class="spinner-border text-info" role="status"></div></div>';
-        
+
         var myModal = new bootstrap.Modal(document.getElementById('historyModal'));
         myModal.show();
 
@@ -786,33 +789,56 @@
     }
 
     $(document).ready(function() {
-        $('#id_teacher_select, #id_course_info_select').select2({ 
-            width: '100%', 
-            dir: 'rtl', 
-            dropdownParent: $('#addEnrollment')
-        });
+    // 1. تهيئة Select2 للقوائم المنسدلة (إضافة قائمة الأقسام أيضاً)
+    $('#id_department_select, #id_teacher_select, #id_course_info_select').select2({
+        width: '100%',
+        dir: 'rtl',
+        dropdownParent: $('#addEnrollment').length ? $('#addEnrollment') : $(document.body)
+    });
 
-        $("#tableSearch").on("keyup", function() {
-            var value = $(this).val().toLowerCase();
-            $("#mainTable tbody tr").filter(function() {
-                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-            });
-        });
+    // 2. 🟢 ربط تغيير القسم بتصفية قائمة المدرسين تلقائياً
+    $('#id_department_select').on('change', function() {
+        const selectedDept = $(this).val();
+        const $teacherSelect = $('#id_teacher_select');
 
-        $('#flexSwitchExternal').on('change', function() {
-            const fields = $('#external_fields');
-            const studentCol = $('#student_selection_col');
+        $teacherSelect.find('option').each(function() {
+            const empDept = $(this).attr('data-department');
 
-            if(this.checked) {
-                fields.slideDown(250);
-                studentCol.css({'opacity': '0.3', 'pointer-events': 'none'});
-                $('#id_student_hidden').val('');
+            // إظهار خيار "اختر المدرس" الخالي أو المدرسين التابعين للقسم المختار
+            if (!selectedDept || !empDept || empDept === selectedDept || $(this).val() === "") {
+                $(this).prop('disabled', false);
             } else {
-                fields.slideUp(250);
-                studentCol.css({'opacity': '1', 'pointer-events': 'auto'});
+                $(this).prop('disabled', true);
             }
         });
+
+        // تفريغ الاختيار الحالي وتحديث Select2 لتنعكس التغيرات فوراً
+        $teacherSelect.val('').trigger('change');
     });
+
+    // 3. فلترة وتصفية جدول البيانات
+    $("#tableSearch").on("keyup", function() {
+        var value = $(this).val().toLowerCase();
+        $("#mainTable tbody tr").filter(function() {
+            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+        });
+    });
+
+    // 4. مفتاح التبديل للطلاب الخارجيين
+    $('#flexSwitchExternal').on('change', function() {
+        const fields = $('#external_fields');
+        const studentCol = $('#student_selection_col');
+
+        if(this.checked) {
+            fields.slideDown(250);
+            studentCol.css({'opacity': '0.3', 'pointer-events': 'none'});
+            $('#id_student_hidden').val('');
+        } else {
+            fields.slideUp(250);
+            studentCol.css({'opacity': '1', 'pointer-events': 'auto'});
+        }
+    });
+});
 </script>
 </body>
 </html>

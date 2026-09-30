@@ -18,99 +18,155 @@
 <body class="bg-slate-50 text-slate-800 min-h-screen p-4 md:p-8">
 
     <div class="max-w-3xl mx-auto mb-6 flex justify-between items-center no-print">
-        <a href="/hr/payroll/report/" class="text-sm font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-300 px-4 py-2 rounded-xl shadow-sm transition-all">
+        <a href="{% url 'hr:payroll_report' %}" class="text-sm font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-300 px-4 py-2 rounded-xl shadow-sm transition-all">
             ⬅️ العودة للكشف المجمع
         </a>
-        <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/10 transition-all">
-            🖨️ طباعة مفردات المرتب
+        <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/10 transition-all flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+            طباعة مفردات المرتب
         </button>
     </div>
 
-    <div class="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8 print-card">
+    <div class="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8 print-card relative overflow-hidden">
         
-        <div class="flex justify-between items-start border-b border-slate-200 pb-6 mb-6">
+        <!-- الترويسة الرسمية للمدرسة -->
+        <div class="flex justify-between items-start border-b border-slate-200 pb-6 mb-6 relative z-10">
             <div>
                 <h1 class="text-2xl font-black text-slate-900">إيصال مفردات الراتب الشهري</h1>
                 <p class="text-xs text-slate-500 mt-1">رقم المسير المالي الآلي للنظام</p>
             </div>
             <div class="text-left">
-                <h2 class="text-lg font-bold text-blue-600">نظام إدارة الموارد البشرية</h2>
-                <p class="text-xs text-slate-400 font-mono mt-0.5">تاريخ الاستخراج: {% now "Y-m-d" %}</p>
+                <h2 class="text-lg font-bold text-blue-700">مدرسة طلعت حرب الثانوية الفندقية</h2>
+                <p class="text-xs text-slate-500 font-medium mt-0.5">إدارة الموارد البشرية وشؤون العاملين</p>
+                <p class="text-xs text-slate-400 font-mono mt-1">تاريخ الاستخراج: {% now "Y-m-d" %}</p>
             </div>
         </div>
 
-        <div class="bg-slate-50 rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 text-sm">
+        <!-- بيانات الموظف والتأمينات -->
+        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 text-sm">
             <div>
-                <span class="block text-xs font-semibold text-slate-400">اسم الموظف:</span>
+                <span class="block text-xs font-semibold text-slate-400 mb-1">اسم الموظف:</span>
                 <span class="font-bold text-slate-800 text-base">{{ employee.name }}</span>
             </div>
             <div>
-                <span class="block text-xs font-semibold text-slate-400">الكود الوظيفي (ID):</span>
-                <span class="font-mono font-bold text-slate-700">{{ employee.emp_id }}</span>
+                <span class="block text-xs font-semibold text-slate-400 mb-1">الكود الوظيفي:</span>
+                <span class="font-mono font-bold text-slate-700">#{{ employee.emp_id }}</span>
             </div>
             <div>
-                <span class="block text-xs font-semibold text-slate-400">القسم:</span>
+                <span class="block text-xs font-semibold text-slate-400 mb-1">القسم:</span>
                 <span class="font-semibold text-slate-700">{{ employee.department.name|default:"-" }}</span>
             </div>
+            <div>
+                <span class="block text-xs font-semibold text-slate-400 mb-1">الموقف التأميني:</span>
+                {% if is_insured %}
+                    <span class="font-bold text-emerald-600 text-xs bg-emerald-50 px-2 py-1 rounded border border-emerald-100">مؤمن عليه ({{ insurance_number }})</span>
+                {% else %}
+                    <span class="font-semibold text-slate-500 text-xs bg-slate-200/50 px-2 py-1 rounded">غير خاضع</span>
+                {% endif %}
+            </div>
         </div>
 
+        <!-- تفاصيل الراتب (الاستحقاقات والاستقطاعات) -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             
-            <div class="border border-slate-200 rounded-2xl p-4 bg-emerald-50/10">
-                <h3 class="text-sm font-bold text-emerald-700 border-b border-emerald-100 pb-2 mb-3 flex justify-between">
-                    <span>➕ المستحقات والحوافز</span>
-                    <span class="text-xs font-normal">القيمة بالجنيه</span>
+            <!-- المستحقات -->
+            <div class="border border-emerald-100 rounded-2xl p-5 bg-emerald-50/20 shadow-sm">
+                <h3 class="text-sm font-bold text-emerald-800 border-b border-emerald-100/60 pb-3 mb-4 flex justify-between">
+                    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> المستحقات والحوافز</span>
+                    <span class="text-xs font-normal text-emerald-600">القيمة (ج.م)</span>
                 </h3>
-                <div class="space-y-2.5 text-sm">
-                    <div class="flex justify-between text-slate-600">
-                        <span>الراتب الأساسي للشهر:</span>
-                        <span class="font-semibold text-slate-900">{{ base_salary }} ج.م</span>
+                <div class="space-y-3.5 text-sm">
+                    <div class="flex justify-between text-slate-700 items-center">
+                        <span class="font-medium">الراتب الأساسي التعاقدي:</span>
+                        <span class="font-bold text-slate-900 font-mono">{{ base_salary }}</span>
                     </div>
-                    <div class="flex justify-between text-emerald-600 font-medium">
-                        <span>حافز الساعات الإضافية:</span>
-                        <span>+ {{ overtime_allowance }} ج.م</span>
+                    {% if overtime_allowance > 0 %}
+                    <div class="flex justify-between text-emerald-700 items-center bg-emerald-50 p-1.5 rounded-lg">
+                        <span class="font-bold">حافز الساعات الإضافية:</span>
+                        <span class="font-bold font-mono">+ {{ overtime_allowance }}</span>
                     </div>
+                    {% endif %}
+                    
+                    {% if is_insured and insurance_variable_allowance > 0 %}
+                    <div class="flex justify-between text-slate-600 items-center">
+                        <span class="font-medium text-xs">بدلات تأمينية (متغير):</span>
+                        <span class="font-semibold font-mono text-xs">+ {{ insurance_variable_allowance }}</span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
-            <div class="border border-slate-200 rounded-2xl p-4 bg-rose-50/10">
-                <h3 class="text-sm font-bold text-rose-700 border-b border-rose-100 pb-2 mb-3 flex justify-between">
-                    <span>➖ الاستقطاعات والخصم</span>
-                    <span class="text-xs font-normal">القيمة بالجنيه</span>
+            <!-- الاستقطاعات -->
+            <div class="border border-rose-100 rounded-2xl p-5 bg-rose-50/20 shadow-sm">
+                <h3 class="text-sm font-bold text-rose-800 border-b border-rose-100/60 pb-3 mb-4 flex justify-between">
+                    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span> الاستقطاعات والجزاءات</span>
+                    <span class="text-xs font-normal text-rose-600">القيمة (ج.م)</span>
                 </h3>
-                <div class="space-y-2.5 text-sm">
-                    <div class="flex justify-between text-rose-600 font-medium">
-                        <span>خصومات التأخير عن العمل:</span>
-                        <span>- {{ late_deduction }} ج.م</span>
+                <div class="space-y-3 text-sm">
+                    {% if late_deduction > 0 %}
+                    <div class="flex justify-between text-rose-600 items-center">
+                        <span class="font-medium">خصومات التأخير عن العمل:</span>
+                        <span class="font-semibold font-mono">- {{ late_deduction }}</span>
                     </div>
-                    <div class="flex justify-between text-rose-600 font-medium">
-                        <span>جزاءات أيام الغياب:</span>
-                        <span>- {{ absence_deduction }} ج.م</span>
+                    {% endif %}
+                    
+                    {% if absence_deduction > 0 %}
+                    <div class="flex justify-between text-rose-600 items-center">
+                        <span class="font-medium">أيام الغياب بدون إذن:</span>
+                        <span class="font-semibold font-mono">- {{ absence_deduction }}</span>
                     </div>
+                    {% endif %}
+
+                    {% if penalty_deduction and penalty_deduction > 0 %}
+                    <div class="flex justify-between text-red-700 items-center bg-red-100/50 p-1.5 rounded-lg border border-red-100">
+                        <span class="font-bold">الجزاءات الإدارية المباشرة:</span>
+                        <span class="font-bold font-mono">- {{ penalty_deduction }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if is_insured and insurance_deduction > 0 %}
+                    <div class="flex justify-between text-slate-600 items-center pt-2 border-t border-rose-100/50">
+                        <span class="font-medium text-xs">الاستقطاع التأميني (حصة الموظف):</span>
+                        <span class="font-semibold font-mono text-xs">- {{ insurance_deduction }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if late_deduction == 0 and absence_deduction == 0 and not penalty_deduction and not is_insured %}
+                    <div class="text-center text-slate-400 text-xs py-2">لا توجد أي استقطاعات هذا الشهر</div>
+                    {% endif %}
                 </div>
             </div>
 
         </div>
 
-        <div class="bg-blue-600 text-white rounded-2xl p-5 flex justify-between items-center shadow-lg shadow-blue-600/20 mb-8">
-            <div>
-                <h4 class="text-sm font-bold opacity-80">صافي الراتب المستحق للصرف</h4>
-                <p class="text-xs opacity-60 mt-0.5">يشمل جميع التسويات والخصومات المسجلة من واقع البصمة</p>
+        <!-- الإجمالي الصافي -->
+        <div class="bg-gradient-to-r from-blue-700 to-blue-600 text-white rounded-2xl p-6 flex justify-between items-center shadow-lg shadow-blue-600/20 mb-10 relative overflow-hidden">
+            <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/4"></div>
+            <div class="relative z-10">
+                <h4 class="text-base font-bold">صافي الراتب المستحق للصرف</h4>
+                <p class="text-xs text-blue-100 mt-1">تمت التسوية بعد خصم التأمينات والجزاءات إن وجدت</p>
             </div>
-            <div class="text-left">
-                <span class="text-3xl font-black font-mono tracking-tight">{{ net_salary }}</span>
-                <span class="text-xs font-semibold block opacity-90">جنيه مصري لا غير</span>
+            <div class="text-left relative z-10">
+                <div class="flex items-baseline gap-1 justify-end">
+                    <span class="text-4xl font-black font-mono tracking-tight">{{ net_salary }}</span>
+                    <span class="text-sm font-bold text-blue-100">ج.م</span>
+                </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4 pt-6 border-t border-dashed border-slate-200 text-xs text-center text-slate-400 font-medium mt-12">
+        <!-- التوقيعات -->
+        <div class="grid grid-cols-3 gap-4 pt-8 border-t-2 border-dashed border-slate-200 text-sm text-center font-bold text-slate-600 mt-12">
             <div>
-                <p class="mb-8">توقيع المستلم / الموظف</p>
-                <p class="text-slate-300">━━━━━━━━━━━━━━━</p>
+                <p class="mb-12">إعداد (شؤون العاملين)</p>
+                <p class="text-slate-300">━━━━━━━━━</p>
             </div>
             <div>
-                <p class="mb-8">اعتماد إدارة الحسابات</p>
-                <p class="text-slate-300">━━━━━━━━━━━━━━━</p>
+                <p class="mb-12">مراجعة واعتماد (المدير المالي)</p>
+                <p class="text-slate-300">━━━━━━━━━</p>
+            </div>
+            <div>
+                <p class="mb-12">توقيع المستلم (الموظف)</p>
+                <p class="text-slate-300">━━━━━━━━━</p>
             </div>
         </div>
 

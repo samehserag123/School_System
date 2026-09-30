@@ -14,44 +14,159 @@
             theme: {
                 extend: {
                     fontFamily: { sans: ['Tajawal', 'sans-serif'] },
-                    colors: { primary: '#1e40af', secondary: '#3b82f6', dark: '#0f172a' }
+                    colors: { 
+                        primary: '#06b6d4', 
+                        secondary: '#3b82f6', 
+                        dark: '#0a0f1c' 
+                    }
                 }
             }
         }
     </script>
     <style>
-        /* سكرول بار ناعم للأنظمة الإدارية */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { bg: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { bg: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { bg: #94a3b8; }
+        /* 
+        🟢 ثيم "الوضع الليلي العميق" - (النسخة الحاسمة)
+        تدمير أي تواجد للون الرمادي أو الأبيض في جميع الصفحات الداخلية (Dashboard والكروت)
+        */
+        :root {
+            --bg-main: #0a0f1c;        /* كحلي عميق جداً للخلفية */
+            --bg-card: #111827;        /* لون الكروت والجداول الموحد */
+            --bg-sidebar: #0d1324;     
+            --border-color: #1e293b;   
+            --border-glow: #0ea5e9;    
+            --text-primary: #f8fafc;   
+            --text-secondary: #94a3b8; 
+            --text-accent: #fbbf24;    
+            --bg-hover: #1e293b;       
+        }
+
+        body, main {
+            background-color: var(--bg-main) !important;
+            color: var(--text-primary) !important;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 🟢 الإجبار الصارم: تحويل كل درجات الرمادي (الفاتح والغامق) والأبيض إلى لون الكارت الموحد */
+        .bg-white, 
+        .bg-slate-50, .bg-slate-100, .bg-slate-200, .bg-slate-800, .bg-slate-900,
+        .bg-gray-50, .bg-gray-100, .bg-gray-200, .bg-gray-800, .bg-gray-900,
+        .bg-zinc-50, .bg-zinc-100, .bg-zinc-200, .bg-zinc-800, .bg-zinc-900,
+        [class*="bg-white"] {
+            background-color: var(--bg-card) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        /* إعطاء لمسة احترافية للكروت (حدود خفيفة تتوهج عند التمرير) */
+        .rounded-xl, .rounded-2xl, .shadow-sm, .shadow-md {
+            border: 1px solid var(--border-color) !important;
+        }
+
+        /* الترويسة العلوية */
+        header.bg-white, header[class*="bg-white"] {
+            background-color: rgba(17, 24, 39, 0.95) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+        
+        header h2 {
+            color: var(--border-glow) !important;
+            text-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+        }
+
+        /* تحويل ألوان النصوص الحادة للدرجات المريحة */
+        .text-slate-900, .text-slate-800, .text-slate-700, 
+        .text-gray-900, .text-gray-800, .text-gray-700, [class*="text-slate-800"] { 
+            color: var(--text-primary) !important; 
+        }
+        .text-slate-600, .text-slate-500, .text-gray-600, .text-gray-500 { 
+            color: var(--text-secondary) !important; 
+        }
+
+        /* تحويل الجداول بشكل كامل */
+        table, th, td, tr, thead, tbody { border-color: var(--border-color) !important; }
+        thead tr, thead th {
+            background-color: #0f172a !important;
+            color: var(--text-primary) !important;
+            border-bottom: 2px solid var(--border-glow) !important;
+        }
+        tbody tr:hover { background-color: var(--bg-hover) !important; }
+        td.font-mono { color: var(--text-accent) !important; }
+
+        /* الحدود والفواصل */
+        [class*="border-slate-"], [class*="border-gray-"] {
+            border-color: var(--border-color) !important;
+        }
+
+        /* القائمة الجانبية (Sidebar) */
+        aside.bg-dark { background-color: var(--bg-sidebar) !important; border-left: 1px solid var(--border-color); }
+        aside a:hover { background-color: var(--bg-hover) !important; }
+        aside .bg-slate-800 { 
+            background-color: var(--bg-card) !important; 
+            border: 1px solid var(--border-glow) !important; 
+            color: var(--border-glow) !important; 
+        }
+
+        /* الأزرار الأساسية في القائمة */
+        .bg-secondary, .bg-emerald-600 {
+            background-color: #10b981 !important; 
+            color: #000 !important; 
+            font-weight: 800 !important;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.2) !important;
+            border: none !important;
+        }
+
+        /* حقول الإدخال والبحث */
+        input, select, textarea {
+            background-color: var(--bg-main) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid #1e3a8a !important; 
+            border-radius: 8px !important;
+        }
+        input:focus, select:focus { 
+            border-color: var(--border-glow) !important; 
+            box-shadow: 0 0 8px rgba(14, 165, 233, 0.4) !important; 
+            outline: none;
+        }
+
+        /* سكرول بار يطابق الثيم الداكن */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; border: 1px solid var(--bg-main); }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 h-screen overflow-hidden flex font-sans">
 
+    <!-- القائمة الجانبية (Sidebar) -->
     <aside class="w-64 bg-dark text-white flex flex-col h-full shadow-xl z-20">
         <div class="p-6 flex items-center gap-3 border-b border-slate-800">
             <div class="bg-secondary p-2 rounded-xl text-white shadow-md shadow-blue-500/20">
                 <i data-lucide="users" class="w-6 h-6"></i>
             </div>
             <div>
-                <h1 class="text-lg font-bold tracking-wide text-white">إدارة الموارد البشرية</h1>
-                <p class="text-[10px] text-slate-400">لوحة التحكم الفنية</p>
+                <h1 class="text-lg font-bold tracking-wide text-white">شؤون العاملين</h1>
+                <p class="text-[10px] text-slate-400">مدرسة طلعت حرب</p>
             </div>
         </div>
 
         <nav class="flex-1 overflow-y-auto py-4">
             <ul class="space-y-1 px-3">
+                <li class="mb-2">
+                    <a href="/" class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-200 bg-slate-800 text-slate-300 hover:bg-rose-600 hover:text-white border border-slate-700 hover:border-rose-500 shadow-sm font-bold text-sm">
+                        <i data-lucide="home" class="w-4 h-4"></i>
+                        <span>العودة للنظام الرئيسي</span>
+                    </a>
+                </li>
+
                 <li>
                     <a href="{% url 'hr:hr_dashboard' %}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'hr_dashboard' %}bg-secondary text-white shadow-lg shadow-blue-500/10 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
-                        <i data-lucide="layout-dashboard" class="w-5 h-5"></i> <span>الرئيسية</span>
+                        <i data-lucide="layout-dashboard" class="w-5 h-5"></i> <span>الرئيسية (HR)</span>
                     </a>
                 </li>
                 
                 <li class="pt-4 pb-1 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">الإدارة الميدانية</li>
                 
                 <li>
-                    <a href="{% url 'hr:employee_list' %}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'employee_list' %}bg-secondary text-white shadow-lg shadow-blue-500/10 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
+                    <a href="{% url 'hr:employee_list' %}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'employee_list' or request.resolver_match.url_name == 'employee_update' %}bg-secondary text-white shadow-lg shadow-blue-500/10 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
                         <i data-lucide="contact" class="w-5 h-5"></i> <span>دليل الموظفين</span>
                     </a>
                 </li>
@@ -62,26 +177,27 @@
                     </a>
                 </li>
 
-                <li class="pt-4 pb-1 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">الحضور والعمليات</li>
+                <li class="pt-4 pb-1 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">الحضور والرواتب</li>
                 
                 <li>
                     <a href="{% url 'hr:attendance_list' %}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'attendance_list' or request.resolver_match.url_name == 'upload_attendance' %}bg-secondary text-white shadow-lg shadow-blue-500/10 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
-                        <i data-lucide="calendar-clock" class="w-5 h-5"></i> <span>سجل الحضور</span>
+                        <i data-lucide="calendar-clock" class="w-5 h-5"></i> <span>سجل الحضور والجزاءات</span>
                     </a>
                 </li>
 
-                </li>
-                    <a href="{% url 'hr:payroll_report' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'payroll_report' %}text-white bg-blue-600{% else %}text-slate-400 hover:text-white hover:bg-slate-900{% endif %} px-4 py-3 rounded-xl transition-all text-sm font-medium">
-                        <span class="text-base">💰</span>
-                        <span>كشف الرواتب المجمع</span>
+                <li>
+                    <a href="{% url 'hr:payroll_report' %}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'payroll_report' or request.resolver_match.url_name == 'payroll_slip' %}bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
+                        <i data-lucide="banknote" class="w-5 h-5"></i> <span>كشف الرواتب المجمع</span>
                     </a>
                 </li>
                 
+                <li class="pt-4 pb-1 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">مركز الطلبات الشامل</li>
+                
                 <li>
-                    <a href="{% url 'hr:leave_list' %}" class="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'leave_list' %}bg-secondary text-white shadow-lg shadow-blue-500/10 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
+                    <a href="{% url 'hr:leave_list' %}" class="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'leave_list' or request.resolver_match.url_name == 'leave_create' %}bg-secondary text-white shadow-lg shadow-blue-500/10 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
                         <div class="flex items-center gap-3">
                             <i data-lucide="clipboard-list" class="w-5 h-5"></i> 
-                            <span>إدارة الإجازات</span>
+                            <span>الإجازات (من الرصيد)</span>
                         </div>
                         
                         {% if notification_count > 0 %}
@@ -91,6 +207,43 @@
                         {% endif %}
                     </a>
                 </li>
+
+                <li>
+                    <a href="{% url 'hr:permission_list' %}" class="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'permission_list' %}bg-secondary text-white shadow-lg shadow-blue-500/10 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="clock-4" class="w-5 h-5 text-amber-500"></i>
+                            <span class="text-sm">سجل الأذونات</span>
+                        </div>
+                    </a>
+                </li>
+                
+                <li>
+                    <a href="{% url 'hr:mission_list' %}" class="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'mission_list' %}bg-secondary text-white shadow-lg shadow-blue-500/10 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="map" class="w-5 h-5 text-purple-500"></i>
+                            <span class="text-sm">سجل المأموريات</span>
+                        </div>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{% url 'hr:adjustment_list' %}" class="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'adjustment_list' %}bg-secondary text-white shadow-lg shadow-blue-500/10 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="calculator" class="w-5 h-5 text-blue-500"></i>
+                            <span class="text-sm">التسويات والاستثناءات</span>
+                        </div>
+                    </a>
+                </li>
+                
+                <li>
+                    <a href="{% url 'hr:public_holiday_list' %}" class="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 {% if request.resolver_match.url_name == 'public_holiday_list' %}bg-secondary text-white shadow-lg shadow-blue-500/10 font-bold{% else %}text-slate-400 hover:bg-slate-800/60 hover:text-white{% endif %}">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="calendar-heart" class="w-5 h-5 text-rose-500"></i>
+                            <span class="text-sm">أجندة العطلات</span>
+                        </div>
+                    </a>
+                </li>
+                
             </ul>
         </nav>
     </aside>
@@ -100,20 +253,13 @@
             <h2 class="text-xl font-extrabold text-slate-800">{% block header_title %}لوحة القيادة{% endblock %}</h2>
             
             <div class="flex items-center gap-4">
-                <a href="{% url 'hr:leave_list' %}" class="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all group" title="عرض طلبات الإجازات المعلقة">
+                <a href="{% url 'hr:leave_list' %}" class="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all group" title="عرض الطلبات المعلقة">
                     <i data-lucide="bell" class="w-5 h-5"></i>
                     {% if notification_count > 0 %}
                         <span class="absolute top-1 left-1 bg-rose-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-white animate-bounce">
                             {{ notification_count }}
                         </span>
                     {% endif %}
-                </a>
-
-                <div class="h-5 w-px bg-slate-200"></div>
-
-                <a href="/" class="text-xs font-bold text-slate-600 hover:text-primary bg-slate-50 hover:bg-slate-100 border border-slate-200/80 px-3 py-2 rounded-xl transition-all flex items-center gap-1.5">
-                    <span>العودة للنظام الرئيسي</span>
-                    <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
                 </a>
             </div>
         </header>
@@ -127,12 +273,10 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // تفعيل أيقونات نظام Lucide فور رندرة الصفحة
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
             }
 
-            // محرك رصد واستهلاك رسائل سيلفر Django الفورية وتحويلها لتوستات منبثقة
             {% if messages %}
                 {% for message in messages %}
                     let msgType = 'success';
@@ -146,17 +290,16 @@
             {% endif %}
         });
 
-        // دالة الـ Toast الاحترافية الموحدة لجميع الصفحات الفرعية
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             if (!container) return;
 
             const toast = document.createElement('div');
-            let bgClass = 'bg-green-600';
+            let bgClass = 'bg-emerald-600';
             let icon = 'check-circle';
             
             if (type === 'error') {
-                bgClass = 'bg-red-600';
+                bgClass = 'bg-rose-600';
                 icon = 'alert-triangle';
             } else if (type === 'warning') {
                 bgClass = 'bg-amber-500';
@@ -172,19 +315,16 @@
             container.appendChild(toast);
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
-            // أنيميشن الظهور
             setTimeout(() => {
                 toast.classList.remove('translate-y-[-20px]', 'opacity-0');
             }, 30);
 
-            // التلاشي والحذف التلقائي بعد 4 ثوانٍ
             setTimeout(() => {
                 toast.classList.add('opacity-0', 'translate-x-[-20px]');
                 setTimeout(() => toast.remove(), 300);
             }, 4000);
         }
 
-        // دالة حماية عامة لتعطيل الأزرار لمنع تكرار الإرسال المالي وحساب البصمة (Loading)
         function activateLoadingButton(btn) {
             const form = btn.closest('form');
             if (form && form.checkValidity()) {
@@ -197,18 +337,8 @@
                         </svg>
                         <span>جاري معالجة طلبك الآن...</span>
                     `;
-                    btn.className = "w-full sm:w-auto px-6 py-3 bg-slate-400 text-white font-bold rounded-xl flex items-center justify-center gap-2 cursor-not-allowed";
+                    btn.className = "w-full sm:w-auto px-6 py-3 bg-slate-400 text-white font-bold rounded-xl flex items-center justify-center gap-2 cursor-not-allowed transition-all";
                 }, 10);
-            }
-        }
-
-        // دالة مساعدة لصفحات الرفع (عرض اسم الملف المختار حياً)
-        function displayFileName(input) {
-            const displayDiv = document.getElementById('file-name-display');
-            const textSpan = document.getElementById('file-name-text');
-            if (input.files && input.files.length > 0 && displayDiv && textSpan) {
-                textSpan.innerText = input.files[0].name;
-                displayDiv.classList.remove('hidden');
             }
         }
     </script>

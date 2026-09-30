@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'base_students.html' %}
 {% load static %}
 
 {% block title %}لوحة إدارة الباص المدرسي{% endblock %}
@@ -58,25 +58,25 @@
     .badge-neon-primary { background: rgba(56, 189, 248, 0.1); color: var(--accent-primary); border: 1px solid var(--accent-primary); }
 
     /* حل مشكلة شفافية الـ Modals وتداخلها مع الخلفية */
-    .modal-content { 
-        background-color: #020617 !important; 
-        border: 1px solid #1e293b !important; 
+    .modal-content {
+        background-color: #020617 !important;
+        border: 1px solid #1e293b !important;
         box-shadow: 0 10px 50px rgba(0,0,0,0.9) !important;
         color: #e2e8f0;
     }
     .modal-header, .modal-footer {
         border-color: #1e293b !important;
     }
-    .modal-content .form-control, .modal-content .form-select { 
-        background-color: #000 !important; 
-        color: #fff !important; 
-        border-color: #334155 !important; 
+    .modal-content .form-control, .modal-content .form-select {
+        background-color: #000 !important;
+        color: #fff !important;
+        border-color: #334155 !important;
     }
-    .modal-content .form-control:focus, .modal-content .form-select:focus { 
-        border-color: #38bdf8 !important; 
-        box-shadow: 0 0 10px rgba(56, 189, 248, 0.2) !important; 
+    .modal-content .form-control:focus, .modal-content .form-select:focus {
+        border-color: #38bdf8 !important;
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.2) !important;
     }
-    
+
     /* تنسيق خاص بـ Select2 داخل المودال ليتماشى مع الثيم المظلم */
     .select2-container--default .select2-selection--single {
         background-color: #000 !important;
@@ -202,7 +202,7 @@
             <h5 class="fw-bold text-white m-0"><i class="bi bi-list-columns-reverse me-2 text-success"></i> السجل المالي لاشتراكات الطلاب</h5>
             <input type="text" id="searchSub" class="form-control bg-black text-white border-secondary w-25" placeholder="بحث باسم الطالب...">
         </div>
-        
+
         <div class="table-responsive">
             <table class="table table-dark-custom align-middle text-center" id="subscriptionsTable">
                 <thead class="text-start">
@@ -237,7 +237,7 @@
                         </td>
                         <td class="text-center">
                             {% if sub.remaining_amount > 0 %}
-                                <button class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm" 
+                                <button class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm"
                                         onclick="openPaymentModal('{{ sub.id }}', '{{ sub.student.first_name }} {{ sub.student.last_name }}', '{{ sub.remaining_amount }}')">
                                     <i class="bi bi-cash-coin me-1"></i> تحصيل
                                 </button>
@@ -294,7 +294,7 @@
                             <input type="number" name="capacity" class="form-control" value="20" required>
                         </div>
                     </div>
-                    
+
                     <!-- التنسيق المطور لأسعار الخط -->
                     <div class="mb-2 p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid #1e293b;">
                         <h6 class="text-info mb-2 small fw-bold"><i class="bi bi-tags me-1"></i> قائمة أسعار الخط (كتالوج الأسعار)</h6>
@@ -356,9 +356,9 @@
                             <select name="route_id" class="form-select" required onchange="updatePriceHint(this)">
                                 <option value="">اختر الخط...</option>
                                 {% for route in routes %}
-                                    <option value="{{ route.id }}" 
-                                            data-monthly="{{ route.monthly_price }}" 
-                                            data-term="{{ route.term_price }}" 
+                                    <option value="{{ route.id }}"
+                                            data-monthly="{{ route.monthly_price }}"
+                                            data-term="{{ route.term_price }}"
                                             data-yearly="{{ route.yearly_price }}">
                                         {{ route.name }} (متاح: {{ route.capacity|add:"-"|add:route.current_occupancy }})
                                     </option>
@@ -410,7 +410,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="add_payment">
                 <input type="hidden" name="subscription_id" id="pay_sub_id">
-                
+
                 <div class="modal-header border-secondary bg-success bg-opacity-10">
                     <h6 class="modal-title text-success fw-bold"><i class="bi bi-wallet2 me-2"></i> تحصيل قسط باص</h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -481,7 +481,7 @@
     function openPaymentModal(subId, studentName, remainingAmount) {
         document.getElementById('pay_sub_id').value = subId;
         document.getElementById('pay_student_name').innerText = studentName;
-        document.getElementById('pay_amount').value = remainingAmount; 
+        document.getElementById('pay_amount').value = remainingAmount;
         var myModal = new bootstrap.Modal(document.getElementById('paymentModal'));
         myModal.show();
     }
@@ -489,15 +489,15 @@
     // دالة لتحديث السعر التلقائي في مودال الاشتراك بناءً على اختيار الخط والنظام
     function updatePriceHint(routeSelect) {
         if(!routeSelect || routeSelect.selectedIndex === 0) return;
-        
+
         let selectedOption = routeSelect.options[routeSelect.selectedIndex];
         let subType = document.getElementById('subTypeSelect').value;
         let price = 0;
-        
+
         if(subType === 'monthly') price = selectedOption.getAttribute('data-monthly');
         else if(subType === 'term') price = selectedOption.getAttribute('data-term');
         else if(subType === 'yearly') price = selectedOption.getAttribute('data-yearly');
-        
+
         // منع ظهور "null" إذا لم يتم إدخال سعر في الداتا بيز
         if(price === "None" || price === null) price = 0;
 
@@ -508,7 +508,7 @@
     document.addEventListener("DOMContentLoaded", function() {
         let labels = [];
         let data = [];
-        
+
         document.querySelectorAll('.route-chart-data').forEach(item => {
             let count = parseInt(item.getAttribute('data-count'));
             if(count > 0) {

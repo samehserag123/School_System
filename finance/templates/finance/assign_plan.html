@@ -8,7 +8,7 @@
 <div class="container-fluid py-4">
     <div class="row justify-content-center">
         <div class="col-md-11 col-lg-9">
-            
+
             {% if messages %}
                 {% for message in messages %}
                     <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm mb-4" role="alert">
@@ -30,7 +30,7 @@
                                 <small class="text-white text-opacity-75">سنة دراسية: {{ active_year|default:"2028/2029" }}</small>
                             </div>
                         </div>
-                        
+
                         {% if account and account.installment_plan %}
                         <div class="text-end" dir="rtl">
                             <span class="badge bg-warning text-dark fw-bold p-2 px-3 shadow-sm">
@@ -44,7 +44,7 @@
                 <div class="card-body p-4 p-md-5">
                     <form method="POST" id="assignmentForm" action="{% if selected_student %}{% url 'assign_plan_with_id' selected_student.id %}{% else %}{% url 'assign_plan' %}{% endif %}">
                         {% csrf_token %}
-                        
+
                         <!-- 🟢 حفظ مرجع الشاشة القادم منها المستخدم (كاونتر / تحصيل سريع) -->
                         <input type="hidden" name="from_screen" value="{{ from_screen }}">
 
@@ -84,14 +84,22 @@
                             <select name="plan_id" id="plan_select" class="form-select form-select-lg bg-dark text-white border-info p-3 fw-bold" required>
                                 <option value="" data-amount="0">-- اختر خطة الدفع من القائمة --</option>
                                 {% for p in plans %}
-                                    <option value="{{ p.id }}" 
+                                    <option value="{{ p.id }}"
                                             data-name="{{ p.name }}"
-                                            data-amount="{{ p.total_amount }}" 
+                                            data-amount="{{ p.total_amount }}"
                                             data-details='[ {% for item in p.items.all %}{"name":"{{ item.installment_name }}", "amount":"{{ item.amount }}", "date":"{{ item.due_date|date:"Y-m-d" }}"}{% if not forloop.last %},{% endif %}{% endfor %} ]'>
                                         {{ p.name }} (إجمالي: {{ p.total_amount }} ج.م)
                                     </option>
                                 {% endfor %}
                             </select>
+                        </div>
+                        <!-- 🟢 بداية الإضافة: حقل تاريخ البداية الديناميكي -->
+                        <div class="mb-4" dir="rtl" id="customDateDiv" style="display: none;">
+                            <label class="form-label text-warning fw-bold mb-2 small">تاريخ بداية القسط الأول (لترحيل الخطة للطلاب المتأخرين):</label>
+                            <input type="date" name="custom_start_date" id="custom_start_date" class="form-control bg-dark text-white border-warning p-3 shadow-none">
+                            <small class="text-white text-opacity-50 mt-1 d-block">
+                                <i class="bi bi-info-circle me-1"></i> اتركه فارغاً لتطبيق التواريخ الافتراضية للخطة. (اختيار تاريخ جديد سيزيح باقي الأقساط تلقائياً).
+                            </small>
                         </div>
 
                         <div id="financialPreview" class="d-none mb-4" dir="rtl">
@@ -145,6 +153,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
 
 <script>
+// كود صغير لإظهار الحقل فقط عند اختيار خطة لها أقساط
+    $('#plan_select').on('change', function() {
+        if ($(this).val() !== "") {
+            $('#customDateDiv').slideDown();
+        } else {
+            $('#customDateDiv').slideUp();
+        }
+    });
 $(document).ready(function() {
     const planSelect = $('#plan_select');
     const netDisplay = $('#netAmountDisplay');
@@ -163,7 +179,7 @@ $(document).ready(function() {
             planNameDisplay.text(planName);
             netDisplay.text(amount.toLocaleString('ar-EG') + ' ج.م');
             $('#financialSummary').removeClass('d-none');
-            
+
             previewBody.empty();
             if (Array.isArray(details)) {
                 details.forEach(function(item) {

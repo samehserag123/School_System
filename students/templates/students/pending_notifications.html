@@ -237,9 +237,10 @@
                 <i class="bi bi-list-stars text-info"></i> قائمة الطلبات الواردة
             </h5>
             
-            <div class="search-input-wrapper w-100 w-sm-auto" style="min-width: 280px;">
+            <div class="search-input-wrapper w-100 w-sm-auto" style="min-width: 320px;">
                 <i class="bi bi-search"></i>
-                <input type="text" id="quickSearch" class="w-100" placeholder="تصفية بالاسم أو الرقم القومي..." onkeyup="filterNotifications()">
+                <!-- 🟢 تم تعديل خانة البحث لتشمل جواز السفر صراحةً -->
+                <input type="text" id="quickSearch" class="w-100" placeholder="تصفية بالاسم، الرقم القومي، أو جواز السفر..." onkeyup="filterNotifications()">
             </div>
         </div>
 
@@ -250,9 +251,10 @@
                         <th>#</th>
                         <th>تاريخ الورود</th>
                         <th>اسم الطالب بالكامل</th>
-                        <th>الرقم القومي</th>
+                        <!-- 🟢 تعديل العناوين لتشمل الوافدين -->
+                        <th>رقم الهوية (قومي / جواز)</th>
                         <th>رقم التليفون / واتساب</th>
-                        <th>المحافظة</th>
+                        <th>المحافظة / الدولة</th>
                         <th>المؤهل السابق</th>
                         <th class="text-center">الإجراءات</th>
                     </tr>
@@ -263,7 +265,10 @@
                         <td class="text-secondary font-monospace fw-bold">{{ forloop.counter }}</td>
                         <td class="font-monospace text-info small">{{ note.received_at|date:"Y-m-d H:i" }}</td>
                         <td class="fw-black text-white">{{ note.full_name_ar }}</td>
-                        <td class="font-monospace fw-bold text-light">{{ note.national_id }}</td>
+                        
+                        <!-- 🟢 عرض الهوية بشكل يقبل الأرقام والحروف (لجوازات السفر) -->
+                        <td class="font-monospace fw-bold text-light" style="letter-spacing: 1px;">{{ note.national_id }}</td>
+                        
                         <td>
                             <div class="font-monospace small text-slate-300">{{ note.phone }}</div>
                             {% if note.whatsapp_number %}
@@ -272,13 +277,16 @@
                                 </a>
                             {% endif %}
                         </td>
-                        <td><span class="badge bg-secondary bg-opacity-20 text-info border border-info border-opacity-20 rounded-pill px-3">{{ note.birth_governorate|default:"غير محدد" }}</span></td>
-                        <td class="small text-secondary">{{ note.current_qualification|default:"-" }}</td>
+                        <td>
+                            <span class="badge bg-secondary bg-opacity-20 text-info border border-info border-opacity-20 rounded-pill px-3 py-2">
+                                {{ note.birth_governorate|default:"غير محدد" }}
+                            </span>
+                        </td>
+                        <td class="small text-secondary fw-bold">{{ note.current_qualification|default:"-" }}</td>
                         
-                        <!-- 🟢 التعديل: قسم الإجراءات يحتوي على زر الاستكمال وزر الحذف -->
                         <td class="text-center">
                             <div class="d-flex align-items-center justify-content-center gap-2">
-                                <a href="{% url 'add_student' %}?notify_id={{ note.id }}" class="btn-complete" title="قبول واستكمال البيانات">
+                                <a href="{% url 'add_student' %}?notify_id={{ note.id }}" class="btn-complete" title="قبول واستكمال البيانات بالكنترول">
                                     <span>استكمال</span>
                                     <i class="bi bi-arrow-left-short fs-5"></i>
                                 </a>
@@ -309,7 +317,7 @@
 </div>
 
 <script>
-    // سكربت التصفية السريعة والبحث اللحظي داخل الجدول
+    // 🟢 سكربت التصفية السريعة محدث للبحث في جوازات السفر والأرقام القومية
     function filterNotifications() {
         const input = document.getElementById("quickSearch");
         const filter = input.value.toLowerCase();
@@ -318,11 +326,11 @@
 
         for (let i = 1; i < tr.length; i++) {
             let tdName = tr[i].getElementsByTagName("td")[2];
-            let tdNationalId = tr[i].getElementsByTagName("td")[3];
+            let tdIdentity = tr[i].getElementsByTagName("td")[3]; // عمود الهوية (رقم قومي/جواز)
             
-            if (tdName || tdNationalId) {
+            if (tdName || tdIdentity) {
                 let nameValue = tdName.textContent || tdName.innerText;
-                let idValue = tdNationalId.textContent || tdNationalId.innerText;
+                let idValue = tdIdentity.textContent || tdIdentity.innerText;
                 
                 if (nameValue.toLowerCase().indexOf(filter) > -1 || idValue.toLowerCase().indexOf(filter) > -1) {
                     tr[i].style.display = "";

@@ -1,0 +1,69 @@
+{% extends 'hr/base_hr.html' %}
+
+{% block title %}أجندة العطلات الرسمية{% endblock %}
+{% block header_title %}العطلات والإجازات الاستثنائية{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- نموذج إضافة عطلة -->
+    <div class="lg:col-span-1">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
+            <h3 class="text-lg font-bold text-slate-800 mb-1 flex items-center gap-2">
+                <i data-lucide="calendar-heart" class="w-5 h-5 text-rose-500"></i> تسجيل عطلة جديدة
+            </h3>
+            <p class="text-xs text-slate-500 mb-6">سيقوم النظام بتعطيل خصم الغياب تلقائياً خلال هذه التواريخ.</p>
+            
+            <form method="POST" action="" onsubmit="activateLoadingButton(this.querySelector('button[type=\'submit\']'))" class="space-y-4">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            <p class="text-xs text-rose-500 font-bold mt-1">{{ field.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                
+                <button type="submit" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 mt-4">
+                    <i data-lucide="calendar-check" class="w-4 h-4"></i> اعتماد العطلة
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- جدول عرض العطلات -->
+    <div class="lg:col-span-2">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-right text-slate-600">
+                    <thead class="text-xs text-slate-500 bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-5 py-4 font-bold">اسم المناسبة / العطلة</th>
+                            <th class="px-5 py-4 font-bold">من تاريخ</th>
+                            <th class="px-5 py-4 font-bold">إلى تاريخ</th>
+                            <th class="px-5 py-4 font-bold text-center">المدة</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for holiday in holidays %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-5 py-4 font-bold text-slate-800">{{ holiday.name }}</td>
+                            <td class="px-5 py-4 font-mono text-xs font-bold text-slate-600">{{ holiday.start_date|date:"Y-m-d" }}</td>
+                            <td class="px-5 py-4 font-mono text-xs font-bold text-slate-600">{{ holiday.end_date|date:"Y-m-d" }}</td>
+                            <td class="px-5 py-4 text-center">
+                                <span class="bg-rose-100 text-rose-700 px-2.5 py-1 rounded-md text-xs font-black border border-rose-200">
+                                    {{ holiday.duration_days }} أيام
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="px-5 py-16 text-center text-slate-400 font-bold">لا توجد عطلات رسمية مسجلة.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

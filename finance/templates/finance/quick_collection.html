@@ -86,7 +86,7 @@
                                 <option value="">اختر الطالب للتحصيل المباشر...</option>
                                 {% for s in students %}
                                     <option value="{{ s.id }}" {% if selected_student_id == s.id|stringformat:"s" %}selected{% endif %}>
-                                        {{ s.get_full_name }} 
+                                        {{ s.get_full_name }}
                                         {% if s.student_code %}({{ s.student_code }}){% endif %}
                                     </option>
                                 {% endfor %}
@@ -95,7 +95,7 @@
                         <div class="col-md-3 text-end pt-3">
                             <div class="d-flex gap-2">
                                 <a href="{% url 'quick_collection' %}" class="btn btn-outline-light flex-fill btn-sm">إعادة ضبط</a>
-                                
+
                                <a href="{% url 'student_list' %}" id="btn-back" class="btn btn-danger btn-sm">
                                     <i class="bi bi-x-circle"></i> إغلاق والعودة
                                 </a>
@@ -127,8 +127,8 @@
                             <select name="student" id="id_student" class="form-control" required>
                                 <option value="">-- ابحث بالاسم، الكود، أو الرقم القومي --</option>
                                 {% for s in students %}
-                                    <option value="{{ s.id }}" 
-                                            data-national="{{ s.national_id|default:'' }}" 
+                                    <option value="{{ s.id }}"
+                                            data-national="{{ s.national_id|default:'' }}"
                                             data-code="{{ s.student_code|default:'' }}"
                                             {% if selected_student_id == s.id %}selected{% endif %}>
                                         {{ s.get_full_name }} | كود: {{ s.student_code|default:"0000" }}
@@ -156,35 +156,37 @@
                         <div class="row text-right">
                             <div class="col-md-4 mb-3">
                                 <label class="form-label text-warning fw-bold">رقم الإيصال (مرجعي):</label>
-                                
+
                                 {% if active_book %}
                                     <div class="input-group">
-                                        <input type="number" name="receipt_number" id="id_receipt_number" 
-                                            class="form-control bg-dark text-warning fw-bold border-warning fs-5 text-center" 
-                                            value="{{ next_serial }}" readonly required>
-                                        
+                                        <!-- 🔴 التعديل الجراحي: تحويل type إلى text ودعم dir="ltr" لتظهر البادئة بشكل صحيح (EXP-1234) -->
+                                        <input type="text" name="receipt_number" id="id_receipt_number"
+                                            class="form-control bg-dark text-warning fw-bold border-warning fs-5 text-center"
+                                            value="{{ next_serial }}" readonly required dir="ltr">
+
                                         {% if user.is_superuser and last_payment %}
-                                            <button type="button" class="btn btn-danger fw-bold" 
-                                                    onclick="confirmCancel('{% url 'admin_cancel_receipt' last_payment.id %}', '{{ last_payment.receipt_number }}')"
-                                                    title="إلغاء الإيصال السابق رقم {{ last_payment.receipt_number }} وتصفير قيمته">
+                                            <!-- 🟢 تم إضافة الفلتر default:last_payment.id لعرض رقم العملية لو السيريال فارغ -->
+                                            <button type="button" class="btn btn-danger fw-bold"
+                                                    onclick="confirmCancelReceipt('{% url 'admin_cancel_receipt' last_payment.id %}', '{{ last_payment.receipt_number|default:last_payment.id }}')"
+                                                    title="إلغاء الإيصال السابق رقم {{ last_payment.receipt_number|default:last_payment.id }} وتصفير قيمته">
                                                 <i class="bi bi-trash-fill"></i> إلغاء السيريال
                                             </button>
                                         {% endif %}
                                     </div>
                                     <small class="text-success small"><i class="bi bi-check-circle-fill"></i> السيريال المرجعي متاح</small>
-                                    
+
                                     {% if user.is_superuser and last_payment and last_payment.is_cancelled %}
                                         <div class="mt-1">
                                             <small class="text-danger fw-bold">
-                                                <i class="bi bi-info-circle"></i> الإيصال السابق رقم {{ last_payment.receipt_number }} تم إلغاؤه وقيمته (0).
+                                                <i class="bi bi-info-circle"></i> الإيصال السابق رقم {{ last_payment.receipt_number|default:last_payment.id }} تم إلغاؤه وقيمته (0).
                                             </small>
                                         </div>
                                     {% endif %}
 
                                 {% else %}
-                                    <input type="text" id="id_receipt_number" 
-                                        class="form-control bg-dark text-danger fw-bold border-danger text-center fs-5" 
-                                        placeholder="لا يوجد دفتر" disabled>
+                                    <input type="text" id="id_receipt_number"
+                                        class="form-control bg-dark text-danger fw-bold border-danger text-center fs-5"
+                                        placeholder="لا يوجد دفتر نشط" disabled>
                                     <small class="text-danger fw-bold small"><i class="bi bi-exclamation-triangle"></i> ليس لديك عهدة نشطة حالياً!</small>
                                 {% endif %}
                             </div>
@@ -211,7 +213,7 @@
                                     </button>
                                 </div>
                                 <small id="coupon_message" class="d-block mt-2 fw-bold"></small>
-                                
+
                                 <input type="hidden" name="hidden_discount_value" id="hidden_discount_value" value="0">
                                 <input type="hidden" name="hidden_discount_type" id="hidden_discount_type" value="">
                             </div>
@@ -284,17 +286,17 @@
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = url;
-            
+
             const csrfInput = document.createElement('input');
             csrfInput.type = 'hidden';
             csrfInput.name = 'csrfmiddlewaretoken';
             csrfInput.value = '{{ csrf_token }}';
-            
+
             const reasonInput = document.createElement('input');
             reasonInput.type = 'hidden';
             reasonInput.name = 'reason';
             reasonInput.value = result.value;
-            
+
             form.appendChild(csrfInput);
             form.appendChild(reasonInput);
             document.body.appendChild(form);
@@ -331,7 +333,7 @@ $(document).ready(function() {
     $('#id_student').on('select2:select', function (e) {
         setTimeout(function() {
             $('#id_amount').focus();
-        }, 100); 
+        }, 100);
     });
 
     // 4. منع الكسور العشرية والرموز في حقل المبلغ
@@ -341,17 +343,17 @@ $(document).ready(function() {
             e.preventDefault();
         }
     });
-    
+
     amountInput.on('input', function() {
         this.value = this.value.replace(/[^0-9]/g, '');
     });
 
     // 5. زر Enter (المرحلة الأولى) - عند كتابة المبلغ يفتح المعاينة فقط ويمنع الإرسال التلقائي
     $('#id_amount').on('keypress', function(e) {
-        if (e.which === 13) { 
+        if (e.which === 13) {
             e.preventDefault(); // منع المتصفح من إرسال الفورم فوراً
             if (!$('#previewModal').hasClass('show')) {
-                handlePreview(); 
+                handlePreview();
             }
         }
     });
@@ -361,10 +363,10 @@ $(document).ready(function() {
         if ($('#previewModal').hasClass('show') && e.which === 13) {
             e.preventDefault();
             const finalBtn = $('#btnSubmitFinal');
-            
+
             // قفل أمان: إذا كان الزر قد تم الضغط عليه بالفعل وتم تعطيله، تجاهل أي ضغطة Enter إضافية
             if (!finalBtn.prop('disabled')) {
-                submitMainForm(); 
+                submitMainForm();
             }
         }
     });
@@ -373,12 +375,12 @@ $(document).ready(function() {
     function normalizeArabic(text) {
         if (!text) return "";
         let result = text.trim();
-        result = result.replace(/^ال/g, ""); 
+        result = result.replace(/^ال/g, "");
         return result
             .replace(/[أإآ]/g, "ا")
             .replace(/ة/g, "ه")
             .replace(/ى/g, "ي")
-            .replace(/\s+/g, ""); 
+            .replace(/\s+/g, "");
     }
 
     // 💡 الإضافة الجديدة: متغير لتخزين الرسوم الإدارية للطالب
@@ -386,7 +388,7 @@ $(document).ready(function() {
 
     function fetchStudentBalance(studentId) {
         if (!studentId) return;
-        
+
         // إظهار الحاوية وعلامة التحميل
         $('#arrears_container').show();
         $('#current_due, #total_debt').html('<span class="spinner-border spinner-border-sm"></span>');
@@ -398,18 +400,18 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(data) {
                 console.log("البيانات المستلمة:", data);
-                
+
                 if (data.success || !data.error) {
                     let remaining = data.total_remaining || data.total_debt || 0;
                     let due = data.current_due || 0;
-                    
+
                     // 💡 استلام الرسوم الإدارية من السيرفر
                     currentAdminFee = data.admin_fee || 0;
 
                     // تحديث المربعين بالأرقام الحقيقية بدون كسور
                     $('#current_due').text(Math.round(due).toLocaleString() + " ج.م");
                     $('#total_debt').text(Math.round(remaining).toLocaleString() + " ج.م");
-                    
+
                     // تفعيل حدث التغيير لضمان تطبيق الرسوم لو كان مختار فئة رسوم إدارية مسبقاً
                     $('#id_category').trigger('change');
                 } else {
@@ -441,17 +443,17 @@ $(document).ready(function() {
     const normText = normalizeArabic(rawText);
     const hint = $('#category_hint');
     const amountField = $('#id_amount');
-    
+
     // 1. نفس القائمة الموجودة في الـ Models لضمان التطابق
     const feeKeywords = ["مصروفات", "انشطه", "أنشطة", "كتب", "زي", "دراسي", "قسط", "تعليم"];
-    
+
     // 2. نفس كلمات الاستبعاد الموجودة في الـ Models
     const excludedKeywords = ["اداريه", "إدارية", "حر", "منفصل"];
-    
+
     // التحقق من المطابقة
     const isFeeMatch = feeKeywords.some(word => normText.includes(normalizeArabic(word)));
     const isExcluded = excludedKeywords.some(word => normText.includes(normalizeArabic(word)));
-    
+
     // 3. منطق الرسوم الإدارية التلقائية (كما هو عندك)
     const isAdminFee = (normText.includes("اداريه") || normText.includes("ادارية"));
 
@@ -462,7 +464,7 @@ $(document).ready(function() {
             .css({'color': '#0dcaf0', 'display': 'block'});
     } else {
         amountField.prop('readonly', false);
-        
+
         // الشرط الذهبي: يجب أن يكون من الكلمات المسموحة وليس من المستبعدات
         if (isFeeMatch && !isExcluded) {
             hint.html('<i class="bi bi-check-circle-fill text-success"></i> تأكيد: سيتم خصم هذا المبلغ من أقساط الطالب ✅')
@@ -473,7 +475,7 @@ $(document).ready(function() {
         }
     }
 });
-    
+
     $('#id_category').trigger('change');
 });
 
@@ -482,15 +484,15 @@ function applyCoupon() {
     const studentId = $('#id_student').val();
 
     if (!studentId) {
-        Swal.fire({ 
-            icon: 'warning', 
-            title: 'تنبيه', 
+        Swal.fire({
+            icon: 'warning',
+            title: 'تنبيه',
             text: 'يرجى اختيار الطالب أولاً قبل تطبيق الخصم.',
             confirmButtonText: 'حسناً'
         });
         return;
     }
-    
+
     if (!code) {
         $('#coupon_message').html('<span class="text-danger small">❌ يرجى إدخال الكود</span>');
         return;
@@ -501,7 +503,7 @@ function applyCoupon() {
     $('#coupon_message').html('<span class="text-info small">جاري التحقق...</span>');
 
     $.ajax({
-        url: "{% url 'validate_coupon' %}", 
+        url: "{% url 'validate_coupon' %}",
         method: "GET",
         data: {
             'code': code,
@@ -509,14 +511,14 @@ function applyCoupon() {
         },
         success: function(response) {
             $('#btnApplyCoupon').prop('disabled', false).html('<i class="bi bi-check2-circle"></i> تطبيق');
-            
+
             if (response.status === 'success') {
                 $('#coupon_message').html(`<span class="text-success small">✅ ${response.message} (${response.display_msg})</span>`);
                 $('#hidden_discount_value').val(response.discount_value);
                 $('#hidden_discount_type').val(response.discount_type);
-                
+
                 // تمييز الحقل بصرياً وتعطيله لضمان عدم تغيير الطالب بعد الخصم
-                $('#id_student').addClass('is-valid').css('background-color', '#1a202c').prop('disabled', true); 
+                $('#id_student').addClass('is-valid').css('background-color', '#1a202c').prop('disabled', true);
                 $('#coupon_code').prop('readonly', true);
             } else {
                 $('#coupon_message').html(`<span class="text-danger small">❌ ${response.message}</span>`);
@@ -534,9 +536,9 @@ function applyCoupon() {
 
 function handlePreview() {
     // 1. فك التجميد لضمان الحصول على القيم الصحيحة قبل القراءة
-    $('#id_student').prop('disabled', false); 
+    $('#id_student').prop('disabled', false);
     $('#id_amount').prop('readonly', false);
-    
+
     const sSelect = $('#id_student');
     const originalAmount = parseFloat($('#id_amount').val()) || 0;
     const cat = $('#id_category option:selected').text();
@@ -545,14 +547,14 @@ function handlePreview() {
 
     // 2. جلب قيمة المديونية الحالية (تنظيف النص من الفواصل والعملة)
     // هذا الجزء يضمن تحويل "13,000 ج.م" إلى رقم 13000
-    const totalDebtRaw = $('#total_debt').text().replace(/[^\d.]/g, ''); 
+    const totalDebtRaw = $('#total_debt').text().replace(/[^\d.]/g, '');
     const currentDebt = parseFloat(totalDebtRaw) || 0;
 
     // --- 3. التحقق من وجود مديونية من الأساس ---
     if (currentDebt <= 0) {
-        Swal.fire({ 
-            icon: 'error', 
-            title: 'عفواً!', 
+        Swal.fire({
+            icon: 'error',
+            title: 'عفواً!',
             text: 'لا يمكن تحصيل مبالغ لهذا الطالب لأن مديونيته الحالية تظهر (0) في النظام.',
             confirmButtonText: 'مفهوم'
         });
@@ -562,21 +564,21 @@ function handlePreview() {
     // --- 4. التعديل المطلوب: رفض العملية إذا كان المبلغ أكبر من المتبقي ---
     // أضفنا 0.01 لتجنب أخطاء الكسور البسيطة في البرمجة
     if (originalAmount > (currentDebt + 0.01)) {
-        Swal.fire({ 
-            icon: 'error', 
-            title: 'تجاوز الحد المسموح', 
+        Swal.fire({
+            icon: 'error',
+            title: 'تجاوز الحد المسموح',
             text: `لا يمكنك تحصيل مبلغ (${originalAmount.toLocaleString()} ج.م) وهو أكبر من المديونية المتبقية (${currentDebt.toLocaleString()} ج.م).`,
             confirmButtonText: 'تعديل المبلغ'
         });
-        return; 
+        return;
     }
 
     // --- 5. التحقق من إدخال البيانات الأساسية ---
     if (!sSelect.val() || originalAmount <= 0) {
-        Swal.fire({ 
-            icon: 'warning', 
-            title: 'بيانات ناقصة', 
-            text: 'يرجى اختيار الطالب وتحديد مبلغ سداد صحيح أكبر من الصفر.' 
+        Swal.fire({
+            icon: 'warning',
+            title: 'بيانات ناقصة',
+            text: 'يرجى اختيار الطالب وتحديد مبلغ سداد صحيح أكبر من الصفر.'
         });
         return;
     }
@@ -600,17 +602,17 @@ function handlePreview() {
     $('#p_student').text(sSelect.find(':selected').text());
     $('#p_category').text(cat);
     $('#p_notes').text("إيصال #" + (receiptNum || '---') + " | " + (notes || "بدون ملاحظات"));
-    
+
     if (discountAmount > 0) {
         $('#p_amount').html(`
-            <del class="text-danger ms-2 fs-6">${originalAmount.toLocaleString()} ج.م</del> 
+            <del class="text-danger ms-2 fs-6">${originalAmount.toLocaleString()} ج.م</del>
             <span class="text-success fs-4">${finalAmount.toLocaleString()} ج.م</span>
             <br><small class="text-warning fs-6">(تم خصم مبلغ: ${discountAmount.toLocaleString()} ج.م)</small>
         `);
     } else {
         $('#p_amount').text(originalAmount.toLocaleString() + " ج.م");
     }
-    
+
     // إظهار نافذة التأكيد
     new bootstrap.Modal(document.getElementById('previewModal')).show();
 }
@@ -618,16 +620,16 @@ function handlePreview() {
 // 💡 الدالة المسؤولة عن الإرسال النهائي للسيرفر (تم تعديلها لحل مشكلة CSRF)
 function submitMainForm() {
     const finalBtn = $('#btnSubmitFinal');
-    
+
     if (finalBtn.prop('disabled')) return;
 
     // تعطيل الزر لمنع التكرار
     finalBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> جاري الترحيل...');
-    
+
     // ⚠️ هام جداً: تفعيل الحقول قبل الإرسال لكي يراها السيرفر ويقرأ قيمها
     $('#id_student').prop('disabled', false);
     $('#id_amount').prop('readonly', false);
-    
+
     // 🎯 الحل: الإرسال عبر jQuery لضمان تمرير الـ CSRF Token المحدث بالكامل دون مشاكل
     $('#mainPaymentForm').trigger('submit');
 }

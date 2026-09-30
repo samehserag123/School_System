@@ -4,106 +4,532 @@
 {% block header_title %}سجل الحضور والانصراف{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto space-y-6">
-    
-    <!-- قسم الترويسة والإجراءات -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
-        <div class="absolute right-0 top-0 w-2 h-full bg-gradient-to-b from-blue-500 to-green-400"></div>
+<!-- 🟢 تعريف توكن الأمان للطلبات السريعة (AJAX) -->
+<meta name="csrf-token" content="{{ csrf_token }}">
+
+<div class="max-w-7xl mx-auto space-y-6 pb-10">
+
+    <!-- قسم الترويسة الأنيق -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-blue-100 border-l-4 border-l-blue-600">
         <div>
-            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <div class="bg-blue-100 text-blue-600 p-2 rounded-lg"><i data-lucide="calendar-clock" class="w-6 h-6"></i></div>
-                حضور الموظفين
+            <h3 class="text-2xl font-black text-gray-900 flex items-center gap-2">
+                <i data-lucide="calendar-check-2" class="w-7 h-7 text-blue-600"></i>
+                سجل الحضور والجزاءات الشهري
             </h3>
-            <p class="text-slate-500 text-sm mt-1">سجل تفصيلي لحركات الحضور والانصراف اليومية</p>
+            <p class="text-blue-800 font-bold text-sm mt-2 bg-blue-50 inline-block px-3 py-1 rounded-lg">
+                الدورة المالية: من <span class="text-blue-600">{{ cycle_start|date:"Y-m-d" }}</span> إلى <span class="text-blue-600">{{ cycle_end|date:"Y-m-d" }}</span>
+            </p>
         </div>
-        
-        <!-- تم حل مشكلة المسار هنا بإضافة hr: -->
-        <a href="{% url 'hr:upload_attendance' %}" class="flex items-center gap-2 bg-primary hover:bg-blue-800 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+
+        <div class="flex flex-wrap items-center gap-3">
+            <!-- 🟢 زرار تصدير Excel لأعمدة الصفحة فقط -->
+            <button type="button" onclick="exportTableToExcel()" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-bold transition-all shadow-md cursor-pointer">
+                <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+                تصدير Excel
+            </button>
+
+            <a href="{% url 'hr:upload_attendance' %}" class="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md">
+                <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+                رفع ملف البصمة
+            </a>
+        </div>
+    </div>
+
+        <a href="{% url 'hr:upload_attendance' %}" class="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md">
             <i data-lucide="upload-cloud" class="w-5 h-5"></i>
             رفع ملف البصمة
         </a>
     </div>
 
-    <!-- جدول البيانات -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <!-- 🔍 شريط البحث السريع والفلترة -->
+    <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+        <form id="filter-form" method="GET" action="{% url 'hr:attendance_list' %}" class="flex flex-col md:flex-row gap-5 items-end">
+            <!-- البحث الحي (Live Search) -->
+            <div class="flex-grow w-full">
+                <label class="block text-sm font-black text-gray-800 mb-2">البحث السريع (الاسم أو الكود)</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                        <i data-lucide="search" class="w-5 h-5 text-gray-400"></i>
+                    </div>
+                    <input type="text" id="live-search-input" name="q" value="{{ search_query|default:'' }}" autocomplete="off" placeholder="اكتب الاسم هنا وسيبدأ البحث تلقائياً..." class="w-full bg-white border-2 border-gray-300 text-gray-900 font-bold text-base rounded-xl py-3 pr-12 pl-4 focus:ring-0 focus:border-blue-600 transition-colors shadow-sm placeholder:text-gray-400">
+                </div>
+            </div>
+
+            <!-- فلتر الشهر -->
+            <div class="w-full md:w-32">
+                <label class="block text-sm font-black text-gray-800 mb-2">الشهر</label>
+                <select name="month" id="month-select" class="w-full bg-white border-2 border-gray-300 text-gray-900 font-bold text-base rounded-xl p-3 focus:ring-0 focus:border-blue-600 cursor-pointer shadow-sm">
+                    {% for m in months_range %}
+                        <option value="{{ m }}" {% if m == month %}selected{% endif %}>شهر {{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- فلتر السنة -->
+            <div class="w-full md:w-32">
+                <label class="block text-sm font-black text-gray-800 mb-2">السنة</label>
+                <select name="year" id="year-select" class="w-full bg-white border-2 border-gray-300 text-gray-900 font-bold text-base rounded-xl p-3 focus:ring-0 focus:border-blue-600 cursor-pointer shadow-sm">
+                    {% for y in years_range %}
+                        <option value="{{ y }}" {% if y == year %}selected{% endif %}>سنة {{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- 🌟 حاوية البيانات والجدول -->
+    <div id="table-container" class="relative bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-[400px] transition-opacity duration-200">
+
+        <!-- مؤشر التحميل الأنيق -->
+        <div id="loading-overlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden">
+            <div class="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
+            <span class="mt-3 font-black text-blue-700 text-sm">جاري التحديث السريع...</span>
+        </div>
+
         <div class="overflow-x-auto">
             <table class="w-full text-right border-collapse">
-                <thead class="bg-slate-50 text-slate-500 text-sm border-b border-slate-100">
+                <thead class="bg-blue-50 text-blue-900 text-sm border-b-2 border-blue-200">
                     <tr>
-                        <th class="py-4 px-6 font-bold">التاريخ</th>
-                        <th class="py-4 px-6 font-bold">الموظف</th>
-                        <th class="py-4 px-6 font-bold text-center">حضور</th>
-                        <th class="py-4 px-6 font-bold text-center">انصراف</th>
-                        <th class="py-4 px-6 font-bold">الحالة</th>
+                        <th class="py-4 px-5 font-black whitespace-nowrap">التاريخ</th>
+                        <th class="py-4 px-5 font-black whitespace-nowrap">الموظف</th>
+                        <th class="py-4 px-5 font-black text-center whitespace-nowrap">حضور</th>
+                        <th class="py-4 px-5 font-black text-center whitespace-nowrap">انصراف</th>
+                        <th class="py-4 px-5 font-black text-center whitespace-nowrap">تأخير / خصم</th>
+                        <th class="py-4 px-5 font-black text-center whitespace-nowrap">إضافي</th>
+                        <th class="py-4 px-5 font-black text-center text-red-700 whitespace-nowrap">الجزاءات</th>
+                        <th class="py-4 px-5 font-black whitespace-nowrap">الحالة</th>
+                        <th class="py-4 px-5 font-black text-center whitespace-nowrap">إجراءات الإدارة</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-50 text-sm">
+                <tbody class="text-sm divide-y divide-gray-100">
                     {% for record in attendance %}
+
+                    {% ifchanged record.employee.name %}
+                        <tr class="bg-gray-50 border-y-2 border-gray-200">
+                            <td colspan="9" class="py-3 px-5">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-blue-700 text-white flex items-center justify-center font-black text-sm shadow-sm">
+                                        {{ record.employee.name|slice:":1" }}
+                                    </div>
+                                    <span class="font-black text-gray-900 text-lg">{{ record.employee.name }}</span>
+                                    <span class="bg-white text-gray-700 px-3 py-1 rounded-md text-xs font-mono font-bold border border-gray-300">كود: {{ record.employee.emp_id }}</span>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endifchanged %}
+
                     <tr class="hover:bg-blue-50/50 transition-colors">
-                        <td class="py-4 px-6 text-slate-600 font-medium">{{ record.date|date:"Y-m-d" }}</td>
-                        
-                        <td class="py-4 px-6 font-bold text-slate-800">{{ record.employee.name }}</td>
-                        
-                        <td class="py-4 px-6 text-slate-600 font-bold text-center">
+                        <td class="py-3 px-5 text-gray-800 font-bold border-r-4 border-transparent hover:border-blue-500">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="calendar" class="w-4 h-4 text-blue-600"></i>
+                                {{ record.date|date:"Y-m-d" }}
+                            </div>
+                        </td>
+
+                        <td class="py-3 px-5 font-bold text-gray-400 text-xs">
+                            <span class="flex items-center gap-1.5"><i data-lucide="corner-down-left" class="w-3 h-3 text-gray-300"></i> تابع السجل</span>
+                        </td>
+
+                        <td class="py-3 px-5 text-gray-900 font-black text-center font-mono text-base">
                             {{ record.check_in|time:"H:i"|default:"--:--" }}
                         </td>
-                        
-                        <td class="py-4 px-6 text-slate-600 font-bold text-center">
-                            {{ record.check_out|time:"H:i"|default:"--:--" }}
+
+                        <!-- 🟢 تعديل خلية الانصراف لإضافة زر الانصراف اليدوي -->
+                        <td class="py-3 px-5 text-gray-900 font-black text-center font-mono text-base">
+                            {% if record.check_in and not record.check_out and request.user.is_staff %}
+                                <button type="button"
+                                        onclick="openManualCheckoutModal({{ record.id }}, '{{ record.employee.name|escapejs }}')"
+                                        class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 mx-auto animate-pulse">
+                                    <i data-lucide="clock-4" class="w-3.5 h-3.5"></i>
+                                    <span>انصراف يدوي</span>
+                                </button>
+                            {% elif record.check_out %}
+                                {{ record.check_out|time:"H:i" }}
+                            {% else %}
+                                <span class="text-gray-400">--:--</span>
+                            {% endif %}
                         </td>
-                        
-                        <td class="py-4 px-6 text-center">
+
+                        <!-- الخصم -->
+                        <td class="py-3 px-5 text-center">
                             {% if record.late_minutes > 0 %}
-                                <span class="text-amber-700 font-semibold text-sm">{{ record.late_minutes }} دقيقة</span>
-                                <span class="text-[11px] text-slate-400 block font-medium">(خصم فعلي: {{ record.deduction_hours|floatformat:1 }} س)</span>
+                                <span class="text-orange-700 font-black text-sm block">{{ record.late_minutes }} دقيقة</span>
+                                <span class="text-xs text-gray-600 block font-bold mt-0.5">(خصم: {{ record.deduction_hours|floatformat:1 }} س)</span>
                             {% else %}
-                                <span class="text-slate-300">-</span>
+                                <span class="text-gray-300 font-bold">-</span>
                             {% endif %}
                         </td>
-                        
-                        <td class="py-4 px-6 text-center">
+
+                        <!-- الإضافي -->
+                        <td class="py-3 px-5 text-center">
                             {% if record.overtime_hours > 0 %}
-                                <span class="text-green-600 font-bold text-sm">+{{ record.overtime_hours|floatformat:1 }} ساعة</span>
+                                <span class="text-emerald-700 font-black text-sm bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md inline-block">+{{ record.overtime_hours|floatformat:1 }} ساعة</span>
                             {% else %}
-                                <span class="text-slate-300">-</span>
+                                <span class="text-gray-300 font-bold">-</span>
                             {% endif %}
                         </td>
-                        
-                        <td class="py-4 px-6">
+
+                        <!-- الجزاء الإداري الحالي -->
+                        <td class="py-3 px-5 text-center">
+                            {% if record.administrative_penalty_days > 0 %}
+                                <span class="inline-flex items-center justify-center bg-red-100 text-red-800 font-black text-sm px-3 py-1.5 rounded-lg border border-red-300 shadow-sm">
+                                    {{ record.administrative_penalty_days|floatformat:1 }} يوم
+                                </span>
+                            {% else %}
+                                <span class="text-gray-300 font-bold">-</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- الحالة -->
+                        <td class="py-3 px-5">
                             {% if record.status == 'present' %}
-                                <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold bg-green-100 text-green-700 border border-green-200 shadow-sm">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> حاضر
+                                <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-600"></span> حاضر
+                                </span>
+                            {% elif record.status == 'absent' and record.administrative_penalty_days > 0 %}
+                                <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-rose-100 text-rose-900 border border-rose-400 shadow-sm">
+                                    <span class="w-2 h-2 rounded-full bg-rose-700"></span> جزاء تحايل (غياب)
                                 </span>
                             {% elif record.status == 'absent' %}
-                                <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold bg-red-100 text-red-700 border border-red-200 shadow-sm">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> غائب
+                                <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-red-100 text-red-800 border border-red-300 shadow-sm">
+                                    <span class="w-2 h-2 rounded-full bg-red-600"></span> غائب
                                 </span>
                             {% elif record.status == 'leave' %}
-                                <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200 shadow-sm">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> إجازة رسمية
+                                {% if record.leave_type_code == 'sick' %}
+                                    <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-orange-100 text-orange-800 border border-orange-300 shadow-sm">
+                                        <span class="w-2 h-2 rounded-full bg-orange-600"></span> إجازة مرضية
+                                    </span>
+                                {% elif record.leave_type_code == 'casual' %}
+                                    <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-cyan-100 text-cyan-800 border border-cyan-300 shadow-sm">
+                                        <span class="w-2 h-2 rounded-full bg-cyan-600"></span> إجازة عارضة
+                                    </span>
+                                {% elif record.leave_type_code == 'annual' %}
+                                    <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-blue-100 text-blue-800 border border-blue-300 shadow-sm">
+                                        <span class="w-2 h-2 rounded-full bg-blue-600"></span> إجازة سنوية
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-blue-100 text-blue-800 border border-blue-300 shadow-sm">
+                                        <span class="w-2 h-2 rounded-full bg-blue-600"></span> إجازة
+                                    </span>
+                                {% endif %}
+                            {% elif record.status == 'mission' %}
+                                <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-purple-100 text-purple-800 border border-purple-300 shadow-sm">
+                                    <span class="w-2 h-2 rounded-full bg-purple-600"></span> مأمورية
                                 </span>
                             {% else %}
-                                <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200 shadow-sm">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> {{ record.get_status_display }}
+                                <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-gray-200 text-gray-800 border border-gray-300 shadow-sm">
+                                    <span class="w-2 h-2 rounded-full bg-gray-500"></span> {{ record.get_status_display }}
                                 </span>
                             {% endif %}
+                        </td>
+
+                        <!-- الإجراءات -->
+                        <td class="py-3 px-5 text-center">
+                            <div class="flex flex-col items-center gap-1.5">
+                                {% if record.administrative_penalty_days == 0 %}
+                                <button onclick="applyFraudPenalty({{ record.id }}, '{{ record.employee.name|escapejs }}')" class="group text-xs bg-white text-red-600 border border-red-200 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-lg transition-all font-bold shadow-sm flex items-center justify-center gap-1.5 mx-auto" title="الموظف خرج بدون إذن وعاد لتبصيم الانصراف">
+                                    <i data-lucide="shield-alert" class="w-4 h-4 transition-transform group-hover:scale-110"></i> جزاء تحايل
+                                </button>
+                                {% else %}
+                                    <span class="text-xs text-gray-400 font-bold"><i data-lucide="check-circle" class="w-4 h-4 inline-block text-green-500"></i> تم توقيع جزاء</span>
+                                {% endif %}
+                                <a href="{% url 'hr:penalty_add' employee_id=record.employee.id %}" class="text-xs bg-white text-rose-700 border border-rose-200 hover:bg-rose-700 hover:text-white px-3 py-1.5 rounded-lg transition-all font-bold shadow-sm flex items-center justify-center gap-1.5 mx-auto" title="توقيع جزاء إداري عام بسبب مخصص">
+                                    <i data-lucide="gavel" class="w-4 h-4"></i> جزاء إداري
+                                </a>
+                            </div>
                         </td>
                     </tr>
 
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="py-12 text-center text-slate-500">
-                            <div class="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <i data-lucide="inbox" class="w-10 h-10 text-slate-400"></i>
+                        <td colspan="9" class="py-20 text-center text-gray-600 bg-gray-50">
+                            <div class="bg-white w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-5 border-2 border-gray-200 shadow-sm">
+                                <i data-lucide="user-search" class="w-10 h-10 text-gray-400"></i>
                             </div>
-                            <p class="text-lg font-bold text-slate-700">لا توجد سجلات حضور</p>
-                            <p class="text-sm mt-1">قم برفع ملف بصمة جديد لعرض البيانات الحسابية المحدثة هنا.</p>
+                            <p class="text-xl font-black text-gray-900">لا توجد سجلات تطابق بحثك</p>
+                            <p class="text-base mt-2 text-gray-600 font-medium">جرب تغيير الدورة المالية أو تعديل الاسم في مربع البحث.</p>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+
+        <!-- الباجنيشن الأنيق -->
+        <div class="p-5 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between bg-white gap-4">
+            <div class="text-sm font-black text-gray-700">
+                الصفحة {{ attendance.number }} من {{ attendance.paginator.num_pages }}
+            </div>
+
+            {% if attendance.paginator.num_pages > 1 %}
+            <div class="flex gap-2">
+                {% if attendance.has_previous %}
+                    <a href="?page=1&q={{ search_query|default:'' }}&month={{ month }}&year={{ year }}" class="ajax-link px-4 py-2 bg-white border border-gray-300 rounded-xl text-sm font-black text-gray-800 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all shadow-sm" title="الصفحة الأولى">
+                        <i data-lucide="chevrons-right" class="w-4 h-4"></i>
+                    </a>
+                    <a href="?page={{ attendance.previous_page_number }}&q={{ search_query|default:'' }}&month={{ month }}&year={{ year }}" class="ajax-link px-5 py-2 bg-white border border-gray-300 rounded-xl text-sm font-black text-gray-800 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all shadow-sm">السابق</a>
+                {% endif %}
+
+                {% if attendance.has_next %}
+                    <a href="?page={{ attendance.next_page_number }}&q={{ search_query|default:'' }}&month={{ month }}&year={{ year }}" class="ajax-link px-5 py-2 bg-white border border-gray-300 rounded-xl text-sm font-black text-gray-800 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all shadow-sm">التالي</a>
+                    <a href="?page={{ attendance.paginator.num_pages }}&q={{ search_query|default:'' }}&month={{ month }}&year={{ year }}" class="ajax-link px-4 py-2 bg-white border border-gray-300 rounded-xl text-sm font-black text-gray-800 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all shadow-sm" title="الصفحة الأخيرة">
+                        <i data-lucide="chevrons-left" class="w-4 h-4"></i>
+                    </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
     </div>
 </div>
+
+<!-- 🟢 نافذة تسجيل الانصراف اليدوي (Modal) -->
+<div id="checkoutModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-fade-in">
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-200 max-w-md w-full overflow-hidden font-cairo">
+        <div class="p-5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+                    <i data-lucide="user-check" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-gray-800">تسجيل انصراف يدوي</h3>
+                    <p id="modal-emp-name" class="text-xs text-gray-500 mt-0.5 font-medium"></p>
+                </div>
+            </div>
+            <button type="button" onclick="closeCheckoutModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="p-5 space-y-4">
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800 leading-relaxed font-bold">
+                <i data-lucide="info" class="w-4 h-4 inline-block ml-1 text-blue-600"></i>
+                سيتم حساب ساعات العمل ورفع جزاء البصمة الواحدة تلقائياً بعد الحفظ.
+            </div>
+            <input type="hidden" id="modal_record_id">
+            <div class="space-y-1.5">
+                <label class="text-xs font-black text-gray-700 block">وقت الانصراف الفعلي</label>
+                <div class="relative">
+                    <input type="time" id="modal_checkout_time" class="w-full pl-4 pr-10 py-2.5 rounded-xl border-2 border-gray-300 focus:border-blue-600 focus:ring-0 text-sm font-mono text-gray-800 font-bold" required>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                        <i data-lucide="clock" class="w-4 h-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+            <button type="button" onclick="closeCheckoutModal()" class="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-black rounded-xl text-xs transition-colors shadow-sm">
+                إلغاء
+            </button>
+            <button type="button" id="btn-save-checkout" onclick="submitManualCheckout()" class="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-black rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span>حفظ الانصراف</span>
+            </button>
+        </div>
+    </div>
+</div>
+<!-- 🚀 سكريبت البحث الحي، التصدير الشامل، وتسجيل الانصراف -->
+<script>
+// 🟢 دالة تصدير جميع البيانات/الصفحات إلى Excel عبر الـ Back-end
+function exportTableToExcel() {
+    const searchInput = document.getElementById('live-search-input')?.value || '';
+    const monthSelect = document.getElementById('month-select')?.value || '';
+    const yearSelect = document.getElementById('year-select')?.value || '';
+
+    // إعداد معاملات الفلترة الحالية لتطبيقها على التقرير الشامل
+    const params = new URLSearchParams({
+        q: searchInput,
+        month: monthSelect,
+        year: yearSelect
+    });
+
+    // توجيه المتصفح لتحميل ملف Excel الشامل لجميع الصفحات من السيرفر مباشرة
+    const exportUrl = `{% url 'hr:export_attendance_excel' %}?${params.toString()}`;
+    window.location.href = exportUrl;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const filterForm = document.getElementById('filter-form');
+    const searchInput = document.getElementById('live-search-input');
+    const monthSelect = document.getElementById('month-select');
+    const yearSelect = document.getElementById('year-select');
+    const tableContainer = document.getElementById('table-container');
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    let debounceTimer;
+
+    // استخراج توكن الحماية CSRF مع حماية ضد أخطاء عدم الوجود
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+    // 🔴 دالة توقيع جزاء التحايل
+    window.applyFraudPenalty = async function(recordId, empName) {
+        if (!confirm(`تحذير إداري:\nهل أنت متأكد من توقيع جزاء "خروج بدون إذن (تحايل)" على الموظف (${empName})؟\n\nسيتم توقيع جزاء 3 أيام واعتبار هذا اليوم غياباً.`)) {
+            return;
+        }
+
+        if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+        if (tableContainer) tableContainer.style.opacity = '0.5';
+
+        try {
+            const response = await fetch(`/hr/attendance/${recordId}/fraud-penalty/`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                triggerSearch();
+            } else {
+                alert('خطأ: ' + (data.message || 'حدث خطأ غير متوقع'));
+            }
+        } catch (error) {
+            alert('حدث خطأ في الاتصال بالخادم.');
+            console.error('Penalty Error:', error);
+        } finally {
+            if (loadingOverlay) loadingOverlay.classList.add('hidden');
+            if (tableContainer) tableContainer.style.opacity = '1';
+        }
+    };
+
+    // 🟢 دوال الانصراف اليدوي
+    window.openManualCheckoutModal = function(recordId, employeeName) {
+        const modalRecordId = document.getElementById('modal_record_id');
+        const modalEmpName = document.getElementById('modal-emp-name');
+        const checkoutModal = document.getElementById('checkoutModal');
+
+        if (modalRecordId) modalRecordId.value = recordId;
+        if (modalEmpName) modalEmpName.innerText = "الموظف: " + employeeName;
+        if (checkoutModal) checkoutModal.classList.remove('hidden');
+    };
+
+    window.closeCheckoutModal = function() {
+        const checkoutModal = document.getElementById('checkoutModal');
+        const checkoutTimeInput = document.getElementById('modal_checkout_time');
+
+        if (checkoutModal) checkoutModal.classList.add('hidden');
+        if (checkoutTimeInput) checkoutTimeInput.value = '';
+    };
+
+    window.submitManualCheckout = async function() {
+        const recordId = document.getElementById('modal_record_id')?.value;
+        const checkoutTime = document.getElementById('modal_checkout_time')?.value;
+        const btn = document.getElementById('btn-save-checkout');
+
+        if (!checkoutTime) {
+            alert('يرجى اختيار وقت الانصراف أولاً.');
+            return;
+        }
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> جاري الحفظ...`;
+        }
+
+        try {
+            const response = await fetch(`/hr/attendance/manual-checkout/${recordId}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken
+                },
+                body: `checkout_time=${encodeURIComponent(checkoutTime)}`
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                closeCheckoutModal();
+                triggerSearch();
+            } else {
+                alert('خطأ: ' + (data.message || 'فشلت عملية الحفظ'));
+            }
+        } catch (error) {
+            console.error('Checkout Error:', error);
+            alert('حدث خطأ أثناء الاتصال بالخادم.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> <span>حفظ الانصراف</span>`;
+            }
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+    };
+
+    // 🔵 دالة تحديث الجدول (البحث الحي والباجنيشن AJAX)
+    async function fetchAndUpdate(url) {
+        if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+        if (tableContainer) tableContainer.style.opacity = '0.5';
+
+        try {
+            const response = await fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const htmlText = await response.text();
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlText, 'text/html');
+            const newTableContainer = doc.getElementById('table-container');
+
+            if (newTableContainer && tableContainer) {
+                tableContainer.innerHTML = newTableContainer.innerHTML;
+                window.history.replaceState({ path: url }, '', url);
+
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }
+        } catch (error) {
+            console.error('Fetch error:', error);
+        } finally {
+            if (loadingOverlay) loadingOverlay.classList.add('hidden');
+            if (tableContainer) tableContainer.style.opacity = '1';
+        }
+    }
+
+    function triggerSearch() {
+        if (!filterForm) return;
+        const formData = new FormData(filterForm);
+        const params = new URLSearchParams(formData);
+        params.delete('page');
+        const url = `${filterForm.action}?${params.toString()}`;
+        fetchAndUpdate(url);
+    }
+
+    // مستمعات أحداث البحث الحي والفلترة
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                triggerSearch();
+            }, 400);
+        });
+    }
+
+    if (monthSelect) monthSelect.addEventListener('change', triggerSearch);
+    if (yearSelect) yearSelect.addEventListener('change', triggerSearch);
+
+    if (filterForm) {
+        filterForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            triggerSearch();
+        });
+    }
+
+    // التنقل بين الصفحات بدون إعادة تحميل (AJAX Pagination)
+    if (tableContainer) {
+        tableContainer.addEventListener('click', (e) => {
+            const link = e.target.closest('.ajax-link');
+            if (link) {
+                e.preventDefault();
+                fetchAndUpdate(link.href);
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

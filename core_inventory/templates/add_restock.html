@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}تسجيل فاتورة مشتريات وتوريد مخزني{% endblock %}
+
+{% block page_title %}
+<div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3 animate__animated animate__fadeIn">
+    <div class="d-flex align-items-center gap-3">
+        <div class="icon-header-box bg-emerald bg-opacity-10 p-3 rounded-4 border border-success border-opacity-25 shadow-sm">
+            <i class="bi bi-receipt text-success fs-2"></i>
+        </div>
+        <div>
+            <h4 class="fw-black text-white m-0">فاتورة مشتريات الموردين (ERP)</h4>
+            <p class="text-success opacity-75 small m-0 fw-semibold">تسجيل فواتير المشتريات، ترصيد حسابات الموردين، وتحديث المخزن بضغطة واحدة | {{ active_year }}</p>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a href="{% url 'inventory_report' %}" class="btn btn-outline-success btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm border-opacity-25">
+            <i class="bi bi-box-seam me-1"></i> منظومة الجرد
+        </a>
+        <a href="/" class="btn btn-outline-light btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm border-opacity-25">
+            <i class="bi bi-house-door-fill text-info me-1"></i> الرئيسية
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<!-- Tom Select CSS للبحث الذكي -->
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+
+<style>
+    :root {
+        --bg-main: #030712;
+        --glass-surface: rgba(15, 23, 42, 0.75);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --neon-cyan: #06b6d4;
+        --neon-emerald: #10b981;
+        --neon-amber: #f59e0b;
+        --neon-rose: #f43f5e;
+    }
+
+    body { background-color: var(--bg-main) !important; color: #f8fafc !important; }
+
+    /* Glass Cards */
+    .glass-card { background: var(--glass-surface) !important; backdrop-filter: blur(24px); border: 1px solid var(--glass-border) !important; border-radius: 20px !important; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); }
+    .glass-modal { background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(30px); border: 1px solid var(--neon-cyan) !important; border-radius: 24px; box-shadow: 0 0 40px rgba(6, 182, 212, 0.2); }
+
+    /* Inputs */
+    .form-control-neon, .form-select-neon { background-color: rgba(2, 6, 23, 0.7) !important; color: #ffffff !important; border: 1px solid var(--glass-border) !important; border-radius: 12px !important; padding: 12px 16px !important; font-weight: 700 !important; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .form-control-neon:focus, .form-select-neon:focus { border-color: var(--neon-cyan) !important; box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.15) !important; background-color: rgba(15, 23, 42, 0.9) !important; }
+
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(1) brightness(1.5);
+        cursor: pointer;
+    }
+
+    /* Table */
+    .invoice-table { border-collapse: separate; border-spacing: 0 8px; }
+    .invoice-table th { background: transparent !important; color: #94a3b8; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; border: none; padding-bottom: 4px; }
+    .invoice-table td { background: rgba(30, 41, 59, 0.4); vertical-align: middle; padding: 8px; border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border); }
+    .invoice-table td:first-child { border-right: 1px solid var(--glass-border); border-top-right-radius: 14px; border-bottom-right-radius: 14px; }
+    .invoice-table td:last-child { border-left: 1px solid var(--glass-border); border-top-left-radius: 14px; border-bottom-left-radius: 14px; }
+    .row-anim { animation: fadeInDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+    /* Buttons */
+    .btn-neon-action { background: rgba(6, 182, 212, 0.1); color: var(--neon-cyan); border: 1px solid rgba(6, 182, 212, 0.3); font-weight: 800; transition: all 0.3s; }
+    .btn-neon-action:hover { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(6, 182, 212, 0.4); }
+    .btn-neon-submit { background: linear-gradient(135deg, var(--neon-emerald), #059669); color: #fff; border: none; font-weight: 900; transition: all 0.3s; }
+    .btn-neon-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4); color: #fff;}
+    .btn-add-supplier { border-radius: 12px 0 0 12px !important; border: 1px solid var(--neon-cyan); color: var(--neon-cyan); background: rgba(6, 182, 212, 0.1); font-weight: 900; transition: 0.3s; }
+    .btn-add-supplier:hover { background: var(--neon-cyan); color: #000; box-shadow: 0 0 15px rgba(6, 182, 212, 0.5); }
+
+    /* Custom Tom-Select Dark Styling */
+    .ts-control {
+        background-color: rgba(2, 6, 23, 0.7) !important;
+        color: #ffffff !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 12px !important;
+        padding: 10px 14px !important;
+        font-weight: 700 !important;
+    }
+    .ts-control input {
+        color: #ffffff !important;
+    }
+    .ts-dropdown {
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+        border: 1px solid var(--neon-cyan) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8) !important;
+        z-index: 1050 !important;
+    }
+    .ts-dropdown .option {
+        color: #e2e8f0 !important;
+        padding: 10px 14px !important;
+    }
+    .ts-dropdown .option.active, .ts-dropdown .option:hover {
+        background-color: rgba(6, 182, 212, 0.25) !important;
+        color: var(--neon-cyan) !important;
+    }
+    .ts-dropdown .no-results {
+        color: #94a3b8 !important;
+        background: transparent !important;
+        padding: 10px !important;
+    }
+</style>
+
+<div class="container-fluid px-3 max-w-1200 mx-auto mt-3">
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show fw-bold fs-6 rounded-4 shadow mb-4 border-0" role="alert" style="background: rgba(16, 185, 129, 0.15); color: #34d399; backdrop-filter: blur(10px);">
+                {{ message }}
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- 1. نموذج الفاتورة المتطور -->
+    <div class="glass-card p-4 p-md-5 mb-5 animate__animated animate__fadeInUp">
+        <form method="POST" action="{% url 'admin_add_restock' %}" id="invoiceForm">
+            {% csrf_token %}
+
+            <!-- القسم العلوي: بيانات الفاتورة (4 أعمدة متناسقة تماماً) -->
+            <div class="row g-3 mb-5 pb-4 border-bottom border-secondary border-opacity-25">
+
+                <!-- 1. المورد (اختياري مع زر الإضافة السريعة) -->
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label fw-bold text-white small text-uppercase letter-spacing-1 mb-2">
+                        <i class="bi bi-buildings text-info me-1"></i> المورد <span class="text-white-50 opacity-50 fw-normal">(اختياري)</span>
+                    </label>
+                    <div class="input-group">
+                        <select name="supplier_id" id="supplierSelect" class="form-select form-select-neon text-info" style="border-radius: 0 12px 12px 0 !important;">
+                            <option value="">-- بدون مورد (نقدي) --</option>
+                            {% for sup in suppliers %}
+                                <option value="{{ sup.id }}">{{ sup.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-add-supplier px-3" type="button" data-bs-toggle="modal" data-bs-target="#quickAddSupplierModal" title="تسجيل مورد جديد لحظياً">
+                            <i class="bi bi-person-plus-fill fs-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. المستودع المستلم (إجباري) -->
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label fw-bold text-white small text-uppercase letter-spacing-1 mb-2">
+                        <i class="bi bi-shop text-warning me-1"></i> المستودع المستلم <span class="text-danger">*</span>
+                    </label>
+                    <select name="warehouse_id" class="form-select form-select-neon text-warning" required>
+                        <option value="">-- تحديد المستودع --</option>
+                        {% for wh in warehouses %}
+                            <option value="{{ wh.id }}">{{ wh.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- 3. تاريخ الفاتورة (افتراضي تاريخ اليوم) -->
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label fw-bold text-white small text-uppercase letter-spacing-1 mb-2">
+                        <i class="bi bi-calendar-event text-emerald me-1"></i> تاريخ الفاتورة <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" name="invoice_date" class="form-control form-control-neon text-emerald fw-bold" value="{% now 'Y-m-d' %}" required>
+                </div>
+
+                <!-- 4. رقم الفاتورة (اختياري) -->
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label fw-bold text-white small text-uppercase letter-spacing-1 mb-2">
+                        <i class="bi bi-upc-scan text-secondary me-1"></i> رقم الفاتورة
+                    </label>
+                    <input type="text" name="invoice_number" class="form-control form-control-neon font-monospace text-muted" placeholder="توليد آلي">
+                </div>
+
+            </div>
+
+            <!-- القسم الأوسط: جدول الأصناف الديناميكي -->
+            <div class="d-flex justify-content-between align-items-end mb-3">
+                <h5 class="fw-black text-white m-0"><i class="bi bi-cart-check-fill text-emerald me-2"></i> أصناف الفاتورة</h5>
+                <button type="button" class="btn btn-neon-action rounded-pill px-4 py-2" onclick="addRow()">
+                    <i class="bi bi-plus-lg me-1"></i> إضافة صنف <kbd class="bg-dark border border-secondary ms-1 small rounded-1 px-1">Alt+A</kbd>
+                </button>
+            </div>
+
+            <div class="table-responsive mb-4" style="overflow-x: visible;">
+                <table class="table invoice-table w-100" id="invoiceTable">
+                    <!-- تعديل رأس الجدول -->
+                    <thead>
+                        <tr>
+                            <th width="30%">الصنف / المادة <span class="text-danger">*</span></th>
+                            <th width="20%">الصف الدراسي <span class="text-white-50 opacity-50 fw-normal">(اختياري)</span></th>
+                            <th width="15%">الكمية <span class="text-danger">*</span></th>
+                            <th width="15%">سعر الوحدة <span class="text-danger">*</span></th>
+                            <th width="15%">الإجمالي (ج.م)</th>
+                            <th width="5%" class="text-center"><i class="bi bi-gear"></i></th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoiceBody">
+                        <tr class="row-anim">
+                            <td>
+                                <select name="item_id[]" class="form-select form-select-neon item-select text-white" required>
+                                    <option value="">-- ابحث واختر الصنف --</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="grade_id[]" class="form-select form-select-neon text-info small">
+                                    <option value="">-- بدون ربط (عام) --</option>
+                                    {% for grade in grades %}
+                                        <option value="{{ grade.id }}">{{ grade.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <input type="number" name="quantity[]" class="form-control form-control-neon text-center fw-black qty-input text-info" min="1" step="1" required placeholder="0" onwheel="this.blur()" oninput="calculateRow(this); this.value = this.value.replace(/[^0-9]/g, '')">
+                            </td>
+                            <td>
+                                <input type="number" name="price[]" class="form-control form-control-neon text-center fw-black price-input text-warning" min="0" step="0.01" required placeholder="0.00" onwheel="this.blur()" oninput="calculateRow(this)">
+                            </td>
+                            <td>
+                                <input type="text" class="form-control form-control-neon text-center fw-black row-total text-emerald border-0 bg-transparent" readonly value="0.00">
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-secondary border-0 rounded-circle disabled"><i class="bi bi-dash-lg"></i></button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- القسم السفلي: الملاحظات والإجمالي -->
+            <div class="row g-4 align-items-center bg-dark bg-opacity-50 p-4 rounded-4 border border-secondary border-opacity-25 mt-2">
+                <div class="col-lg-7">
+                    <input type="text" name="note" class="form-control form-control-neon bg-transparent border-secondary" placeholder="اكتب أي ملاحظات إضافية هنا...">
+                </div>
+                <div class="col-lg-5 text-start text-lg-end">
+                    <p class="text-muted fw-bold mb-1 small text-uppercase">الصافي المطلوب للمورد</p>
+                    <h1 class="fw-black text-emerald m-0" style="text-shadow: 0 0 20px rgba(16,185,129,0.4);">
+                        <span id="grandTotal">0.00</span> <span class="fs-5 text-white-50">ج.م</span>
+                    </h1>
+                </div>
+            </div>
+
+            <div class="d-grid mt-5">
+                <button type="submit" class="btn btn-neon-submit btn-lg py-4 rounded-4 fs-4 shadow-lg">
+                    <i class="bi bi-shield-check me-2"></i> حفظ الفاتورة واعتماد الأرصدة رسمياً
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 2. سجل الفواتير السابقة -->
+    <div class="glass-card p-4 animate__animated animate__fadeInUp mb-5 delay-1s">
+        <h5 class="fw-black text-white mb-4 d-flex align-items-center gap-2">
+            <i class="bi bi-clock-history fs-4 text-info"></i> أحدث فواتير المشتريات المعتمدة
+        </h5>
+        <div class="table-responsive">
+            <table class="table invoice-table m-0">
+                <thead>
+                    <tr>
+                        <th width="50">#</th>
+                        <th width="140">التاريخ</th>
+                        <th>رقم الفاتورة</th>
+                        <th>المورد</th>
+                        <th>المستودع</th>
+                        <th class="text-end pe-4">الصافي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in recent_invoices %}
+                    <tr>
+                        <td class="text-white-50">{{ forloop.counter }}</td>
+                        <td class="small text-white-50 fw-bold">{{ inv.date|date:"Y-m-d" }}</td>
+                        <td class="fw-bold font-monospace text-info">{{ inv.invoice_number }}</td>
+                        <td class="fw-bold text-white">{{ inv.supplier.name|default:"نقدي / عام" }}</td>
+                        <td><span class="badge bg-secondary bg-opacity-25 text-light border border-secondary px-2 py-1">{{ inv.warehouse.name }}</span></td>
+                        <td class="text-end pe-4"><span class="fw-black text-emerald fs-6">{{ inv.net_amount }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="py-5 text-center text-muted fw-bold">لا توجد فواتير مسجلة مسبقاً في النظام. بمجرد حفظ أول فاتورة، ستظهر هنا تلقائياً.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal الإضافة السريعة للمورد (AJAX) -->
+<div class="modal fade" id="quickAddSupplierModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal text-white">
+            <div class="modal-header border-bottom border-secondary border-opacity-25">
+                <h5 class="modal-title fw-black text-info"><i class="bi bi-person-plus-fill me-2"></i> تسجيل مورد جديد فوراً</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="ajaxSupplierForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-white-50 small">اسم المورد / الشركة <span class="text-danger">*</span></label>
+                        <input type="text" id="supName" class="form-control form-control-neon" required placeholder="مثال: مطبعة الشروق">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-white-50 small">رقم الهاتف (اختياري)</label>
+                        <input type="text" id="supPhone" class="form-control form-control-neon" placeholder="01xxxxxxxxx">
+                    </div>
+                    <button type="button" class="btn btn-info w-100 fw-black rounded-3 py-2 shadow" onclick="saveSupplierAjax()">
+                        <i class="bi bi-check2-circle"></i> حفظ وإدراج
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tom Select JS للبحث الذكي -->
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+
+<script>
+    const allItemsData = JSON.parse('{{ items_json|default:"[]"|escapejs }}');
+    let itemOptionsHTML = '<option value="">-- ابحث واختر الصنف --</option>';
+
+    if (Array.isArray(allItemsData)) {
+        allItemsData.forEach(item => {
+            if (item.item_type === 'saleable' || !item.item_type) {
+                const skuText = item.sku ? `[${item.sku}] ` : '';
+                itemOptionsHTML += `<option value="${item.id}">${skuText}${item.name}</option>`;
+            }
+        });
+    }
+
+    // بناء خيارات الصفوف الدراسية لاستخدامها في السطور الديناميكية
+    let gradeOptionsHTML = '<option value="">-- بدون ربط (عام) --</option>';
+    {% for grade in grades %}
+        gradeOptionsHTML += '<option value="{{ grade.id }}">{{ grade.name }}</option>';
+    {% endfor %}
+
+    // دالة تفعيل البحث الذكي على أي عنصر select
+    function initSmartSelect(element) {
+        if (!element || element.tomselect) return;
+        new TomSelect(element, {
+            create: false,
+            placeholder: "-- اكتب للبحث بالاسم أو الكود --",
+            render: {
+                no_results: function(data, escape) {
+                    return '<div class="no-results">لا توجد نتائج تطابق: "' + escape(data.input) + '"</div>';
+                }
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.item-select').forEach(select => {
+            select.innerHTML = itemOptionsHTML;
+            initSmartSelect(select);
+        });
+    });
+
+    // اختصار لوحة المفاتيح لإضافة سطر سريعاً (Alt + A)
+    document.addEventListener('keydown', function(event) {
+        if (event.altKey && event.key.toLowerCase() === 'a') {
+            event.preventDefault();
+            addRow();
+        }
+    });
+
+    function addRow() {
+        const tbody = document.getElementById('invoiceBody');
+        const tr = document.createElement('tr');
+        tr.className = 'row-anim';
+
+        tr.innerHTML = `
+            <td>
+                <select name="item_id[]" class="form-select form-select-neon item-select text-white" required>
+                    ${itemOptionsHTML}
+                </select>
+            </td>
+            <td>
+                <select name="grade_id[]" class="form-select form-select-neon text-info small">
+                    ${gradeOptionsHTML}
+                </select>
+            </td>
+            <td>
+                <input type="number" name="quantity[]" class="form-control form-control-neon text-center fw-black qty-input text-info" min="1" step="1" required placeholder="0" onwheel="this.blur()" oninput="calculateRow(this); this.value = this.value.replace(/[^0-9]/g, '')">
+            </td>
+            <td>
+                <input type="number" name="price[]" class="form-control form-control-neon text-center fw-black price-input text-warning" min="0" step="0.01" required placeholder="0.00" onwheel="this.blur()" oninput="calculateRow(this)">
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-neon text-center fw-black row-total text-emerald border-0 bg-transparent" readonly value="0.00">
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-circle" onclick="removeRow(this)" title="حذف السطر"><i class="bi bi-x-lg fw-black"></i></button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+
+        // تفعيل البحث الذكي على القائمة الجديدة
+        const newSelect = tr.querySelector('.item-select');
+        initSmartSelect(newSelect);
+    }
+
+    function removeRow(btn) {
+        const row = btn.closest('tr');
+        row.style.animation = 'fadeOutUp 0.3s forwards';
+        setTimeout(() => {
+            row.remove();
+            calculateGrandTotal();
+        }, 300);
+    }
+
+    function calculateRow(inputElement) {
+        const row = inputElement.closest('tr');
+        const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+        const price = parseFloat(row.querySelector('.price-input').value) || 0;
+        const total = qty * price;
+        row.querySelector('.row-total').value = total.toFixed(2);
+        calculateGrandTotal();
+    }
+
+    function calculateGrandTotal() {
+        let grandTotal = 0;
+        document.querySelectorAll('.row-total').forEach(input => {
+            grandTotal += parseFloat(input.value) || 0;
+        });
+        document.getElementById('grandTotal').innerText = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // دالة حفظ المورد الجديد لحظياً بالـ AJAX
+    function saveSupplierAjax() {
+        const name = document.getElementById('supName').value.trim();
+        const phone = document.getElementById('supPhone').value.trim();
+
+        if (!name) {
+            alert('الرجاء إدخال اسم المورد');
+            return;
+        }
+
+        fetch("/inventory/api/add-supplier/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ name: name, phone: phone })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('supplierSelect');
+                const newOption = new Option(data.supplier.name, data.supplier.id, true, true);
+                select.add(newOption);
+
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('quickAddSupplierModal'));
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                document.getElementById('ajaxSupplierForm').reset();
+            } else {
+                alert("حدث خطأ: " + (data.error || 'عذراً، لم تنجح العملية'));
+            }
+        })
+        .catch(error => {
+            console.error("Error:", error);
+            alert("حدث خطأ في الاتصال بالخادم.");
+        });
+    }
+</script>
+{% endblock %}

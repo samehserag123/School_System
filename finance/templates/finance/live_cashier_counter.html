@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_finance.html" %}
 {% load static %}
 
 {% block title %}شاشة الكاونتر والتحصيل المباشر السريع (POS){% endblock %}
@@ -89,7 +89,7 @@
         border: 1px solid rgba(255, 255, 255, 0.18);
         transition: transform 0.2s, border-color 0.2s;
     }
-    
+
     .clickable-card {
         cursor: pointer;
     }
@@ -103,8 +103,20 @@
     .stat-label-old { color: #fca5a5 !important; font-weight: 800; font-size: 0.95rem; }
     .stat-label-current { color: #7dd3fc !important; font-weight: 800; font-size: 0.95rem; }
     .stat-label-late { color: #f87171 !important; font-weight: 800; font-size: 0.95rem; }
+    /* 🟢 أضف هذا السطر مع كلاسات التنسيق */
+    .stat-label-discount { color: #c084fc !important; font-weight: 800; font-size: 0.95rem; }
     .stat-label-paid { color: #6ee7b7 !important; font-weight: 800; font-size: 0.95rem; }
     .stat-label-remaining { color: #fde047 !important; font-weight: 900; font-size: 1rem; }
+
+    /* 🟢 إخفاء أسهم التمرير من حقول الأرقام لتبدو كشاشة POS احترافية */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
 </style>
 
 <div class="container-fluid py-3" dir="rtl">
@@ -168,7 +180,7 @@
                     <!-- 🟢 الكروت الـ 5 بعناوين واضحة ناصعة وإمكانية الضغط للتحويل لصفحة تسوية المديونية -->
                     <div class="row g-2 mb-4">
                         <div class="col-6 col-md">
-                            <div class="stat-badge border-danger clickable-card" onclick="payOldDebtDirectly()" title="اضغط للانتثال لصفحة تسوية المديونية القديمة">
+                            <div class="stat-badge border-danger clickable-card" onclick="payOldDebtDirectly()" title="اضغط للانتقال لصفحة تسوية المديونية القديمة">
                                 <span class="stat-label-old d-block mb-1">
                                     <i class="bi bi-clock-history me-1"></i> مديونية قديمة
                                 </span>
@@ -189,6 +201,15 @@
                                     <i class="bi bi-exclamation-octagon me-1"></i> غرامة تأخير
                                 </span>
                                 <strong id="dispLateFine" class="text-danger fs-5 fw-black">0.00</strong>
+                            </div>
+                        </div>
+                        <!-- 🟢 1. كارت عداد الخصم الجديد -->
+                        <div class="col-6 col-md">
+                            <div class="stat-badge" style="border-color: #c084fc !important;">
+                                <span class="stat-label-discount d-block mb-1">
+                                    <i class="bi bi-percent me-1"></i> عداد الخصم
+                                </span>
+                                <strong id="dispDiscount" class="fs-5 fw-black" style="color: #c084fc;">0.00</strong>
                             </div>
                         </div>
                         <div class="col-6 col-md">
@@ -218,6 +239,9 @@
                         </a>
                         <a id="btnWithdraw" href="#" class="btn btn-sm btn-outline-danger fw-bold px-3">
                             <i class="bi bi-box-seam me-1"></i> سحب الملف
+                        </a>
+                        <a id="btnAddSale" href="{% url 'add_book_sale' %}" target="_blank" class="btn btn-sm btn-outline-success fw-bold px-3">
+                            <i class="bi bi-cart-check-fill me-1"></i> عملية تسهيل (كتب / زي)
                         </a>
                     </div>
                 </div>
@@ -320,6 +344,7 @@
 <script>
 let searchTimeout;
 let currentStudentData = null;
+let currentFocus = -1; // متغير لتتبع التنقل بالكيبورد
 
 // 🟢 التركيز الفوري على خانة المبلغ
 function focusAmountInput() {
@@ -332,7 +357,7 @@ function focusAmountInput() {
     }, 120);
 }
 
-// 🟢 عند الضغط على كارت المديونية القديمة يتم التوجيه المباشر لصفحة التسوية
+// 🟢 التوجيه المباشر لصفحة التسوية
 function payOldDebtDirectly() {
     if (currentStudentData && currentStudentData.old_debt > 0) {
         window.location.href = `/finance/student/${currentStudentData.id}/settle-debt/?from=counter`;
@@ -351,45 +376,63 @@ function payOldDebtDirectly() {
 
 document.addEventListener('DOMContentLoaded', function() {
     {% if selected_student %}
+        // 🟢 1. معالجة وتحديد قيم الطالب المختار الممرر مباشرة من السيرفر
+        const rawOldDebt = parseFloat("{{ selected_student.previous_debt|default:'0' }}") || parseFloat("{{ account.previous_balance|default:'0' }}") || 0;
+        const rawTotalRem = parseFloat("{{ account.total_remaining|default:'0' }}") || 0;
+
+        // 🟢 قراءة قيمة الخصم بكافة المسميات المحتملة
+        const rawDiscount = parseFloat("{{ account.discount|default:'0' }}") || parseFloat("{{ account.total_discount|default:'0' }}") || parseFloat("{{ account.discount_amount|default:'0' }}") || 0;
+
         const studentData = {
             id: "{{ selected_student.id }}",
-            full_name: "{{ selected_student.get_full_name }}",
-            code: "{{ selected_student.student_code|default:'---' }}",
-            national_id: "{{ selected_student.national_id|default:'---' }}",
-            grade: "{{ selected_student.grade.name|default:'' }}",
-            classroom: "{{ selected_student.classroom.name|default:'' }}",
+            full_name: "{{ selected_student.get_full_name|escapejs }}",
+            code: "{{ selected_student.student_code|default:'---'|escapejs }}",
+            national_id: "{{ selected_student.national_id|default:'---'|escapejs }}",
+            grade: "{{ selected_student.grade.name|default:''|escapejs }}",
+            classroom: "{{ selected_student.classroom.name|default:''|escapejs }}",
+            specialization: "{{ selected_student.get_specialization_display|default:'غير محدد'|escapejs }}",
             is_assigned: {% if account and account.installment_plan %}true{% else %}false{% endif %},
-            old_debt: parseFloat("{{ account.previous_balance|default:0 }}") || 0,
+
+            old_debt: rawOldDebt,
             fees: parseFloat("{{ account.total_fees|default:0 }}") || 0,
-            late_fine: parseFloat("{{ account.late_fines|default:0 }}") || 0,
-            paid: parseFloat("{{ account.paid_amount|default:0 }}") || 0,
-            total_obligation: parseFloat("{{ account.remaining_balance|default:0 }}") || 0
+            late_fine: 0,
+            discount: rawDiscount, // 🟢 إضافة حقل الخصم ليتغذى منه العداد بالشاشة
+            paid: parseFloat("{{ account.total_paid|default:0 }}") || 0,
+            total_obligation: rawTotalRem + rawOldDebt
         };
+
         selectStudent(studentData);
+
     {% else %}
-        const urlParams = new URLSearchParams(window.location.search);
-        const studentId = urlParams.get('student_id');
+        // 🟢 2. جلب سريع وفوري من الـ API عند وجود student_id في رابط الصفحة
+        const studentId = new URLSearchParams(window.location.search).get('student_id');
 
         if (studentId) {
-            fetch(`/finance/api/student-search/?q=${encodeURIComponent(studentId)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status === 'success' && data.results.length > 0) {
-                        const matchedStudent = data.results.find(s => s.id == studentId) || data.results[0];
-                        if (matchedStudent) {
-                            selectStudent(matchedStudent);
-                        }
+            fetch(`/finance/api/student-search/?q=${encodeURIComponent(studentId)}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(res => res.ok ? res.json() : Promise.reject(res))
+            .then(data => {
+                if (data.status === 'success' && data.results && data.results.length > 0) {
+                    const matchedStudent = data.results.find(s => String(s.id) === String(studentId)) || data.results[0];
+                    if (matchedStudent) {
+                        selectStudent(matchedStudent);
                     }
-                })
-                .catch(err => console.error('خطأ أثناء تحميل بيانات الطالب من الرابط:', err));
+                }
+            })
+            .catch(err => console.error("حدث خطأ أثناء جلب بيانات الطالب الممرر:", err));
         }
     {% endif %}
 });
 
-document.getElementById('studentSearchInput').addEventListener('input', function() {
+// 🟢 محرك البحث ودعم الكيبورد (الأسهم و Enter)
+const searchInput = document.getElementById('studentSearchInput');
+const resultsBox = document.getElementById('searchResultsList');
+
+searchInput.addEventListener('input', function() {
     clearTimeout(searchTimeout);
     const query = this.value.trim();
-    const resultsBox = document.getElementById('searchResultsList');
+    currentFocus = -1; // إعادة تعيين التحديد
 
     if (query.length < 2) {
         resultsBox.classList.add('d-none');
@@ -402,9 +445,10 @@ document.getElementById('studentSearchInput').addEventListener('input', function
             .then(data => {
                 resultsBox.innerHTML = '';
                 if (data.status === 'success' && data.results.length > 0) {
-                    data.results.forEach(student => {
+                    data.results.forEach((student, index) => {
                         const div = document.createElement('div');
-                        div.className = 'student-search-card d-flex justify-content-between align-items-center';
+                        div.className = 'student-search-card d-flex justify-content-between align-items-center search-item';
+                        div.setAttribute('data-index', index);
 
                         let totalDue = student.total_obligation;
                         let debtBadge = totalDue > 0
@@ -419,7 +463,7 @@ document.getElementById('studentSearchInput').addEventListener('input', function
                             <div>
                                 <strong class="text-warning d-block fs-5 mb-1">${student.full_name}</strong>
                                 <div class="d-flex align-items-center gap-2 flex-wrap text-white small fw-bold">
-                                    <span class="badge bg-primary px-2 py-1">${student.grade} - ${student.classroom}</span>
+                                    <span class="badge bg-primary px-2 py-1">${student.grade} - ${student.specialization || 'غير محدد'}</span>
                                     ${assignedText}
                                     <span class="text-info">| كود: ${student.code}</span>
                                     <span class="text-white-50">| قومي: ${student.national_id}</span>
@@ -429,61 +473,134 @@ document.getElementById('studentSearchInput').addEventListener('input', function
                                 ${debtBadge}
                             </div>
                         `;
+                        // التحديد بالماوس
                         div.onclick = () => selectStudent(student);
+                        // التحديد بالكيبورد
+                        div.dataset.student = JSON.stringify(student);
                         resultsBox.appendChild(div);
                     });
 
                     if (data.has_more) {
                         const moreDiv = document.createElement('div');
-                        moreDiv.className = 'p-3 text-center text-info bg-black fw-bold small border-top border-secondary';
+                        moreDiv.className = 'p-3 text-center text-info bg-black fw-bold small border-top border-secondary unselectable';
                         moreDiv.innerHTML = `<i class="bi bi-info-circle-fill text-warning me-1"></i> يظهر أعلى 15 نتيجة فقط.. اكتب اسم الأب أو كود الطالب للتحديد بدقة.`;
                         resultsBox.appendChild(moreDiv);
                     }
 
                     resultsBox.classList.remove('d-none');
                 } else {
-                    resultsBox.innerHTML = '<div class="p-4 text-center text-warning fw-black fs-5"><i class="bi bi-exclamation-triangle-fill me-2"></i> لا توجد نتائج مطابقة لبحثك</div>';
+                    resultsBox.innerHTML = '<div class="p-4 text-center text-warning fw-black fs-5 unselectable"><i class="bi bi-exclamation-triangle-fill me-2"></i> لا توجد نتائج مطابقة لبحثك</div>';
                     resultsBox.classList.remove('d-none');
                 }
-            })
-            .catch(err => console.error('خطأ في البحث:', err));
+            });
     }, 250);
 });
 
+// 🟢 تفعيل التنقل بالأسهم
+searchInput.addEventListener('keydown', function(e) {
+    const items = resultsBox.querySelectorAll('.search-item');
+    if (!items || items.length === 0 || resultsBox.classList.contains('d-none')) return;
+
+    if (e.key === 'ArrowDown') {
+        currentFocus++;
+        addActive(items);
+    } else if (e.key === 'ArrowUp') {
+        currentFocus--;
+        addActive(items);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (currentFocus > -1) {
+            items[currentFocus].click();
+        } else if (items.length > 0) {
+            items[0].click(); // إذا ضغط Enter دون استخدام الأسهم، اختار أول نتيجة
+        }
+    }
+});
+
+function addActive(items) {
+    if (!items) return false;
+    items.forEach(item => {
+        item.style.background = '';
+        item.style.paddingRight = '18px';
+    });
+    if (currentFocus >= items.length) currentFocus = 0;
+    if (currentFocus < 0) currentFocus = (items.length - 1);
+
+    // تمييز العنصر المحدد بالكيبورد
+    items[currentFocus].style.background = 'rgba(56, 189, 248, 0.25)';
+    items[currentFocus].style.paddingRight = '25px';
+    items[currentFocus].scrollIntoView({ block: 'nearest' });
+}
+
+// 🟢 دالة مساعدة فائقة السرعة لتنسيق المبالغ المالية
+const fmtNum = val => (parseFloat(val) || 0).toFixed(2);
+
 function selectStudent(s) {
+    if (!s) return;
     currentStudentData = s;
-    document.getElementById('searchResultsList').classList.add('d-none');
-    document.getElementById('studentSearchInput').value = s.full_name;
 
-    document.getElementById('dispName').innerText = s.full_name;
-    document.getElementById('dispCode').innerText = s.code;
-    document.getElementById('dispNational').innerText = s.national_id;
-    document.getElementById('dispGrade').innerText = `${s.grade} - ${s.classroom}`;
+    // 1. إخفاء القائمة المنسدلة وتعبئة خانة البحث
+    resultsBox.classList.add('d-none');
+    searchInput.value = s.full_name || '';
 
+    // 2. تحديث النصوص الأساسية باستخدام textContent (أسرع من innerText لأنه لا يسبب Reflow)
+    document.getElementById('dispName').textContent = s.full_name || '---';
+    document.getElementById('dispCode').textContent = s.code || '---';
+    document.getElementById('dispNational').textContent = s.national_id || '---';
+    document.getElementById('dispGrade').textContent = `${s.grade || ''} - ${s.specialization || 'غير محدد'}`;
+
+    // 3. تحديث شارة التسكين
     const assignedBadge = document.getElementById('dispAssignedBadge');
-    if (s.is_assigned) {
-        assignedBadge.className = "badge bg-success px-3 py-1";
-        assignedBadge.innerText = "مسكن ماليًا ✅";
-    } else {
-        assignedBadge.className = "badge bg-warning text-dark px-3 py-1";
-        assignedBadge.innerText = "غير مسكن ماليًا ⚠️";
+    if (assignedBadge) {
+        assignedBadge.className = s.is_assigned ? "badge bg-success px-3 py-1" : "badge bg-warning text-dark px-3 py-1";
+        assignedBadge.textContent = s.is_assigned ? "مسكن ماليًا ✅" : "غير مسكن ماليًا ⚠️";
     }
 
-    document.getElementById('dispOldDebt').innerText = s.old_debt.toFixed(2);
-    document.getElementById('dispFees').innerText = s.fees.toFixed(2);
-    document.getElementById('dispLateFine').innerText = s.late_fine.toFixed(2);
-    document.getElementById('dispPaid').innerText = s.paid.toFixed(2);
-    document.getElementById('dispRemaining').innerText = s.total_obligation.toFixed(2);
+    // 🟢 4. تحديث العدادات المالية (تمت إضافة عداد الخصم هنا)
+    document.getElementById('dispOldDebt').textContent = fmtNum(s.old_debt);
+    document.getElementById('dispFees').textContent = fmtNum(s.fees);
+    document.getElementById('dispLateFine').textContent = fmtNum(s.late_fine);
 
+    // 🟢 السطر الذي يحل المشكلة ويعرض الخصم في العداد البنفسجي
+    const dispDiscountEl = document.getElementById('dispDiscount');
+    if (dispDiscountEl) {
+        dispDiscountEl.textContent = fmtNum(s.discount);
+    }
+
+    document.getElementById('dispPaid').textContent = fmtNum(s.paid);
+    document.getElementById('dispRemaining').textContent = fmtNum(s.total_obligation);
+
+    // 5. ربط البيانات بالفورم والأزرار
     document.getElementById('formStudentId').value = s.id;
 
+    const counterBackUrl = `{% url 'live_cashier_counter' %}?student_id=${s.id}`;
     document.getElementById('btnPrintStatement').href = `/finance/student/${s.id}/print-statement/`;
     document.getElementById('btnAssignPlan').href = `/finance/assign-plan/${s.id}/?from=counter`;
     document.getElementById('btnWithdraw').href = `/finance/student-inventory/${s.id}/?from=counter`;
+    document.getElementById('btnAddSale').href = `{% url 'add_book_sale' %}?student_id=${s.id}&next=${encodeURIComponent(counterBackUrl)}`;
 
+    // 6. إظهار مساحة عمل الطالب
     document.getElementById('studentWorkspace').classList.remove('d-none');
 
-    focusAmountInput();
+    // 🟢 7. تنفيذ التركيز وتنسيق الإيصال بعد اكتمال رسم الصفحة (Non-blocking UI)
+    requestAnimationFrame(() => {
+        refreshReceiptNumber();
+        focusAmountInput();
+    });
+}
+
+function refreshReceiptNumber() {
+    const receiptInput = document.getElementById('formReceiptNumber');
+    if (!receiptInput) return;
+
+    fetch('/finance/api/next-receipt-number/')
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success' && data.next_receipt_number) {
+                receiptInput.value = data.next_receipt_number;
+            }
+        })
+        .catch(() => { /* لو فشل الطلب، نسيب الرقم الحالي كما هو بدل ما نكسر الشاشة */ });
 }
 
 document.getElementById('paymentCounterForm').addEventListener('submit', function(e) {
@@ -528,9 +645,16 @@ document.getElementById('paymentCounterForm').addEventListener('submit', functio
                 document.getElementById('formReceiptNumber').value = data.next_receipt_number;
             }
 
+            // 🟢 تحديث جميع الأرصدة (تتطلب أن يرسل الـ API القيم الجديدة، أو تحديثها بناءً على المتاح)
             document.getElementById('dispPaid').innerText = data.new_paid.toFixed(2);
             document.getElementById('dispLateFine').innerText = data.new_late_fine.toFixed(2);
             document.getElementById('dispRemaining').innerText = data.new_total_obligation.toFixed(2);
+
+            // تحديث المديونية القديمة إذا أعادها الـ API (يفضل تعديل الـ API ليرجع new_old_debt)
+            if (data.new_old_debt !== undefined) {
+                document.getElementById('dispOldDebt').innerText = data.new_old_debt.toFixed(2);
+                currentStudentData.old_debt = data.new_old_debt;
+            }
 
             if (currentStudentData) {
                 currentStudentData.paid = data.new_paid;
@@ -541,11 +665,18 @@ document.getElementById('paymentCounterForm').addEventListener('submit', functio
             const emptyRow = document.getElementById('emptyRow');
             if (emptyRow) emptyRow.remove();
 
+            // 🟢 إعادة ترتيب أرقام الصفوف الموجودة لتبدأ من 2 بعد إدراج الصف الأول
             const tbody = document.getElementById('todayPaymentsBody');
+            const existingRows = tbody.querySelectorAll('tr');
+            existingRows.forEach((row, idx) => {
+                const numTd = row.querySelector('.row-num');
+                if (numTd) numTd.innerText = idx + 2;
+            });
+
             const newRow = document.createElement('tr');
-            newRow.className = 'animate__animated animate__fadeInDown';
+            newRow.className = 'animate__animated animate__fadeInDown bg-dark bg-opacity-50'; // تمييز الصف الجديد
             newRow.innerHTML = `
-                <td class="text-muted fw-bold">#</td>
+                <td class="text-white fw-bold row-num">1</td>
                 <td class="text-white-50 small">${data.payment.time}</td>
                 <td><span class="badge bg-primary bg-opacity-20 text-info border border-info px-2 py-1 font-monospace">#${data.payment.receipt_number}</span></td>
                 <td class="text-start ps-3 fw-bold text-white">${data.payment.student_name}</td>
@@ -591,17 +722,17 @@ document.getElementById('paymentCounterForm').addEventListener('submit', functio
 });
 
 function resetCounterForm() {
-    document.getElementById('studentSearchInput').value = '';
-    document.getElementById('searchResultsList').classList.add('d-none');
+    searchInput.value = '';
+    resultsBox.classList.add('d-none');
     document.getElementById('studentWorkspace').classList.add('d-none');
     document.getElementById('formAmount').value = '';
     currentStudentData = null;
-    document.getElementById('studentSearchInput').focus();
+    currentFocus = -1;
+    refreshReceiptNumber(); // 🟢 تأكيد إن الرقم المعروض هو الأحدث دايماً
+    searchInput.focus();
 }
 
 document.addEventListener('click', function(e) {
-    const searchInput = document.getElementById('studentSearchInput');
-    const resultsBox = document.getElementById('searchResultsList');
     if (e.target !== searchInput && !resultsBox.contains(e.target)) {
         resultsBox.classList.add('d-none');
     }

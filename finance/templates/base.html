@@ -56,14 +56,14 @@
         .loader-overlay.active {
             visibility: visible !important;
             opacity: 1 !important;
-            transition: none !important; 
+            transition: none !important;
         }
 
         .custom-spinner {
             width: 70px;
             height: 70px;
-            border: 5px solid rgba(56, 189, 248, 0.15); 
-            border-top-color: #38bdf8; 
+            border: 5px solid rgba(56, 189, 248, 0.15);
+            border-top-color: #38bdf8;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -293,7 +293,7 @@
             <span class="d-block fw-bold text-white fs-5">{{ student.get_full_name }}</span>
             <small class="badge bg-info text-dark mt-2 px-3">{{ student.academic_year.name }}</small>
         </div>
-        
+
         <div class="section-title">العمليات المالية</div>
         {% if user.is_superuser or "Finance_General" in user.groups.all.0.name %}
             <a href="{% url 'assign_plan_with_id' student.id %}"><i class="bi bi-calendar-check text-info"></i> تسكين برنامج مالي</a>
@@ -333,7 +333,7 @@
 
     {% else %}
         <h5><i class="bi bi-shield-check"></i> لوحة الإدارة</h5>
-        
+
         <div class="section-title">إدارة الطلاب</div>
         {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name %}
             <!-- 🟢 إضافة رابط طلبات التقديم الإلكتروني الواردة بالشارة الديناميكية -->
@@ -418,7 +418,7 @@
     <div class="top-navbar d-flex justify-content-between align-items-center">
         <h5 class="mb-0 text-info">{% block page_title %}نظام إدارة شؤون الطلاب{% endblock %}</h5>
         <div class="d-flex align-items-center gap-3">
-            
+
             {% if user.is_authenticated %}
             <!-- 🔔 جرس إشعارات التقديم الإلكتروني التفاعلي في الشريط العلوي -->
             <a href="{% url 'pending_admissions_list' %}" class="position-relative text-white me-2 d-inline-flex align-items-center justify-content-center text-decoration-none bg-dark border border-secondary p-2 rounded-3 shadow-sm" title="طلبات التقديم الواردة" style="width: 42px; height: 42px;">
@@ -432,18 +432,18 @@
             </a>
 
             <span class="badge bg-secondary border border-secondary p-2 shadow-sm fs-6 text-light" style="background-color: #2d3238 !important;">
-                <i class="bi bi-person-circle me-1 text-warning"></i> 
+                <i class="bi bi-person-circle me-1 text-warning"></i>
                 مرحباً، {{ user.get_full_name|default:user.username }}
             </span>
             {% endif %}
-            
+
             <span class="badge bg-dark border border-secondary p-2 shadow-sm fs-6">
-                <i class="bi bi-calendar3 me-1 text-info"></i> 
+                <i class="bi bi-calendar3 me-1 text-info"></i>
                 {{ active_year.name|default:"لم يتم تحديد سنة" }}
             </span>
         </div>
     </div>
-    
+
     {% if messages %}
     <div class="toast-notification-container">
         {% for message in messages %}
@@ -465,8 +465,8 @@
             toasts.forEach(toast => {
                 setTimeout(() => {
                     toast.classList.add('toast-fade-out');
-                    setTimeout(() => toast.remove(), 400); 
-                }, 4000); 
+                    setTimeout(() => toast.remove(), 400);
+                }, 4000);
             });
         });
     </script>
@@ -486,7 +486,7 @@
     // 2. نظام منع الدخول وعرض الإشعار الذكي
     function showAccessDenied(e) {
         if(e) e.preventDefault();
-        
+
         let container = document.querySelector('.toast-notification-container');
         if (!container) {
             container = document.createElement('div');
@@ -501,7 +501,7 @@
             <div class="toast-message">عفواً، ليس لديك صلاحية للوصول إلى هذه الصفحة أو تنفيذ هذه العملية.</div>
             <div class="toast-progress"></div>
         `;
-        
+
         container.appendChild(toast);
 
         setTimeout(() => {
@@ -560,12 +560,12 @@
         window.addEventListener('contextmenu', function(e) {
             e.preventDefault();
             return false;
-        }, true); 
+        }, true);
 
         window.addEventListener('keydown', function(e) {
-            if (e.keyCode == 123 || 
-                (e.ctrlKey && e.shiftKey && e.keyCode == 73) || 
-                (e.ctrlKey && e.keyCode == 85) || 
+            if (e.keyCode == 123 ||
+                (e.ctrlKey && e.shiftKey && e.keyCode == 73) ||
+                (e.ctrlKey && e.keyCode == 85) ||
                 (e.ctrlKey && e.keyCode == 83)) {
                 e.preventDefault();
                 return false;
@@ -574,9 +574,17 @@
     })();
 
     // =========================================================
-    // 5. المحرك الماسي لشاشة التحميل اللحظية (يمنع أي تجميد)
+    // 5. المحرك الماسي لشاشة التحميل اللحظية وتكبير النافذة التلقائي
     // =========================================================
     document.addEventListener("DOMContentLoaded", function () {
+
+        // 🟢 تكبير الشاشة تلقائياً بمجرد الدخول للوحة التحكم
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || !window.menubar.visible;
+        if (isStandalone) {
+            window.moveTo(0, 0);
+            window.resizeTo(screen.availWidth, screen.availHeight);
+        }
+
         const loader = document.getElementById("global-loader");
         if (!loader) return;
 
@@ -588,7 +596,7 @@
         // 2. اصطياد النقرات على مستوى الصفحة بالكامل
         document.addEventListener("click", function (e) {
             const link = e.target.closest("a");
-            if (!link) return; 
+            if (!link) return;
 
             // السماح بفتح الروابط في تاب جديد دون تجميد
             if (e.ctrlKey || e.shiftKey || e.metaKey || (e.button && e.button !== 0)) {
@@ -596,16 +604,16 @@
             }
 
             const href = link.getAttribute("href");
-            
+
             // الاستثناءات
             if (!href || href.startsWith("#") || href.startsWith("javascript") || link.classList.contains("locked-link") || link.getAttribute("target") === "_blank") {
                 return;
             }
-            
+
             // إيقاف المتصفح مؤقتاً لضمان رسم اللودر قبل الانتقال
             e.preventDefault();
 
-            // إظهار اللودر فوراً وبقوة (ستعمل فوراً بفضل إلغاء الأنيميشن في الـ CSS)
+            // إظهار اللودر فوراً وبقوة
             loader.classList.add("active");
 
             // أمر المتصفح بالانتقال بعد 15 ملي ثانية (لضمان رسم الشاشة السوداء)
@@ -617,7 +625,7 @@
         // 3. تشغيل اللودر عند إرسال النماذج وتجميد زر الحفظ
         document.addEventListener("submit", function (e) {
             loader.classList.add("active");
-            
+
             const submitBtn = e.target.querySelector('button[type="submit"], input[type="submit"]');
             if (submitBtn) {
                 setTimeout(() => {

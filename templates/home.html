@@ -18,19 +18,14 @@
         }
 
         /* ==========================================
-           إخفاء مسطرة التمرير (Scrollbar) الجانبية
+           1. منع السكرول نهائياً وضبط الشاشة 100%
            ========================================== */
         html, body {
-            overflow-x: hidden;
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE & Edge */
-        }
-
-        html::-webkit-scrollbar, 
-        body::-webkit-scrollbar {
-            display: none; /* Chrome, Safari, Opera */
-            width: 0;
-            height: 0;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
         }
 
         body {
@@ -38,10 +33,9 @@
             background-size: 400% 400%;
             animation: gradientBG 15s ease infinite;
             font-family: 'Cairo', sans-serif;
-            min-height: 100vh;
-            margin: 0;
-            padding-top: 80px;
             color: #fff;
+            display: flex;
+            flex-direction: column;
         }
 
         @keyframes gradientBG {
@@ -52,227 +46,232 @@
 
         /* شاشة التحميل الشاملة */
         .loader-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(2, 6, 23, 0.9);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            z-index: 999999;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            visibility: hidden;
-            opacity: 0;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 23, 0.9);
+            backdrop-filter: blur(8px); z-index: 999999; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; visibility: hidden; opacity: 0;
         }
+        .loader-overlay.active { visibility: visible !important; opacity: 1 !important; transition: none !important; }
+        .custom-spinner { width: 70px; height: 70px; border: 5px solid rgba(56, 189, 248, 0.15); border-top-color: #38bdf8; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loader-text { margin-top: 20px; font-weight: 800; font-size: 1.2rem; color: #38bdf8; animation: pulse-text 1.5s ease-in-out infinite; }
+        @keyframes pulse-text { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-        .loader-overlay.active {
-            visibility: visible !important;
-            opacity: 1 !important;
-            transition: none !important;
-        }
-
-        .custom-spinner {
-            width: 70px;
-            height: 70px;
-            border: 5px solid rgba(56, 189, 248, 0.15);
-            border-top-color: #38bdf8;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loader-text {
-            margin-top: 20px;
-            font-weight: 800;
-            font-size: 1.2rem;
-            color: #38bdf8;
-            letter-spacing: 0.5px;
-            animation: pulse-text 1.5s ease-in-out infinite;
-        }
-
-        @keyframes pulse-text {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* Navbar & Dropdown Styles */
+        /* ==========================================
+           2. Navbar & Dropdown Styles (Desktop المحسّن للسرعة)
+           ========================================== */
         .navbar-glass {
             background: var(--dark-glass);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            padding: 10px 0;
-            transition: all 0.3s ease;
+            padding: 8px 0;
+            height: 70px;
         }
 
-        .navbar-brand {
-            font-weight: 900;
-            font-size: 1.4rem;
-            color: #fff !important;
-            text-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
-        }
+        .navbar-brand { font-weight: 900; font-size: 1.4rem; color: #fff !important; text-shadow: 0 0 15px rgba(56, 189, 248, 0.5); }
+        .nav-link { color: #cbd5e1 !important; font-weight: 700; padding: 8px 15px !important; border-radius: 10px; transition: all 0.3s; margin: 0 2px; font-size: 0.95rem;}
+        .nav-link:hover, .nav-link.show { background: rgba(56, 189, 248, 0.1); color: var(--primary) !important; }
 
-        .nav-link {
-            color: #cbd5e1 !important;
-            font-weight: 700;
-            padding: 10px 18px !important;
-            border-radius: 10px;
-            transition: all 0.3s;
-            margin: 0 2px;
-        }
-
-        .nav-link:hover, .nav-link.show {
-            background: rgba(56, 189, 248, 0.1);
-            color: var(--primary) !important;
-        }
-
+        /* 🟢 تحسين سرعة القوائم: إزالة الأنيميشن الثقيل وتجهيز الكارت شاشة */
         .dropdown-menu {
-            background: var(--darker-glass);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.08);
             border-radius: 15px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
             padding: 10px;
             min-width: 250px;
             margin-top: 10px;
-            animation: fadeIn 0.3s ease;
+            will-change: transform, opacity;
         }
 
         @media all and (min-width: 992px) {
-            .navbar .nav-item.dropdown:hover > .dropdown-menu {
-                display: block; opacity: 1; visibility: visible; transform: translateY(0);
+            .navbar .nav-item.dropdown:hover > .dropdown-menu { display: block; opacity: 1; visibility: visible; transform: translateY(0); }
+            /* 🟢 تحديد سرعة الظهور بدقة بدون تعارض */
+            .navbar .dropdown-menu { display: block; opacity: 0; visibility: hidden; transform: translateY(10px); transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s; }
+        }
+
+        .dropdown-submenu { position: relative; }
+        .dropdown-submenu > .dropdown-menu { top: 0; right: 100%; left: auto; margin-top: -5px; margin-right: 5px; min-width: 260px; }
+
+        @media all and (min-width: 992px) {
+            .dropdown-submenu:hover > .dropdown-menu { display: block; opacity: 1; visibility: visible; transform: translateX(0); }
+            .dropdown-submenu > .dropdown-menu { transform: translateX(10px); transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s; }
+        }
+
+        .dropdown-item { color: #e2e8f0; font-weight: 600; padding: 10px 20px; border-radius: 10px; transition: all 0.2s; display: flex; align-items: center; gap: 12px; margin-bottom: 3px; font-size: 0.9rem;}
+        .dropdown-item i:first-child { font-size: 1.2rem; width: 25px; text-align: center; }
+        .dropdown-item:hover:not(.locked-link) { background: rgba(255,255,255,0.05); color: #fff; transform: translateX(-5px); }
+        .locked-link { opacity: 0.5; cursor: not-allowed !important; color: #94a3b8 !important; }
+
+        .icon-student { color: #3b82f6; } .icon-finance { color: #10b981; } .icon-services { color: #8b5cf6; } .icon-admin { color: #f59e0b; } .icon-danger { color: #ef4444; } .icon-academy { color: #f59e0b; }
+
+        /* ==========================================
+           📱 3. تحسينات الموبايل (Mobile Glassmorphism)
+           ========================================== */
+        @media (max-width: 991px) {
+            /* جعل حاوية القائمة المنسدلة تطفو ككارت زجاجي منفصل */
+            .navbar-collapse {
+                position: absolute;
+                top: 75px;
+                left: 15px;
+                right: 15px;
+                background: rgba(15, 23, 42, 0.98); /* لون أغمق لتقليل الاعتماد على الـ Blur */
+                backdrop-filter: blur(10px); /* 🟢 تخفيف الـ Blur لسرعة الموبايل */
+                -webkit-backdrop-filter: blur(10px);
+                border-radius: 20px;
+                padding: 15px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+                max-height: calc(100vh - 100px);
+                overflow-y: auto;
+                z-index: 1050;
+                will-change: transform;
             }
+
+            /* تحسين شكل الروابط الرئيسية في الموبايل */
+            .navbar-nav .nav-link {
+                padding: 12px 15px !important;
+                margin-bottom: 5px;
+                border-radius: 12px;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid transparent;
+            }
+
+            .navbar-nav .nav-link:hover, .navbar-nav .nav-link[aria-expanded="true"] {
+                background: rgba(56, 189, 248, 0.15);
+                border-color: rgba(56, 189, 248, 0.3);
+                color: #fff !important;
+            }
+
+            /* تصميم القوائم الفرعية (Dropdowns) كأشكال زجاجية غائرة بدون أنيميشن ثقيل */
             .navbar .dropdown-menu {
-                display: block; opacity: 0; visibility: hidden; transform: translateY(10px); transition: all 0.3s ease;
+                background: rgba(0, 0, 0, 0.2) !important;
+                border: 1px solid rgba(255, 255, 255, 0.05) !important;
+                border-radius: 15px !important;
+                padding: 10px !important;
+                margin-top: 5px !important;
+                margin-bottom: 10px !important;
+                box-shadow: inset 0 4px 15px rgba(0, 0, 0, 0.3) !important;
             }
+
+            /* تعديل القوائم المتداخلة (Submenus) لتفتح لأسفل الموبايل */
+            .dropdown-submenu > .dropdown-menu {
+                position: static !important;
+                float: none !important;
+                width: 100% !important;
+                margin-top: 5px !important;
+            }
+
+            .dropdown-item { padding: 12px 15px; border-radius: 10px; margin-bottom: 3px; }
+            .navbar-toggler { outline: none !important; border: none !important; box-shadow: none !important; }
         }
 
-        /* دعم القوائم المنسدلة المتداخلة للتقارير */
-        .dropdown-submenu {
-            position: relative;
-        }
-        .dropdown-submenu > .dropdown-menu {
-            top: 0;
-            right: 100%;
-            left: auto;
-            margin-top: -5px;
-            margin-right: 5px;
-            min-width: 260px;
-        }
-        @media all and (min-width: 992px) {
-            .dropdown-submenu:hover > .dropdown-menu {
-                display: block;
-                opacity: 1;
-                visibility: visible;
-                transform: translateX(0);
-            }
-        }
-
-        .dropdown-item {
-            color: #e2e8f0;
-            font-weight: 600;
-            padding: 12px 20px;
-            border-radius: 10px;
-            transition: all 0.2s;
+        /* ==========================================
+           4. تخطيط الشبكة المحيطية (Center + Wings)
+           ========================================== */
+        .main-wrapper {
+            flex: 1;
+            margin-top: 70px;
+            height: calc(100vh - 70px);
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 5px;
+            justify-content: center;
+            padding: 20px 40px;
+            position: relative;
+            z-index: 1;
         }
 
-        .dropdown-item i:first-child {
-            font-size: 1.2rem;
-            width: 25px;
-            text-align: center;
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 320px minmax(350px, 1fr) 320px;
+            gap: 30px;
+            width: 100%;
+            max-width: 1500px;
+            height: 100%;
+            max-height: 600px;
         }
 
-        .dropdown-item:hover:not(.locked-link) {
-            background: rgba(255,255,255,0.05);
-            color: #fff;
-            transform: translateX(-5px);
+        .side-column { display: flex; flex-direction: column; justify-content: space-between; gap: 15px; height: 100%; }
+
+        /* الكروت الزجاجية المدمجة */
+        .portal-card {
+            flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border-radius: 20px;
+            padding: 15px 20px; display: flex; align-items: center; gap: 15px;
+            text-decoration: none !important; color: #fff; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); position: relative; overflow: hidden;
+            max-height: calc(33.33% - 10px);
         }
 
-        .locked-link {
-            opacity: 0.5;
-            cursor: not-allowed !important;
-            color: #94a3b8 !important;
-        }
-        .locked-link:hover {
-            background: transparent !important;
+        .portal-card::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%);
+            transform: skewX(-25deg); transition: all 0.75s; z-index: 1;
         }
 
-        /* ألوان الأيقونات */
-        .icon-student { color: #3b82f6; }
-        .icon-finance { color: #10b981; }
-        .icon-services { color: #8b5cf6; }
-        .icon-admin { color: #f59e0b; }
-        .icon-danger { color: #ef4444; }
-        .icon-academy { color: #f59e0b; }
+        .portal-card:hover { transform: scale(1.04) translateY(-5px); background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.3); }
+        .portal-card:hover::before { left: 200%; }
 
-        /* Hero Section */
-        .hero-section {
+        .card-icon { width: 65px; height: 65px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 2rem; flex-shrink: 0; transition: all 0.3s ease; position: relative; z-index: 2; }
+        .portal-card:hover .card-icon { transform: scale(1.1) rotate(5deg); }
+
+        .card-content { text-align: right; z-index: 2; display: flex; flex-direction: column; justify-content: center; width: 100%; }
+        .card-title { font-size: 1.2rem; font-weight: 800; margin-bottom: 4px; color: #fff; }
+        .card-desc { font-size: 0.8rem; color: #94a3b8; margin: 0; line-height: 1.5; }
+
+        /* ألوان الكروت وإضاءتها */
+        .card-hr .card-icon { background: rgba(56, 189, 248, 0.15); color: #38bdf8; box-shadow: 0 0 20px rgba(56, 189, 248, 0.3); }
+        .card-student .card-icon { background: rgba(129, 140, 248, 0.15); color: #818cf8; box-shadow: 0 0 20px rgba(129, 140, 248, 0.3); }
+        .card-finance .card-icon { background: rgba(52, 211, 153, 0.15); color: #34d399; box-shadow: 0 0 20px rgba(52, 211, 153, 0.3); }
+        .card-academy .card-icon { background: rgba(251, 146, 60, 0.15); color: #fb923c; box-shadow: 0 0 20px rgba(251, 146, 60, 0.3); }
+        .card-control .card-icon { background: rgba(248, 113, 113, 0.15); color: #f87171; box-shadow: 0 0 20px rgba(248, 113, 113, 0.3); }
+        .card-services .card-icon { background: rgba(192, 132, 252, 0.15); color: #c084fc; box-shadow: 0 0 20px rgba(192, 132, 252, 0.3); }
+
+        /* المركز (شاشة الترحيب) */
+        .center-column {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            min-height: calc(100vh - 120px); text-align: center; position: relative; z-index: 1;
+            background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px); border-radius: 30px; padding: 40px; text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4); animation: floatCard 6s ease-in-out infinite;
         }
-        .welcome-card {
-            background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px); padding: 50px; border-radius: 30px;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.5); max-width: 600px; width: 90%;
-            animation: floatCard 6s ease-in-out infinite;
-        }
-        @keyframes floatCard { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
 
-        .user-avatar {
-            width: 100px; height: 100px; background: linear-gradient(135deg, var(--primary), #1e3a8a);
+        @keyframes floatCard { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
+
+        .welcome-avatar {
+            width: 120px; height: 120px; background: linear-gradient(135deg, var(--primary), #1e3a8a);
             border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-size: 3rem; margin: 0 auto 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            font-size: 3.5rem; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.4);
             border: 4px solid rgba(255,255,255,0.1);
         }
+
         .clock-display {
-            font-size: 2.5rem; font-weight: 900; font-family: monospace;
+            font-size: 3.5rem; font-weight: 900; font-family: monospace;
             background: -webkit-linear-gradient(#38bdf8, #8b5cf6);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            margin-top: 20px; letter-spacing: 2px;
-        }
-        .school-footer {
-            position: fixed; bottom: 10px; width: 100%; text-align: center;
-            font-size: 0.75rem; color: rgba(255,255,255,0.4); letter-spacing: 2px; z-index: 0;
-        }
-        .bg-icon {
-            position: absolute; font-size: 25vw; color: rgba(255,255,255,0.01);
-            z-index: -1; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg);
+            margin-top: 15px; letter-spacing: 2px; line-height: 1.1;
         }
 
-        /* نظام الإشعارات */
-        .toast-notification-container {
-            position: fixed; top: 20px; left: 20px; z-index: 99999;
-            display: flex; flex-direction: column; gap: 15px; pointer-events: none;
+        .admin-btn {
+            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff; padding: 12px 30px; border-radius: 50px; text-decoration: none;
+            font-weight: bold; font-size: 1rem; margin-top: 30px; transition: 0.3s;
+            display: flex; align-items: center; gap: 10px;
         }
-        .modern-toast {
-            min-width: 300px; max-width: 400px; background: rgba(2, 6, 23, 0.95);
-            backdrop-filter: blur(10px); color: #fff; border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); overflow: hidden;
-            position: relative; display: flex; align-items: center; padding: 15px 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            animation: toastSlideIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        .admin-btn:hover { background: rgba(255, 255, 255, 0.15); transform: translateY(-3px); color: #fff; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+
+        .school-footer { position: fixed; bottom: 8px; width: 100%; text-align: center; font-size: 0.75rem; color: rgba(255,255,255,0.4); letter-spacing: 2px; z-index: 0; }
+        .bg-icon { position: fixed; font-size: 35vw; color: rgba(255,255,255,0.015); z-index: 0; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-10deg); pointer-events: none; }
+
+        /* شاشات اللابتوب الصغيرة والموبايل */
+        @media (max-width: 1200px) {
+            html, body { overflow-y: auto; height: auto; scrollbar-width: thin; }
+            .main-wrapper { height: auto; padding: 20px; }
+            .dashboard-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); height: auto; max-height: none; gap: 20px; }
+            .center-column { grid-column: 1 / -1; order: -1; min-height: 400px; }
+            .portal-card { max-height: none; padding: 20px; }
         }
-        .modern-toast.toast-fade-out { animation: toastSlideOut 0.4s ease-in forwards; }
-        @keyframes toastSlideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes toastSlideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-100%); opacity: 0; } }
-        .toast-progress {
-            position: absolute; bottom: 0; left: 0; height: 3px; width: 100%;
-            background: #ff3131; animation: toastProgress 4s linear forwards;
-        }
-        @keyframes toastProgress { from { width: 100%; } to { width: 0%; } }
-        .toast-icon { font-size: 1.5rem; margin-left: 15px; color:#ff3131; }
-        .toast-message { font-family: 'Cairo', sans-serif; font-size: 0.95rem; font-weight: 700; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -281,6 +280,8 @@
     <div class="custom-spinner"></div>
     <div class="loader-text">جاري المعالجة والأمان...</div>
 </div>
+
+<i class="bi bi-grid-fill bg-icon"></i>
 
 <nav class="navbar navbar-expand-lg navbar-dark fixed-top navbar-glass">
     <div class="container-fluid px-4">
@@ -302,31 +303,15 @@
                         <i class="bi bi-briefcase-fill me-1"></i> الموارد البشرية
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
-                        <li>
-                            <a class="dropdown-item" href="{% url 'hr:hr_dashboard' %}">
-                                <i class="bi bi-speedometer2 text-primary"></i> لوحة تحكم الموارد
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{% url 'hr:employee_list' %}">
-                                <i class="bi bi-person-badge text-success"></i> دليل الموظفين
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{% url 'hr:attendance_list' %}">
-                                <i class="bi bi-clock-history text-warning"></i> الحضور والانصراف
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{% url 'hr:leave_list' %}">
-                                <i class="bi bi-calendar2-check text-info"></i> إدارة الإجازات
-                            </a>
-                        </li>
+                        <li><a class="dropdown-item" href="{% url 'hr:hr_dashboard' %}"><i class="bi bi-speedometer2 text-primary"></i> لوحة تحكم الموارد</a></li>
+                        <li><a class="dropdown-item" href="{% url 'hr:employee_list' %}"><i class="bi bi-person-badge text-success"></i> دليل الموظفين</a></li>
+                        <li><a class="dropdown-item" href="{% url 'hr:attendance_list' %}"><i class="bi bi-clock-history text-warning"></i> الحضور والانصراف</a></li>
+                        <li><a class="dropdown-item" href="{% url 'hr:leave_list' %}"><i class="bi bi-calendar2-check text-info"></i> إدارة الإجازات</a></li>
                     </ul>
                 </li>
                 {% endif %}
 
-                {# --- 🎯 2. قائمة الأكاديمية المستقلة الجديدة (بجانب الموارد البشرية) --- #}
+                {# --- 🎯 2. قائمة الأكاديمية المستقلة --- #}
                 {% if user.is_authenticated %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle fw-bold" href="#" role="button" data-bs-toggle="dropdown">
@@ -391,9 +376,7 @@
                                 {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
                                     <li><a class="dropdown-item" href="{% url 'academic_final_report' %}"><i class="bi bi-file-earmark-bar-graph-fill text-success"></i> التقرير الأكاديمي النهائي</a></li>
                                     <li><a class="dropdown-item" href="{% url 'attendance_report' %}"><i class="bi bi-clipboard-data-fill text-warning"></i> تقرير الغياب والحضور الإحصائي</a></li>
-
                                     <li><hr class="dropdown-divider border-secondary opacity-25"></li>
-
                                     <li><a class="dropdown-item" href="{% url 'report_class_roster' %}"><i class="bi bi-filetype-pdf text-danger"></i> طباعة كشوف الفصول (PDF)</a></li>
                                     <li><a class="dropdown-item" href="{% url 'report_student_registry' %}"><i class="bi bi-filetype-pdf text-danger"></i> طباعة السجل المدني للطلاب (PDF)</a></li>
                                     <li><a class="dropdown-item" href="{% url 'report_dismissed_students' %}"><i class="bi bi-filetype-pdf text-danger"></i> تقرير الطلاب المفصولين (PDF)</a></li>
@@ -428,7 +411,6 @@
                         <i class="bi bi-cash-stack me-1"></i> الإدارة المالية
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
-
                         {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
                             <li><a class="dropdown-item" href="{% url 'student_list' %}"><i class="bi bi-wallet2 icon-finance"></i> سجل الطلاب المالي</a></li>
                             <li><a class="dropdown-item" href="{% url 'live_cashier_counter' %}"><i class="bi bi-plus-circle-fill text-success"></i> إضافة سجل مالي جديد</a></li>
@@ -472,17 +454,13 @@
                     </ul>
                 </li>
 
-                {# --- 6. قائمة الخدمات المدرسية (تمت نقية وحذف أزرار الأكاديمية منها) --- #}
+                {# --- 6. قائمة الخدمات المدرسية --- #}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                         <i class="bi bi-grid-fill me-1"></i> الخدمات المدرسية
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
-                        {% if user.is_superuser or "Finance_Books" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
-                            <li><a class="dropdown-item" href="{% url 'book_sales_list' %}"><i class="bi bi-book-half icon-services"></i> صرف الكتب والزي</a></li>
-                        {% else %}
-                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-book-half text-muted"></i> صرف الكتب والزي <i class="bi bi-lock-fill ms-auto"></i></a></li>
-                        {% endif %}
+
 
                         {% if user.is_superuser or "Finance_Courses" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
                             <li><a class="dropdown-item" href="{% url 'course_prices' %}"><i class="bi bi-currency-exchange icon-services"></i> أسعار الكورسات والمجموعات</a></li>
@@ -497,14 +475,61 @@
                         {% endif %}
                     </ul>
                 </li>
+                {# --- 🆕 قائمة إدارة المخازن (ERP) --- #}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle fw-bold" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-box-seam-fill me-1 text-warning"></i> إدارة المخازن
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
 
+                        <!-- 🟢 1. الجزء المنقول: حركة صرف الكتب والزي -->
+                        {% if user.is_superuser or "Finance_Books" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                            <li><a class="dropdown-item" href="{% url 'book_sales_list' %}"><i class="bi bi-book-half text-warning"></i> صرف الكتب والزي</a></li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-book-half text-muted"></i> صرف الكتب والزي <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+
+                        <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+                        <!-- ============================================== -->
+
+                        <!-- 2. باقي أزرار المخازن الأساسية -->
+                        {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+                            <li>
+                                <a class="dropdown-item" href="{% url 'admin_add_restock' %}">
+                                    <i class="bi bi-box-arrow-in-down text-success"></i> تسجيل أذونات التوريد والشراء
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'manual_stock_transaction' %}">
+                                    <i class="bi bi-arrow-left-right text-primary"></i> حركات الصرف والإضافة اليدوية
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'inventory_report' %}">
+                                    <i class="bi bi-boxes text-info"></i> منظومة الجرد وتقارير الأرصدة
+                                </a>
+                            </li>
+
+                            <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+
+                            <li>
+                                <a class="dropdown-item" href="{% url 'material_control_settings' %}">
+                                    <i class="bi bi-gear-wide-connected text-danger"></i> إعدادات الماتيريال ودليل الأصناف
+                                </a>
+                            </li>
+                        {% else %}
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-box-arrow-in-down text-muted"></i> أذونات التوريد الشراء <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-arrow-left-right text-muted"></i> حركات الصرف والإضافة <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                            <li><a class="dropdown-item locked-link" href="javascript:void(0);" onclick="showAccessDenied(event)"><i class="bi bi-gear-wide-connected text-muted"></i> إعدادات الماتيريال (MC) <i class="bi bi-lock-fill ms-auto"></i></a></li>
+                        {% endif %}
+                    </ul>
+                </li>
                 {# --- 7. قائمة النظام والإحصاء --- #}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                         <i class="bi bi-gear-fill me-1"></i> النظام والإحصاء
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
-
                         {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
                             <li><a class="dropdown-item" href="{% url 'students_analytics' %}"><i class="bi bi-graph-up-arrow icon-finance"></i> التحليل الإحصائي العام</a></li>
                         {% else %}
@@ -541,39 +566,113 @@
                     </ul>
                 </li>
                 {% endif %}
-
             </ul>
 
-            <div class="d-flex align-items-center me-auto">
-                <i class="bi bi-person-circle fs-4 text-info"></i>
+            <div class="d-flex align-items-center gap-3 me-auto">
+                <form action="{% url 'logout' %}" method="post" class="m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold"><i class="bi bi-power"></i> خروج</button>
+                </form>
             </div>
         </div>
     </div>
 </nav>
 
-<div class="container hero-section animate__animated animate__fadeIn">
-    <i class="bi bi-diagram-3-fill bg-icon"></i>
+<!-- ==========================================
+     تصميم الشبكة المحيطية (Center + Left & Right Wings)
+     ========================================== -->
+<div class="main-wrapper animate__animated animate__zoomIn">
+    <div class="dashboard-grid">
 
-    <div class="welcome-card text-center">
-        <div class="user-avatar">
-            <i class="bi bi-person-check-fill text-white"></i>
+        <!-- ⬅️ العمود الأيمن (كروت) -->
+        <div class="side-column">
+            {% if user.is_superuser or "HR_Access" in user.groups.all.0.name %}
+            <a href="{% url 'hr:hr_dashboard' %}" class="portal-card card-hr">
+                <div class="card-icon"><i class="bi bi-briefcase-fill"></i></div>
+                <div class="card-content">
+                    <h3 class="card-title">الموارد البشرية</h3>
+                    <p class="card-desc">إدارة الموظفين والرواتب</p>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+            <a href="{% url 'student_registry' %}" class="portal-card card-student">
+                <div class="card-icon"><i class="bi bi-people-fill"></i></div>
+                <div class="card-content">
+                    <h3 class="card-title">شؤون الطلاب</h3>
+                    <p class="card-desc">السجل والغياب والتقديم</p>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if user.is_superuser or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+            <a href="{% url 'finance_dashboard' %}" class="portal-card card-finance">
+                <div class="card-icon"><i class="bi bi-cash-stack"></i></div>
+                <div class="card-content">
+                    <h3 class="card-title">الإدارة المالية</h3>
+                    <p class="card-desc">التحصيل والمصروفات</p>
+                </div>
+            </a>
+            {% endif %}
         </div>
-        <h1 class="fw-bold mb-2">مرحباً بك، <span class="text-info">{{ user.username }}</span></h1>
-        <p class="text-secondary mb-4 fs-5">قم باختيار العملية المطلوبة من القوائم العلوية للبدء.</p>
 
-        <div class="clock-display" id="realtimeClock">00:00:00</div>
-        <div class="text-secondary mt-2 fs-6 fw-bold" id="realtimeDate">جارِ التحميل...</div>
-        <form action="{% url 'logout' %}" method="post" class="mt-4">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-outline-danger rounded-pill px-4 fw-bold">
-                <i class="bi bi-power"></i> خروج
-            </button>
-        </form>
+        <!-- 🎯 العمود الأوسط (شاشة الترحيب المركزية) -->
+        <div class="center-column">
+            <div class="welcome-avatar">
+                <i class="bi bi-person-fill-check text-white"></i>
+            </div>
+            <h1 class="fw-bold fs-2 mb-1">مرحباً بك، <span class="text-info">{{ user.username }}</span></h1>
+            <p class="text-secondary fs-6 mb-3">اختر مسارك من الأقسام المتاحة عبر الأيقونات الجانبية.</p>
+
+            <div class="clock-display" id="realtimeClock">00:00</div>
+            <div class="text-slate-400 mt-2 fs-6 fw-bold" id="realtimeDate">--</div>
+
+            {% if user.is_superuser %}
+            <a href="/admin/" class="admin-btn">
+                <i class="bi bi-gear-fill text-warning"></i> لوحة الإدارة العامة (Admin)
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- ➡️ العمود الأيسر (كروت) -->
+        <div class="side-column">
+            {% if user.is_superuser or "Finance_Courses" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name or "Student_Affairs" in user.groups.all.0.name %}
+            <a href="{% url 'academy_dashboard' %}" class="portal-card card-academy">
+                <div class="card-icon"><i class="bi bi-mortarboard-fill"></i></div>
+                <div class="card-content">
+                    <h3 class="card-title">الأكاديمية والدورات</h3>
+                    <p class="card-desc">الدبلومات والخطة الدراسية</p>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if user.is_superuser or "Student_Affairs" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+            <a href="{% url 'control_numbers_dashboard' %}" class="portal-card card-control">
+                <div class="card-icon"><i class="bi bi-shield-check"></i></div>
+                <div class="card-content">
+                    <h3 class="card-title">غرفة الكنترول</h3>
+                    <p class="card-desc">رصد الدرجات وأرقام الجلوس</p>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if user.is_superuser or "Finance_Books" in user.groups.all.0.name or "Finance_General" in user.groups.all.0.name or "Full_Access_No_Admin" in user.groups.all.0.name %}
+            <a href="{% url 'book_sales_list' %}" class="portal-card card-services">
+                <div class="card-icon"><i class="bi bi-grid-fill"></i></div>
+                <div class="card-content">
+                    <h3 class="card-title">الخدمات المدرسية</h3>
+                    <p class="card-desc">الكتب، الزي، والباص المدرسي</p>
+                </div>
+            </a>
+            {% endif %}
+        </div>
+
     </div>
 </div>
 
 <div class="school-footer">
-    TALAAT HARB HOTELIER HIGH SCHOOL | 2026
+    مدرسة طلعت حرب الثانوية الفندقية | 2026
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -616,6 +715,12 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || !window.menubar.visible;
+        if (isStandalone) {
+            window.moveTo(0, 0);
+            window.resizeTo(screen.availWidth, screen.availHeight);
+        }
+
         const loader = document.getElementById("global-loader");
         if (!loader) return;
 

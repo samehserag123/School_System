@@ -192,7 +192,6 @@ class StudentControlSheet(models.Model):
 
 
 
-# --- 4. جدول رصد الدرجات (يشمل الشهور، التيرمات، الملاحق) ---
 class ExamResult(models.Model):
     EXAM_TYPES = [
         ('month', 'امتحان شهر'),
@@ -213,10 +212,12 @@ class ExamResult(models.Model):
 
     is_absent = models.BooleanField("غائب في الامتحان؟", default=False)
 
+    # 🟢 الحقل الجديد: لتسجيل تاريخ رصد الدرجة أو الغياب تلقائياً
+    created_at = models.DateField("تاريخ الرصد", auto_now_add=True, null=True, blank=True)
+
     class Meta:
         verbose_name = "نتيجة امتحان"
         verbose_name_plural = "رصد الدرجات"
-        # ضمان عدم رصد درجة لنفس الطالب في نفس المادة لنفس الترم ونفس الشهر مرتين
         unique_together = ('student', 'subject', 'academic_year', 'exam_type', 'term', 'month')
 
     @property
@@ -228,6 +229,7 @@ class ExamResult(models.Model):
     def __str__(self):
         exam_name = self.get_month_display() if self.exam_type == 'month' else self.get_term_display()
         return f"{self.student.first_name} - {self.subject.name} - {exam_name}"
+
 
 
 class SystemSettings(models.Model):
@@ -318,8 +320,17 @@ class Student(models.Model):
     registration_number = models.CharField("رقم القيد", max_length=50, blank=True, null=True)
     first_name = models.CharField("الاسم الأول", max_length=100, db_index=True)
     last_name = models.CharField("اسم العائلة", max_length=100, db_index=True)
-    national_id = models.CharField("الرقم القومي", max_length=14, validators=[national_id_validator], unique=True, null=True, blank=True)
+
+    # قم بتعديل حقل national_id ليكون هكذا (توسيع الطول إلى 50 وإزالة الفاليديتور):
+    national_id = models.CharField(
+        "الرقم القومي / جواز السفر",
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True
+    )
     student_code = models.CharField("كود الطالب", max_length=20, unique=True, editable=False, blank=True, null=True)
+    search_name = models.CharField("الاسم للبحث السريع", max_length=255, blank=True, null=True, db_index=True)
 
     # --- البيانات الشخصية ---
     date_of_birth = models.DateField("تاريخ الميلاد", null=True, blank=True)
@@ -393,6 +404,26 @@ class Student(models.Model):
             if not Student.objects.filter(student_code=code).exists():
                 return code
 
+    @property
+    def book_sales_summary(self):
+        """تعطي ملخصاً للطالب: هل عليه مبالغ متأخرة في الكتب/الزي؟"""
+        sales = self.booksale_set.all().prefetch_related('item') # تقليل استعلامات الداتابيز
+
+        total_due = sum(s.remaining_amount for s in sales)
+
+        # الأشياء التي تم دفع ثمنها بالكامل (أو جزئياً) ولم تسلم فعلياً
+        pending_delivery_items = [
+            s.item.display_name for s in sales
+            if not s.is_delivered and (s.status == 'paid' or s.calculated_paid_amount > 0)
+        ]
+
+        return {
+            'total_due': total_due,
+            'pending_items_count': len(pending_delivery_items),
+            'pending_items_names': pending_delivery_items,
+        }
+
+
     def save(self, *args, **kwargs):
         is_new = self.pk is None
 
@@ -400,20 +431,24 @@ class Student(models.Model):
         if not self.student_code:
             self.student_code = self.generate_unique_code()
 
-        # 2. عند إنشاء الطالب لأول مرة فقط (فتح الملف)
+        # 🟢 2. إنشاء وتوحيد حقل البحث الذكي (تحويل الحروف المتشابهة)
+        full = f"{self.first_name or ''} {self.last_name or ''}".strip()
+        if full:
+            norm = full.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+            norm = norm.replace('ة', 'ه').replace('ى', 'ي')
+            self.search_name = norm
+
+        # 3. عند إنشاء الطالب لأول مرة فقط (فتح الملف)
         if is_new:
-            # مزامنة حالة القيد الحالية مع حالة التقديم
             if self.initial_status and not self.enrollment_status:
                 self.enrollment_status = self.initial_status
             elif self.enrollment_status and not self.initial_status:
                 self.initial_status = self.enrollment_status
 
-            # معالجة رسوم فتح الملف (تأخذ رسوم السنة الحالية وتُحفظ كقيمة ثابتة للطالب)
             if self.is_application_fee_exempt:
                 self.application_fee_amount = Decimal('0.00')
             else:
                 if self.application_fee_amount == Decimal('0.00') and self.academic_year:
-                    # جلب قيمة رسوم فتح الملف المحددة في موديل السنة الدراسية إن وجدت
                     year_fee = getattr(self.academic_year, 'application_fee', Decimal('0.00'))
                     self.application_fee_amount = Decimal(str(year_fee))
 
@@ -434,29 +469,38 @@ class Student(models.Model):
         for acc in self.accounts.all():
             total_fees_all_years += (Decimal(str(acc.total_fees or 0)) - Decimal(str(acc.discount or 0)))
 
-        total_paid_ever = Payment.objects.filter(student=self).aggregate(Sum('amount_paid'))['amount_paid__sum'] or Decimal('0.00')
+        # 🟢 استبعاد الإيصالات الملغاة
+        total_paid_ever = Payment.objects.filter(
+            student=self,
+            is_cancelled=False
+        ).aggregate(Sum('amount_paid'))['amount_paid__sum'] or Decimal('0.00')
+
         total_paid_ever = Decimal(str(total_paid_ever))
 
         remaining = (old_debt + app_fee + total_fees_all_years) - total_paid_ever
         return max(remaining, Decimal('0.00'))
 
     @property
-    def total_required_amount(self):
-        return self.current_year_fees_amount
-
-    @property
     def current_year_paid(self):
         from finance.models import Payment
         from django.db.models import Sum, Q
+
+        # 🟢 استبعاد الإيصالات الملغاة
         total = Payment.objects.filter(
             student=self,
-            academic_year=self.academic_year
+            academic_year=self.academic_year,
+            is_cancelled=False
         ).filter(
             Q(revenue_category__name__icontains="اساس") |
             Q(revenue_category__name__icontains="مصروف") |
             Q(revenue_category__name__icontains="ملف")
         ).aggregate(total=Sum('amount_paid'))['total'] or 0
+
         return Decimal(str(total))
+
+    @property
+    def total_required_amount(self):
+        return self.current_year_fees_amount
 
     @property
     def final_remaining(self):
@@ -483,8 +527,11 @@ class Student(models.Model):
     def total_balance_due(self):
         from django.db.models import Sum
         total_required = Decimal(str(self.previous_debt or 0)) + Decimal(str(self.application_fee_amount or 0)) + self.current_year_fees_amount
+
+        # 🟢 استبعاد الإيصالات الملغاة لضمان دقة الرصيد المستحق
         current_year_paid = self.all_payments.filter(
-            academic_year=self.academic_year
+            academic_year=self.academic_year,
+            is_cancelled=False
         ).aggregate(total=Sum('amount_paid'))['total'] or 0
 
         return total_required - Decimal(str(current_year_paid))
@@ -507,263 +554,6 @@ class Student(models.Model):
     @property
     def current_account(self):
         return self.accounts.filter(academic_year=self.academic_year).first()
-
-
-# class Student(models.Model):
-#     # --- الخيارات (Choices) ---
-#     RELIGION_CHOICES = [("Muslim", "مسلم"), ("Christian", "مسيحي")]
-#     STATUS_CHOICES = [
-#         ("New", "مستجد"),
-#         ("Promoted", "منقول"),
-#         ("Retained", "باق"),
-#         ("Transferred", "محول"),
-#         ("Dismissed", "مفصول"),
-#         ("First_Round", "دور أول"),
-#         ("Second_Round", "دور ثان"),
-#         ("Graduated", "إتمام مرحلة"),
-#     ]
-#     GENDER_CHOICES = [('Male', 'بنين'), ('Female', 'بنات')]
-#     SPECIALIZATION_CHOICES = [
-#     ("General", "شعبة عامة"),
-#     ("Host", "فني مضيف"),           # مفتاح فريد خاص بـ فني مضيف
-#     ("Chef", "فن طاهي"),            # مفتاح فريد خاص بـ فن طاهي
-#     ("Internal", "مشرف غرف"),
-#     ("Kitchen", "مطبخ"),
-#     ("Restaurant", "مطعم"),         # مفتاح فريد خاص بـ مطعم
-#     ("Tourism_Services", "خدمات سياحية"),
-# ]
-
-#     phone_validator = RegexValidator(
-#         regex=r'^01[0-9]{9}$',
-#         message="يجب إدخال رقم موبايل مصري صحيح مكون من 11 رقم"
-#     )
-
-#     # --- البيانات الأساسية ---
-#     image = models.ImageField("صورة الطالب", upload_to="students/", null=True, blank=True)
-#     # جعلنا رقم القيد اختيارياً وغير فريد (أو فريد مع السماح بالقيم الفارغة)
-#     registration_number = models.CharField("رقم القيد", max_length=50, blank=True, null=True)
-#     first_name = models.CharField("الاسم الأول", max_length=100, db_index=True)
-#     last_name = models.CharField("اسم العائلة", max_length=100, db_index=True)
-
-#     # 1. إضافة الرقم القومي مع التحقق (14 رقم فقط)
-#     national_id_validator = RegexValidator(
-#         regex=r'^\d{14}$',
-#         message="الرقم القومي يجب أن يتكون من 14 رقماً فقط."
-#     )
-#     national_id = models.CharField(
-#         "الرقم القومي", max_length=14, validators=[national_id_validator],
-#         unique=True, null=True, blank=True
-#     )
-
-#     # 2. كود الطالب (تلقائي)
-#     student_code = models.CharField("كود الطالب", max_length=20, unique=True, editable=False, blank=True, null=True)
-
-#     # --- البيانات الشخصية ---
-#     date_of_birth = models.DateField("تاريخ الميلاد", null=True, blank=True)
-#     birth_place = models.CharField("محل الميلاد", max_length=150, blank=True, null=True)
-
-#     # إضافة null و blank للنوع
-#     gender = models.CharField("النوع", max_length=10, choices=GENDER_CHOICES, null=True, blank=True, db_index=True)
-#     religion = models.CharField("الديانة", max_length=20, choices=RELIGION_CHOICES, null=True, blank=True, db_index=True)
-#     nationality = models.CharField("الجنسية", max_length=100, default="مصري", null=True, blank=True)
-#     address = models.TextField("العنوان", blank=True, null=True)
-#     study_type = models.CharField('نوع الدراسة', max_length=20, choices=[('Regular', 'انتظام'), ('Workers', 'عمال')], default='Regular', db_index=True)
-#     mother_name = models.CharField("اسم الأم", max_length=150, null=True, blank=True)
-#     phone = models.CharField("رقم التليفون", max_length=40, null=True, blank=True)
-#     whatsapp_number = models.CharField(
-#         max_length=11,
-#         validators=[phone_validator],
-#         verbose_name="رقم الواتساب",
-#         blank=True,
-#         null=True
-#     )
-#     father_job = models.CharField(max_length=100, verbose_name="وظيفة الأب", blank=True, null=True)
-#     # --- الحالة الأكاديمية ---
-#     # جعل حالة القيد اختيارية
-#     enrollment_status = models.CharField("حالة القيد", max_length=20, choices=STATUS_CHOICES, null=True, blank=True)
-#     enrollment_notes = models.CharField("ملاحظات حالة القيد", max_length=255, blank=True, null=True)
-
-#     # الدمج (BooleanField يفضل أن يكون له default لكن وضعنا null=True ليكون اختيارياً تماماً)
-#     integration_status = models.BooleanField("موقف الدمج", default=False, null=True, blank=True, db_index=True)
-
-#     specialization = models.CharField("التخصص", max_length=30, choices=SPECIALIZATION_CHOICES, blank=True, null=True, db_index=True)
-#     previous_debt = models.DecimalField("مديونية سابقة مرحلة", max_digits=10, decimal_places=2, default=0)
-#     last_promotion_date = models.DateField(null=True, blank=True)
-
-#     grade = models.ForeignKey("students.Grade", on_delete=models.PROTECT, null=True, verbose_name="الصف الدراسي")
-#     classroom = models.ForeignKey("students.Classroom", on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الفصل")
-#     academic_year = models.ForeignKey("finance.AcademicYear", on_delete=models.CASCADE, verbose_name="السنة الدراسية", related_name="students")
-
-#     is_active = models.BooleanField("نشط", default=True)
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     # حقول الحظر الذكي لبوابة الأمن
-#     is_blocked_at_gate = models.BooleanField("محظور من الدخول يدوياً", default=False)
-#     gate_block_reason = models.CharField("سبب حظر البوابة", max_length=255, blank=True, null=True)
-#     gate_blocked_from = models.DateField("تاريخ بدء الحظر", null=True, blank=True)
-#     gate_blocked_to = models.DateField("تاريخ نهاية الحظر", null=True, blank=True)
-
-#     class Meta:
-#         ordering = ["-created_at"]
-#         verbose_name = "طالب"
-#         verbose_name_plural = "الطلاب"
-#         # الفهرس المشترك للترتيب السريع في شاشة القائمة
-#         indexes = [
-#             models.Index(fields=['first_name', 'id']),
-#         ]
-
-#     # ----------------------------------------------------------------
-#     # 2. الدوال الأساسية (Standard Methods)
-#     # ----------------------------------------------------------------
-#     def __str__(self):
-#         # اعتماد الدالة الرئيسية لعرض الطالب في القوائم ولوحة التحكم
-#         return self.get_full_name()
-
-#     @property
-#     def total_absolute_remaining(self):
-#         from decimal import Decimal
-#         from django.db.models import Sum
-#         from finance.models import Payment  # استيراد الموديل مباشرة
-
-#         # 1. المديونية القديمة
-#         old_debt = Decimal(str(self.previous_debt or 0))
-
-#         # 2. إجمالي كل رسوم السنوات
-#         total_fees_all_years = Decimal('0.00')
-#         # ملحوظة: تأكد أن الـ related_name في StudentAccount هو 'accounts'
-#         for acc in self.accounts.all():
-#             total_fees_all_years += (Decimal(str(acc.total_fees or 0)) - Decimal(str(acc.discount or 0)))
-
-#         # 3. الحل النهائي: البحث عن المدفوعات باسم الحقل مباشرة
-#         total_paid_ever = Payment.objects.filter(student=self).aggregate(Sum('amount_paid'))['amount_paid__sum'] or Decimal('0.00')
-#         total_paid_ever = Decimal(str(total_paid_ever))
-
-#         remaining = (old_debt + total_fees_all_years) - total_paid_ever
-#         return max(remaining, Decimal('0.00'))
-
-
-#     def get_full_name(self):
-#         # معالجة آمنة للحقول الفارغة لمنع ظهور None
-#         first = self.first_name if self.first_name else ""
-#         last = self.last_name if self.last_name else ""
-#         full = f"{first} {last}".strip()
-
-#         # إذا كان الاسم فارغاً، نرجع كود الطالب
-#         return full if full else f"طالب رقم {self.student_code}"
-
-#     def save(self, *args, **kwargs):
-#         # توليد كود الطالب تلقائياً عند الإضافة لأول مرة فقط
-#         if not self.student_code:
-#             self.student_code = self.generate_unique_code()
-#         super().save(*args, **kwargs)
-
-#     def generate_unique_code(self):
-#         # توليد كود يبدأ بسنة الالتحاق + رقم عشوائي (مثال: 20260001)
-#         year_prefix = str(timezone.now().year)
-#         while True:
-#             random_num = str(random.randint(1000, 9999))
-#             code = f"{year_prefix}{random_num}"
-#             if not Student.objects.filter(student_code=code).exists():
-#                 return code
-
-
-#     @property
-#     def total_required_amount(self):
-#         # ❌ متضيفش previous_debt هنا
-#         return self.current_year_fees_amount
-#         # 1. إجمالي المطلوب (السنة دي + المديونية اللي اترحلّت في الحقل)
-
-
-
-#     @property
-#     def current_year_paid(self):
-#         from finance.models import Payment
-#         from django.db.models import Sum, Q
-#         total = Payment.objects.filter(
-#             student=self,
-#             academic_year=self.academic_year # شرط السنة الحالية
-#         ).filter(
-#             Q(revenue_category__name__icontains="اساس") |
-#             Q(revenue_category__name__icontains="مصروف")
-#         ).aggregate(total=Sum('amount_paid'))['total'] or 0
-#         return Decimal(str(total))
-
-
-#     # students/models.py
-
-#     @property
-#     def final_remaining(self):
-#         from decimal import Decimal
-#         # 1. المديونية المرحلة (القديمة)
-#         old_debt = Decimal(str(self.previous_debt or 0))
-
-#         # 2. صافي مصاريف السنة الحالية (المصاريف - الخصم)
-#         acc = self.accounts.filter(academic_year=self.academic_year).last()
-#         current_fees = Decimal('0.00')
-#         if acc:
-#             # طرح الخصم من إجمالي المصاريف
-#             current_fees = Decimal(str(acc.total_fees or 0)) - Decimal(str(acc.discount or 0))
-
-#         # 3. إجمالي المدفوعات المسجلة للسنة الحالية
-#         total_paid = self.current_year_paid
-
-#         # المعادلة: (قديم + جديد) - مدفوع
-#         remaining = (old_debt + current_fees) - total_paid
-#         return max(remaining, Decimal('0.00'))
-
-#     # إضافة "Alias" أو اسم مستعار للدالة ليتوافق مع الكود القديم إذا أردت
-#     def calculated_remaining(self):
-#         return self.final_remaining
-
-#         @property
-#         def calculated_previous_debt(self):
-#             from decimal import Decimal
-
-#             return max(Decimal('0.00'), Decimal(str(self.previous_debt or 0)))
-
-
-
-#     @property
-#     def total_balance_due(self):
-#         from decimal import Decimal
-#         from django.db.models import Sum
-
-#         total_required = Decimal(str(self.previous_debt or 0)) + self.current_year_fees_amount
-
-#         current_year_paid = self.all_payments.filter(
-#             academic_year=self.academic_year
-#         ).aggregate(total=Sum('amount_paid'))['total'] or 0
-
-#         return total_required - Decimal(str(current_year_paid))
-
-
-#     @property
-#     def current_year_fees_amount(self):
-#         """جلب إجمالي المصروفات المطلوبة من حساب الطالب للسنة الحالية"""
-#         from finance.models import StudentAccount
-#         from decimal import Decimal
-
-#         # البحث عن حساب الطالب المرتبط بالسنة الدراسية الحالية
-#         account = self.accounts.filter(academic_year=self.academic_year).first()
-
-#         if account:
-#             # نستخدم Decimal لضمان دقة الحسابات المالية ومنع أخطاء التقريب
-#             return Decimal(str(account.total_fees or 0))
-
-#         # لو الطالب مش متسكن له حساب، نرجع صفر عشان السيستم ما يضربش
-#         return Decimal("0.00")
-
-#     @property
-#     def full_name(self):
-#         return self.get_full_name()
-
-#     @property
-#     def name(self):
-#         return self.get_full_name()
-
-#     @property
-#     def current_account(self):
-#         return self.accounts.filter(academic_year=self.academic_year).first()
 
 
 # ----------------------------------------------------------------
@@ -802,8 +592,39 @@ class RemedialProgramRecord(models.Model):
     def __str__(self):
         return f"{self.student.get_full_name()} - {self.subjects_count} مواد"
 
+
+# 1. موديل الأقسام (Department)
+class Department(models.Model):
+    name = models.CharField("اسم القسم", max_length=100, unique=True)
+    description = models.TextField("وصف القسم", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "قسم"
+        verbose_name_plural = "الأقسام"
+
+    def __str__(self):
+        return self.name
+
+
 class Teacher(models.Model):
-    name = models.CharField("اسم المدرس", max_length=150)
+    employee = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="اسم المدرس",
+        related_name="teacher_profile"
+    )
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="القسم",
+        related_name="teachers"
+    )
+    # جعل الحقل يقبل القيم الفارغة لتجنب خطأ الحفظ
+    name = models.CharField("اسم المدرس", max_length=150, blank=True, null=True)
     phone = models.CharField("رقم الهاتف", max_length=20, validators=[numbers_only], blank=True, null=True)
     is_active = models.BooleanField("نشط", default=True)
 
@@ -811,8 +632,19 @@ class Teacher(models.Model):
         verbose_name = "مدرس"
         verbose_name_plural = "اسماء المدرسون"
 
+    def save(self, *args, **kwargs):
+        if self.employee:
+            full_name = self.employee.get_full_name().strip()
+            self.name = full_name if full_name else self.employee.username
+        elif not self.name:
+            self.name = "مدرس جديد"
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return self.name
+        dept_info = f" ({self.department.name})" if self.department else ""
+        return f"{self.name or 'مدرس'}{dept_info}"
+
+
 
 
 # 1. المواد الدراسية
@@ -1004,9 +836,12 @@ class BookSale(models.Model):
         from treasury.models import GeneralLedger
         from django.db.models import Sum
 
+        # تغيير المطابقة لتكون دقيقة بناءً على صيغة الإيصال التي تولدها الدالة save
         total = GeneralLedger.objects.filter(
-            notes__icontains=f"#{self.pk}"
-        ).aggregate(total=Sum('amount'))['total'] or 0
+            student=self.student,
+            receipt_number=f"BS-{self.pk}"  # استخدام Exact Match بدلاً من icontains
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
         return Decimal(str(total))
 
     @property
@@ -1016,26 +851,43 @@ class BookSale(models.Model):
         if total <= Decimal('0.00'):
             return Decimal('0.00')
 
-        if self.student and self.item:
-            item_type = self.item.item_type
-            sales_same_type = BookSale.objects.filter(student=self.student, item__item_type=item_type)
-            total_paid_for_type = sum(s.calculated_paid_amount for s in sales_same_type)
+        # إلغاء لوب (sales_same_type) والاعتماد المباشر على الإذن نفسه
+        paid_for_this_sale = self.calculated_paid_amount
+        return max(Decimal('0.00'), total - paid_for_this_sale)
 
-            # إذا سدد الطالب سعر الباقة بالكامل في الخزينة
-            if total_paid_for_type >= total:
-                return Decimal('0.00')
 
-            return max(Decimal('0.00'), total - total_paid_for_type)
+    def mark_as_delivered(self, user, warehouse_id=None):
+        """تأكيد التسليم الفعلي وإنشاء حركة منصرف في المخزن الرئيسي"""
+        from core_inventory.models import StockTransaction, ItemMaster, Warehouse # تأكد من مسار الاستيراد الصحيح
+        from django.core.exceptions import ValidationError
 
-        return max(Decimal('0.00'), total - self.calculated_paid_amount)
-
-    def mark_as_delivered(self, user):
-        """تأكيد التسليم الفعلي من أمين المخزن وتوثيق الموظف والوقت"""
         self.is_delivered = True
         self.delivered_at = timezone.now()
         self.delivered_by = user
+
         if self.remaining_amount <= 0 and self.total_amount > 0:
             self.status = 'delivered'
+
+        # إضافة التسميع التلقائي في المخزن الرئيسي (StockTransaction)
+        try:
+            # افتراض أنك ستربط InventoryItem بـ ItemMaster عبر SKU أو حقل مباشر
+            # إذا لم يكن هناك ربط مباشر، يجب إضافة حقل linked_item_master في InventoryItem
+            mapped_item = ItemMaster.objects.filter(name=self.item.display_name).first()
+            default_warehouse = Warehouse.objects.filter(is_active=True).first() # أو جلب المستودع المحدد
+
+            if mapped_item and default_warehouse:
+                StockTransaction.objects.create(
+                    movement_type='OUT_STUDENT',
+                    item=mapped_item,
+                    warehouse=default_warehouse,
+                    quantity=self.quantity,
+                    student=self.student,
+                    notes=f"منصرف آلي بناءً على إذن تسليم رقم #{self.pk}",
+                    created_by=user
+                )
+        except Exception as e:
+            pass # يمكن تسجيل الخطأ هنا في ملف Log
+
         self.save()
 
     def save(self, *args, **kwargs):
@@ -1226,18 +1078,7 @@ class CoursePayment(models.Model):
 
 
 # أضف هذه الدوال داخل كلاس Student في ملف models.py
-    @property
-    def book_sales_summary(self):
-        """تعطي ملخصاً للطالب: هل عليه مبالغ متأخرة في الكتب/الزي؟"""
-        sales = self.booksale_set.all()
-        total_required = sum(s.total_amount for s in sales)
-        total_paid = sum(s.paid_amount for s in sales)
-        pending_delivery = sales.filter(is_delivered=False, status='paid').count()
 
-        return {
-            'total_due': total_required - total_paid,
-            'pending_items_count': pending_delivery, # أشياء دفع ثمنها ولم يستلمها
-        }
 
 
 class BusRoute(models.Model):
@@ -1331,16 +1172,17 @@ class MiscellaneousRevenue(models.Model):
     """جدول الإيرادات المتنوعة (أخرى)"""
     REVENUE_TYPES = [
         ('canteen', 'إيجار كانتين'),
-        ('donation', 'تبرعات'),
+        ('sports', 'أنشطة رياضية'),
         ('activities', 'رسوم أنشطة / رحلات'),
         ('papers', 'رسوم استخراج أوراق'),
         ('other', 'أخرى متنوعة'),
     ]
 
-    title = models.CharField("بيان الإيراد", max_length=200)
+    title = models.CharField("بيان الإيراد", max_length=200, blank=True, null=True)
     revenue_type = models.CharField("تصنيف الإيراد", max_length=50, choices=REVENUE_TYPES, default='other')
     amount = models.DecimalField("المبلغ المورد", max_digits=12, decimal_places=2)
     date = models.DateField(auto_now_add=True, verbose_name="تاريخ الإيراد", db_index=True)
+    date = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ ووقت الإيراد", db_index=True)
     collected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="الموظف المستلم")
     notes = models.TextField("ملاحظات إضافية", blank=True, null=True)
 
@@ -1356,71 +1198,7 @@ class MiscellaneousRevenue(models.Model):
 
 
 
-# --- جداول الكنترول وشئون الطلاب الجديدة المضافة حديثاً ---
 
-class StudentControlSheet(models.Model):
-    SUBJECT_STATUS_CHOICES = [
-        ('passed', 'ناجح ومجتاز ✅'),
-        ('second_session', 'له دور ثانٍ (ملحق) ⚠️'),
-        ('failed', 'راسب وباقٍ للإعادة ❌'),
-    ]
-
-    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='control_records', verbose_name="الطالب")
-    subject = models.ForeignKey('Subject', on_delete=models.CASCADE, verbose_name="المادة")
-    academic_year = models.ForeignKey('finance.AcademicYear', on_delete=models.CASCADE, verbose_name="العام الدراسي")
-
-    term1_cultural = models.DecimalField("ترم أول - نظري", max_digits=5, decimal_places=2, default=0)
-    term1_practical = models.DecimalField("ترم أول - عملي", max_digits=5, decimal_places=2, default=0)
-    term1_is_absent = models.BooleanField("غياب الترم الأول؟", default=False)
-
-    term2_cultural = models.DecimalField("ترم ثاني - نظري", max_digits=5, decimal_places=2, default=0)
-    term2_practical = models.DecimalField("ترم ثاني - عملي", max_digits=5, decimal_places=2, default=0)
-    term2_is_absent = models.BooleanField("غياب الترم الثاني؟", default=False)
-
-    second_session_cultural = models.DecimalField("دور ثانٍ - نظري", max_digits=5, decimal_places=2, default=0)
-    second_session_practical = models.DecimalField("دور ثانٍ - عملي", max_digits=5, decimal_places=2, default=0)
-    second_session_is_absent = models.BooleanField("غياب الدور الثاني؟", default=False)
-
-    status = models.CharField("الحالة النهائية للمادة", max_length=20, choices=SUBJECT_STATUS_CHOICES, default='second_session')
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "سجل الكنترول السنوي"
-        verbose_name_plural = "شيت الكنترول العام (النتائج النهائية)"
-        unique_together = ('student', 'subject', 'academic_year')
-
-    @property
-    def term1_total(self):
-        if self.term1_is_absent: return Decimal('0.00')
-        return self.term1_cultural + self.term1_practical
-
-    @property
-    def term2_total(self):
-        if self.term2_is_absent: return Decimal('0.00')
-        return self.term2_cultural + self.term2_practical
-
-    @property
-    def total_year_score(self):
-        return self.term1_total + self.term2_total
-
-    @property
-    def second_session_total(self):
-        if self.second_session_is_absent: return Decimal('0.00')
-        return self.second_session_cultural + self.second_session_practical
-
-    def auto_calculate_status(self):
-        try:
-            config = SubjectConfig.objects.filter(subject=self.subject, grade=self.student.grade, academic_year=self.academic_year).first()
-            if not config: return 'second_session'
-            if not self.term2_is_absent and self.total_year_score >= config.passing_score: return 'passed'
-            if self.second_session_total >= config.passing_score and not self.second_session_is_absent: return 'passed'
-            elif self.second_session_is_absent or (self.second_session_total < config.passing_score and self.second_session_total > 0): return 'failed'
-            return 'second_session'
-        except: return self.status
-
-    def save(self, *args, **kwargs):
-        self.status = self.auto_calculate_status()
-        super().save(*args, **kwargs)
 
 
 class StudentAcademicHistory(models.Model):
@@ -1815,3 +1593,96 @@ class PendingAdmissionNotification(models.Model):
 
     def __str__(self):
         return self.full_name_ar
+
+
+# ==========================================
+# 1. جدول الحزم / المقررات (Bill of Materials)
+# ==========================================
+class GradeItemPackage(models.Model):
+    """
+    هذا الجدول يحدد "الباقة": ما هي الكتب أو الزي المخصص لكل صف دراسي؟
+    مثال: الصف الأول الابتدائي -> (كتاب عربي، كتاب حساب، كتاب إنجليزي)
+    """
+    PACKAGE_TYPES = [
+        ('book', 'كتب دراسية'),
+        ('uniform', 'زي مدرسي'),
+    ]
+
+    # بفرض أن لديك جدول اسمه Grade للصفوف الدراسية
+    grade = models.ForeignKey('Grade', on_delete=models.CASCADE, verbose_name="الصف الدراسي")
+    package_type = models.CharField("نوع الباقة", max_length=20, choices=PACKAGE_TYPES)
+
+    # الربط المباشر مع المخزن (يمكن اختيار أكثر من كتاب للصف الواحد)
+    items = models.ManyToManyField('core_inventory.ItemMaster', verbose_name="الأصناف المقررة من المخزن")
+
+    total_price = models.DecimalField("سعر الباقة الإجمالي (ج.م)", max_digits=10, decimal_places=2, default=0.00)
+
+    class Meta:
+        verbose_name = "باقة مقررات صف"
+        verbose_name_plural = "1. باقات المقررات والزي (Packages)"
+        unique_together = ('grade', 'package_type') # لمنع تكرار نفس الباقة لنفس الصف
+
+    def __str__(self):
+        return f"باقة {self.get_package_type_display()} - {self.grade.name}"
+
+
+# ==========================================
+# 2. السجل الرئيسي لعملية التسليم والماليات
+# ==========================================
+class StudentSaleRecord(models.Model):
+    """
+    هذا الجدول يمثل (الفاتورة/إذن الصرف) المربوط بالطالب والماليات.
+    وهو الذي سيظهر في شاشتك الرائعة (sales_list.html).
+    """
+    # الربط المباشر باسم الطالب
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name="الطالب")
+
+    sale_type = models.CharField("نوع الصرف", max_length=20, choices=GradeItemPackage.PACKAGE_TYPES)
+
+    # الجانب المالي
+    total_amount = models.DecimalField("إجمالي المطلوب (ج.م)", max_digits=10, decimal_places=2, default=0)
+    paid_amount = models.DecimalField("إجمالي المدفوع (ج.م)", max_digits=10, decimal_places=2, default=0)
+
+    # حالة المخزن
+    is_fully_delivered = models.BooleanField("تم التسليم بالكامل", default=False)
+    created_at = models.DateTimeField("تاريخ ووقت العملية", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "إذن تسليم طالب"
+        verbose_name_plural = "2. أذونات تسليم الطلاب"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"إذن {self.get_sale_type_display()} - {self.student.name} ({self.created_at.strftime('%Y-%m-%d')})"
+
+    @property
+    def remaining_amount(self):
+        return self.total_amount - self.paid_amount
+
+
+# ==========================================
+# 3. جدول تفاصيل التسليم الجزئي (Checklist)
+# ==========================================
+class SaleDeliveryDetail(models.Model):
+    """
+    هذا الجدول هو الـ Checklist التي تظهر داخل المودال (النافذة المنبثقة).
+    يحتوي على كل كتاب بمفرده، وهل استلمه الطالب أم لا؟
+    """
+    sale_record = models.ForeignKey(StudentSaleRecord, related_name='delivery_details', on_delete=models.CASCADE)
+
+    # الكتاب أو قطعة الزي المحددة من المخزن
+    item = models.ForeignKey('core_inventory.ItemMaster', on_delete=models.PROTECT, verbose_name="الصنف (الكتاب/الزي)")
+
+    is_delivered = models.BooleanField("تم التسليم", default=False)
+    delivered_at = models.DateTimeField("وقت التسليم الفعلي", null=True, blank=True)
+
+    # لمعرفة من الموظف (أمين المخزن) الذي قام بالتسليم
+    delivered_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="مُسلم العهدة")
+
+    class Meta:
+        verbose_name = "تفصيلة تسليم"
+        verbose_name_plural = "3. تفاصيل التسليمات (Checklist)"
+
+    def __str__(self):
+        status = "✅ تم الاستلام" if self.is_delivered else "⏳ معلق"
+        return f"{self.item.name} - {status}"

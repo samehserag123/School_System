@@ -1,0 +1,215 @@
+{% extends 'hr/base_hr.html' %}
+
+{% block title %}سجل المأموريات الخارجية{% endblock %}
+{% block header_title %}المأموريات الخارجية{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- نموذج إضافة مأمورية جديدة -->
+    <div class="lg:col-span-1">
+        <div class="bg-slate-900/80 p-6 rounded-2xl shadow-lg border border-slate-700">
+            <h3 class="text-lg font-black text-purple-400 mb-1 flex items-center gap-2">
+                <i data-lucide="map" class="w-5 h-5"></i> تسجيل مأمورية جديدة
+            </h3>
+            <p class="text-xs text-slate-400 mb-6 font-medium">أيام المأمورية تعتبر حضوراً ولا تخضع للخصم.</p>
+            
+            <form method="POST" action="" onsubmit="return validateMissionForm(this)" class="space-y-5">
+                {% csrf_token %}
+                
+                <!-- 🔍 خانة البحث الذكية -->
+                <div class="relative">
+                    <label class="block text-sm font-bold text-slate-300 mb-2">الموظف <span class="text-rose-500">*</span></label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-purple-400">
+                            <i data-lucide="search" class="w-4 h-4"></i>
+                        </div>
+                        <input type="text" id="mission-search-input" placeholder="اضغط هنا للبحث أو اكتب الكود..." class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full pr-10 p-2.5 font-bold transition-all shadow-sm" autocomplete="off">
+                        <input type="hidden" name="employee" id="mission-hidden-emp" required>
+                        
+                        <!-- سحب البيانات من الـ Form الخاص بجانغو مباشرة -->
+                        <ul id="mission-search-results" class="hidden absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-800">
+                            {% for emp in form.employee.field.queryset %}
+                                <li class="cursor-pointer px-3 py-2 text-sm font-bold text-slate-300 transition-colors mission-emp-option hover:bg-slate-700 hover:text-purple-400" data-id="{{ emp.id }}" data-name="{{ emp.name }}">
+                                    {{ emp.name }} <span class="text-purple-400 text-[10px] font-mono mr-1">كود: {{ emp.emp_id }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- حقول التاريخ -->
+                <div class="flex gap-4">
+                    <div class="w-1/2">
+                        <label class="block text-sm font-bold text-slate-300 mb-2">من تاريخ <span class="text-rose-500">*</span></label>
+                        <input type="date" name="start_date" id="mission_start_date" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 font-bold" required>
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-sm font-bold text-slate-300 mb-2">إلى تاريخ <span class="text-rose-500">*</span></label>
+                        <input type="date" name="end_date" id="mission_end_date" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 font-bold" required>
+                    </div>
+                </div>
+
+                <!-- حقل السبب -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-300 mb-2">السبب والجهة <span class="text-rose-500">*</span></label>
+                    <textarea name="reason" rows="2" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 font-medium" required></textarea>
+                </div>
+                
+                <button type="submit" id="mission-submit-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-3 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.3)] transition-all flex justify-center items-center gap-2 mt-4">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i> اعتماد المأمورية (Enter)
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- جدول عرض المأموريات -->
+    <div class="lg:col-span-2">
+        <div class="bg-slate-900/60 rounded-2xl shadow-lg border border-slate-700 overflow-hidden backdrop-blur-sm">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-right text-slate-300">
+                    <thead class="text-xs text-slate-400 bg-slate-800/80 border-b border-slate-700">
+                        <tr>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider">الموظف</th>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider">التاريخ (من - إلى)</th>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider">السبب والجهة</th>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider text-center">الحالة</th>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider text-center">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/50">
+                        {% for mission in missions %}
+                        <tr class="hover:bg-slate-800/50 transition-colors">
+                            <td class="px-5 py-4 font-bold text-white">{{ mission.employee.name }}</td>
+                            <td class="px-5 py-4 font-mono text-xs">
+                                <span class="block text-primary">{{ mission.start_date|date:"Y-m-d" }}</span>
+                                <span class="block text-slate-500 mt-1">{{ mission.end_date|date:"Y-m-d" }}</span>
+                            </td>
+                            <td class="px-5 py-4 text-xs font-medium text-slate-400">{{ mission.reason|truncatechars:35 }}</td>
+                            <td class="px-5 py-4 text-center">
+                                {% if mission.status == 'approved' %}
+                                    <span class="bg-emerald-950/50 text-emerald-400 px-2 py-1 rounded-md text-xs font-bold border border-emerald-800/50 shadow-sm">مقبولة</span>
+                                {% elif mission.status == 'rejected' %}
+                                    <span class="bg-rose-950/50 text-rose-400 px-2 py-1 rounded-md text-xs font-bold border border-rose-800/50 shadow-sm">مرفوضة</span>
+                                {% else %}
+                                    <span class="bg-amber-950/50 text-amber-400 px-2 py-1 rounded-md text-xs font-bold border border-amber-800/50 shadow-sm">قيد الانتظار</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-5 py-4 text-center">
+                                {% if mission.status == 'pending' %}
+                                <div class="flex items-center justify-center gap-2">
+                                    <a href="{% url 'hr:update_mission_status' mission.id 'approved' %}" class="text-emerald-500 hover:text-emerald-400 bg-emerald-950/30 hover:bg-emerald-900/50 p-2 rounded-lg border border-emerald-900 transition-all shadow-sm" title="موافقة">
+                                        <i data-lucide="check" class="w-4 h-4 font-bold"></i>
+                                    </a>
+                                    <a href="{% url 'hr:update_mission_status' mission.id 'rejected' %}" class="text-rose-500 hover:text-rose-400 bg-rose-950/30 hover:bg-rose-900/50 p-2 rounded-lg border border-rose-900 transition-all shadow-sm" title="رفض">
+                                        <i data-lucide="x" class="w-4 h-4 font-bold"></i>
+                                    </a>
+                                </div>
+                                {% else %}
+                                <span class="text-slate-600 text-xs font-bold bg-slate-800 px-2 py-1 rounded border border-slate-700">- تم اتخاذ إجراء -</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="px-5 py-12 text-center text-slate-500 font-bold"><i data-lucide="map" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>لا توجد مأموريات مسجلة.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    lucide.createIcons();
+
+    // تاريخ اليوم الافتراضي
+    const today = new Date().toISOString().split('T')[0];
+    const startInput = document.getElementById('mission_start_date');
+    const endInput = document.getElementById('mission_end_date');
+    if(startInput) startInput.value = today;
+    if(endInput) endInput.value = today;
+
+    const searchInput = document.getElementById('mission-search-input');
+    const resultsList = document.getElementById('mission-search-results');
+    const hiddenInput = document.getElementById('mission-hidden-emp');
+    const options = document.querySelectorAll('.mission-emp-option');
+    let currentFocus = -1;
+
+    // فتح القائمة عند الضغط بالماوس
+    searchInput.addEventListener('click', function() {
+        resultsList.classList.remove('hidden');
+        options.forEach(opt => opt.style.display = 'block');
+    });
+
+    // البحث والتنقل
+    searchInput.addEventListener('keydown', function(e) {
+        let visibleOpts = Array.from(options).filter(opt => opt.style.display !== 'none');
+        if (e.key === 'ArrowDown') { e.preventDefault(); currentFocus++; addActive(visibleOpts); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); currentFocus--; addActive(visibleOpts); }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (currentFocus > -1 && visibleOpts[currentFocus]) visibleOpts[currentFocus].click();
+            else if (visibleOpts.length > 0) visibleOpts[0].click();
+        }
+    });
+
+    function addActive(opts) {
+        if (!opts || opts.length === 0) return;
+        opts.forEach(opt => opt.classList.remove('bg-slate-700', 'text-purple-400'));
+        if (currentFocus >= opts.length) currentFocus = 0;
+        if (currentFocus < 0) currentFocus = (opts.length - 1);
+        opts[currentFocus].classList.add('bg-slate-700', 'text-purple-400');
+        opts[currentFocus].scrollIntoView({ block: 'nearest' });
+    }
+
+    searchInput.addEventListener('input', function() {
+        currentFocus = -1;
+        const filter = this.value.toLowerCase();
+        resultsList.classList.remove('hidden');
+        options.forEach(opt => { opt.style.display = opt.innerText.toLowerCase().includes(filter) ? 'block' : 'none'; });
+    });
+
+    // الاختيار والانتقال للتاريخ
+    options.forEach(opt => {
+        opt.addEventListener('click', function() {
+            searchInput.value = this.getAttribute('data-name');
+            hiddenInput.value = this.getAttribute('data-id');
+            resultsList.classList.add('hidden');
+            setTimeout(() => {
+                startInput.focus();
+                startInput.showPicker ? startInput.showPicker() : startInput.select();
+            }, 50);
+        });
+    });
+
+    // التنقل بين التواريخ بـ Enter
+    startInput.addEventListener('keydown', e => {
+        if(e.key === 'Enter') { e.preventDefault(); endInput.focus(); endInput.showPicker ? endInput.showPicker() : endInput.select(); }
+    });
+    
+    endInput.addEventListener('keydown', e => {
+        if(e.key === 'Enter') { e.preventDefault(); document.querySelector('textarea[name="reason"]').focus(); }
+    });
+
+    // إخفاء القائمة عند النقر خارجها
+    document.addEventListener('click', e => {
+        if (!searchInput.contains(e.target) && !resultsList.contains(e.target)) {
+            resultsList.classList.add('hidden');
+        }
+    });
+});
+
+function validateMissionForm(form) {
+    if (!document.getElementById('mission-hidden-emp').value) {
+        alert('يجب اختيار الموظف أولاً من القائمة!');
+        document.getElementById('mission-search-input').focus();
+        return false;
+    }
+    const btn = document.getElementById('mission-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> جاري الحفظ...`;
+    return true;
+}
+</script>
+{% endblock %}

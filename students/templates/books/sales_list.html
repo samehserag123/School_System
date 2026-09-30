@@ -28,6 +28,39 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
 <style>
+
+        /* 🩹 إصلاح تمدد شارة المخزون فوق مربع الاختيار داخل صف التسليم */
+    .delivery-item-row {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 12px !important;
+        flex-wrap: nowrap !important;
+    }
+
+    .delivery-item-row .form-check {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .delivery-item-row label,
+    .delivery-item-row .form-check-label {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: inline-block !important;
+        max-width: 100% !important;
+    }
+
+    .delivery-item-row .stock-badge,
+    .delivery-item-row .badge {
+        flex: 0 0 auto !important;
+        white-space: nowrap !important;
+        width: auto !important;
+        max-width: max-content !important;
+    }
+
     :root {
         --bg-main: #030712;
         --glass-surface: rgba(15, 23, 42, 0.85);
@@ -551,7 +584,7 @@
                     <!-- أزرار الإجراءات -->
                     <td>
                         <div class="d-flex justify-content-center gap-1" id="action-btns-{{ sale.id }}">
-                            <button type="button" class="btn btn-sm btn-success fw-bold px-2 py-1 rounded-2 shadow-sm" 
+                            <button type="button" class="btn btn-sm btn-success fw-bold px-2 py-1 rounded-2 shadow-sm"
                                     onclick="openDetailedDeliveryModal('{{ sale.id }}')" title="تأكيد تسليم مقتنيات ومقررات الطالب المتاحة بالمخزن">
                                 <i class="bi bi-box-arrow-up-right me-1"></i> تسليم المخزن
                             </button>
@@ -585,7 +618,7 @@
 <div id="paginationContainer" class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3 mt-4 px-2 animate__animated animate__fadeInUp">
     <div class="text-white-50 small fw-bold">
         <i class="bi bi-info-circle text-info me-1"></i>
-        عرض الصفحة <span class="text-info fw-black">{{ sales.number }}</span> من أصل <span class="text-white fw-black">{{ sales.paginator.num_pages }}</span> 
+        عرض الصفحة <span class="text-info fw-black">{{ sales.number }}</span> من أصل <span class="text-white fw-black">{{ sales.paginator.num_pages }}</span>
         (إجمالي <span class="text-warning fw-black">{{ sales.paginator.count }}</span> إذن صرف)
     </div>
 
@@ -794,82 +827,71 @@ function goToPage(page) {
     instantSalesSearch(page);
 }
 
-// 🟢 4. فتح المودال التفاعلي واستدعاء جرد المخزن مفصلاً
 function openDetailedDeliveryModal(saleId) {
     currentActiveSaleId = saleId;
     document.getElementById('modalErrorAlert').classList.add('d-none');
-    document.getElementById('modalItemsContainer').innerHTML = '<div class="text-center py-5 text-info"><div class="spinner-border spinner-border-sm me-2"></div>جاري استخراج كشف أسماء الكتب ورصيد المخزن الحقيقي...</div>';
+    document.getElementById('modalItemsContainer').innerHTML = `
+        <div class="text-center py-4 text-info">
+            <div class="spinner-border spinner-border-sm me-2"></div>جاري جلب أسماء الكتب والجرد...
+        </div>`;
 
-    const deliveryModal = new bootstrap.Modal(document.getElementById('detailedDeliveryModal'));
-    deliveryModal.show();
+    const modalElement = document.getElementById('detailedDeliveryModal');
+    const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+    modal.show();
 
     fetch(`/students/sales/api/delivery-details/${saleId}/`)
         .then(res => res.json())
         .then(data => {
             if (data.success) {
                 document.getElementById('mStudentName').innerText = data.student_name;
-                document.getElementById('mStudentMeta').innerText = `الصف: ${data.grade_name} | التخصص: ${data.specialization || 'شعبة عامة'}`;
+                document.getElementById('mStudentMeta').innerText = `الصف: ${data.grade_name} | التخصص: ${data.specialization}`;
                 document.getElementById('mProgressBadge').innerText = `استلم ${data.delivered_count} من أصل ${data.total_count} ${data.item_type_label}`;
 
                 const container = document.getElementById('modalItemsContainer');
-                container.innerHTML = '';
-
-                let pendingHtml = '';
-                let deliveredHtml = '';
+                let itemsHtml = '';
 
                 data.items.forEach(item => {
+                    // قراءة الرصيد الفعلي بدقة مع وجود fallback
+                    const stockCount = item.stock !== undefined ? item.stock : (item.available_qty || 0);
+
                     if (item.is_delivered) {
-                        // 🟢 الكتب المسلمة سابقاً
-                        deliveredHtml += `
-                            <div class="delivery-item-row already-done d-flex justify-content-between align-items-center">
-                                <div class="d-flex align-items-center gap-2 fw-black text-success">
-                                    <i class="bi bi-check-circle-fill fs-5"></i>
-                                    <span class="fs-6">${item.name}</span>
+                        itemsHtml += `
+                            <div class="delivery-item-row already-done d-flex justify-content-between align-items-center p-3 mb-2 rounded-3 bg-dark bg-opacity-75 border border-success border-opacity-50">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                    <span class="fw-bold fs-6 text-white" style="color: #ffffff !important;">${item.name}</span>
                                 </div>
-                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-25 stock-badge">
-                                    تم الاستلام سابقاً ✅
-                                </span>
-                            </div>
-                        `;
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-50 px-3 py-2 fw-bold">تم الاستلام سابقاً ✅</span>
+                            </div>`;
                     } else {
-                        // ⏳ الكتب المتبقية للتسليم
-                        const isAvailable = item.is_available;
-                        const stockBadge = isAvailable
-                            ? `<span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-25 stock-badge"><i class="bi bi-box-seam me-1"></i> متاح بالرفوف: ${item.stock} قطعة</span>`
-                            : `<span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-25 stock-badge"><i class="bi bi-x-circle me-1"></i> نفد من المخزن (0)</span>`;
+                        const isAvail = item.is_available;
 
-                        const disabledAttr = !isAvailable ? 'disabled' : '';
-                        const checkedAttr = isAvailable ? 'checked' : '';
+                        // شارة المخزن تظهر الرصيد الفعلي دائماً
+                        const stockTag = isAvail
+                            ? `<span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-50 stock-badge px-3 py-2 fw-bold">المخزن: ${stockCount} قطعة</span>`
+                            : `<span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-50 stock-badge px-3 py-2 fw-bold">غير متوفر بالمخزن (${stockCount})</span>`;
 
-                        pendingHtml += `
-                            <div class="delivery-item-row d-flex justify-content-between align-items-center">
-                                <div class="form-check m-0">
-                                    <input class="form-check-input modal-item-checkbox" type="checkbox" value="${item.id}" id="chk_item_${item.id}" ${checkedAttr} ${disabledAttr}>
-                                    <label class="form-check-label modal-item-label ms-2" for="chk_item_${item.id}">
+                        itemsHtml += `
+                            <div class="delivery-item-row d-flex justify-content-between align-items-center p-3 mb-2 rounded-3 bg-dark bg-opacity-75 border border-secondary border-opacity-50">
+                                <div class="form-check m-0 d-flex align-items-center">
+                                    <input class="form-check-input modal-item-checkbox me-2" type="checkbox" value="${item.id}" id="item_${item.id}" ${isAvail ? 'checked' : 'disabled'} style="cursor: pointer; transform: scale(1.15);">
+                                    <label class="form-check-label fw-bold text-white fs-6 ms-2" for="item_${item.id}" style="color: #ffffff !important; cursor: pointer;">
                                         ${item.name}
                                     </label>
                                 </div>
-                                <div>${stockBadge}</div>
-                            </div>
-                        `;
+                                <div>${stockTag}</div>
+                            </div>`;
                     }
                 });
 
-                let finalHtml = '';
-                if (pendingHtml) {
-                    finalHtml += `<div class="delivery-section-title text-warning"><i class="bi bi-hourglass-split me-1"></i> المقررات المتبقية لـ (تسليم الآن):</div>` + pendingHtml;
-                }
-                if (deliveredHtml) {
-                    finalHtml += `<div class="delivery-section-title text-success"><i class="bi bi-check2-all me-1"></i> المقررات المستلمة سابقاً:</div>` + deliveredHtml;
-                }
-
-                container.innerHTML = finalHtml || '<div class="text-center py-4 text-muted">لا توجد كتب مسجلة لهذه الباقة بداخل إعدادات المخزن</div>';
+                container.innerHTML = itemsHtml || '<div class="text-center py-4 text-white-50 fw-bold bg-dark bg-opacity-50 border border-secondary border-opacity-50 rounded-3">لا توجد أصناف مسجلة لهذا الصف.</div>';
             } else {
                 document.getElementById('modalItemsContainer').innerHTML = `<div class="alert alert-danger m-0">${data.error}</div>`;
             }
         })
         .catch(err => {
-            document.getElementById('modalItemsContainer').innerHTML = '<div class="alert alert-danger m-0">حدث خطأ أثناء جلب تفاصيل الجرد من الخادم!</div>';
+            console.error("Delivery Modal Error:", err);
+            document.getElementById('modalItemsContainer').innerHTML = `<div class="alert alert-danger m-0">حدث خطأ أثناء تحميل البيانات من الخادم.</div>`;
         });
 }
 
@@ -879,32 +901,26 @@ function toggleAvailableCheckboxes(status) {
     });
 }
 
-// 🟢 5. إرسال الأصناف المحددة وحفظ التسليم بالمخزن
 function submitPartialDelivery() {
     if (!currentActiveSaleId) return;
 
-    const selectedCheckboxes = document.querySelectorAll('.modal-item-checkbox:checked');
-    const selectedIds = Array.from(selectedCheckboxes).map(chk => parseInt(chk.value));
-
+    const selectedIds = Array.from(document.querySelectorAll('.modal-item-checkbox:checked')).map(chk => parseInt(chk.value));
     const btn = document.getElementById('btnSubmitDelivery');
     const errAlert = document.getElementById('modalErrorAlert');
     errAlert.classList.add('d-none');
 
     if (selectedIds.length === 0) {
-        errAlert.innerText = 'يرجى تحديد كتاب واحد على الأقل لتسليمه الآن!';
+        errAlert.innerText = 'يرجى تحديد صنف واحد على الأقل لتسليمه!';
         errAlert.classList.remove('d-none');
         return;
     }
 
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></div>جاري التوثيق وتحديث المخزن...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></div>جاري الخصم...';
 
     fetch(`/students/sales/api/save-delivery/${currentActiveSaleId}/`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
         body: JSON.stringify({ selected_items: selectedIds })
     })
     .then(res => res.json())
@@ -913,21 +929,12 @@ function submitPartialDelivery() {
         btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> تأكيد تسليم الكتب المحددة';
 
         if (data.success) {
-            const modalEl = document.getElementById('detailedDeliveryModal');
-            const modalInstance = bootstrap.Modal.getInstance(modalEl);
-            modalInstance.hide();
-
-            instantSalesSearch();
+            bootstrap.Modal.getInstance(document.getElementById('detailedDeliveryModal')).hide();
+            instantSalesSearch(); // إعادة تحميل الجدول لحظياً
         } else {
             errAlert.innerText = data.error;
             errAlert.classList.remove('d-none');
         }
-    })
-    .catch(err => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> تأكيد تسليم الكتب المحددة';
-        errAlert.innerText = 'حدث خطأ غير متوقع أثناء الاتصال بالسيرفر!';
-        errAlert.classList.remove('d-none');
     });
 }
 </script>

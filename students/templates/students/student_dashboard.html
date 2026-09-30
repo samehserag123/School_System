@@ -9,17 +9,17 @@
        ULTRA-PREMIUM DASHBOARD THEME
        ========================================== */
     .premium-wrapper {
-        font-family: 'Cairo', sans-serif; 
+        font-family: 'Cairo', sans-serif;
         color: #e2e8f0;
         /* تفعيل الأرقام المجدولة مالياً للمحاذاة الدقيقة */
-        font-variant-numeric: tabular-nums; 
+        font-variant-numeric: tabular-nums;
     }
 
     .premium-card {
         background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(2, 6, 23, 0.95));
         backdrop-filter: blur(15px);
         -webkit-backdrop-filter: blur(15px);
-        border: 1px solid rgba(56, 189, 248, 0.15); 
+        border: 1px solid rgba(56, 189, 248, 0.15);
         border-radius: 24px;
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
         overflow: hidden;
@@ -75,7 +75,7 @@
 </style>
 
 <div class="container-fluid py-4 premium-wrapper" dir="rtl">
-    
+
     <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
         <div>
             <h2 class="fw-900 text-white m-0 d-flex align-items-center">
@@ -217,11 +217,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // إعدادات افتراضية عالمية لـ Chart.js لتتناسب مع الـ Dark Theme
     Chart.defaults.color = '#94a3b8';
     Chart.defaults.font.family = "'Cairo', sans-serif";
-    
+
     // تأمين المتغيرات لمنع انهيار الجافاسكريبت (Safe Fallbacks)
     const totalPaid = {{ total_paid|default:"0" }};
     const remainingBal = {{ remaining_balance|default:"0" }};
-    
+
     // 1. الرسم الدائري (Doughnut)
     const ctx1 = document.getElementById('paymentChart').getContext('2d');
     new Chart(ctx1, {
@@ -236,11 +236,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 hoverOffset: 4
             }]
         },
-        options: { 
+        options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: '80%', 
-            plugins: { 
+            cutout: '80%',
+            plugins: {
                 legend: { display: false }, // إخفاء المربع الافتراضي لأننا صنعنا تصميماً أفضل في المنتصف
                 tooltip: {
                     backgroundColor: 'rgba(0,0,0,0.8)',
@@ -249,13 +249,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     padding: 15,
                     displayColors: false
                 }
-            } 
+            }
         }
     });
 
     // 2. الرسم البياني الزمني (Line Chart)
     const ctx2 = document.getElementById('timelineChart').getContext('2d');
-    
+
     // جلب البيانات من الداتا بيز بأمان
     const labels = [{% for i in installments %}"{{ i.name|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}];
     const dataDue = [{% for i in installments %}{{ i.amount_due|default:"0" }}{% if not forloop.last %},{% endif %}{% endfor %}];
@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     pointBorderColor: '#38bdf8',
                     pointBorderWidth: 2,
                     pointRadius: 5
-                }, 
+                },
                 {
                     label: 'المدفوع الفعلي',
                     data: dataPaid,
@@ -293,17 +293,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             ]
         },
-        options: { 
+        options: {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
-            scales: { 
-                y: { 
-                    beginAtZero: true, 
+            scales: {
+                y: {
+                    beginAtZero: true,
                     grid: { color: 'rgba(255, 255, 255, 0.05)' },
                     ticks: { font: { family: 'Cairo', weight: 'bold' } }
                 },
-                x: { 
+                x: {
                     grid: { display: false },
                     ticks: { font: { family: 'Cairo', weight: 'bold' } }
                 }

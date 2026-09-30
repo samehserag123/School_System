@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_students.html" %}
 {% load static %}
 
 {% block title %}{{ title|default:"تقرير الجرد والرقابة المخزنية الموحدة" }}{% endblock %}
@@ -14,7 +14,7 @@
             <p class="text-warning opacity-75 small m-0 fw-semibold">متابعة رصيد أول المدة، التوريدات، المنصرف، والمتبقي بالرفوف</p>
         </div>
     </div>
-    
+
     <!-- أزرار التنقل والرجوع المباشر -->
     <div class="d-flex gap-2">
         <a href="{% url 'book_sales_list' %}" class="btn btn-outline-info btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm border-opacity-25">
@@ -37,7 +37,7 @@
         --glass-surface: rgba(15, 23, 42, 0.85);
         --glass-card: rgba(30, 41, 59, 0.75);
         --glass-border: rgba(255, 255, 255, 0.12);
-        
+
         --neon-cyan: #38bdf8;
         --neon-emerald: #34d399;
         --neon-amber: #fbbf24;
@@ -248,7 +248,7 @@
 
     <!-- 3. محتوى الجرد التفصيلي الموجه بالتبويبات -->
     <div class="tab-content animate__animated animate__fadeInUp" id="inventoryTabsContent">
-        
+
         <!-- 📚 قسم الكتب الدراسية والمقررات (مقسمة بالصفوف الحقيقية) -->
         <div class="tab-pane fade show active" id="books-content" role="tabpanel">
             <div class="accordion accordion-custom" id="booksAccordion">
@@ -529,7 +529,7 @@ function loadItemDetails(event, itemId, itemName) {
 
     const modalElement = document.getElementById('detailsModal');
     const modal = new bootstrap.Modal(modalElement);
-    
+
     document.getElementById('modalTitle').innerText = "سجل حركة: " + itemName;
     document.getElementById('modalLoading').style.display = 'block';
     document.getElementById('modalContent').style.display = 'none';
@@ -551,7 +551,7 @@ function loadItemDetails(event, itemId, itemName) {
                 body.innerHTML += `
                 <tr>
                     <td class="fw-bold text-white-50">${row.date}</td>
-                    <td><span class="badge ${badgeClass} bg-opacity-20 border border-opacity-25 px-3 py-1 fw-bold">${row.type}</span></td> 
+                    <td><span class="badge ${badgeClass} bg-opacity-20 border border-opacity-25 px-3 py-1 fw-bold">${row.type}</span></td>
                     <td class="fw-black fs-6">${row.qty}</td>
                     <td class="text-start ps-3 small text-white">${row.note}</td>
                 </tr>`;

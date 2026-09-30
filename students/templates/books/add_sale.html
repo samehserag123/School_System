@@ -4,14 +4,19 @@
 {% block title %}نقطة إصدار أذونات تسليم الكتب والزي المدرسي{% endblock %}
 
 {% block page_title %}
-<div class="d-flex align-items-center gap-3 animate__animated animate__fadeIn">
-    <div class="icon-header-box bg-info bg-opacity-10 p-3 rounded-4 border border-info border-opacity-25">
-        <i class="bi bi-cart-check-fill text-info fs-2"></i>
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-3 animate__animated animate__fadeIn">
+    <div class="d-flex align-items-center gap-3">
+        <div class="icon-header-box bg-info bg-opacity-10 p-3 rounded-4 border border-info border-opacity-25">
+            <i class="bi bi-cart-check-fill text-info fs-2"></i>
+        </div>
+        <div>
+            <h4 class="fw-black text-white m-0">نقطة إصدار إذونات الكتب والزي المدرسي</h4>
+            <p class="text-info opacity-75 small m-0 fw-semibold">ابحث عن الطالب، حدد المجموعات المقررة، وأصدر إذن الاستلام فوراً</p>
+        </div>
     </div>
-    <div>
-        <h4 class="fw-black text-white m-0">نقطة إصدار إذونات الكتب والزي المدرسي</h4>
-        <p class="text-info opacity-75 small m-0 fw-semibold">ابحث عن الطالب، حدد المجموعات المقررة، وأصدر إذن الاستلام فوراً</p>
-    </div>
+    <a href="{{ next_url|default:'/finance/counter/' }}" class="btn btn-outline-light fw-bold px-4 py-2 rounded-3">
+        <i class="bi bi-arrow-right-circle me-1"></i> العودة لشاشة الكاونتر
+    </a>
 </div>
 {% endblock %}
 
@@ -120,7 +125,7 @@
                     <div class="position-relative mb-3" id="searchContainer">
                         <div class="input-group">
                             <span class="input-group-text bg-dark border-secondary text-info px-3"><i class="bi bi-search"></i></span>
-                            <input type="text" id="studentSearchInput" class="form-control form-control-neon fs-6" 
+                            <input type="text" id="studentSearchInput" class="form-control form-control-neon fs-6"
                                    placeholder="ابحث باسم الطالب أو الكود..." autocomplete="off" autofocus>
                         </div>
                         <div class="search-results-dropdown" id="searchResultsDropdown"></div>
@@ -184,7 +189,8 @@
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="form-label fw-bold text-white small">الكمية:</label>
-                            <input type="number" name="quantity" id="quantityInput" class="form-control form-control-neon text-center fs-5" value="1" min="1" required>
+                            <!-- السطر الجديد (قراءة فقط ومقفل) -->
+                            <input type="number" name="quantity" id="quantityInput" class="form-control form-control-neon text-center fs-5" value="1" readonly style="pointer-events: none;" required>
                         </div>
                         <div class="col-6 d-flex align-items-end">
                             <div class="form-check form-switch mb-2">
@@ -201,7 +207,7 @@
                             <i class="bi bi-cash-coin me-1"></i> المبلغ المحصل الآن (تسجيل بالخزينة إن وجد):
                         </label>
                         <div class="input-group">
-                            <input type="number" step="0.01" name="pay_now" id="payNowInput" class="form-control form-control-neon fs-4 text-center text-emerald fw-black" value="0.00">
+                            <input type="number" step="0.01" name="pay_now" id="payNowInput" class="form-control form-control-neon fs-4 text-center text-emerald fw-black" placeholder="0.00">
                             <span class="input-group-text bg-dark text-emerald border-secondary fw-bold">ج.م</span>
                         </div>
                         <div id="packagePriceHint" class="package-hint-badge text-center">
@@ -291,20 +297,34 @@ const itemTypeSelect = document.getElementById('itemTypeSelect');
 const packagePriceHint = document.getElementById('packagePriceHint');
 const payNowInput = document.getElementById('payNowInput');
 
+
+// دالة توحيد الحروف العربية وإزالة التشكيل
+function normalizeArabic(text) {
+    if (!text) return '';
+    return text
+        .replace(/[\u064B-\u0652]/g, '') // إزالة التشكيل
+        .replace(/[أإآٱ]/g, 'ا')         // توحيد (أ، إ، آ، ٱ) إلى (ا)
+        .replace(/ى/g, 'ي')             // توحيد (ى) إلى (ي)
+        .replace(/ة/g, 'ه')             // توحيد (ة) إلى (ه)
+        .replace(/[ؤئ]/g, 'ء');          // توحيد (ؤ، ئ) إلى (ء)
+}
+
+
 // 🟢 1. البحث الفوري الفائق إلغاء الطلبات القديمة تلقائياً
 searchInput.addEventListener('input', function() {
     clearTimeout(searchTimer);
-    const q = this.value.trim();
-    if (q.length < 2) { 
-        dropdown.style.display = 'none'; 
-        return; 
+    const rawQuery = this.value.trim(); // اسم المتغير الجديد
+    if (rawQuery.length < 2) {
+        dropdown.style.display = 'none';
+        return;
     }
 
     if (searchAbortController) searchAbortController.abort();
     searchAbortController = new AbortController();
 
     searchTimer = setTimeout(() => {
-        fetch(`/students/api/search-students-sale/?q=${encodeURIComponent(q)}`, {
+        // 🎯 تم تصحيح المتغير هنا إلى rawQuery
+        fetch(`/students/api/search-students-sale/?q=${encodeURIComponent(rawQuery)}`, {
             signal: searchAbortController.signal
         })
         .then(res => res.json())
@@ -316,7 +336,7 @@ searchInput.addEventListener('input', function() {
                     item.className = 'search-result-item';
                     item.innerHTML = `
                         <div class="fw-bold text-white">${st.name}</div>
-                        <small class="text-info">${st.grade}</small> | 
+                        <small class="text-info">${st.grade}</small> |
                         <small class="text-muted">كود: ${st.code}</small>
                     `;
                     item.onclick = () => selectStudent(st);
@@ -357,14 +377,89 @@ function selectStudent(st) {
         .catch(err => console.error("خطأ جلب البيانات المالية:", err));
 }
 
-itemTypeSelect.addEventListener('change', updatePackageHint);
+itemTypeSelect.addEventListener('change', function() {
+    updatePackageHint();
+
+    // 🔒 تعبئة تلقائية بسعر الباقة (المتبقي فعلياً بعد خصم أي مدفوع سابقاً) وقفل الخانة تماماً
+    const itemType = itemTypeSelect.value;
+    let expectedTotal = 0;
+    let alreadyPaid = 0;
+
+    if (itemType === 'book') {
+        expectedTotal = parseFloat(currentFinancialData.books_total) || 0;
+        alreadyPaid = parseFloat(currentFinancialData.books_paid) || 0;
+    } else if (itemType === 'uniform') {
+        expectedTotal = parseFloat(currentFinancialData.uniform_total) || 0;
+        alreadyPaid = parseFloat(currentFinancialData.uniform_paid) || 0;
+    }
+
+    if (itemType) {
+        const maxAllowedNow = Math.max(0, expectedTotal - alreadyPaid);
+        payNowInput.value = maxAllowedNow.toFixed(2);
+        payNowInput.readOnly = true; // 🔒 يمنع التعديل أو المسح يدوياً
+
+        // 🛑 اعتراض فوري: لو الطالب استلم وسدد الصنف ده بالكامل قبل كده
+        if (expectedTotal > 0 && alreadyPaid >= expectedTotal) {
+            const itemLabel = itemType === 'book' ? 'الكتب الدراسية' : 'الزي المدرسي';
+            document.getElementById('customLimitMsg').innerText =
+                `🛑 الطالب استلم وسدد باقة (${itemLabel}) بالكامل من قبل (${expectedTotal.toLocaleString()} ج.م).\nلا يمكن تسجيل عملية استلام أخرى لنفس الصنف.`;
+
+            const limitModal = new bootstrap.Modal(document.getElementById('customLimitModal'));
+            limitModal.show();
+
+            document.getElementById('mainSaveBtn').disabled = true; // منع الحفظ لحد ما يغيّر الاختيار
+        } else {
+            document.getElementById('mainSaveBtn').disabled = false;
+            payNowInput.focus(); // يفضل التركيز عليها عشان زرار Enter يشتغل على طول
+        }
+    } else {
+        payNowInput.value = '';
+        payNowInput.readOnly = false;
+        document.getElementById('mainSaveBtn').disabled = false;
+    }
+});
+
+// ⌨️ الضغط على Enter (من أي حقل في النموذج) = نفس ضغط زرار "حفظ والاستمرار"
+document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+
+    const active = document.activeElement;
+    // نتجاهل Enter لو المستخدم لسه بيكتب في خانة البحث عن الطالب (عشان ميبقاش فيه تعارض مع اختيار الطالب من نتائج البحث)
+    if (active && active.id === 'studentSearchInput') return;
+
+    e.preventDefault();
+    document.getElementById('mainSaveBtn').click();
+});
+
+// 🟢 لو الصفحة اتفتحت من رابط فيه ?student_id=... (زي زرار "عملية تسهيل" في شاشة
+// الكاونتر)، يتحدد الطالب ده تلقائياً من غير ما يدوّر عليه المستخدم تاني
+{% if preselected_student %}
+selectStudent({
+    id: {{ preselected_student.id }},
+    name: "{{ preselected_student.name|escapejs }}",
+    grade: "{{ preselected_student.grade|escapejs }}",
+    code: "{{ preselected_student.code|escapejs }}"
+});
+{% endif %}
 
 function updatePackageHint() {
     const itemType = itemTypeSelect.value;
     if (itemType === 'book') {
-        packagePriceHint.innerHTML = `💡 القيمة المقررة لباقة الكتب: <strong>${currentFinancialData.books_total} ج.م</strong> (مدفوع سابقاً: ${currentFinancialData.books_paid} ج.م)`;
+        const total = parseFloat(currentFinancialData.books_total) || 0;
+        const paid = parseFloat(currentFinancialData.books_paid) || 0;
+        if (total > 0 && paid >= total) {
+            packagePriceHint.innerHTML = `🛑 <strong class="text-danger">تنبيه: هذا الطالب استلم وسدد باقة الكتب بالكامل من قبل (${total} ج.م).</strong>`;
+        } else {
+            packagePriceHint.innerHTML = `💡 القيمة المقررة لباقة الكتب: <strong>${total} ج.م</strong> (مدفوع سابقاً: ${paid} ج.م)`;
+        }
     } else if (itemType === 'uniform') {
-        packagePriceHint.innerHTML = `💡 القيمة المقررة لباقة الزي: <strong>${currentFinancialData.uniform_total} ج.م</strong> (مدفوع سابقاً: ${currentFinancialData.uniform_paid} ج.م)`;
+        const total = parseFloat(currentFinancialData.uniform_total) || 0;
+        const paid = parseFloat(currentFinancialData.uniform_paid) || 0;
+        if (total > 0 && paid >= total) {
+            packagePriceHint.innerHTML = `🛑 <strong class="text-danger">تنبيه: هذا الطالب استلم وسدد باقة الزي بالكامل من قبل (${total} ج.م).</strong>`;
+        } else {
+            packagePriceHint.innerHTML = `💡 القيمة المقررة لباقة الزي: <strong>${total} ج.م</strong> (مدفوع سابقاً: ${paid} ج.م)`;
+        }
     } else {
         packagePriceHint.innerHTML = `* اختر الصنف لمشاهدة القيمة المقررة للباقة.`;
     }
@@ -400,17 +495,24 @@ function validateAndSubmit(shouldPrint) {
     // حساب المتبقي الحقيقي المسموح بدفعه الآن
     const maxAllowedNow = Math.max(0, expectedTotal - alreadyPaid);
 
+    // 🛑 اعتراض صريح: الصنف ده مسدد بالكامل واتسلم قبل كده -> امنع العملية نهائياً
+    //    (بغض النظر عن قيمة المبلغ المدخل، حتى لو كانت 0)
+    if (expectedTotal > 0 && alreadyPaid >= expectedTotal) {
+        const itemLabel = itemType === 'book' ? 'الكتب الدراسية' : 'الزي المدرسي';
+        document.getElementById('customLimitMsg').innerText =
+            `🛑 الطالب استلم وسدد باقة (${itemLabel}) بالكامل من قبل (${expectedTotal.toLocaleString()} ج.م).\nلا يمكن تسجيل عملية استلام أخرى لنفس الصنف.`;
+
+        const limitModal = new bootstrap.Modal(document.getElementById('customLimitModal'));
+        limitModal.show();
+        return; // إيقاف تام بدون أي submit
+    }
+
     // 🛑 الاعتراض الحاسم: يمنع الإرسال فوراً إذا كان المبلغ المدخل أكبر من المتبقي
     if (expectedTotal > 0 && payNow > maxAllowedNow) {
-        let msg = "";
-        if (alreadyPaid >= expectedTotal) {
-            msg = `الطالب مسدد بالكامل سابقاً للباقة (${expectedTotal.toLocaleString()} ج.م).\nلا يمكنك تحصيل أي مبلغ إضافي (${payNow.toLocaleString()} ج.م).`;
-        } else {
-            msg = `لا يمكنك تحصيل مبلغ (${payNow.toLocaleString()} ج.م).\nالحد الأقصى المسموح تحصيله الآن هو (${maxAllowedNow.toLocaleString()} ج.م) فقط لاستكمال الباقة.`;
-        }
+        let msg = `لا يمكنك تحصيل مبلغ (${payNow.toLocaleString()} ج.م).\nالحد الأقصى المسموح تحصيله الآن هو (${maxAllowedNow.toLocaleString()} ج.م) فقط لاستكمال الباقة.`;
 
         document.getElementById('customLimitMsg').innerText = msg;
-        
+
         const limitModal = new bootstrap.Modal(document.getElementById('customLimitModal'));
         limitModal.show();
         return; // إيقاف تام بدون أي submit أو تهنيج
@@ -477,7 +579,9 @@ function resetFormForNextEntry() {
     itemTypeSelect.value = '';
     document.getElementById('quantityInput').value = 1;
     document.getElementById('isDeliveredCheck').checked = false;
-    payNowInput.value = '0.00';
+    payNowInput.value = '';
+    payNowInput.readOnly = false;
+    document.getElementById('mainSaveBtn').disabled = false;
     updatePackageHint();
 }
 
@@ -552,6 +656,10 @@ function clearSelectedStudent() {
     document.getElementById('selectedStudentCard').style.display = 'none';
     document.getElementById('noStudentPlaceholder').style.display = 'block';
     currentFinancialData = { books_total: 0, books_paid: 0, uniform_total: 0, uniform_paid: 0 };
+    itemTypeSelect.value = '';
+    payNowInput.value = '';
+    payNowInput.readOnly = false;
+    document.getElementById('mainSaveBtn').disabled = false;
     updatePackageHint();
     searchInput.focus();
 }

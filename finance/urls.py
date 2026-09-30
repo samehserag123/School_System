@@ -59,7 +59,7 @@ urlpatterns = [
     path('offers/create/', views.create_offer_view, name='create_offer'),
     path('api/validate-coupon/', views.validate_coupon_advanced, name='validate_coupon'),
 
-    path('reports/print-debts/', views.print_debts_report_view, name='print_debts_report'),
+    path('reports/print-debts/', views.print_debts_report, name='print_debts_report'),
 
     path('reports/missing-contacts/', views.missing_contacts_report_view, name='missing_contacts_report'),
 

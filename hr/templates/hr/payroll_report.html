@@ -1,145 +1,201 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>كشف مسيرات الرواتب المجمّع</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Cairo', sans-serif; }
-    </style>
-</head>
-<body class="bg-slate-900 text-slate-100 min-h-screen">
+{% extends 'hr/base_hr.html' %}
 
-    <div class="flex">
-        <div class="w-64 bg-slate-950 min-h-screen p-5 border-l border-slate-800 hidden md:block">
-            <div class="flex items-center gap-3 mb-8 pb-5 border-b border-slate-800">
-                <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/30">HR</div>
-                <div>
-                    <h2 class="font-bold text-sm tracking-wide">نظام الموارد</h2>
-                    <span class="text-xs text-blue-500 font-medium">لوحة الإدارة المالية</span>
-                </div>
-            </div>
-            
-            <nav class="space-y-2">
-                <a href="/hr/employees/" class="flex items-center gap-3 text-slate-400 hover:text-white hover:bg-slate-900 px-4 py-3 rounded-xl transition-all text-sm font-medium">
-                    👥 دليل الموظفين
-                </a>
-                <a href="#" class="flex items-center gap-3 text-white bg-blue-600/10 border border-blue-500/20 px-4 py-3 rounded-xl text-sm font-medium">
-                    💰 كشف الرواتب المجمع
-                </a>
-                <a href="/hr/leaves/" class="flex items-center gap-3 text-slate-400 hover:text-white hover:bg-slate-900 px-4 py-3 rounded-xl transition-all text-sm font-medium">
-                    📅 إدارة الإجازات
-                </a>
-            </nav>
+{% block title %}كشف مسيرات الرواتب المجمّع{% endblock %}
+{% block header_title %}الإدارة المالية - كشف الرواتب{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- 🌟 شريط التحكم العلوي -->
+    <div class="print:hidden bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
+        <div>
+            <h1 class="text-2xl font-black text-white tracking-tight">كشف مسيرات الرواتب</h1>
+            <p class="text-sm text-slate-400 mt-1 font-bold">مدرسة طلعت حرب الثانوية الفندقية لشهر <span class="text-blue-400 font-black">{{ month }} / {{ year }}</span></p>
         </div>
 
-        <div class="flex-1 p-6 lg:p-8 bg-slate-900">
-            
-            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 bg-slate-950 p-6 rounded-2xl border border-slate-800 gap-4 shadow-xl">
-                <div>
-                    <div class="flex items-center gap-2 text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1">
-                        <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> التقارير المالية
-                    </div>
-                    <h1 class="text-2xl font-black text-white">كشف مسيرات الرواتب المجمّع</h1>
-                    <p class="text-xs text-slate-400 mt-1">احتساب الأجور الشاملة والخصومات بناءً على بصمات شهر {{ month }} / {{ year }}</p>
-                </div>
-                
-                <form method="GET" class="flex flex-wrap items-center gap-3 bg-slate-900 p-2 rounded-xl border border-slate-800 w-full lg:w-auto">
-                    <select name="month" class="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium">
+        <div class="flex flex-col md:flex-row items-center gap-4 w-full xl:w-auto">
+            <!-- 🔍 محرك البحث الذكي -->
+            <div class="relative w-full md:w-80">
+                <input type="text" id="smartSearch" placeholder="ابحث باسم الموظف..." class="w-full bg-slate-900 px-4 py-2.5 rounded-lg border border-slate-600 text-white font-bold placeholder-slate-500 focus:border-blue-500 outline-none transition-all shadow-inner">
+                <i data-lucide="search" class="w-5 h-5 text-slate-400 absolute left-3 top-3"></i>
+            </div>
+
+            <!-- فلاتر التاريخ -->
+            <form method="GET" class="flex flex-wrap items-center gap-2 bg-slate-900 p-1.5 rounded-lg border border-slate-700 w-full md:w-auto">
+                <div class="flex items-center bg-slate-800 px-2 py-1 rounded border border-slate-600">
+                    <select name="month" class="bg-transparent text-white text-sm py-1 pr-2 focus:ring-0 outline-none font-bold cursor-pointer border-none">
                         {% for m in months_range %}
                             <option value="{{ m }}" {% if m == month %}selected{% endif %}>شهر {{ m }}</option>
                         {% endfor %}
                     </select>
-                    <select name="year" class="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium">
+                </div>
+                <div class="flex items-center bg-slate-800 px-2 py-1 rounded border border-slate-600">
+                    <select name="year" class="bg-transparent text-white text-sm py-1 pr-2 focus:ring-0 outline-none font-bold cursor-pointer border-none">
                         {% for y in years_range %}
                             <option value="{{ y }}" {% if y == year %}selected{% endif %}>سنة {{ y }}</option>
                         {% endfor %}
                     </select>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-lg transition-all shadow-lg shadow-blue-500/20 w-full sm:w-auto">
-                        تحديث الكشف
-                    </button>
-                </form>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 relative overflow-hidden shadow-md">
-                    <p class="text-xs font-bold text-slate-400 uppercase">إجمالي المرتبات الأساسية</p>
-                    <p class="text-2xl font-black text-white mt-2">{{ total_company_base }} <span class="text-xs font-normal text-slate-400">ج.م</span></p>
-                    <div class="absolute -bottom-2 -left-2 text-slate-900 text-5xl font-black select-none">01</div>
                 </div>
-                <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 relative overflow-hidden shadow-md">
-                    <p class="text-xs font-bold text-emerald-500 uppercase">إجمالي الحوافز والإضافي</p>
-                    <p class="text-2xl font-black text-emerald-400 mt-2">+ {{ total_company_overtime }} <span class="text-xs font-normal text-slate-400">ج.م</span></p>
-                    <div class="absolute -bottom-2 -left-2 text-slate-900 text-5xl font-black select-none">02</div>
-                </div>
-                <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 relative overflow-hidden shadow-md">
-                    <p class="text-xs font-bold text-rose-500 uppercase">إجمالي الخصومات والغياب</p>
-                    <p class="text-2xl font-black text-rose-400 mt-2">- {{ total_company_deductions }} <span class="text-xs font-normal text-slate-400">ج.م</span></p>
-                    <div class="absolute -bottom-2 -left-2 text-slate-900 text-5xl font-black select-none">03</div>
-                </div>
-                <div class="bg-gradient-to-br from-blue-900/40 to-slate-950 p-5 rounded-2xl border border-blue-500/30 relative overflow-hidden shadow-lg shadow-blue-500/5">
-                    <p class="text-xs font-bold text-blue-400 uppercase">صافي الخزينة المطلوب صرفه</p>
-                    <p class="text-3xl font-black text-blue-400 mt-2">{{ total_company_net }} <span class="text-xs font-semibold text-slate-300">ج.م</span></p>
-                    <div class="absolute -bottom-2 -left-2 text-blue-950/20 text-5xl font-black select-none">04</div>
-                </div>
-            </div>
-
-            <div class="bg-slate-950 rounded-2xl shadow-2xl overflow-hidden border border-slate-800">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-right text-slate-300">
-                        <thead class="text-xs text-slate-400 uppercase bg-slate-900/60 border-b border-slate-800">
-                            <tr>
-                                <th scope="col" class="px-6 py-4 font-bold tracking-wider">الموظف</th>
-                                <th scope="col" class="px-6 py-4 text-center font-bold tracking-wider">الراتب الأساسي</th>
-                                <th scope="col" class="px-6 py-4 text-center font-bold tracking-wider">ساعات الإضافي</th>
-                                <th scope="col" class="px-6 py-4 text-center font-bold tracking-wider">قيمة الإضافي</th>
-                                <th scope="col" class="px-6 py-4 text-center font-bold tracking-wider">الاستقطاعات والخصم</th>
-                                <th scope="col" class="px-6 py-4 text-center font-bold tracking-wider text-blue-400 bg-blue-950/20">صافي المرتب</th>
-                                <th scope="col" class="px-6 py-4 text-center font-bold tracking-wider">الإجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-800/60">
-                            {% for record in payroll_records %}
-                            <tr class="hover:bg-slate-900/40 transition-all">
-                                <td class="px-6 py-4 font-medium text-white flex items-center gap-3">
-                                    <div class="w-9 h-9 rounded-xl bg-blue-600/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs shadow-inner">
-                                        {{ record.employee.name|slice:":2" }}
-                                    </div>
-                                    <div>
-                                        <span class="block font-bold text-slate-100">{{ record.employee.name }}</span>
-                                        <span class="text-[10px] font-mono text-slate-500">ID: {{ record.employee.emp_id }}</span>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 text-center font-medium text-slate-300">{{ record.base_salary }} ج.م</td>
-                                <td class="px-6 py-4 text-center">
-                                    <span class="bg-slate-900 text-slate-400 px-2.5 py-1 rounded-md text-xs font-semibold border border-slate-800">
-                                        {{ record.overtime_hours }} س
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-center text-emerald-400 font-bold">+ {{ record.overtime_allowance }} ج.م</td>
-                                <td class="px-6 py-4 text-center text-rose-400 font-bold">- {{ record.deductions }} ج.م</td>
-                                <td class="px-6 py-4 text-center font-black text-base text-blue-400 bg-blue-950/30">{{ record.net_salary }} ج.م</td>
-                                <td class="px-6 py-4 text-center">
-                                    <a href="/hr/payroll/{{ record.employee.id }}/{{ year }}/{{ month }}/" target="_blank" class="text-blue-400 hover:text-white font-bold text-xs inline-flex items-center gap-1.5 bg-blue-500/10 hover:bg-blue-600 border border-blue-500/20 hover:border-blue-500 px-3 py-2 rounded-lg transition-all shadow-sm">
-                                        📄 طباعة الفاتورة
-                                    </a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="7" class="px-6 py-12 text-center text-slate-500 font-medium">
-                                    ⚠️ لا توجد بيانات رواتب متاحة لشهر {{ month }}، يرجى رفع ملف البصمة أولاً لتوليد التقارير المالية.
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm px-5 py-2 rounded transition-colors flex items-center gap-2">
+                    <i data-lucide="filter" class="w-4 h-4"></i> عرض
+                </button>
+            </form>
         </div>
     </div>
 
-</body>
-</html>
+    <!-- 📊 البطاقات الإحصائية -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-md">
+            <p class="text-sm font-bold text-slate-400 uppercase">إجمالي الأساسي</p>
+            <p class="text-2xl font-black text-white mt-1">{{ total_company_base|floatformat:0 }} <span class="text-sm text-slate-500">ج.م</span></p>
+        </div>
+        <div class="bg-slate-800 p-5 rounded-xl border-t-4 border-t-emerald-500 shadow-md">
+            <p class="text-sm font-bold text-emerald-400 uppercase">إجمالي الإضافي</p>
+            <p class="text-2xl font-black text-emerald-400 mt-1">+ {{ total_company_overtime|floatformat:0 }} <span class="text-sm">ج.م</span></p>
+        </div>
+        <div class="bg-slate-800 p-5 rounded-xl border-t-4 border-t-rose-500 shadow-md">
+            <p class="text-sm font-bold text-rose-400 uppercase">خصومات وجزاءات</p>
+            <p class="text-2xl font-black text-rose-400 mt-1">- {{ total_company_deductions|floatformat:0 }} <span class="text-sm">ج.م</span></p>
+        </div>
+        <div class="bg-blue-900 p-5 rounded-xl border border-blue-700 shadow-lg">
+            <p class="text-sm font-bold text-blue-200 uppercase">صافي الخزينة للصرف</p>
+            <p class="text-3xl font-black text-white mt-1">{{ total_company_net|floatformat:0 }} <span class="text-base text-blue-300">ج.م</span></p>
+        </div>
+    </div>
+
+    <!-- 📋 جدول الرواتب التفصيلي -->
+    <div class="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden print:border-none print:shadow-none print:bg-white">
+        <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900 print:hidden">
+            <h3 class="text-lg font-black text-white">تفاصيل رواتب الموظفين (ترتيب أبجدي من الألف للياء)</h3>
+            <div class="flex gap-2">
+                <a href="{% url 'hr:export_payroll_excel' year month %}" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded flex items-center gap-2">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> إكسيل الرواتب
+                </a>
+                <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs px-4 py-2 rounded flex items-center gap-2">
+                    <i data-lucide="printer" class="w-4 h-4"></i> طباعة الكشف
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-right border-collapse">
+                <thead class="bg-slate-900 text-slate-300 border-b border-slate-700 uppercase print:bg-gray-200 print:text-black">
+                    <tr>
+                        <th class="px-4 py-4 font-black">م / الموظف</th>
+                        <th class="px-3 py-4 text-center font-black">الأساسي</th>
+                        <th class="px-3 py-4 text-center font-black text-emerald-400">إضافي (+)</th>
+                        <th class="px-3 py-4 text-center font-black text-rose-400">خصم وجزاء (-)</th>
+                        <th class="px-3 py-4 text-center font-black text-slate-400">تأمينات (-)</th>
+                        <th class="px-3 py-4 text-center font-black text-cyan-300 text-base">الصافي (ج.م)</th>
+                        <th class="px-3 py-4 text-center font-black print:hidden">إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700/50 bg-slate-800 print:bg-white print:divide-gray-300">
+                    {% for record in payroll_records %}
+                    <tr class="hover:bg-slate-700/50 transition-colors search-row">
+                        <td class="px-4 py-4 font-medium flex items-center gap-3 search-name">
+                            <span class="text-xs font-black text-slate-500 w-4">{{ forloop.counter }}</span>
+                            <div>
+                                <!-- الأسماء بيضاء ناصعة الوضوح -->
+                                <span class="block font-black text-white text-[15px] employee-name-text">{{ record.employee.name }}</span>
+                                <span class="text-[11px] font-bold text-slate-500 block">ID: {{ record.employee.emp_id }}</span>
+                            </div>
+                        </td>
+                        <td class="px-3 py-4 text-center font-black text-white text-base">{{ record.base_salary }}</td>
+                        <td class="px-3 py-4 text-center font-bold text-emerald-400">
+                            {% if record.overtime_allowance > 0 %}
+                                + {{ record.overtime_allowance }}
+                            {% else %}
+                                <span class="text-slate-600">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="px-3 py-4 text-center">
+                            {% if record.deductions > 0 %}
+                                <div class="font-black text-rose-400 text-base">- {{ record.deductions }}</div>
+                                {% if record.penalty_deduction > 0 %}
+                                    <div class="text-[11px] font-bold text-rose-300/70 mt-1">(متضمن جزاء إداري)</div>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-slate-600">-</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-3 py-4 text-center font-bold text-slate-400">
+                            {% if record.employee.is_insured %}
+                                - {{ record.employee.insurance_deduction }}
+                            {% else %}
+                                <span class="text-[10px] text-slate-500 bg-slate-700 border border-slate-600 px-1 rounded">غير مؤمن</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="px-3 py-4 text-center font-black text-xl text-cyan-300 bg-slate-900/30 border-x border-slate-700">{{ record.net_salary }}</td>
+                        <td class="px-3 py-4 text-center print:hidden">
+                            <a href="/hr/payroll/{{ record.employee.id }}/{{ year }}/{{ month }}/" target="_blank" class="text-blue-400 hover:text-white bg-slate-700 hover:bg-blue-600 font-bold text-xs px-3 py-1.5 rounded transition-colors inline-block">
+                                مفردات
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr id="noSearchResults" class="hidden">
+                        <td colspan="7" class="px-4 py-8 text-center text-rose-500 font-black text-lg">لم يتم العثور على الموظف!</td>
+                    </tr>
+                </tbody>
+                {% if payroll_records %}
+                <tfoot class="bg-slate-900 text-white font-black text-base border-t border-slate-600">
+                    <tr>
+                        <td class="px-4 py-5 text-left text-sm uppercase">الإجماليات:</td>
+                        <td class="px-3 py-5 text-center">{{ total_company_base|floatformat:0 }}</td>
+                        <td class="px-3 py-5 text-center text-emerald-400">+ {{ total_company_overtime|floatformat:0 }}</td>
+                        <td class="px-3 py-5 text-center text-rose-400">- {{ total_company_deductions|floatformat:0 }}</td>
+                        <td class="px-3 py-5 text-center">-</td>
+                        <td class="px-3 py-5 text-center text-2xl text-cyan-400">{{ total_company_net|floatformat:0 }}</td>
+                        <td class="px-3 py-5 print:hidden"></td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const searchInput = document.getElementById('smartSearch');
+        const rows = document.querySelectorAll('.search-row');
+        const noResultsRow = document.getElementById('noSearchResults');
+
+        function normalizeArabic(text) {
+            return text.replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/[يى]/g, 'ي').toLowerCase().trim();
+        }
+
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = normalizeArabic(e.target.value);
+            let hasVisibleRow = false;
+            rows.forEach(row => {
+                const nameElement = row.querySelector('.employee-name-text');
+                if (nameElement) {
+                    const originalName = nameElement.textContent;
+                    if (normalizeArabic(originalName).includes(searchTerm)) {
+                        row.style.display = '';
+                        hasVisibleRow = true;
+                        if (searchTerm !== '') {
+                            const regex = new RegExp(`(${e.target.value})`, 'gi');
+                            nameElement.innerHTML = originalName.replace(regex, '<span class="bg-blue-600 text-white px-1 rounded">$1</span>');
+                        } else {
+                            nameElement.innerHTML = originalName;
+                        }
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
+            if (!hasVisibleRow && rows.length > 0) {
+                noResultsRow.classList.remove('hidden');
+            } else {
+                noResultsRow.classList.add('hidden');
+            }
+        });
+    });
+</script>
+{% endblock %}

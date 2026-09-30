@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_students.html" %}
 {% load static %}
 
 {% block extra_css %}
@@ -114,7 +114,7 @@
         margin-bottom: 6px !important;
     }
 
-    .form-control:disabled, .form-select:disabled {
+    .form-control:disabled, .form-select:disabled, .form-control[readonly] {
         opacity: 0.65;
         cursor: not-allowed;
         background-color: #0f172a !important;
@@ -150,6 +150,30 @@
         background-color: #fbbf24 !important;
         border-color: #fbbf24 !important;
     }
+
+    /* تصميم أزرار الاختيار الموحدة */
+    .custom-btn-group .btn {
+        padding: 12px;
+        font-size: 1rem;
+        border: 2px solid #1e293b;
+        background-color: #020617;
+        color: #64748b;
+        transition: all 0.3s;
+    }
+
+    .custom-btn-group .btn-check:checked + .btn-outline-info {
+        background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+        color: #020617;
+        border-color: #38bdf8;
+        box-shadow: 0 4px 15px rgba(56,189,248,0.4);
+    }
+
+    .custom-btn-group .btn-check:checked + .btn-outline-warning {
+        background: linear-gradient(135deg, #d97706, #fbbf24);
+        color: #020617;
+        border-color: #fbbf24;
+        box-shadow: 0 4px 15px rgba(251,191,36,0.4);
+    }
 </style>
 {% endblock %}
 
@@ -178,15 +202,20 @@
         <form method="post" id="studentForm" enctype="multipart/form-data">
             {% csrf_token %}
 
-            <!-- 📸 دائرة رفع الصورة الشخصية -->
+            <!-- 📸 دائرة رفع ومعاينة الصورة الشخصية -->
             <div class="profile-pic-container">
                 <div class="profile-pic-wrapper" {% if not student_admin_mode %}onclick="document.getElementById('hidden-image-input').click();"{% endif %}>
+
                     {% if student and student.image %}
-                        <img id="image-preview" src="{{ student.image.url }}" alt="preview">
+                        <img id="image-preview" src="{{ student.image.url }}" alt="صورة الطالب">
                     {% elif notification and notification.student_photo %}
-                        <img id="image-preview" src="{{ notification.student_photo.url }}" alt="preview">
+                        <img id="image-preview" src="{{ notification.student_photo.url }}" alt="صورة الطالب من الحجز">
+                    {% elif booking and booking.student_photo %}
+                        <img id="image-preview" src="{{ booking.student_photo.url }}" alt="صورة الطالب من الحجز">
+                    {% elif initial_photo_url %}
+                        <img id="image-preview" src="{{ initial_photo_url }}" alt="صورة الطالب المرفوعة">
                     {% else %}
-                        <img id="image-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="preview">
+                        <img id="image-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="صورة افتراضية">
                     {% endif %}
 
                     {% if not student_admin_mode %}
@@ -195,7 +224,15 @@
                     </div>
                     {% endif %}
                 </div>
-                <span class="text-white-50 small mt-2 fw-bold"><i class="bi bi-image me-1 text-info"></i> صورة الطالب الشخصية</span>
+
+                <span class="text-white-50 small mt-2 fw-bold">
+                    <i class="bi bi-image me-1 text-info"></i> صورة الطالب الشخصية
+                    {% if notification and notification.student_photo or booking and booking.student_photo %}
+                        <span class="badge bg-success bg-opacity-20 text-emerald-400 ms-1 border border-success border-opacity-20">✓ تم جلبها من موقع الحجز</span>
+                    {% endif %}
+                </span>
+
+                <input type="hidden" name="notification_photo_path" value="{% if notification.student_photo %}{{ notification.student_photo }}{% elif booking.student_photo %}{{ booking.student_photo }}{% endif %}">
                 <input type="file" name="image" id="hidden-image-input" accept="image/*" onchange="previewImage(this)">
             </div>
 
@@ -223,20 +260,47 @@
             <!-- 2️⃣ بطاقة البيانات الشخصية -->
             <div class="section-card-box">
                 <div class="card-header-title">
-                    <i class="bi bi-person-lines-fill text-warning me-2 fs-5"></i> البيانات الشخصية
+                    <i class="bi bi-person-lines-fill text-warning me-2 fs-5"></i> البيانات الشخصية والهوية
                 </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="btn-group w-100 custom-btn-group shadow-sm" role="group">
+                            <input type="radio" class="btn-check" name="nationality_type" id="nat_egyptian" value="egyptian" autocomplete="off" checked>
+                            <label class="btn btn-outline-info fw-bold" for="nat_egyptian" style="border-radius: 0 50px 50px 0;">
+                                <i class="bi bi-person-vcard me-1"></i> مصري (رقم قومي)
+                            </label>
+
+                            <input type="radio" class="btn-check" name="nationality_type" id="nat_international" value="international" autocomplete="off">
+                            <label class="btn btn-outline-warning fw-bold" for="nat_international" style="border-radius: 50px 0 0 50px;">
+                                <i class="bi bi-passport me-1"></i> وافد من الخارج (جواز سفر)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row g-3">
                     <div class="col-md-3">
-                        <label class="form-label"><i class="bi bi-credit-card-2-front text-info me-1"></i> الرقم القومي</label>
-                        {{ form.national_id }}
+                        <label class="form-label" id="label-national-id">
+                            <i class="bi bi-credit-card-2-front text-info me-1"></i> الرقم القومي (14 رقم)
+                        </label>
+                        <!-- 🟢 التعديل الأهم: قراءة الرقم القومي من notification -->
+                        <input type="text" name="national_id" id="input-national-id"
+                               value="{% if request.POST.national_id %}{{ request.POST.national_id }}{% elif student.national_id %}{{ student.national_id }}{% elif notification.national_id %}{{ notification.national_id }}{% endif %}"
+                               class="form-control text-center fs-5 tracking-widest font-monospace" required>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label"><i class="bi bi-flag me-1 text-secondary"></i> الجنسية</label>
-                        {{ form.nationality }}
+                        <input type="text" name="nationality" id="input-nationality" class="form-control text-center fw-bold"
+                               value="{% if request.POST.nationality %}{{ request.POST.nationality }}{% elif student.nationality %}{{ student.nationality }}{% else %}مصري{% endif %}">
                     </div>
                     <div class="col-md-2">
                         <label class="form-label"><i class="bi bi-gender-ambiguous me-1 text-info"></i> النوع</label>
-                        {{ form.gender }}
+                        <select name="gender" id="select-gender" class="form-select text-center">
+                            <!-- 🟢 التعديل: قراءة النوع من الإشعار إن وجد -->
+                            <option value="Male" {% if student.gender == 'Male' or notification.gender == 'Male' or not student.gender and not notification.gender %}selected{% endif %}>بنين</option>
+                            <option value="Female" {% if student.gender == 'Female' or notification.gender == 'Female' %}selected{% endif %}>بنات</option>
+                        </select>
                     </div>
                     <div class="col-md-1">
                         <label class="form-label"><i class="bi bi-book me-1 text-info"></i> الديانة</label>
@@ -244,11 +308,15 @@
                     </div>
                     <div class="col-md-2">
                         <label class="form-label"><i class="bi bi-calendar-event me-1 text-info"></i> تاريخ الميلاد</label>
-                        {{ form.date_of_birth }}
+                        <!-- 🟢 التعديل: قراءة تاريخ الميلاد من الإشعار -->
+                        <input type="date" name="date_of_birth" id="input-dob" class="form-control text-center"
+                               value="{% if request.POST.date_of_birth %}{{ request.POST.date_of_birth }}{% elif student.date_of_birth %}{{ student.date_of_birth|date:'Y-m-d' }}{% elif notification.birth_date %}{{ notification.birth_date|date:'Y-m-d' }}{% endif %}">
                     </div>
                     <div class="col-md-2">
                         <label class="form-label"><i class="bi bi-geo-alt me-1 text-info"></i> محل الميلاد</label>
-                        {{ form.birth_place }}
+                        <!-- 🟢 التعديل: قراءة المحافظة من الإشعار -->
+                        <input type="text" name="birth_place" id="input-birthplace" class="form-control text-center"
+                               value="{% if request.POST.birth_place %}{{ request.POST.birth_place }}{% elif student.birth_place %}{{ student.birth_place }}{% elif notification.birth_governorate %}{{ notification.birth_governorate }}{% endif %}">
                     </div>
                 </div>
             </div>
@@ -314,7 +382,6 @@
                         {{ form.registration_number }}
                     </div>
                     <div class="col-md-3">
-                        <!-- 🟢 قراءة حقل حالة القيد عند فتح الملف الثابتة -->
                         <label class="form-label text-info fw-bold"><i class="bi bi-info-circle-fill me-1"></i> حالة القيد عند فتح الملف</label>
                         {{ form.initial_status }}
                     </div>
@@ -347,7 +414,6 @@
                     {% endif %}
                 </div>
 
-                <!-- 🟢 تجميع خيارات الخصائص والإعفاء في أقصى اليسار -->
                 <div class="col-md-5 d-flex justify-content-end align-items-center gap-3 flex-wrap">
                     <div class="form-check form-switch mb-0">
                         {{ form.is_application_fee_exempt }}
@@ -377,75 +443,132 @@
     }
 
     document.addEventListener("DOMContentLoaded", function() {
-    const form = document.getElementById("studentForm");
-    const isViewMode = "{{ student_admin_mode }}" === "True";
+        const isViewMode = "{{ student_admin_mode }}" === "True";
+        if (isViewMode) return;
 
-    if (isViewMode) return;
+        const natEgyptianBtn = document.getElementById('nat_egyptian');
+        const natIntBtn = document.getElementById('nat_international');
+        const idInput = document.getElementById('input-national-id');
+        const natInput = document.getElementById('input-nationality');
+        const dobInput = document.getElementById('input-dob');
+        const placeInput = document.getElementById('input-birthplace');
+        const genderSelect = document.getElementById('select-gender');
+        const idLabel = document.getElementById('label-national-id');
 
-    // تأكيد إضافي بالـ JS لمنع الحروف في حقل رقم القيد بشكل لحظي
-    const regInput = document.querySelector('input[name="registration_number"]');
-    if (regInput) {
-        regInput.addEventListener("input", function() {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
-    }
+        const egyptGovernorates = {
+            "01": "القاهرة", "02": "الإسكندرية", "03": "بورسعيد", "04": "السويس",
+            "11": "دمياط", "12": "الدقهلية", "13": "الشرقية", "14": "القليوبية",
+            "15": "كفر الشيخ", "16": "الغربية", "17": "المنوفية", "18": "البحيرة",
+            "19": "الإسماعيلية", "21": "الجيزة", "22": "بني سويف", "23": "الفيوم",
+            "24": "المنيا", "25": "أسيوط", "26": "سوهاج", "27": "قنا",
+            "28": "أسوان", "29": "الأقصر", "31": "البحر الأحمر", "32": "الوادى الجديد",
+            "33": "مطروح", "34": "شمال سيناء", "35": "جنوب سيناء", "88": "خارج مصر"
+        };
 
-    const egyptGovernorates = {
-        "01": "القاهرة", "02": "الإسكندرية", "03": "بورسعيد", "04": "السويس",
-        "11": "دمياط", "12": "الدقهلية", "13": "الشرقية", "14": "القليوبية",
-        "15": "كفر الشيخ", "16": "الغربية", "17": "المنوفية", "18": "البحيرة",
-        "19": "الإسماعيلية", "21": "الجيزة", "22": "بني سويف", "23": "الفيوم",
-        "24": "المنيا", "25": "أسيوط", "26": "سوهاج", "27": "قنا",
-        "28": "أسوان", "29": "الأقصر", "31": "البحر الأحمر", "32": "الوادى الجديد",
-        "33": "مطروح", "34": "شمال سيناء", "35": "جنوب سيناء", "88": "مولود خارج الجمهورية"
-    };
+        function applyIdentityMode() {
+            if (natEgyptianBtn.checked) {
+                idLabel.innerHTML = '<i class="bi bi-credit-card-2-front text-info me-1"></i> الرقم القومي (14 رقم)';
+                idInput.maxLength = 14;
+                idInput.placeholder = "أدخل 14 رقم...";
+                natInput.value = "مصري";
+                natInput.readOnly = true;
+                dobInput.readOnly = true;
+                placeInput.readOnly = true;
 
-    const nationalIdInput = document.querySelector('input[name="national_id"]');
-    const dobInput = document.querySelector('input[name="date_of_birth"]');
-    const birthPlaceInput = document.querySelector('input[name="birth_place"]');
-
-    if (nationalIdInput) {
-        nationalIdInput.addEventListener("input", function() {
-            const id = this.value.trim();
-
-            if (id.length === 14 && !isNaN(id)) {
-                const centuryDigit = id.substring(0, 1);
-                const yearPart = id.substring(1, 3);
-                const monthPart = id.substring(3, 5);
-                const dayPart = id.substring(5, 7);
-
-                let yearPrefix = (centuryDigit === "3") ? "20" : "19";
-                const fullYear = yearPrefix + yearPart;
-                const formattedDate = `${fullYear}-${monthPart}-${dayPart}`;
-
-                if (dobInput) dobInput.value = formattedDate;
-
-                const govCode = id.substring(7, 9);
-                if (birthPlaceInput && egyptGovernorates[govCode]) {
-                    birthPlaceInput.value = egyptGovernorates[govCode];
-                }
+                idInput.value = idInput.value.replace(/[^0-9]/g, '');
+                extractDataFromID();
+            } else {
+                idLabel.innerHTML = '<i class="bi bi-passport text-warning me-1"></i> رقم جواز السفر';
+                idInput.maxLength = 50;
+                idInput.placeholder = "أدخل رقم الجواز...";
+                if (natInput.value === "مصري") natInput.value = "";
+                natInput.readOnly = false;
+                dobInput.readOnly = false;
+                placeInput.readOnly = false;
             }
-        });
-    }
+        }
 
-    const inputs = Array.from(form.querySelectorAll("input:not([type='hidden']):not([type='file']), select, textarea, button"));
+        function extractDataFromID() {
+            if (natEgyptianBtn.checked && idInput.value.length === 14) {
+                let id = idInput.value;
+                let century = id.substring(0, 1) === '3' ? '20' : '19';
+                let year = id.substring(1, 3);
+                let month = id.substring(3, 5);
+                let day = id.substring(5, 7);
 
-    inputs.forEach((input, index) => {
-        input.addEventListener("keydown", function(e) {
-            if (e.key === "Enter") {
-                if (e.target.tagName.toLowerCase() === "textarea") return;
+                // ملء تاريخ الميلاد والنوع والمحافظة
+                dobInput.value = `${century}${year}-${month}-${day}`;
 
-                e.preventDefault();
-                const nextInput = inputs[index + 1];
-
-                if (nextInput) {
-                    nextInput.focus();
-                } else if (input.type === "submit") {
-                    form.submit();
+                let govCode = id.substring(7, 9);
+                if (egyptGovernorates[govCode]) {
+                    placeInput.value = egyptGovernorates[govCode];
                 }
+
+                let genderDigit = parseInt(id.charAt(12));
+                genderSelect.value = (genderDigit % 2 === 0) ? 'Female' : 'Male';
             }
+        }
+
+        // 🟢 دالة التحقق الذكي عند فتح الصفحة من الإشعار
+        function initIdentityFromValue() {
+            let initialId = idInput.value.trim();
+            // إذا كان هناك رقم مسجل ويحتوي على حروف (ليس أرقاماً صافية)، نعتبره وافداً
+            if (initialId.length > 0 && isNaN(initialId)) {
+                natIntBtn.checked = true;
+            } else {
+                natEgyptianBtn.checked = true;
+            }
+            applyIdentityMode();
+        }
+
+        if (natEgyptianBtn && natIntBtn) {
+            initIdentityFromValue(); // التشغيل الأولي الذكي
+
+            natEgyptianBtn.addEventListener('change', function() {
+                idInput.value = ''; dobInput.value = ''; placeInput.value = '';
+                applyIdentityMode();
+            });
+
+            natIntBtn.addEventListener('change', function() {
+                idInput.value = ''; dobInput.value = ''; placeInput.value = '';
+                applyIdentityMode();
+            });
+        }
+
+        if (idInput) {
+            idInput.addEventListener('input', function() {
+                if (natEgyptianBtn.checked) {
+                    this.value = this.value.replace(/[^0-9]/g, '');
+                    extractDataFromID();
+                } else {
+                    this.value = this.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                }
+            });
+        }
+
+        const regInput = document.querySelector('input[name="registration_number"]');
+        if (regInput) {
+            regInput.addEventListener("input", function() {
+                this.value = this.value.replace(/[^0-9]/g, '');
+            });
+        }
+
+        const form = document.getElementById("studentForm");
+        const inputs = Array.from(form.querySelectorAll("input:not([type='hidden']):not([type='file']), select, textarea, button"));
+        inputs.forEach((input, index) => {
+            input.addEventListener("keydown", function(e) {
+                if (e.key === "Enter") {
+                    if (e.target.tagName.toLowerCase() === "textarea") return;
+                    e.preventDefault();
+                    const nextInput = inputs[index + 1];
+                    if (nextInput) {
+                        nextInput.focus();
+                    } else if (input.type === "submit") {
+                        form.submit();
+                    }
+                }
+            });
         });
     });
-});
 </script>
 {% endblock %}

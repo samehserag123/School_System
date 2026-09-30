@@ -1,64 +1,46 @@
-@login_required
-@user_passes_test(lambda u: u.is_superuser)
-def withdraw_student(request, student_id):
-    student = get_object_or_404(Student, id=student_id)
-    current_year = student.academic_year
+{% extends "base_finance.html" %}
+{% load static %}
 
-    total_paid = Payment.objects.filter(
-        student=student, academic_year=current_year, is_cancelled=False
-    ).aggregate(s=Sum('amount_paid'))['s'] or Decimal('0.00')
+{% block title %}سحب ملف طالب{% endblock %}
 
-    # التقاط الشاشة المرجعية أثناء العرض (GET)
-    referer = request.META.get('HTTP_REFERER', '')
-    from_screen = request.GET.get('from') or request.GET.get('next')
-    if not from_screen:
-        if 'quick-collection' in referer or 'quick_collection' in referer:
-            from_screen = 'quick_collection'
-        elif 'counter' in referer:
-            from_screen = 'counter'
+{% block content %}
+<div class="container py-5" dir="rtl">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card bg-dark text-white border border-secondary shadow-lg rounded-4 p-4">
+                <h3 class="fw-black text-danger mb-3 text-center">
+                    <i class="bi bi-box-seam me-2"></i> سحب ملف الطالب نهائياً
+                </h3>
+                
+                <div class="bg-secondary bg-opacity-20 p-3 rounded-3 mb-4 border border-secondary">
+                    <h5 class="text-warning fw-bold mb-1">{{ student.get_full_name }}</h5>
+                    <p class="text-white-50 small m-0">كود الطالب: <span class="text-white fw-mono">{{ student.student_code }}</span></p>
+                    <p class="text-white-50 small m-0">إجمالي المدفوع سابقاً: <span class="text-success fw-bold">{{ total_paid }} ج.م</span></p>
+                </div>
 
-    if request.method == "POST":
-        refund_amount = Decimal(request.POST.get('refund_amount', '0'))
-        reason = request.POST.get('reason', 'سحب ملف نهائي')
-        from_screen_post = request.POST.get('from_screen') or from_screen
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="from_screen" value="{{ from_screen }}">
 
-        try:
-            process_student_withdrawal(
-                student_id=student.id,
-                refund_amount=refund_amount,
-                admin_user=request.user,
-                reason=reason
-            )
+                    <div class="mb-3">
+                        <label class="form-label text-white-50 fw-bold small">المبلغ المسترد (إن وجد):</label>
+                        <input type="number" name="refund_amount" step="0.01" value="0.00" class="form-control bg-black text-white border-secondary fw-bold text-center" required>
+                    </div>
 
-            messages.success(request, f"✅ تم سحب ملف الطالب وتصفير مديونيته بنجاح. المبلغ المسترد: {refund_amount} ج.م")
-            cache.clear()
+                    <div class="mb-3">
+                        <label class="form-label text-white-50 fw-bold small">سبب سحب الملف:</label>
+                        <textarea name="reason" rows="3" class="form-control bg-black text-white border-secondary" placeholder="اكتب سبب السحب هنا...">سحب ملف نهائي</textarea>
+                    </div>
 
-            # التوجيه الذكي بناءً على الشاشة السابقة
-            if from_screen_post == 'quick_collection' or 'quick-collection' in referer or 'quick_collection' in referer:
-                try:
-                    target_base = reverse('quick_collection')
-                except Exception:
-                    target_base = '/finance/quick-collection/'
-            elif 'counter' in referer or from_screen_post == 'counter':
-                try:
-                    target_base = reverse('counter')
-                except Exception:
-                    target_base = '/finance/counter/'
-            else:
-                target_base = reverse('student_list')
-
-            if 'student_list' not in target_base:
-                target_url = f"{target_base}?student_id={student.id}"
-            else:
-                target_url = target_base
-
-            return redirect(target_url)
-
-        except Exception as e:
-            messages.error(request, f"❌ حدث خطأ: {e}")
-
-    return render(request, 'students/withdraw_student.html', {
-        'student': student,
-        'total_paid': total_paid,
-        'from_screen': from_screen
-    })
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-danger w-100 fw-black py-2">
+                            <i class="bi bi-check-circle me-1"></i> تأكيد سحب الملف وتصفير المديونية
+                        </button>
+                        <a href="javascript:history.back()" class="btn btn-outline-secondary w-50 fw-bold py-2">إلغاء</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

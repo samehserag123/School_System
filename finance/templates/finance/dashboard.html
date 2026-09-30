@@ -1,27 +1,27 @@
-{% extends 'base.html' %}
+{% extends 'base_finance.html' %}
 
 {% block title %}المركز المالي الذكي - نظام الإدارة المتكامل{% endblock %}
 
 {% block content %}
 <style>
     /* لمسات جمالية إضافية */
-    .card-stat { 
-        transition: all 0.3s cubic-bezier(.25,.8,.25,1); 
-        border: none; 
-        border-radius: 20px; 
+    .card-stat {
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        border: none;
+        border-radius: 20px;
         background: #ffffff;
     }
-    .card-stat:hover { 
-        transform: translateY(-10px); 
-        box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important; 
+    .card-stat:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important;
     }
-    .icon-shape { 
-        width: 55px; 
-        height: 55px; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        border-radius: 15px; 
+    .icon-shape {
+        width: 55px;
+        height: 55px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 15px;
         font-size: 1.5rem;
     }
     /* تدرجات ألوان حديثة */
@@ -29,11 +29,11 @@
     .bg-gradient-dark-gold { background: linear-gradient(135deg, #232526 0%, #414345 100%) !important; }
     .bg-gradient-green { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important; }
     .bg-gradient-orange { background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%) !important; }
-    
-    .table thead th { 
-        font-size: 0.85rem; 
-        text-transform: uppercase; 
-        background-color: #fcfcfd; 
+
+    .table thead th {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        background-color: #fcfcfd;
         border-top: none;
         color: #8898aa;
     }

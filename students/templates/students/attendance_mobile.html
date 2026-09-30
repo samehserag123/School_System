@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>تحضير الغياب</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+<style>
+    :root{
+        --acc-present:#198754;
+        --acc-absent:#dc3545;
+        --acc-excused:#fd7e14;
+        --acc-unmarked:#adb5bd;
+        --acc-primary:#0d6efd;
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    html,body{
+        height:100%; background:#f1f3f5; overscroll-behavior-y: contain;
+        font-family: -apple-system, "Cairo", "Segoe UI", Tahoma, sans-serif;
+    }
+    body{ padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
+
+    /* ===== الشريط العلوي ===== */
+    .app-bar{
+        position: sticky; top: var(--safe-top); z-index: 1030;
+        background: linear-gradient(135deg,#1f2937,#111827);
+        color:#fff; padding: 10px 12px 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.25);
+    }
+    .app-bar h1{ font-size:1rem; font-weight:800; margin:0; }
+    .stat-pill{
+        display:flex; align-items:center; gap:4px;
+        font-size:.75rem; font-weight:700;
+        padding:2px 8px; border-radius:999px;
+        background:rgba(255,255,255,.08);
+    }
+    .progress-track{ height:5px; background:rgba(255,255,255,.15); overflow:hidden; border-radius:0 0 6px 6px; margin-top:8px; }
+    .progress-fill{ height:100%; width:0%; background:linear-gradient(90deg,#198754,#20c997); transition:width .35s ease; }
+    #network-badge.offline{ background:#dc3545 !important; }
+    .icon-btn{
+        width:34px; height:34px; border-radius:10px; border:none;
+        background:rgba(255,255,255,.1); color:#fff; display:flex;
+        align-items:center; justify-content:center; font-size:1rem;
+    }
+
+    /* ===== لوحة الفلاتر المنسدلة ===== */
+    .filter-panel{
+        background:#fff; border-bottom:1px solid #e9ecef;
+        max-height:0; overflow:hidden; transition:max-height .25s ease;
+    }
+    .filter-panel.open{ max-height:340px; }
+    .filter-panel-inner{ padding:12px; }
+
+    /* ===== البحث والفلاتر ===== */
+    .content{ padding: 10px 10px calc(78px + var(--safe-bottom)); max-width:640px; margin:0 auto; }
+    .search-wrap{ position:relative; margin-bottom:8px; }
+    .search-wrap input{ border-radius:999px; padding-inline-start:36px; font-weight:600; }
+    .search-wrap .search-icon{ position:absolute; top:50%; transform:translateY(-50%); inset-inline-start:12px; opacity:.55; }
+    .filter-chips{ display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; }
+    .filter-chips::-webkit-scrollbar{ display:none; }
+    .filter-chip{
+        white-space:nowrap; border:1px solid #dee2e6; background:#fff;
+        border-radius:999px; padding:5px 14px; font-size:.78rem; font-weight:700; color:#495057;
+    }
+    .filter-chip.active{ color:#fff; border-color:transparent; }
+    .filter-chip[data-filter="all"].active{ background:var(--acc-primary); }
+    .filter-chip[data-filter="present"].active{ background:var(--acc-present); }
+    .filter-chip[data-filter="absent"].active{ background:var(--acc-absent); }
+    .filter-chip[data-filter="excused"].active{ background:var(--acc-excused); }
+    .filter-chip[data-filter="unmarked"].active{ background:var(--acc-unmarked); }
+
+    /* ===== كارت الطالب ===== */
+    .student-card{
+        border-inline-start:4px solid #e9ecef !important;
+        transition: border-color .2s ease, transform .1s ease;
+        position:relative;
+        content-visibility: auto; /* تحسين سرعة الأداء والرندر للموبايل */
+        contain-intrinsic-size: 68px;
+    }
+    .student-card.st-present{ border-inline-start-color:var(--acc-present) !important; }
+    .student-card.st-absent{ border-inline-start-color:var(--acc-absent) !important; }
+    .student-card.st-excused{ border-inline-start-color:var(--acc-excused) !important; }
+    .student-card:active{ transform:scale(.99); }
+    .student-card.hidden-by-filter{ display:none; }
+
+    .avatar-circle{
+        width:36px; height:36px; min-width:36px; border-radius:50%;
+        display:flex; align-items:center; justify-content:center;
+        font-weight:800; font-size:.85rem; color:#fff;
+        background:linear-gradient(135deg,#6c757d,#495057);
+        flex-shrink:0;
+    }
+    .sync-dot{
+        position:absolute; top:6px; inset-inline-end:6px;
+        width:9px; height:9px; border-radius:50%; background:transparent;
+    }
+    .sync-dot.pending{ background:#ffc107; animation:pulse 1s infinite; }
+    .sync-dot.error{ background:#dc3545; cursor:pointer; }
+    .sync-dot.synced{ background:#198754; animation:fadeOut 1.4s forwards; }
+    @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+    @keyframes fadeOut{ 0%,70%{opacity:1;} 100%{opacity:0;} }
+
+    .btn-attendance{
+        font-weight:700; min-width:52px; touch-action: manipulation;
+        border-radius:10px !important; font-size:.78rem;
+        transition: transform .08s ease;
+    }
+    .btn-attendance:active{ transform:scale(.92); }
+    .btn-attendance.active{ box-shadow: inset 0 0 0 2px rgba(0,0,0,.06); }
+
+    .empty-state{ padding:48px 12px; text-align:center; color:#868e96; }
+
+    /* ===== الشريط السفلي الثابت ===== */
+    .bottom-bar{
+        position:fixed; bottom:0; inset-inline:0; z-index:1030;
+        background:#fff; border-top:1px solid #e9ecef;
+        padding: 8px 10px calc(8px + var(--safe-bottom));
+        box-shadow: 0 -2px 10px rgba(0,0,0,.08);
+        display:flex; gap:8px;
+    }
+    .bottom-bar .btn{ flex:1; font-weight:800; border-radius:12px; padding:10px 6px; font-size:.82rem; position:relative; }
+    .wa-badge{
+        position:absolute; top:-6px; inset-inline-end:-6px;
+        background:#dc3545; color:#fff; font-size:.65rem; font-weight:800;
+        border-radius:999px; min-width:19px; height:19px; display:flex;
+        align-items:center; justify-content:center; padding:0 4px;
+    }
+
+    /* ===== مودال واتساب مخصص ===== */
+    .wa-overlay{
+        position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:2000;
+        display:none; align-items:flex-end; justify-content:center;
+    }
+    .wa-overlay.show{ display:flex; }
+    .wa-sheet{
+        background:#fff; width:100%; max-width:640px; border-radius:18px 18px 0 0;
+        max-height:88vh; display:flex; flex-direction:column;
+        padding-bottom: var(--safe-bottom);
+        animation: slideUp .22s ease;
+    }
+    @keyframes slideUp{ from{ transform:translateY(30px); opacity:0;} to{ transform:translateY(0); opacity:1;} }
+    .wa-sheet-header{ padding:14px 16px 10px; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:space-between; }
+    .wa-sheet-body{ overflow-y:auto; padding:10px 14px; }
+    .wa-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #f1f3f5; }
+    .wa-row:last-child{ border-bottom:none; }
+    .wa-row .name{ font-weight:700; font-size:.88rem; flex:1; }
+    .wa-row .phone{ font-size:.72rem; color:#868e96; }
+    .wa-row .badge-sent{ background:#198754; }
+    .wa-row .badge-nophone{ background:#adb5bd; }
+    .wa-quick{ padding:12px 14px; border-top:1px solid #eee; }
+
+    /* ===== إشعارات Toast ===== */
+    #toast-stack{
+        position:fixed; bottom: calc(84px + var(--safe-bottom)); left:50%; transform:translateX(-50%);
+        z-index:2100; display:flex; flex-direction:column; gap:6px; width:min(92%,420px);
+    }
+    .app-toast{
+        color:#fff; font-weight:700; font-size:.82rem;
+        padding:10px 14px; border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,.25);
+        opacity:0; transform:translateY(10px); transition:.25s ease;
+    }
+    .app-toast.show{ opacity:1; transform:translateY(0); }
+    .app-toast.success{ background:#198754; }
+    .app-toast.error{ background:#dc3545; }
+    .app-toast.info{ background:#0d6efd; }
+</style>
+</head>
+<body>
+
+{% csrf_token %}
+
+<!-- الشريط العلوي -->
+<div class="app-bar">
+    <div class="d-flex align-items-center justify-content-between">
+        <h1>⏱️ تحضير الغياب</h1>
+        <div class="d-flex align-items-center gap-2">
+            <span id="network-badge" class="badge bg-success">متصل</span>
+            <button class="icon-btn" onclick="toggleFilterPanel()" aria-label="فلاتر">⚙️</button>
+
+            <!-- زر تسجيل الخروج -->
+            <!-- زر تسجيل الخروج المعدل -->
+            <form method="post" action="{% url 'logout' %}" class="m-0 p-0 d-inline-flex">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">
+                <button type="submit" class="icon-btn" aria-label="خروج" title="تسجيل الخروج" style="color: #ff6b6b; background: rgba(255, 107, 107, 0.1);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                        <line x1="12" y1="2" x2="12" y2="12"></line>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+    <div class="d-flex align-items-center justify-content-between mt-1">
+        <span id="queue-badge" class="badge bg-warning text-dark d-none">0 معلق</span>
+        <div class="d-flex align-items-center gap-1 flex-wrap justify-content-end" aria-live="polite">
+            <span class="stat-pill"><span style="color:#20c997">●</span> <span id="count-present">0</span></span>
+            <span class="stat-pill"><span style="color:#ff6b6b">●</span> <span id="count-absent">0</span></span>
+            <span class="stat-pill"><span style="color:#fd7e14">●</span> <span id="count-excused">0</span></span>
+            <span class="stat-pill"><span style="color:#adb5bd">●</span> <span id="count-unmarked">0</span></span>
+        </div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+</div>
+
+<!-- لوحة الفلاتر (الصف / الفصل / التاريخ) -->
+<div class="filter-panel" id="filter-panel">
+    <div class="filter-panel-inner">
+        <form method="GET" action="">
+            <div class="row g-2 align-items-end">
+                <div class="col-12">
+                    <label class="form-label small fw-bold mb-1">التاريخ:</label>
+                    {{ form.date }}
+                </div>
+                <div class="col-6">
+                    <label class="form-label small fw-bold mb-1">الصف الدراسي:</label>
+                    {{ form.grade }}
+                </div>
+                <div class="col-6">
+                    <label class="form-label small fw-bold mb-1">الفصل:</label>
+                    {{ form.classroom }}
+                </div>
+                <div class="col-6">
+                    <label class="form-label small fw-bold mb-1">الترم:</label>
+                    {{ form.term }}
+                </div>
+                <div class="col-6 d-flex align-items-end">
+                    <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold">🔍 عرض</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="content">
+
+    {% if students_data %}
+    <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="student-search" class="form-control" placeholder="ابحث عن طالب بالاسم...">
+    </div>
+
+    <div class="filter-chips">
+        <button class="filter-chip active" data-filter="all">الكل (<span id="chip-all">{{ students_data|length }}</span>)</button>
+        <button class="filter-chip" data-filter="present">✓ حاضر</button>
+        <button class="filter-chip" data-filter="absent">✕ غائب</button>
+        <button class="filter-chip" data-filter="excused">! بعذر</button>
+        <button class="filter-chip" data-filter="unmarked">لم يرصد</button>
+    </div>
+    {% endif %}
+
+    <div class="student-list">
+        {% for item in students_data %}
+        {% with full_name=item.student.first_name|add:" "|add:item.student.last_name %}
+        <div class="card mb-2 shadow-sm border-0 student-card {% if item.status == 'present' %}st-present{% elif item.status == 'absent' %}st-absent{% elif item.status == 'excused' %}st-excused{% endif %}"
+             id="card-{{ item.student.id }}"
+             data-status="{{ item.status|default:'unmarked' }}"
+             data-name="{{ full_name }}"
+             data-phone="{{ item.student.whatsapp_number|default:'' }}">
+            <div class="card-body p-2 d-flex align-items-center justify-content-between gap-2">
+
+                <span class="sync-dot" id="sync-{{ item.student.id }}" onclick="retryStudent({{ item.student.id }})"></span>
+
+                <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width:0;">
+                    <div class="avatar-circle">{{ item.student.first_name|first }}</div>
+                    <div style="min-width:0;" class="flex-grow-1">
+                        <!-- عرض اسم الطالب كاملاً دون اقتطاع -->
+                        <div class="fw-bold text-dark fs-6 text-wrap lh-sm mb-1">
+                            {{ forloop.counter }}. {{ item.student.first_name }} {{ item.student.last_name }}
+                        </div>
+                        <small class="badge bg-light text-muted border indicator-badge" id="indicator-{{ item.student.id }}">
+                            {% if item.status == 'present' %}<span class="text-success">✓ حاضر</span>
+                            {% elif item.status == 'absent' %}<span class="text-danger">✕ غائب</span>
+                            {% elif item.status == 'excused' %}<span class="text-warning">! بعذر</span>
+                            {% else %}لم يرصد{% endif %}
+                        </small>
+                    </div>
+                </div>
+
+                <div class="btn-group btn-group-sm flex-shrink-0" role="group">
+                    <button type="button" class="btn btn-outline-success btn-attendance btn-present {% if item.status == 'present' %}active{% endif %}"
+                            onclick="handleAttendanceClick({{ item.student.id }}, 'present', this)">حاضر</button>
+                    <button type="button" class="btn btn-outline-danger btn-attendance btn-absent {% if item.status == 'absent' %}active{% endif %}"
+                            onclick="handleAttendanceClick({{ item.student.id }}, 'absent', this)">غائب</button>
+                    <button type="button" class="btn btn-outline-warning btn-attendance btn-excused {% if item.status == 'excused' %}active{% endif %}"
+                            onclick="handleAttendanceClick({{ item.student.id }}, 'excused', this)">بعذر</button>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+        {% empty %}
+        <div class="empty-state">
+            <h5>🔍 اختار الصف والفصل للبدء في رصد الغياب</h5>
+            <button class="btn btn-sm btn-outline-primary mt-2" onclick="toggleFilterPanel(true)">فتح الفلاتر</button>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="empty-state d-none" id="no-results">
+        <h6>🚫 لا يوجد طلاب مطابقين للبحث/الفلتر الحالي</h6>
+    </div>
+</div>
+
+<!-- الشريط السفلي -->
+{% if students_data %}
+<div class="bottom-bar">
+    <button class="btn btn-success" onclick="markAllPresent()">⚡ الكل حاضر</button>
+    <button class="btn btn-outline-success" style="background:#25D366;color:#fff;border-color:#25D366;" onclick="openWaSheet()">
+        📲 إشعار الغياب
+        <span class="wa-badge d-none" id="wa-pending-badge">0</span>
+    </button>
+        <!-- زر فتح القناة المدرسية مباشرة (تطبيق أو متصفح) -->
+        <a href="tg://resolve?domain=talaatharbsch"
+           onclick="setTimeout(function(){ window.location.href='https://t.me/talaatharbsch'; }, 1000);"
+           target="_blank"
+           class="btn btn-primary"
+           style="background-color: #229ED9; border-color: #229ED9; font-weight: 700;">
+            ✈️ فتح القناة المدرسية
+        </a>
+</div>
+{% endif %}
+
+<!-- مودال إرسال واتساب وتليجرام لأولياء الأمور -->
+<div class="wa-overlay" id="wa-overlay" onclick="if(event.target===this) closeWaSheet()">
+    <div class="wa-sheet">
+        <div class="wa-sheet-header">
+            <strong>📲 إشعار الغياب لأولياء الأمور</strong>
+            <button class="btn btn-sm btn-light" onclick="closeWaSheet()">✕</button>
+        </div>
+
+        <div class="wa-sheet-body" id="wa-list"></div>
+
+        <div class="wa-quick d-flex flex-column gap-2 p-3 border-top bg-light">
+            <!-- 🚀 1. زر إرسال واتساب جماعي دفعة واحدة -->
+            <button class="btn w-100 fw-bold text-white d-flex align-items-center justify-content-center gap-2"
+                    style="background:#25D366; border-radius: 12px; padding: 12px; font-size: 0.95rem;"
+                    onclick="sendAllWhatsapp()">
+                <span>🚀 إرسال جماعي (واتساب) لجميع الغائبين</span>
+            </button>
+
+            <!-- ✈️ 2. زر نشر رابط الاستعلام بقناة التليجرام -->
+            <button class="btn w-100 fw-bold text-white d-flex align-items-center justify-content-center gap-2"
+                    style="background:#229ED9; border-radius: 12px; padding: 12px; font-size: 0.95rem;"
+                    onclick="shareToTelegramChannel()">
+                <span>✈️ نشر رابط الاستعلام بالقناة</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="toast-stack"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const QUEUE_KEY = 'attendance_offline_queue';
+    const MAX_AUTO_RETRIES = 4;
+    let isSyncing = false;
+    let currentFilter = 'all';
+    let searchTerm = '';
+
+    /* ============ أدوات عامة ============ */
+    function normalizeArabic(text) {
+        if (!text) return '';
+        return text.replace(/[أإآٱ]/g, 'ا')
+                   .replace(/ة/g, 'ه')
+                   .replace(/[ىئ]/g, 'ي')
+                   .replace(/ؤ/g, 'و')
+                   .replace(/[\u064B-\u065F\u0670]/g, '') // إزالة التشكيل
+                   .toLowerCase();
+    }
+
+    // التخزين المسبق للنصوص المعالجة لزيادة السرعة فائقة الأداء أثناء الفلترة
+    function cacheNormalizedNames() {
+        document.querySelectorAll('.student-card').forEach(card => {
+            if (!card.dataset.normalizedName) {
+                card.dataset.normalizedName = normalizeArabic(card.dataset.name || '');
+            }
+        });
+    }
+
+    function getCsrfToken() { return document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''; }
+    function debounce(fn, wait) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), wait); }; }
+    function currentDate() {
+        const dateInput = document.querySelector('[name="date"]');
+        return dateInput?.value || new Date().toISOString().split('T')[0];
+    }
+
+    function showToast(message, type = 'info', duration = 2600) {
+        const stack = document.getElementById('toast-stack');
+        if (!stack) return;
+        const el = document.createElement('div');
+        el.className = `app-toast ${type}`;
+        el.innerText = message;
+        stack.appendChild(el);
+        requestAnimationFrame(() => el.classList.add('show'));
+        setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, duration);
+    }
+
+    function toggleFilterPanel(forceOpen) {
+        const panel = document.getElementById('filter-panel');
+        if (forceOpen === true) panel.classList.add('open');
+        else panel.classList.toggle('open');
+    }
+
+    /* ============ طابور المزامنة (Offline Queue) ============ */
+    function getQueue() { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; } }
+    function saveQueue(queue) { localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); updateQueueUI(); }
+
+    function addToQueue(item) {
+        let queue = getQueue();
+        queue = queue.filter(q => !(q.student_id === item.student_id && q.date === item.date));
+        queue.push({ ...item, retries: 0 });
+        saveQueue(queue);
+    }
+
+    function updateQueueUI() {
+        const queue = getQueue();
+        const queueBadge = document.getElementById('queue-badge');
+        if (queueBadge) {
+            if (queue.length > 0) { queueBadge.classList.remove('d-none'); queueBadge.innerText = `${queue.length} معلق`; }
+            else queueBadge.classList.add('d-none');
+        }
+        queue.forEach(q => setSyncDot(q.student_id, q.retries >= MAX_AUTO_RETRIES ? 'error' : 'pending'));
+        updateCounters();
+    }
+
+    function setSyncDot(studentId, state) {
+        const dot = document.getElementById(`sync-${studentId}`);
+        if (!dot) return;
+        dot.classList.remove('pending', 'error', 'synced');
+        if (state) dot.classList.add(state);
+    }
+
+    /* ============ العدادات وشريط التقدم (محسنة للأداء العالي O(N)) ============ */
+    function updateCounters() {
+        const cards = document.querySelectorAll('.student-card');
+        let present = 0, absent = 0, excused = 0, unmarked = 0;
+
+        cards.forEach(card => {
+            const status = card.dataset.status;
+            if (status === 'present') present++;
+            else if (status === 'absent') absent++;
+            else if (status === 'excused') excused++;
+            else unmarked++;
+        });
+
+        const total = cards.length;
+        setText('count-present', present);
+        setText('count-absent', absent);
+        setText('count-excused', excused);
+        setText('count-unmarked', unmarked);
+
+        const fill = document.getElementById('progress-fill');
+        if (fill && total > 0) fill.style.width = `${Math.round(((total - unmarked) / total) * 100)}%`;
+
+        updateWaBadge();
+    }
+    function setText(id, val) { const el = document.getElementById(id); if (el) el.innerText = val; }
+
+    /* ============ تحديث حالة الطالب في الواجهة ============ */
+    function applyStatusToCard(studentId, status) {
+        const card = document.getElementById(`card-${studentId}`);
+        if (!card) return;
+        card.dataset.status = status;
+        card.classList.remove('st-present', 'st-absent', 'st-excused');
+        if (status === 'present') card.classList.add('st-present');
+        else if (status === 'absent') card.classList.add('st-absent');
+        else if (status === 'excused') card.classList.add('st-excused');
+
+        const group = card.querySelector('.btn-group');
+        group.querySelectorAll('.btn-attendance').forEach(b => b.classList.remove('active'));
+        group.querySelector(`.btn-${status}`)?.classList.add('active');
+
+        const indicator = document.getElementById(`indicator-${studentId}`);
+        if (indicator) {
+            const map = {
+                present: ['bg-success-subtle text-success border border-success', '✓ حاضر'],
+                absent: ['bg-danger-subtle text-danger border border-danger', '✕ غائب'],
+                excused: ['bg-warning-subtle text-warning border border-warning', '! بعذر'],
+            };
+            const [cls, txt] = map[status] || ['bg-light text-muted border', 'لم يرصد'];
+            indicator.className = `badge ${cls} indicator-badge`;
+            indicator.innerText = txt;
+        }
+        applyFiltersToCard(card);
+    }
+
+    function handleAttendanceClick(studentId, status, btnElement) {
+        if (navigator.vibrate) navigator.vibrate(status === 'absent' ? [30, 40, 30] : 35);
+        applyStatusToCard(studentId, status);
+        updateCounters();
+        addToQueue({ student_id: studentId, status, date: currentDate(), term: 'term1' });
+        processQueue();
+    }
+
+    /* ============ المزامنة مع السيرفر ============ */
+    async function processQueue() {
+        if (isSyncing || !navigator.onLine) return;
+        const queue = getQueue();
+        const dueItems = queue.filter(q => (q.retries || 0) <= MAX_AUTO_RETRIES);
+        if (dueItems.length === 0) return;
+
+        isSyncing = true;
+        dueItems.forEach(i => setSyncDot(i.student_id, 'pending'));
+
+        try {
+            const response = await fetch("{% url 'api_save_attendance_robust' %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify({ items: dueItems })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                const syncedIds = new Set((result.records || []).map(r => r.student_id));
+                let currentQueue = getQueue();
+                currentQueue = currentQueue.map(q => {
+                    if (dueItems.some(d => d.student_id === q.student_id) && !syncedIds.has(q.student_id)) {
+                        return { ...q, retries: (q.retries || 0) + 1 };
+                    }
+                    return q;
+                }).filter(q => !syncedIds.has(q.student_id));
+
+                syncedIds.forEach(id => setSyncDot(id, 'synced'));
+                const failedNow = dueItems.filter(d => !syncedIds.has(d.student_id));
+                if (failedNow.length > 0) showToast(`تعذّر حفظ بيانات ${failedNow.length} طالب، جاري إعادة المحاولة...`, 'error');
+                else if (syncedIds.size > 0) showToast(`✓ تمت مزامنة ${syncedIds.size} سجل`, 'success', 1500);
+
+                saveQueue(currentQueue);
+            } else { throw new Error(result.error || 'فشل غير معروف'); }
+        } catch (err) {
+            console.warn("تعذر المزامنة، الاحتفاظ بالبيانات محليًا:", err);
+            let currentQueue = getQueue();
+            currentQueue = currentQueue.map(q => dueItems.some(d => d.student_id === q.student_id) ? { ...q, retries: (q.retries || 0) + 1 } : q);
+            saveQueue(currentQueue);
+        } finally { isSyncing = false; }
+    }
+
+    function retryStudent(studentId) {
+        let queue = getQueue(); let touched = false;
+        queue = queue.map(q => { if (q.student_id === studentId) { touched = true; return { ...q, retries: 0 }; } return q; });
+        if (touched) { saveQueue(queue); showToast('جاري إعادة المحاولة...', 'info', 1400); processQueue(); }
+    }
+
+    /* ============ تحضير الكل ============ */
+    function markAllPresent() {
+        if (!confirm('هل تريد تعليم جميع الطلاب كـ "حاضر"؟')) return;
+        const dateVal = currentDate();
+        const cards = document.querySelectorAll('.student-card');
+        let queue = getQueue();
+
+        cards.forEach(card => {
+            const studentId = parseInt(card.id.replace('card-', ''), 10);
+            applyStatusToCard(studentId, 'present');
+            queue = queue.filter(q => !(q.student_id === studentId && q.date === dateVal));
+            queue.push({ student_id: studentId, status: 'present', date: dateVal, term: 'term1', retries: 0 });
+        });
+
+        saveQueue(queue); updateCounters();
+        if (navigator.vibrate) navigator.vibrate([20, 30, 20, 30, 40]);
+        showToast(`تم تعليم ${cards.length} طالب كحاضر، جاري الحفظ...`, 'info');
+        processQueue();
+    }
+
+    /* ============ البحث والفلاتر (فائقة السرعة) ============ */
+    function applyFiltersToCard(card) {
+        const matchesFilter = currentFilter === 'all' || card.dataset.status === currentFilter;
+        const normalizedName = card.dataset.normalizedName || (card.dataset.normalizedName = normalizeArabic(card.dataset.name || ''));
+        const matchesSearch = !searchTerm || normalizedName.includes(searchTerm);
+        card.classList.toggle('hidden-by-filter', !(matchesFilter && matchesSearch));
+    }
+    function applyFilters() {
+        const cards = document.querySelectorAll('.student-card');
+        let visible = 0;
+        cards.forEach(card => { applyFiltersToCard(card); if (!card.classList.contains('hidden-by-filter')) visible++; });
+        const noResults = document.getElementById('no-results');
+        if (noResults) noResults.classList.toggle('d-none', visible !== 0 || cards.length === 0);
+    }
+
+    document.getElementById('student-search')?.addEventListener('input', debounce((e) => {
+        searchTerm = normalizeArabic(e.target.value.trim());
+        applyFilters();
+    }, 100));
+
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentFilter = chip.dataset.filter;
+            applyFilters();
+        });
+    });
+
+    /* ============ إشعارات واتساب لأولياء الأمور ============ */
+    function waSentKey() { return `wa_sent_${currentDate()}`; }
+    function getSentSet() { try { return new Set(JSON.parse(localStorage.getItem(waSentKey()) || '[]')); } catch (e) { return new Set(); } }
+    function saveSentSet(set) { localStorage.setItem(waSentKey(), JSON.stringify([...set])); }
+
+    function formatPhoneForWhatsapp(raw) {
+        if (!raw) return null;
+        let digits = raw.replace(/\D/g, '');
+        if (!digits) return null;
+        if (digits.startsWith('0')) digits = digits.substring(1);
+        if (!digits.startsWith('20')) digits = '20' + digits;
+        return digits;
+    }
+
+    function buildWaMessage(studentName) {
+        const dateVal = currentDate();
+        return encodeURIComponent(
+            `عزيزي ولي أمر الطالب/ة "${studentName}"، نفيدكم بأن ابنكم/ابنتكم كان غائبًا اليوم بتاريخ ${dateVal}.\n` +
+            `لمتابعة حالة الحضور والغياب: https://school.shell-store.online/students/parent-check/`
+        );
+    }
+
+    function getAbsentStudents() {
+        return [...document.querySelectorAll('.student-card[data-status="absent"]')].map(card => ({
+            id: parseInt(card.id.replace('card-', ''), 10),
+            name: card.dataset.name,
+            phone: card.dataset.phone
+        }));
+    }
+
+    function updateWaBadge() {
+        const absentList = getAbsentStudents();
+        const sent = getSentSet();
+        const pending = absentList.filter(s => !sent.has(s.id)).length;
+        const badge = document.getElementById('wa-pending-badge');
+        if (badge) { badge.classList.toggle('d-none', pending === 0); badge.innerText = pending; }
+    }
+
+    function renderWaList() {
+        const container = document.getElementById('wa-list');
+        const absentList = getAbsentStudents();
+        const sent = getSentSet();
+
+        if (absentList.length === 0) {
+            container.innerHTML = `<div class="text-center text-muted py-4">🎉 لا يوجد طلاب غائبين حاليًا</div>`;
+            return;
+        }
+
+        container.innerHTML = absentList.map(s => {
+            const phoneDigits = formatPhoneForWhatsapp(s.phone);
+            const isSent = sent.has(s.id);
+            const statusClass = isSent ? 'notified' : '';
+            const statusBadge = isSent
+                ? `<span class="badge badge-sent">تم الإرسال</span>`
+                : (phoneDigits ? `<span class="badge bg-secondary">لم يُرسل</span>` : `<span class="badge badge-nophone">لا يوجد رقم</span>`);
+
+            const btn = phoneDigits
+                ? `<button class="btn btn-sm ${isSent ? 'btn-outline-secondary' : ''}" style="${isSent ? '' : 'background:#25D366;color:#fff;'}" onclick="sendWaToStudent(${s.id})">📲</button>`
+                : `<button class="btn btn-sm btn-outline-secondary" disabled>—</button>`;
+
+            // إضافة الفئات الموحدة والـ Data Attributes لدعم الإرسال الجماعي والفردي
+            return `
+                <div class="wa-row wa-item ${statusClass}" data-id="${s.id}" data-name="${s.name}" data-phone="${phoneDigits || ''}">
+                    <div class="name">${s.name}</div>
+                    <div class="phone">${s.phone || 'بدون رقم'}</div>
+                    ${statusBadge}
+                    ${btn}
+                </div>`;
+        }).join('');
+    }
+
+    function sendWaToStudent(studentId) {
+        const card = document.getElementById(`card-${studentId}`);
+        if (!card) return;
+        const phoneDigits = formatPhoneForWhatsapp(card.dataset.phone);
+        if (!phoneDigits) { showToast('لا يوجد رقم واتساب مسجل لهذا الطالب', 'error'); return; }
+
+        const msg = buildWaMessage(card.dataset.name);
+        window.open(`https://wa.me/${phoneDigits}?text=${msg}`, '_blank');
+
+        const sent = getSentSet();
+        sent.add(studentId);
+        saveSentSet(sent);
+        updateWaBadge();
+        renderWaList();
+    }
+
+    function sendNextWhatsapp() {
+        const absentList = getAbsentStudents();
+        const sent = getSentSet();
+        const next = absentList.find(s => !sent.has(s.id) && formatPhoneForWhatsapp(s.phone));
+        if (!next) {
+            const stillNoPhone = absentList.filter(s => !sent.has(s.id) && !formatPhoneForWhatsapp(s.phone));
+            if (stillNoPhone.length > 0) showToast(`تبقّى ${stillNoPhone.length} طالب بدون رقم واتساب مسجل`, 'error');
+            else showToast('تم إشعار كل أولياء الأمور الغائبين 🎉', 'success');
+            return;
+        }
+        sendWaToStudent(next.id);
+    }
+
+    // 1️⃣ دالة الإرسال الجماعي عبر الواتساب (المعدلة والمطابقة للمستند)
+    async function sendAllWhatsapp() {
+        const unnotifiedItems = document.querySelectorAll('.wa-item[data-phone]:not(.notified)');
+        const validItems = [...unnotifiedItems].filter(item => item.getAttribute('data-phone') !== '');
+
+        if (validItems.length === 0) {
+            alert('⚠️ لا يوجد طلاب غائبين بحاجة للإشعار، أو تم إشعار الجميع بالفعل!');
+            return;
+        }
+
+        if (!confirm(`هل أنت محدد لإرسال إشعارات الواتساب لعدد (${validItems.length}) طالب؟\nملاحظة: إذا لم تفتح كافة التبويبات، يرجى السماح بالنوافذ المنبثقة (Pop-ups) من أعلى المتصفح.`)) {
+            return;
+        }
+
+        const sent = getSentSet();
+
+        for (let i = 0; i < validItems.length; i++) {
+            const item = validItems[i];
+            const phone = item.getAttribute('data-phone');
+            const studentName = item.getAttribute('data-name') || 'الطالب';
+            const studentId = parseInt(item.getAttribute('data-id'), 10);
+
+            const msg = buildWaMessage(studentName);
+            const waUrl = `https://wa.me/${phone}?text=${msg}`;
+            window.open(waUrl, '_blank');
+
+            // تعليم العنصر محلياً وحفظ الحالة
+            item.classList.add('notified');
+            if (studentId) sent.add(studentId);
+
+            if (i < validItems.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 1200));
+            }
+        }
+
+        saveSentSet(sent);
+        updateWaBadge();
+        renderWaList();
+        alert('✅ تم فتح محادثات الواتساب بنجاح!');
+    }
+
+    // 2️⃣ دالة نشر رابط الاستعلام مباشرة في قناة التليجرام (المصححة)
+    function shareToTelegramChannel() {
+        const checkUrl = "https://school.shell-store.online/students/parent-check/";
+        const textMessage = "🏫 *مدرسة طلعت حرب الثانوية الفندقية*\n\n" +
+                            "السادة أولياء الأمور الكرام،\n" +
+                            "يمكنكم الآن الاستعلام المباشر واللحظي عن حضور وغياب أبنائكم اليوم عبر الرابط التالي:\n\n";
+
+        const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(checkUrl)}&text=${encodeURIComponent(textMessage)}`;
+        window.open(tgShareUrl, '_blank');
+    }
+
+    function openWaSheet() {
+        renderWaList();
+        document.getElementById('wa-overlay')?.classList.add('show');
+    }
+    function closeWaSheet() { document.getElementById('wa-overlay')?.classList.remove('show'); }
+
+    /* ============ حالة الشبكة ============ */
+    window.addEventListener('online', () => {
+        const badge = document.getElementById('network-badge');
+        if (badge) { badge.className = 'badge bg-success'; badge.innerText = 'متصل'; }
+        showToast('عاد الاتصال، جاري المزامنة...', 'info', 1800);
+        processQueue();
+    });
+    window.addEventListener('offline', () => {
+        const badge = document.getElementById('network-badge');
+        if (badge) { badge.className = 'badge bg-danger'; badge.innerText = 'غير متصل'; }
+        showToast('انقطع الاتصال، سيتم الحفظ محليًا والمزامنة تلقائيًا لاحقًا', 'error', 3200);
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        cacheNormalizedNames();
+        updateCounters();
+        applyFilters();
+        updateQueueUI();
+        if (!navigator.onLine) {
+            const badge = document.getElementById('network-badge');
+            if (badge) { badge.className = 'badge bg-danger'; badge.innerText = 'غير متصل'; }
+        }
+        processQueue();
+    });
+    setInterval(processQueue, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,928 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>تسليم المخزون للطلاب</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+<style>
+    :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --accent: #22d3ee;
+        --success: #22c55e;
+        --danger: #ef4444;
+        --warning: #f59e0b;
+        --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+        background: var(--bg);
+        color: #f1f5f9;
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        padding-bottom: 40px;
+        min-height: 100vh;
+    }
+    .topbar {
+        position: sticky; top: 0; z-index: 20;
+        background: var(--card-bg);
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    .topbar h5 { margin: 0; font-weight: 800; font-size: 1.05rem; }
+    .count-badge {
+        background: var(--accent); color: #04222b; font-weight: 800;
+        border-radius: 20px; padding: 3px 12px; font-size: 0.85rem;
+    }
+
+    /* 🚪 زر الخروج */
+    .btn-logout {
+        color: var(--danger);
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        border-radius: 10px;
+        padding: 6px 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 700;
+        transition: all 0.2s ease;
+    }
+    .btn-logout:hover, .btn-logout:active {
+        background: var(--danger);
+        color: #fff;
+        border-color: var(--danger);
+    }
+
+    /* 🔍 تحسين مربع البحث */
+    .search-box { margin-top: 12px; position: relative; }
+    .search-box input {
+        background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff;
+        border-radius: 12px; padding: 12px 42px 12px 42px; font-size: 0.95rem; width: 100%;
+        transition: all 0.2s ease;
+    }
+    .search-box input:focus {
+        background: #0f172a; color: #fff; border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(34,211,238,0.18); outline: none;
+    }
+    .search-box i.bi-search {
+        position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+        color: var(--text-muted); font-size: 1.1rem; pointer-events: none;
+    }
+    .search-box i.clear-btn {
+        position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+        color: var(--text-muted); font-size: 1.15rem; cursor: pointer; display: none;
+        transition: color 0.15s ease, transform 0.15s ease;
+    }
+    .search-box i.clear-btn:hover { color: #fff; transform: translateY(-50%) scale(1.1); }
+
+    .tabs { display: flex; gap: 8px; margin-top: 12px; }
+    .tab-btn {
+        flex: 1; text-align: center; padding: 9px 4px; border-radius: 10px;
+        background: #0f172a; border: 1px solid rgba(255,255,255,0.1);
+        color: var(--text-muted); font-weight: 700; font-size: 0.8rem; cursor: pointer;
+        transition: all .15s ease;
+    }
+    .tab-btn.active { background: var(--accent); color: #04222b; border-color: var(--accent); }
+
+    .list-wrap { padding: 14px; transition: opacity 0.15s ease; }
+
+    .student-card {
+        background: var(--card-bg); border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px; padding: 16px; margin-bottom: 12px;
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        cursor: pointer; transition: transform .1s ease, border-color .1s ease;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .student-card:active { transform: scale(0.98); border-color: var(--accent); }
+    .student-info { min-width: 0; flex: 1 1 auto; }
+    .student-name { font-weight: 800; font-size: 1.05rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .student-meta { font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .status-badge {
+        flex: 0 0 auto; font-weight: 800; font-size: 0.78rem;
+        border-radius: 999px; padding: 7px 14px; display: flex; align-items: center; gap: 5px; white-space: nowrap;
+    }
+    .status-badge.paid { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.4); }
+    .status-badge.done { background: rgba(148,163,184,0.15); color: var(--text-muted); border: 1px solid rgba(148,163,184,0.3); }
+
+    .empty-state, .loading-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state i, .loading-state i { font-size: 3rem; color: rgba(255,255,255,0.15); margin-bottom: 14px; display:block; }
+
+    /* 📊 صف إحصائيات المخزون */
+    .stock-stats-row {
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+        margin-bottom: 14px;
+    }
+    .stock-stat-card {
+        background: var(--card-bg); border: 1.5px solid rgba(255,255,255,0.08);
+        border-radius: 12px; padding: 10px 6px; text-align: center; cursor: pointer;
+        transition: all .15s ease;
+    }
+    .stock-stat-card.active { border-color: var(--accent); background: rgba(34,211,238,0.08); }
+    .stock-stat-num { font-weight: 900; font-size: 1.25rem; line-height: 1.2; }
+    .stock-stat-label { font-size: 0.68rem; color: var(--text-muted); font-weight: 700; margin-top: 2px; }
+    .stock-stat-card[data-filter="all"] .stock-stat-num { color: #fff; }
+    .stock-stat-card[data-filter="available"] .stock-stat-num { color: var(--success); }
+    .stock-stat-card[data-filter="low"] .stock-stat-num { color: var(--warning); }
+    .stock-stat-card[data-filter="out"] .stock-stat-num { color: var(--danger); }
+
+    /* ⚠️ قسم نفاذ الرصيد المنفصل */
+    .out-of-stock-section {
+        background: rgba(239,68,68,0.06); border: 1.5px solid rgba(239,68,68,0.35);
+        border-radius: 14px; padding: 12px; margin-bottom: 20px;
+    }
+    .out-of-stock-title {
+        font-weight: 900; font-size: 0.95rem; color: var(--danger);
+        margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+    }
+    .out-of-stock-title .badge-count {
+        background: var(--danger); color: #fff; border-radius: 999px;
+        font-size: 0.72rem; padding: 2px 9px; font-weight: 800;
+    }
+
+    .stock-category-block { margin-bottom: 18px; }
+    .stock-category-title {
+        font-weight: 800; font-size: 0.95rem; color: var(--accent);
+        margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed rgba(34,211,238,0.3);
+        display: flex; align-items: center; gap: 6px;
+    }
+    .stock-item-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        background: var(--card-bg); border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+    }
+    .stock-item-sku { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .stock-qty-badge {
+        flex: 0 0 auto; font-weight: 800; font-size: 0.82rem; border-radius: 999px;
+        padding: 6px 13px; white-space: nowrap;
+    }
+    .stock-qty-badge.ok { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.4); }
+    .stock-qty-badge.low { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.4); }
+    .stock-qty-badge.out { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.4); }
+
+    /* 📱 المودال وشريط أزرار التصنيفات الأفقية */
+    .modal-content { background: var(--card-bg); color: #fff; border-radius: 18px; border: none; }
+    .modal-header { border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .modal-footer { border-top: 1px solid rgba(255,255,255,0.08); }
+
+    /* أزرار التصنيفات الأفقية */
+    .modal-cat-tabs {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-bottom: 8px;
+        margin-bottom: 12px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .modal-cat-tabs::-webkit-scrollbar { display: none; }
+    .modal-cat-btn {
+        flex: 0 0 auto;
+        padding: 6px 14px;
+        border-radius: 20px;
+        background: #0f172a;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #94a3b8;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .modal-cat-btn.active {
+        background: var(--accent);
+        color: #0f172a;
+        border-color: var(--accent);
+        font-weight: 800;
+        box-shadow: 0 2px 8px rgba(34,211,238,0.25);
+    }
+
+    .modal-category-title {
+        font-weight: 800; font-size: 0.88rem; color: var(--accent);
+        margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px dashed rgba(34,211,238,0.25);
+        display: flex; align-items: center; gap: 6px;
+    }
+
+    /* 🏷️ أصناف قائمة التوصيل والمودال - إظهار الاسم كاملاً دون اقتصاص */
+    .delivery-item-row {
+        display: flex !important;
+        align-items: flex-start !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+        background: #0f172a !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        border-radius: 12px !important;
+        padding: 10px 12px !important;
+        margin-bottom: 8px !important;
+    }
+    .delivery-item-row .form-check {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        display: flex !important;
+        align-items: flex-start !important;
+        margin: 0 !important;
+    }
+    .delivery-item-row .modal-item-checkbox {
+        flex-shrink: 0 !important;
+        margin-top: 3px !important;
+    }
+    .delivery-item-row label, .delivery-item-row .form-check-label {
+        white-space: normal !important;
+        word-break: break-word !important;
+        line-height: 1.4 !important;
+        display: block !important;
+        width: 100% !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        color: #ffffff !important;
+    }
+
+    .stock-item-name {
+        font-weight: 700;
+        color: #fff;
+        font-size: 0.95rem;
+        white-space: normal !important;
+        word-break: break-word !important;
+        line-height: 1.3 !important;
+    }
+
+    /* 🏷️ شارات المودال */
+    .m-badge {
+        font-weight: 800 !important;
+        font-size: 0.78rem !important;
+        padding: 6px 12px !important;
+        border-radius: 8px !important;
+        white-space: nowrap !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        line-height: 1.2 !important;
+    }
+    .m-badge-outstock {
+        background: #450a0a !important;
+        color: #fca5a5 !important;
+        border: 1px solid #dc2626 !important;
+    }
+    .m-badge-instock {
+        background: #082f49 !important;
+        color: #7dd3fc !important;
+        border: 1px solid #0284c7 !important;
+    }
+    .m-badge-delivered {
+        background: #052e16 !important;
+        color: #86efac !important;
+        border: 1px solid #16a34a !important;
+    }
+
+    .modal-item-checkbox {
+        width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent);
+    }
+
+    .success-summary-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.3);
+        border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+    }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="d-flex align-items-center justify-content-between">
+        <h5 class="d-flex align-items-center gap-1">
+            <i class="bi bi-box-seam-fill me-1"></i> تسليم المخزون
+        </h5>
+        <div class="d-flex align-items-center gap-2">
+            <span class="count-badge" id="countBadge">0</span>
+            <!-- 🚪 زر الخروج مع حفظ رابط الصفحة الحالية للعودة إليها بعد الدخول -->
+            <form action="{% url 'logout' %}" method="post" class="d-inline m-0">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn-logout border-0" style="cursor: pointer;" title="تسجيل الخروج">
+                    <i class="bi bi-box-arrow-right fs-6"></i>
+                    <span>خروج</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 🔍 مربع البحث المطور -->
+    <div class="search-box">
+        <i class="bi bi-search"></i>
+        <input type="text" id="searchInput" placeholder="دوّر باسم الطالب أو الصنف..." autocomplete="off">
+        <i class="bi bi-x-circle-fill clear-btn" id="clearSearchBtn" onclick="clearSearch()" title="مسح البحث"></i>
+    </div>
+
+    <div class="tabs">
+        <div class="tab-btn active" id="tabPending" onclick="switchTab('pending')">
+            <i class="bi bi-hourglass-split"></i> مستحقون
+        </div>
+        <div class="tab-btn" id="tabDone" onclick="switchTab('done')">
+            <i class="bi bi-check2-all"></i> تم التسليم
+        </div>
+        <div class="tab-btn" id="tabStock" onclick="switchTab('stock')">
+            <i class="bi bi-boxes"></i> المخزون
+        </div>
+    </div>
+</div>
+
+<div class="list-wrap" id="listWrap">
+    <div class="loading-state"><i class="bi bi-arrow-repeat"></i>جاري التحميل...</div>
+</div>
+
+<!-- المودال -->
+<div class="modal fade" id="deliveryModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h6 class="mb-0 fw-bold text-white" id="mStudentName">—</h6>
+          <small class="text-white-50" id="mStudentMeta">—</small>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex justify-content-between align-items-center mb-2" id="mActionsBar">
+          <button class="btn btn-sm btn-outline-info" onclick="toggleAvailableCheckboxes(true)">تحديد الكل المتوفر</button>
+          <small class="text-white-50 fw-bold" id="mProgressBadge">—</small>
+        </div>
+
+        <div id="mSuccessBanner" class="alert alert-success text-center m-0 mb-2 py-2 fw-bold d-none">
+          <i class="bi bi-check-all me-1"></i> تم تسليم جميع أصناف هذا الطالب بالكامل ✅
+        </div>
+
+        <div id="modalErrorAlert" class="alert alert-danger d-none py-2 px-3 small"></div>
+
+        <!-- شريط الأزرار الأفقية للتصنيفات -->
+        <div id="modalCategoryTabs" class="modal-cat-tabs d-none"></div>
+
+        <div id="modalItemsContainer">
+          <div class="text-center py-4 text-info">
+            <div class="spinner-border spinner-border-sm me-2"></div>جاري تحميل بيانات الطالب...
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" id="mFooter">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+        <button type="button" class="btn btn-info text-white fw-bold" id="btnSubmitDelivery" onclick="submitDelivery()">
+          <i class="bi bi-check2-circle me-1"></i> تأكيد تسليم الأصناف المحددة
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script>
+let currentTab = 'pending';
+let currentStudentId = null;
+let lastStockData = null;
+let stockFilter = 'all';
+let searchTimer = null;
+let listAbortController = null;
+let detailAbortController = null;
+let deliveryModalInstance = null;
+
+const ENDPOINTS = {
+    pending: '/students/sales/api/mobile-delivery-students/',
+    done: '/students/sales/api/mobile-delivered-students/',
+    stock: '/students/sales/api/mobile-inventory-stock/',
+};
+
+const SEARCH_PLACEHOLDERS = {
+    pending: 'دوّر باسم الطالب...',
+    done: 'دوّر باسم الطالب...',
+    stock: 'دوّر باسم الصنف أو الكود...',
+};
+
+const DOM = {
+    searchInput: document.getElementById('searchInput'),
+    clearSearchBtn: document.getElementById('clearSearchBtn'),
+    listWrap: document.getElementById('listWrap'),
+    countBadge: document.getElementById('countBadge'),
+    tabPending: document.getElementById('tabPending'),
+    tabDone: document.getElementById('tabDone'),
+    tabStock: document.getElementById('tabStock'),
+    modalElement: document.getElementById('deliveryModal'),
+    modalErrorAlert: document.getElementById('modalErrorAlert'),
+    modalItemsContainer: document.getElementById('modalItemsContainer'),
+    modalCategoryTabs: document.getElementById('modalCategoryTabs'),
+    mActionsBar: document.getElementById('mActionsBar'),
+    mSuccessBanner: document.getElementById('mSuccessBanner'),
+    mFooter: document.getElementById('mFooter'),
+    btnSubmitDelivery: document.getElementById('btnSubmitDelivery'),
+    mStudentName: document.getElementById('mStudentName'),
+    mStudentMeta: document.getElementById('mStudentMeta'),
+    mProgressBadge: document.getElementById('mProgressBadge'),
+};
+
+DOM.modalElement.addEventListener('hidden.bs.modal', function () {
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+});
+
+function getDeliveryModal() {
+    if (!deliveryModalInstance) {
+        deliveryModalInstance = new bootstrap.Modal(DOM.modalElement, { backdrop: true });
+    }
+    return deliveryModalInstance;
+}
+
+function getCsrfToken() {
+    let token = '{{ csrf_token }}';
+    if (!token || token.includes('csrf_token')) {
+        const name = 'csrftoken';
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) token = parts.pop().split(';').shift();
+    }
+    return token;
+}
+
+function stockBadgeClass(qty) {
+    if (qty <= 0) return 'out';
+    if (qty <= 10) return 'low';
+    return 'ok';
+}
+
+function switchTab(tab) {
+    if (currentTab === tab) return;
+    currentTab = tab;
+    DOM.tabPending.classList.toggle('active', tab === 'pending');
+    DOM.tabDone.classList.toggle('active', tab === 'done');
+    DOM.tabStock.classList.toggle('active', tab === 'stock');
+    DOM.searchInput.placeholder = SEARCH_PLACEHOLDERS[tab];
+    clearSearch();
+    if (tab === 'stock') stockFilter = 'all';
+}
+
+DOM.searchInput.addEventListener('input', function() {
+    const hasValue = this.value.trim().length > 0;
+    DOM.clearSearchBtn.style.display = hasValue ? 'block' : 'none';
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadList, 180);
+});
+
+// إمكانية إلغاء البحث بزر Esc
+DOM.searchInput.addEventListener('keyup', function(e) {
+    if (e.key === 'Escape') {
+        clearSearch();
+    }
+});
+
+function clearSearch() {
+    DOM.searchInput.value = '';
+    DOM.clearSearchBtn.style.display = 'none';
+    DOM.searchInput.focus();
+    loadList();
+}
+
+function loadList() {
+    if (listAbortController) listAbortController.abort();
+    listAbortController = new AbortController();
+
+    const q = DOM.searchInput.value.trim();
+    DOM.listWrap.style.opacity = '0.5';
+
+    const url = ENDPOINTS[currentTab] + (q ? `?q=${encodeURIComponent(q)}` : '');
+
+    fetch(url, { signal: listAbortController.signal })
+        .then(res => res.json())
+        .then(data => {
+            DOM.listWrap.style.opacity = '1';
+
+            if (currentTab === 'stock') {
+                lastStockData = data;
+                renderStockTab(data);
+                return;
+            }
+
+            DOM.countBadge.innerText = data.count || 0;
+
+            if (!data.success || !data.students || data.students.length === 0) {
+                DOM.listWrap.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-inbox"></i>
+                        ${q ? 'لا توجد نتائج تطابق بحثك.' : (currentTab === 'pending' ? 'لا يوجد طلاب بانتظار التسليم حالياً.' : 'لا يوجد طلاب استلموا بعد.')}
+                    </div>`;
+                return;
+            }
+
+            const frag = data.students.map(st => {
+                if (currentTab === 'pending') {
+                    return `
+                        <div class="student-card" onclick="openDeliveryModal(${st.student_id}, false)">
+                            <div class="student-info">
+                                <div class="student-name">${st.name}</div>
+                                <div class="student-meta">
+                                    <i class="bi bi-mortarboard-fill"></i> ${st.grade || 'غير محدد'}
+                                    &nbsp;•&nbsp;
+                                    <i class="bi bi-cash-coin"></i> ${st.total_amount || 0} ج.م
+                                </div>
+                            </div>
+                            <div class="status-badge paid"><i class="bi bi-check-circle-fill"></i> مستحق</div>
+                        </div>`;
+                }
+                return `
+                    <div class="student-card" onclick="openDeliveryModal(${st.student_id}, true)">
+                        <div class="student-info">
+                            <div class="student-name">${st.name}</div>
+                            <div class="student-meta">
+                                <i class="bi bi-mortarboard-fill"></i> ${st.grade || 'غير محدد'}
+                                &nbsp;•&nbsp;
+                                <i class="bi bi-clock-history"></i> ${st.delivered_at || '—'}
+                            </div>
+                        </div>
+                        <div class="status-badge done"><i class="bi bi-receipt"></i> عرض الإيصال</div>
+                    </div>`;
+            }).join('');
+
+            DOM.listWrap.innerHTML = frag;
+        })
+        .catch(err => {
+            if (err.name === 'AbortError') return;
+            DOM.listWrap.style.opacity = '1';
+            DOM.listWrap.innerHTML = `<div class="empty-state"><i class="bi bi-wifi-off"></i> تعذر تحميل البيانات، تأكد من الاتصال.</div>`;
+        });
+}
+
+function renderStockTab(data) {
+    DOM.countBadge.innerText = data.total_items || 0;
+
+    if (!data.success || !data.categories || data.categories.length === 0) {
+        DOM.listWrap.innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i>لا توجد أصناف مطابقة.</div>`;
+        return;
+    }
+
+    const summary = data.summary || { total: 0, available: 0, low: 0, out: 0 };
+
+    let html = `
+        <div class="stock-stats-row">
+            <div class="stock-stat-card ${stockFilter === 'all' ? 'active' : ''}" data-filter="all" onclick="applyStockFilter('all')">
+                <div class="stock-stat-num">${summary.total}</div>
+                <div class="stock-stat-label">إجمالي</div>
+            </div>
+            <div class="stock-stat-card ${stockFilter === 'available' ? 'active' : ''}" data-filter="available" onclick="applyStockFilter('available')">
+                <div class="stock-stat-num">${summary.available}</div>
+                <div class="stock-stat-label">متوفر</div>
+            </div>
+            <div class="stock-stat-card ${stockFilter === 'low' ? 'active' : ''}" data-filter="low" onclick="applyStockFilter('low')">
+                <div class="stock-stat-num">${summary.low}</div>
+                <div class="stock-stat-label">منخفض</div>
+            </div>
+            <div class="stock-stat-card ${stockFilter === 'out' ? 'active' : ''}" data-filter="out" onclick="applyStockFilter('out')">
+                <div class="stock-stat-num">${summary.out}</div>
+                <div class="stock-stat-label">نفذ الرصيد</div>
+            </div>
+        </div>`;
+
+    let outItems = [];
+    let categoriesToRender = [];
+
+    data.categories.forEach(cat => {
+        const outInCat = cat.items.filter(i => i.status === 'out');
+        const restInCat = cat.items.filter(i => i.status !== 'out');
+        outItems = outItems.concat(outInCat.map(i => ({ ...i, categoryName: cat.category })));
+        if (restInCat.length > 0) categoriesToRender.push({ category: cat.category, items: restInCat });
+    });
+
+    if (outItems.length > 0 && (stockFilter === 'all' || stockFilter === 'out')) {
+        html += `
+            <div class="out-of-stock-section">
+                <div class="out-of-stock-title">
+                    <i class="bi bi-exclamation-triangle-fill"></i> أصناف نفذ رصيدها
+                    <span class="badge-count">${outItems.length}</span>
+                </div>`;
+        outItems.forEach(item => {
+            html += `
+                <div class="stock-item-row" style="background:rgba(239,68,68,0.05); border-color:rgba(239,68,68,0.25);">
+                    <div style="min-width:0; overflow:hidden;">
+                        <div class="stock-item-name">${item.name}</div>
+                        <div class="stock-item-sku">${item.categoryName}${item.sku ? ' • SKU: ' + item.sku : ''}</div>
+                    </div>
+                    <div class="stock-qty-badge out">نفذ الرصيد</div>
+                </div>`;
+        });
+        html += `</div>`;
+    }
+
+    if (stockFilter !== 'out') {
+        categoriesToRender.forEach(cat => {
+            const statusKey = stockFilter === 'available' ? 'ok' : stockFilter;
+            const filteredItems = stockFilter === 'all'
+                ? cat.items
+                : cat.items.filter(i => i.status === statusKey);
+
+            if (filteredItems.length === 0) return;
+
+            html += `<div class="stock-category-block">
+                <div class="stock-category-title"><i class="bi bi-tag-fill"></i> ${cat.category} (${filteredItems.length})</div>`;
+
+            filteredItems.forEach(item => {
+                const qty = item.stock || 0;
+                const cls = item.status || stockBadgeClass(qty);
+                const label = `${qty} قطعة`;
+                html += `
+                    <div class="stock-item-row">
+                        <div style="min-width:0; overflow:hidden;">
+                            <div class="stock-item-name">${item.name}</div>
+                            ${item.sku ? `<div class="stock-item-sku">SKU: ${item.sku}</div>` : ''}
+                        </div>
+                        <div class="stock-qty-badge ${cls}">${label}</div>
+                    </div>`;
+            });
+
+            html += `</div>`;
+        });
+    }
+
+    if (outItems.length === 0 && (stockFilter === 'out')) {
+        html += `<div class="empty-state"><i class="bi bi-emoji-smile"></i>مفيش أي صنف نافذ الرصيد حالياً 🎉</div>`;
+    }
+
+    DOM.listWrap.innerHTML = html;
+}
+
+function applyStockFilter(filter) {
+    stockFilter = filter;
+    if (lastStockData) renderStockTab(lastStockData);
+}
+
+function openDeliveryModal(studentId, readOnly = false) {
+    currentStudentId = studentId;
+    DOM.modalErrorAlert.classList.add('d-none');
+    DOM.mSuccessBanner.classList.add('d-none');
+    DOM.modalCategoryTabs.classList.add('d-none');
+    DOM.modalCategoryTabs.innerHTML = '';
+    DOM.mActionsBar.style.display = 'flex';
+    DOM.mFooter.style.display = 'flex';
+    DOM.btnSubmitDelivery.style.display = 'inline-block';
+    DOM.btnSubmitDelivery.disabled = false;
+    DOM.btnSubmitDelivery.innerHTML = '<i class="bi bi-check2-circle me-1"></i> تأكيد تسليم الأصناف المحددة';
+
+    DOM.modalItemsContainer.innerHTML = `
+        <div class="text-center py-4 text-info">
+            <div class="spinner-border spinner-border-sm me-2"></div>جاري تحميل بيانات الطالب...
+        </div>`;
+
+    getDeliveryModal().show();
+
+    if (detailAbortController) detailAbortController.abort();
+    detailAbortController = new AbortController();
+
+    fetch(`/students/sales/api/student-delivery-overview/${studentId}/`, { signal: detailAbortController.signal })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) {
+                DOM.modalItemsContainer.innerHTML = `<div class="alert alert-danger m-0">${data.error || 'حدث خطأ أثناء جلب البيانات.'}</div>`;
+                DOM.mActionsBar.style.display = 'none';
+                return;
+            }
+
+            const totalCount = data.total_items ?? data.total_count ?? 0;
+            const deliveredCount = data.delivered_count ?? 0;
+
+            DOM.mStudentName.innerText = data.student_name || 'طالب غير معروف';
+            DOM.mStudentMeta.innerText = `الصف: ${data.grade_name || 'غير محدد'}`;
+            DOM.mProgressBadge.innerText = `استلم ${deliveredCount} من أصل ${totalCount} صنف`;
+
+            let categoriesList = [];
+
+            if (Array.isArray(data.categories) && data.categories.length > 0) {
+                categoriesList = data.categories.map(c => ({
+                    name: c.category || c.name || 'أصناف عامة',
+                    items: c.items || []
+                }));
+            } else if (Array.isArray(data.items) && data.items.length > 0) {
+                const groups = {};
+                data.items.forEach(item => {
+                    const catName = item.category_name || item.category || 'أصناف عامة';
+                    if (!groups[catName]) groups[catName] = [];
+                    groups[catName].push(item);
+                });
+                categoriesList = Object.keys(groups).map(catName => ({
+                    name: catName,
+                    items: groups[catName]
+                }));
+            }
+
+            let allItemsCount = 0;
+            let pendingItemsCount = 0;
+
+            categoriesList.forEach(cat => {
+                allItemsCount += cat.items.length;
+                pendingItemsCount += cat.items.filter(i => !i.is_delivered).length;
+            });
+
+            const allDelivered = allItemsCount > 0 && pendingItemsCount === 0;
+
+            if (allDelivered) {
+                DOM.mSuccessBanner.classList.remove('d-none');
+                DOM.mActionsBar.style.display = 'none';
+                DOM.btnSubmitDelivery.style.display = 'none';
+            } else if (readOnly) {
+                DOM.mActionsBar.style.display = 'none';
+                DOM.btnSubmitDelivery.style.display = 'none';
+            } else {
+                DOM.mActionsBar.style.display = 'flex';
+                DOM.btnSubmitDelivery.style.display = 'inline-block';
+            }
+
+            if (categoriesList.length === 0) {
+                DOM.modalItemsContainer.innerHTML = '<div class="text-center py-4 text-white-50 fw-bold">لا توجد أصناف قابلة للعرض.</div>';
+                return;
+            }
+
+            let tabsHtml = `<button class="modal-cat-btn active" onclick="filterModalCategory('all', this)">الكل (${allItemsCount})</button>`;
+            categoriesList.forEach((cat, idx) => {
+                tabsHtml += `<button class="modal-cat-btn" onclick="filterModalCategory('cat_${idx}', this)">${cat.name} (${cat.items.length})</button>`;
+            });
+
+            DOM.modalCategoryTabs.innerHTML = tabsHtml;
+            DOM.modalCategoryTabs.classList.remove('d-none');
+
+            let itemsHtml = '';
+            categoriesList.forEach((cat, idx) => {
+                itemsHtml += `<div class="modal-category-group mb-3" data-cat-id="cat_${idx}">`;
+                itemsHtml += `<div class="modal-category-title"><i class="bi bi-tag-fill"></i> ${cat.name} (${cat.items.length})</div>`;
+
+                cat.items.forEach(item => {
+                    const itemName = item.name || 'صنف غير معروف';
+                    const stockQty = item.available_stock ?? item.stock ?? 0;
+                    const inStock = item.in_stock ?? item.is_available ?? (stockQty > 0);
+
+                    if (item.is_delivered) {
+                        itemsHtml += `
+                            <div class="delivery-item-row">
+                                <div class="d-flex align-items-start gap-2" style="flex: 1 1 auto; min-width: 0;">
+                                    <i class="bi bi-check-circle-fill text-success fs-5" style="flex-shrink: 0; margin-top: 1px;"></i>
+                                    <span class="fw-bold fs-6 text-white" style="white-space: normal; word-break: break-word; line-height: 1.4;">${itemName}</span>
+                                </div>
+                                <span class="m-badge m-badge-delivered">
+                                    <i class="bi bi-check-lg"></i> تم الاستلام
+                                </span>
+                            </div>`;
+                    } else {
+                        const badgeHtml = inStock
+                            ? `<span class="m-badge m-badge-instock"><i class="bi bi-box-seam me-1"></i> المخزن: ${stockQty}</span>`
+                            : `<span class="m-badge m-badge-outstock"><i class="bi bi-x-circle me-1"></i> غير متوفر (${stockQty})</span>`;
+
+                        itemsHtml += `
+                            <div class="delivery-item-row">
+                                <div class="form-check m-0 d-flex align-items-start" style="flex: 1 1 auto; min-width: 0;">
+                                    <input class="form-check-input modal-item-checkbox me-2" type="checkbox" value="${item.id}" id="item_${item.id}" ${inStock ? 'checked' : 'disabled'} style="flex-shrink: 0; margin-top: 3px;">
+                                    <label class="form-check-label fw-bold text-white fs-6 ms-2" for="item_${item.id}" title="${itemName}" style="white-space: normal; word-break: break-word; line-height: 1.4; flex: 1 1 auto; min-width: 0;">
+                                        ${itemName}
+                                    </label>
+                                </div>
+                                <div>${badgeHtml}</div>
+                            </div>`;
+                    }
+                });
+
+                itemsHtml += `</div>`;
+            });
+
+            DOM.modalItemsContainer.innerHTML = itemsHtml;
+        })
+        .catch(err => {
+            if (err.name === 'AbortError') return;
+            DOM.modalItemsContainer.innerHTML = `<div class="alert alert-danger m-0">تعذر الاتصال بالخادم لجلب بيانات الأصناف.</div>`;
+        });
+}
+
+function filterModalCategory(catId, btnEl) {
+    document.querySelectorAll('.modal-cat-btn').forEach(btn => btn.classList.remove('active'));
+    if (btnEl) btnEl.classList.add('active');
+
+    const groups = document.querySelectorAll('.modal-category-group');
+    groups.forEach(group => {
+        if (catId === 'all' || group.dataset.catId === catId) {
+            group.style.display = 'block';
+        } else {
+            group.style.display = 'none';
+        }
+    });
+}
+
+function toggleAvailableCheckboxes(forceStatus) {
+    const visibleGroups = Array.from(document.querySelectorAll('.modal-category-group')).filter(g => g.style.display !== 'none');
+    let available = [];
+
+    visibleGroups.forEach(g => {
+        available = available.concat(Array.from(g.querySelectorAll('.modal-item-checkbox:not([disabled])')));
+    });
+
+    if (available.length === 0) {
+        available = Array.from(document.querySelectorAll('.modal-item-checkbox:not([disabled])'));
+    }
+
+    if (available.length === 0) return;
+
+    const shouldCheck = (typeof forceStatus === 'boolean')
+        ? forceStatus
+        : available.some(chk => !chk.checked);
+
+    available.forEach(chk => chk.checked = shouldCheck);
+}
+
+async function submitDelivery() {
+    if (!currentStudentId) return;
+
+    const showError = (msg) => {
+        DOM.modalErrorAlert.innerText = msg;
+        DOM.modalErrorAlert.classList.remove('d-none');
+    };
+
+    DOM.modalErrorAlert.classList.add('d-none');
+
+    const selectableCheckboxes = document.querySelectorAll('.modal-item-checkbox:not([disabled])');
+    const selectedCheckboxes = document.querySelectorAll('.modal-item-checkbox:checked');
+    const selectedIds = Array.from(selectedCheckboxes).map(chk => parseInt(chk.value, 10));
+
+    if (selectableCheckboxes.length === 0) {
+        showError('عفواً، لا توجد أصناف متوفرة بالمخزن حالياً قابلة للتسليم.');
+        return;
+    }
+
+    if (selectedIds.length === 0) {
+        showError('يرجى تحديد صنف واحد غير مستلم على الأقل لتسليمه!');
+        return;
+    }
+
+    const originalBtnContent = DOM.btnSubmitDelivery.innerHTML;
+    DOM.btnSubmitDelivery.disabled = true;
+    DOM.btnSubmitDelivery.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>جاري الخصم...';
+
+    try {
+        const response = await fetch(`/students/sales/api/save-student-delivery/${currentStudentId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({ selected_items: selectedIds })
+        });
+
+        if (!response.ok) {
+            throw new Error(`خطأ في استجابة الخادم (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+            showDeliverySuccessSummary(data);
+            loadList();
+        } else {
+            showError(data.error || 'حدث خطأ غير متوقع أثناء حفظ التسليم.');
+            DOM.btnSubmitDelivery.disabled = false;
+            DOM.btnSubmitDelivery.innerHTML = originalBtnContent;
+        }
+    } catch (error) {
+        console.error('Submission Error:', error);
+        showError('تعذر الاتصال بالخادم، يرجى التأكد من شبكة الإنترنت والمحاولة مجدداً.');
+        DOM.btnSubmitDelivery.disabled = false;
+        DOM.btnSubmitDelivery.innerHTML = originalBtnContent;
+    }
+}
+
+function showDeliverySuccessSummary(data) {
+    DOM.mActionsBar.style.display = 'none';
+    DOM.modalCategoryTabs.classList.add('d-none');
+    DOM.btnSubmitDelivery.style.display = 'none';
+    DOM.mSuccessBanner.classList.add('d-none');
+
+    const stockList = data.delivered_stock || [];
+
+    let html = `
+        <div class="alert alert-success text-center py-2 fw-bold mb-3">
+            <i class="bi bi-check-all me-1"></i> ${data.message || 'تم التسليم بنجاح'}
+        </div>`;
+
+    if (stockList.length > 0) {
+        html += `<div class="text-white-50 fw-bold mb-2 small"><i class="bi bi-boxes me-1"></i> الرصيد المتبقي بالمخزن بعد الصرف:</div>`;
+        stockList.forEach(item => {
+            const cls = stockBadgeClass(item.remaining);
+            const label = item.remaining <= 0 ? 'نفذ الرصيد' : `${item.remaining} قطعة`;
+            html += `
+                <div class="success-summary-row">
+                    <span class="fw-bold text-white">${item.name}</span>
+                    <span class="stock-qty-badge ${cls}">${label}</span>
+                </div>`;
+        });
+    }
+
+    DOM.modalItemsContainer.innerHTML = html;
+}
+
+loadList();
+</script>
+</body>
+</html>

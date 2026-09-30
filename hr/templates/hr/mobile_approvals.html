@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>اعتماد الإجازات - بوابة الإدارة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- تأجيل تحميل الأيقونات لسرعة فتح الصفحة -->
+    <script src="https://unpkg.com/lucide@latest" defer></script>
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #030712;
+            color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .card-dismissing {
+            transform: scale(0.9) translateY(20px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        /* تحسينات الأداء: تخفيف حدة الحركة لمنع استهلاك بطارية الموبايل */
+        @keyframes blob {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -30px) scale(1.05); }
+            66% { transform: translate(-20px, 20px) scale(0.95); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob { 
+            animation: blob 10s infinite alternate; 
+            will-change: transform; /* تفعيل Hardware Acceleration */
+        }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
+        
+        input[type="month"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            opacity: 0.5;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="relative min-h-screen pb-10 overflow-x-hidden">
+
+    <div style="display:none;">{% csrf_token %}</div>
+
+    <!-- الخلفية الزجاجية (محسنة الأداء) -->
+    <div class="fixed inset-0 w-full h-full pointer-events-none z-0 overflow-hidden">
+        <div class="absolute top-[-10%] left-[-10%] w-72 h-72 bg-emerald-500/20 rounded-full mix-blend-screen filter blur-[60px] animate-blob"></div>
+        <div class="absolute top-[20%] right-[-10%] w-72 h-72 bg-primary/20 rounded-full mix-blend-screen filter blur-[60px] animate-blob animation-delay-2000"></div>
+        <div class="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-purple-500/20 rounded-full mix-blend-screen filter blur-[80px] animate-blob animation-delay-4000"></div>
+    </div>
+
+    <!-- الترويسة -->
+    <header class="sticky top-0 z-50 bg-white/5 border-b border-white/10 backdrop-blur-lg shadow-[0_4px_30px_rgba(0,0,0,0.1)] p-4 flex justify-between items-center transition-all">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400 to-primary flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.4)]">
+                <i data-lucide="shield-check" class="w-6 h-6 text-slate-900"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-black text-transparent bg-clip-text bg-gradient-to-l from-white to-slate-400">بوابة الاعتمادات</h1>
+                <p class="text-[10px] text-emerald-400 font-mono tracking-wider">SECURE PORTAL</p>
+            </div>
+        </div>
+        
+        <!-- 🟢 فورم الخروج المحدث: تم إضافة حقل next للعودة لنفس الشاشة بعد تسجيل الدخول -->
+        <form method="post" action="{% url 'logout' %}" class="m-0 p-0">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="w-10 h-10 bg-white/5 border border-white/10 text-rose-400 rounded-2xl flex items-center justify-center hover:bg-rose-500/20 active:scale-90 transition-all cursor-pointer">
+                <i data-lucide="power" class="w-5 h-5"></i>
+            </button>
+        </form>
+    </header>
+
+    <main class="relative z-10 p-4 space-y-4 mt-2">
+        
+        <!-- شريط التحكم (التبويبات وفلتر الشهر) -->
+        <div class="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-3 shadow-lg mb-6">
+            <div class="flex gap-2 mb-3">
+                <a href="?status=pending&month={{ request.GET.month }}" class="flex-1 text-center py-2.5 rounded-xl text-sm font-bold transition-all {% if request.GET.status != 'approved' %}bg-primary text-slate-900 shadow-[0_0_15px_rgba(6,182,212,0.3)]{% else %}bg-black/40 text-slate-400 border border-white/5{% endif %}">
+                    طلبات معلقة
+                </a>
+                <a href="?status=approved&month={{ request.GET.month }}" class="flex-1 text-center py-2.5 rounded-xl text-sm font-bold transition-all {% if request.GET.status == 'approved' %}bg-emerald-500 text-slate-900 shadow-[0_0_15px_rgba(16,185,129,0.3)]{% else %}bg-black/40 text-slate-400 border border-white/5{% endif %}">
+                    إجازات معتمدة
+                </a>
+            </div>
+
+            <form method="GET" class="flex flex-col gap-1">
+                <input type="hidden" name="status" value="{{ request.GET.status|default:'pending' }}">
+                <div class="flex items-center justify-between px-1 mb-1">
+                    <label class="text-[11px] text-slate-400 font-bold flex items-center gap-1">
+                        <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-primary"></i> 
+                        دورة الراتب (من يوم 26 للسابق لـ 25 للحالي)
+                    </label>
+                </div>
+                <input type="month" name="month" value="{{ request.GET.month }}" onchange="this.form.submit()" class="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-mono text-white focus:outline-none focus:border-primary transition-colors">
+            </form>
+        </div>
+
+        <!-- حلقة كروت الإجازات -->
+        {% for leave in leaves %}
+        <div id="leave-card-{{ leave.id }}" class="bg-white/5 border border-white/10 backdrop-blur-lg rounded-[2rem] p-5 shadow-lg relative z-10">
+
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 border border-white/10 flex items-center justify-center text-primary font-black text-sm shadow-inner">
+                        {{ leave.employee.name|slice:":2" }}
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-white text-base leading-tight">{{ leave.employee.name }}</h4>
+                        <span class="inline-block mt-1 px-2 py-0.5 bg-black/40 border border-white/5 rounded-md text-[10px] text-primary font-mono">
+                            كود: {{ leave.employee.emp_id }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- شارة نوع الإجازة ملونة حسب النوع -->
+                {% if leave.leave_type == 'casual' or 'عارض' in leave.get_leave_type_display %}
+                    <span class="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-[11px] font-black shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                        {{ leave.get_leave_type_display }}
+                    </span>
+                {% elif leave.leave_type == 'sick' or 'مرض' in leave.get_leave_type_display %}
+                    <span class="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-[11px] font-black shadow-[0_0_10px_rgba(244,63,94,0.2)]">
+                        {{ leave.get_leave_type_display }}
+                    </span>
+                {% else %}
+                    <span class="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-[11px] font-black shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                        {% if leave.get_leave_type_display == 'سنوية' %}اعتيادية{% else %}{{ leave.get_leave_type_display }}{% endif %}
+                    </span>
+                {% endif %}
+            </div>
+
+            <!-- لوحة إحصائيات الأرصدة المصغرة -->
+            <div class="bg-black/40 p-3 rounded-2xl border border-white/5 mb-3 shadow-inner">
+                <h5 class="text-[10px] text-slate-400 font-bold mb-2 flex items-center gap-1.5">
+                    <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-blue-400"></i> الموقف الحالي للأرصدة
+                </h5>
+                <div class="grid grid-cols-2 gap-2">
+                    <!-- الإجازة العارضة (باللون الأخضر) -->
+                    <div class="bg-white/5 border border-white/10 rounded-xl p-2.5 flex flex-col justify-between relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-8 h-8 bg-emerald-500/10 rounded-bl-full pointer-events-none"></div>
+                        <span class="text-[10px] text-slate-300 font-bold">عارضة (متبقي)</span>
+                        <div class="flex justify-between items-end mt-2">
+                            <span class="font-black text-emerald-400 text-lg leading-none">{{ leave.employee.casual_balance|default:"0" }}</span>
+                            <span class="text-[9px] text-rose-300 bg-rose-500/20 border border-rose-500/30 px-1.5 py-0.5 rounded-md font-mono" title="ما تم أخذه هذا الشهر">الشهر ده: {{ leave.employee.casual_taken_this_month|default:"0" }}</span>
+                        </div>
+                    </div>
+                    <!-- الإجازة الاعتيادية (باللون الأصفر) -->
+                    <div class="bg-white/5 border border-white/10 rounded-xl p-2.5 flex flex-col justify-between relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-8 h-8 bg-amber-500/10 rounded-bl-full pointer-events-none"></div>
+                        <span class="text-[10px] text-slate-300 font-bold">اعتيادية (متبقي)</span>
+                        <div class="flex justify-between items-end mt-2">
+                            <span class="font-black text-amber-400 text-lg leading-none">{{ leave.employee.annual_balance|default:"0" }}</span>
+                            <span class="text-[9px] text-rose-300 bg-rose-500/20 border border-rose-500/30 px-1.5 py-0.5 rounded-md font-mono" title="ما تم أخذه هذا الشهر">الشهر ده: {{ leave.employee.annual_taken_this_month|default:"0" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تفاصيل الطلب الحالي -->
+            <div class="bg-black/30 p-4 rounded-2xl border border-white/5 space-y-3 mb-5 shadow-inner">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400 text-xs flex items-center gap-1.5"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> الفترة:</span>
+                    <span class="font-mono text-xs text-white bg-white/5 px-2 py-1 rounded-lg">{{ leave.start_date|date:"Y-m-d" }} <span class="text-slate-500 mx-1">إلى</span> {{ leave.end_date|date:"Y-m-d" }}</span>
+                </div>
+                <div class="w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400 text-xs flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5"></i> المدة المطلوبة:</span>
+                    <span class="font-black text-primary text-sm flex items-center gap-1">
+                        {{ leave.duration_days }} <span class="text-xs font-normal text-slate-400">أيام</span>
+                    </span>
+                </div>
+                {% if leave.reason %}
+                <div class="w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                <div>
+                    <span class="text-slate-500 text-[10px] mb-1 block">ملاحظات الموظف:</span>
+                    <p class="text-xs text-slate-300 leading-relaxed">{{ leave.reason }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- أزرار القرار -->
+            {% if request.GET.status == 'approved' or leave.status == 'approved' %}
+                <button onclick="handleQuickAction('{{ leave.id }}', 'cancel')" class="w-full relative overflow-hidden group bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white font-black py-4 rounded-2xl text-sm flex items-center justify-center gap-2 active:scale-95 transition-all">
+                    <i data-lucide="rotate-ccw" class="w-5 h-5"></i> 
+                    إلغاء الموافقة (واسترجاع الرصيد)
+                </button>
+            {% else %}
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="handleQuickAction('{{ leave.id }}', 'approve')" class="relative overflow-hidden group bg-gradient-to-r from-emerald-500 to-emerald-400 text-slate-950 font-black py-3.5 rounded-2xl text-sm flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition-all">
+                        <i data-lucide="check-circle-2" class="w-5 h-5"></i> اعتماد
+                    </button>
+                    <button onclick="handleQuickAction('{{ leave.id }}', 'reject')" class="bg-white/5 text-rose-400 border border-rose-500/30 font-bold py-3.5 rounded-2xl text-sm flex items-center justify-center gap-2 hover:bg-rose-500/10 active:scale-95 transition-all">
+                        <i data-lucide="x-octagon" class="w-5 h-5"></i> رفض
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="py-20 text-center flex flex-col items-center justify-center bg-white/5 border border-white/10 backdrop-blur-lg rounded-[2rem] shadow-2xl">
+            <div class="w-20 h-20 bg-gradient-to-br from-emerald-400/20 to-primary/20 rounded-full flex items-center justify-center mb-4 border border-white/10 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+                <i data-lucide="{% if request.GET.status == 'approved' %}calendar-check{% else %}check-check{% endif %}" class="w-10 h-10 text-emerald-400"></i>
+            </div>
+            <h2 class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-l from-white to-slate-400">
+                {% if request.GET.status == 'approved' %}
+                    لا توجد إجازات معتمدة
+                {% else %}
+                    أنت في السليم!
+                {% endif %}
+            </h2>
+            <p class="text-slate-400 mt-2 text-sm">
+                {% if request.GET.status == 'approved' %}
+                    لم يتم العثور على إجازات معتمدة خلال هذه الدورة.
+                {% else %}
+                    تم إنجاز جميع المهام، لا توجد طلبات معلقة.
+                {% endif %}
+            </p>
+        </div>
+        {% endfor %}
+    </main>
+
+    <script>
+        // تفعيل الأيقونات بعد تحميل الصفحة لسرعة الأداء
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+        });
+
+        function handleQuickAction(leaveId, action) {
+            if (navigator.vibrate) navigator.vibrate(50);
+            
+            if (action === 'reject' && !confirm('هل أنت متأكد من رفض الإجازة؟')) return;
+            if (action === 'approve' && !confirm('هل أنت متأكد من الاعتماد وخصم الرصيد؟')) return;
+            if (action === 'cancel' && !confirm('تحذير: هل أنت متأكد من إلغاء هذه الإجازة؟ سيتم استرجاع رصيد الموظف.')) return;
+
+            let url = '';
+            if (action === 'approve') url = `/hr/leaves/${leaveId}/approve/`;
+            else if (action === 'reject') url = `/hr/leaves/${leaveId}/reject/`;
+            else if (action === 'cancel') url = `/hr/leaves/${leaveId}/cancel/`; 
+
+            const card = document.getElementById(`leave-card-${leaveId}`);
+            const csrftoken = '{{ csrf_token }}';
+
+            card.style.filter = 'blur(4px) grayscale(50%)';
+            card.style.pointerEvents = 'none';
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrftoken,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Server Error');
+                return res.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    card.style.filter = 'none';
+                    card.classList.add('card-dismissing');
+
+                    if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+
+                    setTimeout(() => {
+                        card.remove(); 
+                        
+                        const remainingCards = document.querySelectorAll('[id^="leave-card-"]');
+                        if (remainingCards.length === 0) {
+                            const isApprovedTab = new URLSearchParams(window.location.search).get('status') === 'approved';
+                            const msgTitle = isApprovedTab ? 'لا توجد إجازات معتمدة' : 'أنت في السليم!';
+                            const msgSub = isApprovedTab ? 'لا توجد إجازات أخرى معتمدة هنا.' : 'لا توجد طلبات معلقة بانتظارك.';
+                            const iconName = isApprovedTab ? 'calendar-check' : 'check-check';
+                            
+                            const mainEl = document.querySelector('main');
+                            const filterBar = mainEl.querySelector('.bg-white\\/5.backdrop-blur-md');
+                            
+                            mainEl.innerHTML = '';
+                            if(filterBar) mainEl.appendChild(filterBar);
+                            
+                            mainEl.insertAdjacentHTML('beforeend', `
+                                <div class="py-20 text-center flex flex-col items-center justify-center bg-white/5 border border-white/10 backdrop-blur-lg rounded-[2rem] shadow-2xl animate-blob">
+                                    <div class="w-20 h-20 bg-gradient-to-br from-emerald-400/20 to-primary/20 rounded-full flex items-center justify-center mb-4 border border-white/10 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+                                        <i data-lucide="${iconName}" class="w-10 h-10 text-emerald-400"></i>
+                                    </div>
+                                    <h2 class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-l from-white to-slate-400">${msgTitle}</h2>
+                                    <p class="text-slate-400 mt-2 text-sm">${msgSub}</p>
+                                </div>
+                            `);
+                            lucide.createIcons();
+                        }
+                    }, 300);
+                } else {
+                    throw new Error(data.message || 'حدث خطأ');
+                }
+            })
+            .catch(err => {
+                alert('عذراً، حدث خطأ: ' + err.message);
+                card.style.filter = 'none';
+                card.style.pointerEvents = 'auto'; 
+            });
+        }
+    </script>
+</body>
+</html>

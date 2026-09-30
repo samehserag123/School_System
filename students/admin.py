@@ -2,7 +2,10 @@ from django.contrib import admin
 from django.db.models import Sum, F
 from django.utils.html import format_html
 from django.urls import reverse
+from django.contrib.auth.models import User
+from hr.models import Employee  # أو من المكان المعرف فيه موديل Employee
 
+from decimal import Decimal  # 👈 إضافة الاستيراد هنا
 from .models import (
     Grade, Classroom, Student, Teacher, Subject, Uniform,
     InventoryItem, GradePackagePrice, SubjectPrice, BookSale, CourseGroup,
@@ -32,12 +35,6 @@ class AcademyCourseAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'duration_months', 'total_terms', 'base_price')
     list_filter = ('duration_months', 'total_terms')
     search_fields = ('name',)
-
-
-@admin.register(AcademySubject)
-class AcademySubjectAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'code')
-    search_fields = ('name', 'code')
 
 
 @admin.register(AcademyEnrollment)
@@ -76,6 +73,8 @@ from .models import (
     StudentAcademicHistory, SubjectConfig, ReEnrollmentRecord, AttendanceRecord,
     ControlRoomConfig, StudentTermControlNumber
 )
+
+
 
 @admin.register(ControlRoomConfig)
 class ControlRoomConfigAdmin(admin.ModelAdmin):
@@ -387,10 +386,34 @@ class CoursePaymentAdmin(admin.ModelAdmin):
     get_status_display.short_description = 'حالة الاشتراك'
 
 
+
+# 1. إعداد جدول إدخال المواد والأسعار داخل صفحة المدرس
+class SubjectPriceInline(admin.TabularInline):
+    model = SubjectPrice
+    extra = 1  # عدد الصفوف الفارغة المتاحة للإضافة السريعة
+    autocomplete_fields = ['subject', 'grade']  # تتطلب وجود search_fields في الموديلات المقابلة
+
+
+
 @admin.register(Teacher)
 class TeacherAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name', 'phone']
-    search_fields = ['name']
+    list_display = ('name', 'department', 'phone', 'is_active')
+    list_filter = ('department', 'is_active')
+    search_fields = ('name', 'phone', 'employee__first_name', 'employee__last_name')
+    exclude = ('name',)
+    inlines = [SubjectPriceInline]
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "employee":
+            # 👈 تصفية الموظفين حسب اسم القسم (يحتوي على كلمة مدرس أو تدريس)
+            kwargs["queryset"] = Employee.objects.filter(
+                department__name__icontains='مدرس'
+            )
+            field = super().formfield_for_foreignkey(db_field, request, **kwargs)
+            field.label_from_instance = lambda obj: str(obj)
+            return field
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(CourseGroup)

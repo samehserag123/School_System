@@ -1,73 +1,443 @@
 {% extends 'hr/base_hr.html' %}
 
-{% block title %}طلب إجازة جديدة - الموارد البشرية{% endblock %}
-{% block header_title %}تقديم طلب إجازة{% endblock %}
+{% block title %}مركز الطلبات الإدارية{% endblock %}
+{% block header_title %}تقديم طلب إداري جديد{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto space-y-6">
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
-        <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-            <div class="bg-blue-50 text-primary p-2.5 rounded-xl border border-blue-100">
-                <i data-lucide="file-plus" class="w-6 h-6"></i>
-            </div>
-            <div>
-                <h3 class="text-base font-bold text-slate-800">تسجيل إجازة للموظف</h3>
-                <p class="text-xs text-slate-500 mt-0.5">يرجى إدخال تفاصيل الإجازة وتحديد التواريخ بدقة ليتم خصمها تلقائياً.</p>
-            </div>
+<div class="max-w-4xl mx-auto space-y-6">
+
+    <div class="bg-slate-900/60 rounded-2xl shadow-lg border border-slate-700 overflow-hidden">
+
+        <!-- التبويبات العلوية -->
+        <div class="flex border-b border-slate-700 bg-slate-900">
+            <button type="button" onclick="setTab('leave', this)" class="tab-btn flex-1 py-4 text-sm font-black border-b-2 transition-colors border-primary text-primary bg-slate-800/80">
+                <i data-lucide="file-minus" class="w-4 h-4 inline-block me-1"></i> إجازة من الرصيد
+            </button>
+            <button type="button" onclick="setTab('mission', this)" class="tab-btn flex-1 py-4 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+                <i data-lucide="map" class="w-4 h-4 inline-block me-1"></i> مأمورية خارجية
+            </button>
+            <button type="button" onclick="setTab('permission', this)" class="tab-btn flex-1 py-4 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+                <i data-lucide="clock-4" class="w-4 h-4 inline-block me-1"></i> إذن انصراف
+            </button>
         </div>
 
-        <form method="POST" action="" onsubmit="activateLoadingButton(this.querySelector('button[type=\'submit\']'))" class="p-6 space-y-5">
+        <!-- الفورم الداخلي -->
+        <form id="requestForm" method="POST" action="" class="p-6 space-y-6 bg-slate-800/80 rounded-b-2xl shadow-inner" onsubmit="return validateBeforeSubmit(this)">
             {% csrf_token %}
+            <input type="hidden" name="request_type" id="request_type_input" value="leave">
 
-            <div class="space-y-1.5">
-                <label class="text-sm font-bold text-slate-700 block">الموظف</label>
-                <select name="employee" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-white">
-                    <option value="" disabled selected>اختر الموظف...</option>
-                    {% for emp in employees %}
-                        <option value="{{ emp.id }}">{{ emp.name }}</option>
-                    {% empty %}
-                        <option value="" disabled>لا يوجد موظفين مسجلين حالياً</option>
-                    {% endfor %}
-                </select>
-            </div>
+            <!-- 🔍 1. خانة البحث الذكية -->
+            <div class="relative z-50">
+                <label class="block text-sm font-bold text-slate-300 mb-2">ابحث واكتب اسم الموظف أو كود البصمة <span class="text-rose-500">*</span></label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-primary">
+                        <i data-lucide="search" class="w-5 h-5"></i>
+                    </div>
 
-            <div class="space-y-1.5">
-                <label class="text-sm font-bold text-slate-700 block">نوع الإجازة</label>
-                <select name="leave_type" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-white">
-                    <option value="" disabled selected>اختر النوع...</option>
-                    <option value="annual">إجازة سنوية</option>
-                    <option value="sick">إجازة مرضية</option>
-                    <option value="unpaid">إجازة غير مدفوعة الأجر</option>
-                    <option value="casual">إجازة عارضة</option>
-                </select>
-            </div>
+                    <input type="text" id="custom-search-input" placeholder="اكتب الاسم أو كود البصمة..." class="bg-slate-900 border border-slate-600 text-white text-sm rounded-xl focus:ring-primary focus:border-primary block w-full pr-12 p-3.5 font-bold transition-all shadow-sm" autocomplete="off">
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                    <label class="text-sm font-bold text-slate-700 block">تاريخ البدء</label>
-                    <input type="date" name="start_date" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm" />
-                </div>
-                <div class="space-y-1.5">
-                    <label class="text-sm font-bold text-slate-700 block">تاريخ الانتهاء</label>
-                    <input type="date" name="end_date" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm" />
+                    <input type="hidden" name="employee" id="hidden-employee-id" required>
+
+                    <!-- القائمة المنسدلة للنتائج -->
+                    <ul id="custom-search-results" class="hidden absolute z-50 w-full mt-2 bg-slate-900 border border-slate-600 rounded-xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-slate-700">
+                        {% for emp in employees %}
+                            <li class="cursor-pointer px-4 py-3 text-sm font-bold text-slate-200 transition-colors emp-option" data-id="{{ emp.id }}" data-name="{{ emp.name }}" data-code="{{ emp.emp_id|default:'' }}">
+                                {{ emp.name }} <span class="text-primary text-xs font-mono mr-2 bg-slate-950 border border-slate-700 px-2 py-0.5 rounded-md">كود البصمة: {{ emp.emp_id }}</span>
+                            </li>
+                        {% endfor %}
+                        <li id="no-results-msg" class="hidden px-4 py-4 text-sm text-slate-400 font-bold text-center bg-slate-800/50">
+                            <i data-lucide="user-x" class="w-6 h-6 mx-auto mb-2 opacity-50 text-rose-500"></i>
+                            لا يوجد موظف بهذا الاسم أو الكود
+                        </li>
+                    </ul>
                 </div>
             </div>
 
-            <div class="space-y-1.5">
-                <label class="text-sm font-bold text-slate-700 block">السبب / تفاصيل إضافية</label>
-                <textarea name="reason" rows="3" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm resize-none" placeholder="اكتب سبب طلب الإجازة هنا..."></textarea>
+            <!-- 📊 2. البطاقة الإحصائية -->
+            <div id="balance-card" class="hidden bg-slate-900/60 border border-slate-700 rounded-2xl p-5 shadow-inner transition-all duration-300">
+                <h4 class="text-xs font-black text-primary mb-4 uppercase tracking-wider flex items-center gap-2">
+                    <i data-lucide="pie-chart" class="w-4 h-4"></i> أرصدة الموظف واستهلاكه (خلال الشهر الحالي)
+                </h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-emerald-950/30 p-3 rounded-xl border border-emerald-800/50 shadow-sm text-center">
+                        <p class="text-[11px] text-emerald-500 font-bold mb-1">المتبقي (اعتيادي)</p>
+                        <p id="bal-annual" class="text-2xl font-black text-emerald-400 font-mono">0</p>
+                    </div>
+                    <div class="bg-emerald-950/30 p-3 rounded-xl border border-emerald-800/50 shadow-sm text-center">
+                        <p class="text-[11px] text-emerald-500 font-bold mb-1">المتبقي (عارضة)</p>
+                        <p id="bal-casual" class="text-2xl font-black text-emerald-400 font-mono">0</p>
+                    </div>
+                    <div class="bg-rose-950/30 p-3 rounded-xl border border-rose-800/50 shadow-sm text-center">
+                        <p class="text-[11px] text-rose-500 font-bold mb-1">مُستهلك الشهر (اعتيادي)</p>
+                        <p id="taken-annual" class="text-2xl font-black text-rose-400 font-mono">0</p>
+                    </div>
+                    <div class="bg-rose-950/30 p-3 rounded-xl border border-rose-800/50 shadow-sm text-center">
+                        <p class="text-[11px] text-rose-500 font-bold mb-1">مُستهلك الشهر (عارضة)</p>
+                        <p id="taken-casual" class="text-2xl font-black text-rose-400 font-mono">0</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="border-t border-slate-100 pt-4 flex justify-end gap-3">
-                <a href="{% url 'hr:leave_list' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all text-sm">
-                    إلغاء
-                </a>
-                <button type="submit" class="px-5 py-2.5 bg-primary hover:bg-blue-800 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2 text-sm">
-                    <i data-lucide="check" class="w-4 h-4"></i>
-                    حفظ وتأكيد الطلب
+            <!-- حقول التواريخ -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5" id="dates-section">
+                <div>
+                    <label class="block text-sm font-bold text-slate-300 mb-2">تاريخ البدء <span class="text-rose-500">*</span></label>
+                    <input type="date" name="start_date" id="input_start_date" class="bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:ring-primary focus:border-primary block w-full p-2.5 font-bold">
+                </div>
+                <div id="end-date-wrapper">
+                    <label class="block text-sm font-bold text-slate-300 mb-2">تاريخ الانتهاء <span class="text-rose-500">*</span></label>
+                    <input type="date" name="end_date" id="input_end_date" class="bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:ring-primary focus:border-primary block w-full p-2.5 font-bold">
+                </div>
+            </div>
+
+            <!-- الحقول الخاصة بالإجازات -->
+            <div id="leave-fields">
+                <label class="block text-sm font-bold text-slate-300 mb-2">نوع الإجازة <span class="text-rose-500">*</span></label>
+                <select name="leave_type" id="input_leave_type" class="bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:ring-primary focus:border-primary block w-full p-2.5 font-bold">
+                    <option value="annual">سنوية (اعتيادي)</option>
+                    <option value="casual">عارضة</option>
+                    <option value="sick">مرضية</option>
+                    <option value="exceptional">استثنائية (مدفوعة الأجر)</option>
+                </select>
+            </div>
+
+            <!-- الحقول الخاصة بالأذونات -->
+            <div id="permission-fields" class="hidden grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label class="block text-sm font-bold text-slate-300 mb-2">من الساعة <span class="text-rose-500">*</span></label>
+                    <input type="time" name="from_time" id="input_from_time" class="bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:ring-primary focus:border-primary block w-full p-2.5 font-bold">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-300 mb-2">إلى الساعة <span class="text-rose-500">*</span></label>
+                    <input type="time" name="to_time" id="input_to_time" class="bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:ring-primary focus:border-primary block w-full p-2.5 font-bold">
+                </div>
+            </div>
+
+            <!-- الملاحظات -->
+            <div>
+                <label class="block text-sm font-bold text-slate-300 mb-2">ملاحظات / السبب (اختياري)</label>
+                <textarea name="reason" rows="2" class="bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:ring-primary focus:border-primary block w-full p-2.5 font-medium"></textarea>
+            </div>
+
+            <div class="border-t border-slate-700 pt-5">
+                <button type="submit" id="submit-btn" class="w-full bg-primary hover:bg-opacity-80 text-black font-extrabold rounded-xl text-sm px-5 py-3.5 flex justify-center items-center gap-2 transition-all shadow-md">
+                    <i data-lucide="save" class="w-5 h-5"></i>
+                    <span id="submit-btn-text">حفظ واعتماد طلب الإجازة</span>
                 </button>
             </div>
         </form>
     </div>
 </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        const startDateInput = document.getElementById('input_start_date');
+        const endDateInput = document.getElementById('input_end_date');
+
+        // تعبئة التواريخ الافتراضية بتاريخ اليوم
+        const today = new Date().toISOString().split('T')[0];
+        if (startDateInput && !startDateInput.value) startDateInput.value = today;
+        if (endDateInput && !endDateInput.value) endDateInput.value = today;
+
+        let employeeBalances = {};
+        try {
+            employeeBalances = JSON.parse('{{ emp_balances_json|escapejs }}' || '{}');
+        } catch (e) {
+            console.error("خطأ في قراءة بيانات الأرصدة:", e);
+        }
+
+        const searchInput = document.getElementById('custom-search-input');
+        const resultsList = document.getElementById('custom-search-results');
+        const hiddenInput = document.getElementById('hidden-employee-id');
+        const options = document.querySelectorAll('.emp-option');
+        const noResultsMsg = document.getElementById('no-results-msg');
+        const card = document.getElementById('balance-card');
+
+        let isDateModifiedByUser = false;
+
+        if (startDateInput) {
+            startDateInput.addEventListener('change', function() {
+                isDateModifiedByUser = true;
+                updateBalanceDisplay();
+            });
+        }
+        if (endDateInput) {
+            endDateInput.addEventListener('change', function() {
+                isDateModifiedByUser = true;
+                updateBalanceDisplay();
+            });
+        }
+
+        function normalizeArabic(text) {
+            if (!text) return '';
+            return text
+                .toString()
+                .trim()
+                .replace(/[أإآا]/g, 'ا')
+                .replace(/[ةه]/g, 'ه')
+                .replace(/[ئىي]/g, 'ي')
+                .toLowerCase();
+        }
+
+        function selectEmployee(optionElement) {
+            const id = optionElement.getAttribute('data-id');
+            const name = optionElement.getAttribute('data-name');
+
+            if (searchInput) searchInput.value = name;
+            if (hiddenInput) hiddenInput.value = id;
+            if (resultsList) resultsList.classList.add('hidden');
+
+            showBalanceCard(id);
+
+            setTimeout(() => {
+                if (startDateInput) startDateInput.focus();
+            }, 50);
+        }
+
+        if (searchInput) {
+            setTimeout(() => { searchInput.focus(); }, 100);
+
+            let currentFocus = -1;
+
+            searchInput.addEventListener('keydown', function(e) {
+                let visibleOptions = Array.from(options).filter(opt => opt.style.display !== 'none');
+
+                if (e.key === 'ArrowDown') {
+                    currentFocus++;
+                    addActive(visibleOptions);
+                    scrollToActive(visibleOptions);
+                } else if (e.key === 'ArrowUp') {
+                    currentFocus--;
+                    addActive(visibleOptions);
+                    scrollToActive(visibleOptions);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (currentFocus > -1 && visibleOptions[currentFocus]) {
+                        selectEmployee(visibleOptions[currentFocus]);
+                    } else if (visibleOptions.length > 0) {
+                        selectEmployee(visibleOptions[0]);
+                    }
+                }
+            });
+
+            function addActive(visibleOptions) {
+                if (!visibleOptions || visibleOptions.length === 0) return false;
+                removeActive(visibleOptions);
+                if (currentFocus >= visibleOptions.length) currentFocus = 0;
+                if (currentFocus < 0) currentFocus = (visibleOptions.length - 1);
+                visibleOptions[currentFocus].classList.add('bg-slate-700', 'text-primary');
+            }
+
+            function removeActive(visibleOptions) {
+                visibleOptions.forEach(opt => {
+                    opt.classList.remove('bg-slate-700', 'text-primary');
+                });
+            }
+
+            function scrollToActive(visibleOptions) {
+                if (currentFocus > -1 && visibleOptions[currentFocus]) {
+                    visibleOptions[currentFocus].scrollIntoView({ block: 'nearest' });
+                }
+            }
+
+            searchInput.addEventListener('input', function() {
+                currentFocus = -1;
+                const rawFilter = this.value;
+                const normalizedFilter = normalizeArabic(rawFilter);
+                const isNumeric = /^\d+$/.test(rawFilter.trim());
+                let hasResults = false;
+
+                if (resultsList) resultsList.classList.remove('hidden');
+
+                options.forEach(option => {
+                    const name = normalizeArabic(option.getAttribute('data-name'));
+                    const code = normalizeArabic(option.getAttribute('data-code'));
+
+                    let isMatch = false;
+                    if (isNumeric) {
+                        isMatch = code === normalizedFilter || code.startsWith(normalizedFilter);
+                    } else {
+                        isMatch = name.includes(normalizedFilter) || code.includes(normalizedFilter);
+                    }
+
+                    if (isMatch) {
+                        option.style.display = 'block';
+                        hasResults = true;
+                    } else {
+                        option.style.display = 'none';
+                    }
+                });
+
+                if (noResultsMsg) {
+                    if (!hasResults && normalizedFilter.length > 0) {
+                        noResultsMsg.classList.remove('hidden');
+                    } else {
+                        noResultsMsg.classList.add('hidden');
+                    }
+                }
+
+                if (normalizedFilter.length === 0) {
+                    if (hiddenInput) hiddenInput.value = '';
+                    if (card) card.classList.add('hidden');
+                }
+            });
+
+            searchInput.addEventListener('click', function() {
+                if (resultsList) resultsList.classList.remove('hidden');
+                options.forEach(opt => opt.style.display = 'block');
+                if (noResultsMsg) noResultsMsg.classList.add('hidden');
+                this.select();
+            });
+        }
+
+        options.forEach(option => {
+            option.addEventListener('click', function() {
+                selectEmployee(this);
+            });
+        });
+
+        document.addEventListener('click', function(e) {
+            if (searchInput && resultsList && !searchInput.contains(e.target) && !resultsList.contains(e.target)) {
+                resultsList.classList.add('hidden');
+            }
+        });
+
+        function updateBalanceDisplay() {
+            const hiddenEmpInput = document.getElementById('hidden-employee-id');
+            if (!hiddenEmpInput || !hiddenEmpInput.value) return;
+
+            const empId = hiddenEmpInput.value;
+            const data = employeeBalances[empId];
+            if (!data) return;
+
+            let annualBalance = parseFloat(data.annual_balance);
+            let startVal = startDateInput ? startDateInput.value : '';
+            let endVal = endDateInput ? endDateInput.value : '';
+
+            if (!isDateModifiedByUser || !startVal || !endVal) {
+                const balAnnual = document.getElementById('bal-annual');
+                if (balAnnual) balAnnual.innerText = annualBalance + ' يوم';
+                return;
+            }
+
+            let start = new Date(startVal);
+            let end = new Date(endVal);
+            let diffTime = end - start;
+            let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+            if (diffDays > 0) {
+                let previewBalance = annualBalance - diffDays;
+                const balAnnual = document.getElementById('bal-annual');
+                if (balAnnual) balAnnual.innerText = previewBalance + ' يوم';
+            }
+        }
+
+        function showBalanceCard(empId) {
+            if (card && empId && employeeBalances[empId]) {
+                const data = employeeBalances[empId];
+                isDateModifiedByUser = false;
+
+                const balAnnual = document.getElementById('bal-annual');
+                if (balAnnual) balAnnual.innerText = data.annual_balance + ' يوم';
+
+                const balCasual = document.getElementById('bal-casual');
+                if (balCasual) balCasual.innerText = data.casual_balance + ' يوم';
+
+                const takenAnnual = document.getElementById('taken-annual');
+                if (takenAnnual) takenAnnual.innerText = data.taken_annual_month + ' يوم';
+
+                const takenCasual = document.getElementById('taken-casual');
+                if (takenCasual) takenCasual.innerText = data.taken_casual_month + ' يوم';
+
+                card.classList.remove('hidden');
+            } else if (card) {
+                card.classList.add('hidden');
+            }
+        }
+
+        const initialTabBtn = document.querySelector('.tab-btn');
+        if (initialTabBtn) setTab('leave', initialTabBtn);
+    });
+
+    function validateBeforeSubmit(form) {
+        const hiddenEmpInput = document.getElementById('hidden-employee-id');
+        if (hiddenEmpInput && !hiddenEmpInput.value) {
+            alert('يجب اختيار موظف من القائمة أولاً!');
+            const searchInput = document.getElementById('custom-search-input');
+            if (searchInput) searchInput.focus();
+            return false;
+        }
+
+        const btn = document.getElementById('submit-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> <span>جاري الحفظ...</span>`;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+        return true;
+    }
+
+    function setTab(type, element) {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.className = 'tab-btn flex-1 py-4 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-white hover:bg-slate-800 transition-colors bg-slate-900';
+        });
+        if (element) {
+            element.className = 'tab-btn flex-1 py-4 text-sm font-black border-b-2 transition-colors border-primary text-primary bg-slate-800/80';
+        }
+
+        const requestTypeInput = document.getElementById('request_type_input');
+        if (requestTypeInput) requestTypeInput.value = type;
+
+        const leaveFields = document.getElementById('leave-fields');
+        const permissionFields = document.getElementById('permission-fields');
+        const datesSection = document.getElementById('dates-section');
+        const endDateWrapper = document.getElementById('end-date-wrapper');
+
+        if (leaveFields) leaveFields.style.display = 'none';
+        if (permissionFields) permissionFields.style.display = 'none';
+        if (datesSection) datesSection.style.display = 'none';
+        if (endDateWrapper) endDateWrapper.style.display = 'none';
+
+        ['input_start_date', 'input_end_date', 'input_leave_type', 'input_from_time', 'input_to_time'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.required = false;
+        });
+
+        const submitBtnText = document.getElementById('submit-btn-text');
+        const inputStartDate = document.getElementById('input_start_date');
+        const inputEndDate = document.getElementById('input_end_date');
+        const inputLeaveType = document.getElementById('input_leave_type');
+        const inputFromTime = document.getElementById('input_from_time');
+        const inputToTime = document.getElementById('input_to_time');
+
+        if (type === 'leave') {
+            if (leaveFields) leaveFields.style.display = 'block';
+            if (datesSection) datesSection.style.display = 'grid';
+            if (endDateWrapper) endDateWrapper.style.display = 'block';
+
+            if (inputStartDate) { inputStartDate.required = true; inputStartDate.name = 'start_date'; }
+            if (inputEndDate) inputEndDate.required = true;
+            if (inputLeaveType) inputLeaveType.required = true;
+            if (submitBtnText) submitBtnText.innerText = 'حفظ واعتماد الإجازة';
+
+        } else if (type === 'mission') {
+            if (datesSection) datesSection.style.display = 'grid';
+            if (endDateWrapper) endDateWrapper.style.display = 'block';
+
+            if (inputStartDate) { inputStartDate.required = true; inputStartDate.name = 'start_date'; }
+            if (inputEndDate) inputEndDate.required = true;
+            if (submitBtnText) submitBtnText.innerText = 'تسجيل المأمورية الخارجية';
+
+        } else if (type === 'permission') {
+            if (datesSection) datesSection.style.display = 'grid';
+            if (permissionFields) permissionFields.style.display = 'grid';
+
+            if (inputStartDate) { inputStartDate.name = 'date'; inputStartDate.required = true; }
+            if (inputFromTime) inputFromTime.required = true;
+            if (inputToTime) inputToTime.required = true;
+            if (submitBtnText) submitBtnText.innerText = 'تسجيل إذن الانصراف';
+        }
+    }
+</script>
 {% endblock %}

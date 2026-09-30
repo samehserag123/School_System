@@ -1,0 +1,440 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<style>
+    /* 🟢 1. إخفاء أسهم الأرقام ومنع السكرول */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    input[type=number] {
+        -moz-appearance: textfield; /* للفايرفوكس */
+    }
+
+    /* 🟢 2. تصميم Select2 متطور وداكن */
+    .select2-container--default .select2-selection--single {
+        background-color: #212529 !important;
+        border: 1px solid #495057 !important;
+        color: #fff !important;
+        height: 42px !important; /* ارتفاع متناسق */
+        display: flex;
+        align-items: center;
+        border-radius: 0.375rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: #e9ecef !important;
+        line-height: normal;
+        padding-left: 12px;
+        padding-right: 20px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 40px !important;
+        right: 10px !important;
+    }
+    .select2-dropdown {
+        background-color: #2b3035 !important;
+        border: 1px solid #0d6efd !important;
+        color: #fff !important;
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .select2-container--default .select2-results__option[aria-selected=true] {
+        background-color: #343a40 !important;
+    }
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: #0d6efd !important;
+        color: white !important;
+    }
+    .select2-search--dropdown .select2-search__field {
+        background-color: #212529 !important;
+        color: #fff !important;
+        border: 1px solid #495057 !important;
+        border-radius: 4px;
+        padding: 8px;
+    }
+
+    /* 🟢 3. توحيد الفورمات */
+    .form-control, .form-select {
+        background-color: #212529;
+        border: 1px solid #495057;
+        color: #fff;
+        height: 42px;
+    }
+    .form-control:focus, .form-select:focus {
+        background-color: #2b3035;
+        color: #fff;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    .form-control::placeholder {
+        color: #6c757d;
+    }
+</style>
+
+<div class="container-fluid py-4" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+        <div>
+            <h2 class="text-info fw-bold"><i class="bi bi-sliders text-primary"></i> {{ title }}</h2>
+            <p class="text-secondary mb-0">لوحة التحكم التأسيسية لإدارة وتكويد المستودعات، الأصناف، وحدات القياس، ومعاملات التحويل.</p>
+        </div>
+    </div>
+
+    <!-- 🟢 إشعارات ذكية تختفي تلقائياً -->
+    <div id="alert-container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm border-0 auto-hide-alert" role="alert">
+                    <i class="bi bi-info-circle-fill me-2"></i> {{ message }}
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- شريط التبويبات -->
+    <ul class="nav nav-pills mb-4 gap-2" id="mcSettingsTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#items_tab" type="button">
+                <i class="bi bi-box-seam"></i> دليل الأصناف
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#warehouses" type="button">
+                <i class="bi bi-shop"></i> المستودعات
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#units" type="button">
+                <i class="bi bi-rulers"></i> وحدات القياس
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#conversions" type="button">
+                <i class="bi bi-arrow-left-right"></i> معاملات التحويل (BOM)
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="mcSettingsTabContent">
+
+        <!-- ============================================== -->
+        <!-- 1. تكويد الأصناف (التبويب الأول والافتراضي) -->
+        <!-- ============================================== -->
+        <div class="tab-pane fade show active" id="items_tab" role="tabpanel">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <div class="card bg-dark border-secondary shadow-sm">
+                        <div class="card-header border-secondary text-info fw-bold">
+                            <i class="bi bi-plus-circle"></i> تكويد صنف جديد
+                        </div>
+                        <div class="card-body">
+                            <form method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="add_item">
+                                <div class="mb-3">
+                                    <label class="form-label text-light">كود الصنف (SKU) <small class="text-muted">(اختياري)</small></label>
+                                    <input type="text" name="sku" class="form-control" placeholder="اتركه فارغاً للتوليد التلقائي، أو أدخل باركود..." autocomplete="off">
+                                    <small class="text-info d-block mt-1">
+                                        <i class="bi bi-magic"></i> سيقوم النظام بتوليد كود تلقائياً (مثل SKU-0001) إذا تُرك فارغاً.
+                                    </small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-light">اسم الصنف <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control" required placeholder="مثال: أرز بسمتي هندي" autocomplete="off">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-light">التصنيف (القسم) <span class="text-danger">*</span></label>
+                                    <select name="category_id" class="form-select select2-enable" required>
+                                        <option value="" disabled selected>-- ابحث أو اختر التصنيف --</option>
+                                        {% for cat in categories %}
+                                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {% if not categories %}
+                                    <small class="text-danger">⚠️ يجب إضافة تصنيفات من لوحة الآدمن أولاً.</small>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- 🟢 تم التحديث: ربط وحدة الأساس ديناميكياً بجدول units -->
+                                <div class="mb-4">
+                                    <label class="form-label text-light">وحدة الأساس (التسعير) <span class="text-danger">*</span></label>
+                                    <select name="unit_of_measure" class="form-select select2-enable" required>
+                                        <option value="" disabled selected>-- اختر وحدة القياس --</option>
+                                        {% for u in units %}
+                                            <option value="{{ u.id }}">{{ u.name }} {% if u.symbol %}({{ u.symbol }}){% endif %}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {% if not units %}
+                                    <small class="text-warning d-block mt-1">⚠️ يُفضل تكويد وحدات القياس أولاً من تبويب "وحدات القياس".</small>
+                                    {% endif %}
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label text-light">طبيعة الصنف <span class="text-danger">*</span></label>
+                                    <select name="item_type" class="form-select select2-enable" required>
+                                        <option value="consumable" selected>مخزون استهلاكي (مطبخ/خامات)</option>
+                                        <option value="saleable">مخزون للبيع (كتب/زي)</option>
+                                        <option value="asset">أصول ثابتة (معدات)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 fw-bold py-2">حفظ الصنف</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card bg-dark border-secondary shadow-sm">
+                        <div class="card-body table-responsive p-0" style="max-height: 600px; overflow-y: auto;">
+                            <table class="table table-dark table-hover align-middle mb-0">
+                                <thead style="position: sticky; top: 0; z-index: 1;">
+                                    <tr>
+                                        <th class="text-secondary">الكود</th>
+                                        <th>اسم الصنف</th>
+                                        <th>التصنيف</th>
+                                        <th>وحدة القياس</th>
+                                        <th>طبيعة الصنف</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in items %}
+                                    <tr>
+                                        <td><span class="badge bg-secondary px-2 py-1">{{ item.sku }}</span></td>
+                                        <td class="fw-bold text-info">{{ item.name }}</td>
+                                        <td class="text-light">{{ item.category.name|default:"-" }}</td>
+                                        <!-- 🟢 عرض وحدة القياس الديناميكية -->
+                                        <td>
+                                            {% if item.unit_of_measure %}
+                                                <span class="badge bg-info text-dark">{{ item.unit_of_measure.name }}</span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><span class="badge bg-dark border border-secondary">{{ item.get_item_type_display }}</span></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="5" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-1 d-block mb-2"></i> لا توجد أصناف مكودة حالياً.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- 2. المستودعات -->
+        <!-- ============================================== -->
+        <div class="tab-pane fade" id="warehouses" role="tabpanel">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <div class="card bg-dark border-secondary shadow-sm">
+                        <div class="card-header border-secondary text-info fw-bold">إضافة مستودع جديد</div>
+                        <div class="card-body">
+                            <form method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="add_warehouse">
+                                <div class="mb-3">
+                                    <label class="form-label text-light">اسم المستودع <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control" required placeholder="مثال: مخزن المطبخ الرئيسي" autocomplete="off">
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label text-light">الموقع / المبنى</label>
+                                    <input type="text" name="location" class="form-control" placeholder="اختياري" autocomplete="off">
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 fw-bold py-2">اعتماد المستودع</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card bg-dark border-secondary shadow-sm">
+                        <div class="card-body table-responsive p-0">
+                            <table class="table table-dark table-hover align-middle mb-0">
+                                <thead>
+                                    <tr><th class="text-secondary">#</th><th>اسم المستودع</th><th>الموقع</th><th>الحالة</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for w in warehouses %}
+                                    <tr>
+                                        <td class="text-secondary">{{ forloop.counter }}</td>
+                                        <td class="fw-bold text-light">{{ w.name }}</td>
+                                        <td class="text-muted">{{ w.location|default:"-" }}</td>
+                                        <td><span class="badge bg-success text-dark fw-bold">نشط</span></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center py-4 text-muted">لا توجد مستودعات مضافة.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- 3. وحدات القياس -->
+        <!-- ============================================== -->
+        <div class="tab-pane fade" id="units" role="tabpanel">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <div class="card bg-dark border-secondary shadow-sm">
+                        <div class="card-header border-secondary text-info fw-bold">تكويد وحدة قياس</div>
+                        <div class="card-body">
+                            <form method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="add_unit">
+                                <div class="mb-3">
+                                    <label class="form-label text-light">اسم الوحدة <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" list="popular_units" class="form-control" required placeholder="اختر أو اكتب وحدة..." autocomplete="off">
+                                    <datalist id="popular_units">
+                                        <option value="كيلوجرام"><option value="جرام"><option value="لتر"><option value="ملليلتر"><option value="كرتونة"><option value="علبة"><option value="زجاجة"><option value="قطعة">
+                                    </datalist>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label text-light">الرمز المرجعي (اختياري)</label>
+                                    <input type="text" name="symbol" list="popular_symbols" class="form-control" placeholder="اختر أو اكتب رمزاً..." autocomplete="off">
+                                    <datalist id="popular_symbols">
+                                        <option value="Kg"><option value="g"><option value="L"><option value="ml"><option value="Box"><option value="Pack"><option value="Btl"><option value="Pcs">
+                                    </datalist>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 fw-bold py-2">اعتماد الوحدة</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card bg-dark border-secondary shadow-sm">
+                        <div class="card-body table-responsive p-0">
+                            <table class="table table-dark table-hover align-middle mb-0">
+                                <thead><tr><th class="text-secondary">#</th><th>اسم الوحدة</th><th>الرمز الكودي</th></tr></thead>
+                                <tbody>
+                                    {% for u in units %}
+                                    <tr><td class="text-secondary">{{ forloop.counter }}</td><td class="fw-bold text-info">{{ u.name }}</td><td class="text-muted">{{ u.symbol|default:"-" }}</td></tr>
+                                    {% empty %}
+                                    <tr><td colspan="3" class="text-center py-4 text-muted">لا توجد وحدات قياس مكودة.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- 4. تحويلات الوحدات -->
+        <!-- ============================================== -->
+        <div class="tab-pane fade" id="conversions" role="tabpanel">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <div class="card border-primary shadow-sm bg-dark">
+                        <div class="card-header bg-primary text-white fw-bold">برمجة معامل تحويل</div>
+                        <div class="card-body">
+                            <form method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="add_conversion">
+                                <div class="mb-3">
+                                    <label class="form-label text-light">تكويد الصنف <span class="text-danger">*</span></label>
+                                    <select name="item_id" class="form-select select2-enable" required>
+                                        <option value="" disabled selected>-- ابحث بالكود أو الاسم --</option>
+                                        {% for item in items %}
+                                            <option value="{{ item.id }}">[كود: {{ item.sku }}] - {{ item.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label text-light">وحدة الشراء (من)</label>
+                                        <select name="from_unit_id" class="form-select select2-enable" required>
+                                            <option value="" disabled selected>اختر...</option>
+                                            {% for u in units %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label text-light">وحدة الصرف (إلى)</label>
+                                        <select name="to_unit_id" class="form-select select2-enable" required>
+                                            <option value="" disabled selected>اختر...</option>
+                                            {% for u in units %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label text-light">معامل التحويل <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-secondary border-secondary text-light">=</span>
+                                        <input type="number" name="conversion_rate" step="0.0001" class="form-control prevent-scroll" required placeholder="تساوي كم؟">
+                                    </div>
+                                    <small class="text-info d-block mt-1">مثال: إذا اخترت (من كرتونة) (إلى زجاجة)، واكتب هنا 12.</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 fw-bold py-2">ربط التحويل وحفظه</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card bg-dark border-secondary shadow-sm">
+                        <div class="card-body table-responsive p-0">
+                            <table class="table table-dark table-hover align-middle mb-0">
+                                <thead><tr><th>الكود / الصنف</th><th>معادلة التحويل المُبرمجة</th></tr></thead>
+                                <tbody>
+                                    {% for conv in conversions %}
+                                    <tr>
+                                        <td>
+                                            <span class="text-info fw-bold">[{{ conv.item.sku }}]</span><br>
+                                            <span class="text-light">{{ conv.item.name }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2 bg-black p-2 rounded border border-secondary" style="width: fit-content;">
+                                                <span class="badge bg-secondary fs-6">1 {{ conv.from_unit.name }}</span>
+                                                <i class="bi bi-arrow-left-right text-success"></i>
+                                                <span class="badge bg-success text-dark fs-6">{{ conv.conversion_rate|floatformat:-2 }} {{ conv.to_unit.name }}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="2" class="text-center py-4 text-muted">لا توجد معادلات تحويل مسجلة للأن.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- jQuery & Select2 -->
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // 🟢 1. تفعيل محرك البحث في القوائم المنسدلة
+        $('.select2-enable').select2({
+            width: '100%',
+            language: { noResults: function () { return "لا توجد نتائج مطابقة"; } }
+        });
+
+        // 🟢 2. منع السكرول (الماوس) من تغيير الأرقام في حقول Number
+        $('input[type=number]').on('wheel', function(e){
+            $(this).blur(); // يزيل التركيز لمنع تغيير الرقم
+        });
+
+        // 🟢 3. إخفاء الإشعارات تلقائياً بعد 4 ثوانٍ بنعومة
+        setTimeout(function() {
+            $('.auto-hide-alert').fadeOut('slow', function() {
+                $(this).remove();
+            });
+        }, 4000);
+    });
+</script>
+{% endblock %}

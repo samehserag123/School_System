@@ -1,0 +1,230 @@
+{% extends 'hr/base_hr.html' %}
+
+{% block title %}توقيع جزاء إداري{% if employee %} - {{ employee.name }}{% endif %}{% endblock %}
+{% block header_title %}توقيع جزاء إداري{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6 pb-10">
+
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-rose-100 border-l-4 border-l-rose-600">
+        <h3 class="text-2xl font-black text-gray-900 flex items-center gap-2">
+            <i data-lucide="shield-alert" class="w-7 h-7 text-rose-600"></i>
+            توقيع جزاء إداري
+        </h3>
+        {% if employee %}
+        <p class="text-rose-800 font-bold text-sm mt-2 bg-rose-50 inline-block px-3 py-1 rounded-lg">
+            الموظف: {{ employee.name }} (كود البصمة: {{ employee.emp_id|default:employee.id }})
+        </p>
+        {% else %}
+        <p class="text-rose-800 font-bold text-sm mt-2 bg-rose-50 inline-block px-3 py-1 rounded-lg">
+            اكتب اسم الموظف أو كود البصمة واختاره من القائمة المنسدلة الذكية
+        </p>
+        {% endif %}
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="p-4 rounded-xl font-bold border {% if message.tags == 'error' %}bg-red-50 border-red-300 text-red-800{% else %}bg-emerald-50 border-emerald-300 text-emerald-800{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if form.errors %}
+        <div class="p-4 rounded-xl font-bold border bg-red-50 border-red-300 text-red-800">
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                    <p>{{ error }}</p>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST" class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-5">
+        {% csrf_token %}
+
+        {% if not employee %}
+        <div class="space-y-2 relative">
+            <label class="block text-sm font-black text-gray-800">
+                الموظف <span class="text-rose-600">*</span>
+            </label>
+
+            <!-- 🔍 حقل البحث التفاعلي الذكي -->
+            <div class="relative">
+                <div class="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-gray-400">
+                    <i data-lucide="search" class="w-5 h-5"></i>
+                </div>
+                <input type="text"
+                       id="employee-search-input"
+                       placeholder="🔍 ابحث بالاسم أو كود البصمة..."
+                       autocomplete="off"
+                       class="w-full bg-white border-2 border-gray-300 text-gray-900 font-bold text-base rounded-xl py-3 pr-11 pl-10 focus:outline-none focus:border-rose-600 transition-all shadow-sm">
+
+                <!-- زر مسح البحث -->
+                <button type="button" id="clear-search-btn" class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 hover:text-rose-600 hidden">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- 📋 القائمة المنسدلة الذكية المنبثقة -->
+            <div id="employee-dropdown-results"
+                 class="absolute z-50 right-0 left-0 mt-1 bg-white border-2 border-rose-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto hidden divide-y divide-gray-100">
+            </div>
+
+            <!-- القائمة الخفية التي تُرسل ID الموظف -->
+            <select name="employee" id="id_employee" class="hidden" required>
+                <option value="">-- اختر موظف --</option>
+                {% for emp in form.fields.employee.queryset %}
+                    <option value="{{ emp.id }}" data-search="{{ emp.name }} {{ emp.emp_id|default:emp.id }}" data-name="{{ emp.name }}" data-code="{{ emp.emp_id|default:emp.id }}">
+                        {{ emp.name }} (كود البصمة: {{ emp.emp_id|default:emp.id }})
+                    </option>
+                {% endfor %}
+            </select>
+
+            <p class="text-xs text-gray-500 font-bold">اكتب الاسم أو كود البصمة لتظهر لك نتائج البحث المباشرة واضغط لاختيار الموظف.</p>
+        </div>
+        {% else %}
+            <input type="hidden" name="employee" value="{{ employee.id }}">
+        {% endif %}
+
+        <div>
+            <label class="block text-sm font-black text-gray-800 mb-2">نوع الجزاء <span class="text-rose-600">*</span></label>
+            <select name="penalty_type" required class="w-full bg-white border-2 border-gray-300 text-gray-900 font-bold text-base rounded-xl py-3 px-4 focus:ring-0 focus:border-rose-600 transition-colors">
+                <option value="">-- اختر نوع الجزاء --</option>
+                {% for value, label in penalty_types %}
+                    <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-black text-gray-800 mb-2">عدد أيام الخصم <span class="text-rose-600">*</span></label>
+            <input type="number" step="0.5" min="0" name="deduction_days" required placeholder="مثال: 1 أو 0.5 أو 3"
+                   class="w-full bg-white border-2 border-gray-300 text-gray-900 font-bold text-base rounded-xl py-3 px-4 focus:ring-0 focus:border-rose-600 transition-colors">
+            <p class="text-xs text-gray-500 font-bold mt-1">حدد عدد أيام الخصم حسب تقديرك لخطورة المخالفة.</p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-black text-gray-800 mb-2">تاريخ الجزاء</label>
+            <input type="date" name="date" value="{{ today|date:'Y-m-d' }}"
+                   class="w-full bg-white border-2 border-gray-300 text-gray-900 font-bold text-base rounded-xl py-3 px-4 focus:ring-0 focus:border-rose-600 transition-colors">
+        </div>
+
+        <div>
+            <label class="block text-sm font-black text-gray-800 mb-2">سبب الجزاء (بالتفصيل) <span class="text-rose-600">*</span></label>
+            <textarea name="reason" rows="4" required placeholder="اكتب تفاصيل المخالفة والسبب هنا..."
+                      class="w-full bg-white border-2 border-gray-300 text-gray-900 font-bold text-base rounded-xl py-3 px-4 focus:ring-0 focus:border-rose-600 transition-colors"></textarea>
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit" class="flex items-center gap-2 bg-rose-700 hover:bg-rose-800 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md">
+                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                توقيع الجزاء
+            </button>
+            {% if employee %}
+            <a href="{% url 'hr:penalty_list_for_employee' employee_id=employee.id %}" class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-xl font-bold transition-all">
+                إلغاء
+            </a>
+            {% else %}
+            <a href="{% url 'hr:penalty_list' %}" class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-xl font-bold transition-all">
+                إلغاء
+            </a>
+            {% endif %}
+        </div>
+    </form>
+
+</div>
+
+<!-- ⚡ السكربت الذكي للبحث المباشر القافز -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('employee-search-input');
+    const resultsContainer = document.getElementById('employee-dropdown-results');
+    const hiddenSelect = document.getElementById('id_employee');
+    const clearBtn = document.getElementById('clear-search-btn');
+
+    if (!searchInput || !hiddenSelect) return;
+
+    // تجهيز مصفوفة بيانات الموظفين
+    const employees = Array.from(hiddenSelect.options)
+        .filter(opt => opt.value !== "")
+        .map(opt => ({
+            id: opt.value,
+            name: opt.getAttribute('data-name'),
+            code: opt.getAttribute('data-code'),
+            searchText: (opt.getAttribute('data-search') || '').toLowerCase()
+        }));
+
+    function renderResults(filterText = '') {
+        const query = filterText.trim().toLowerCase();
+        resultsContainer.innerHTML = '';
+
+        const filtered = employees.filter(emp => emp.searchText.includes(query));
+
+        if (filtered.length === 0) {
+            resultsContainer.innerHTML = `
+                <div class="p-4 text-center text-gray-500 font-bold text-sm">
+                    🚫 لا يوجد موظف يطابق "${filterText}"
+                </div>
+            `;
+        } else {
+            filtered.forEach(emp => {
+                const item = document.createElement('div');
+                item.className = 'p-3 hover:bg-rose-50 cursor-pointer transition-colors flex items-center justify-between font-bold text-gray-800';
+                item.innerHTML = `
+                    <span class="text-gray-900">${emp.name}</span>
+                    <span class="bg-rose-100 text-rose-800 text-xs px-2.5 py-1 rounded-lg">كود البصمة: ${emp.code}</span>
+                `;
+                item.addEventListener('click', function() {
+                    selectEmployee(emp);
+                });
+                resultsContainer.appendChild(item);
+            });
+        }
+        resultsContainer.classList.remove('hidden');
+    }
+
+    function selectEmployee(emp) {
+        searchInput.value = `${emp.name} (كود البصمة: ${emp.code})`;
+        hiddenSelect.value = emp.id;
+        resultsContainer.classList.add('hidden');
+        if (clearBtn) clearBtn.classList.remove('hidden');
+    }
+
+    // عند كتابة أي اسم أو رقم
+    searchInput.addEventListener('input', function() {
+        if (this.value.trim() !== '') {
+            if (clearBtn) clearBtn.classList.remove('hidden');
+            renderResults(this.value);
+        } else {
+            if (clearBtn) clearBtn.classList.add('hidden');
+            hiddenSelect.value = '';
+            renderResults('');
+        }
+    });
+
+    // إظهار النتائج عند النقر داخل حقل البحث
+    searchInput.addEventListener('focus', function() {
+        renderResults(this.value);
+    });
+
+    // عند الضغط على زر المسح
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            hiddenSelect.value = '';
+            clearBtn.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+            searchInput.focus();
+        });
+    }
+
+    // إخفاء القائمة عند النقر خارج حقل البحث
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !resultsContainer.contains(e.target)) {
+            resultsContainer.classList.add('hidden');
+        }
+    });
+});
+</script>
+{% endblock %}

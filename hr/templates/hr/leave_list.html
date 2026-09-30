@@ -1,99 +1,330 @@
 {% extends 'hr/base_hr.html' %}
 
-{% block title %}إدارة الإجازات - الموارد البشرية{% endblock %}
-{% block header_title %}إدارة الإجازات{% endblock %}
+{% block title %}سجل الإجازات - الموارد البشرية{% endblock %}
+{% block header_title %}إدارة الإجازات (من الرصيد){% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto space-y-6">
-    
-    <!-- قسم الترويسة والإجراءات -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
-        <div class="absolute right-0 top-0 w-2 h-full bg-gradient-to-b from-purple-500 to-pink-400"></div>
-        <div>
-            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <div class="bg-purple-100 text-purple-600 p-2 rounded-lg"><i data-lucide="file-check-2" class="w-6 h-6"></i></div>
-                سجل طلبات الإجازات
-            </h3>
-            <p class="text-slate-500 text-sm mt-1">إدارة ومتابعة طلبات الإجازة للموظفين (مقبولة، مرفوضة، قيد الانتظار)</p>
+<!-- 📱 درع إصلاح الموبايل -->
+<style>
+    @media (max-width: 1024px) {
+        aside { display: none !important; }
+        main {
+            width: 100vw !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 10px !important;
+            overflow-x: hidden !important;
+        }
+        body { overflow-x: hidden !important; }
+    }
+    details > summary::-webkit-details-marker { display: none; }
+</style>
+
+<div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- 💡 تنبيه إداري -->
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-5 flex flex-col md:flex-row gap-5 items-start md:items-center justify-between shadow-sm">
+        <div class="flex items-start gap-4">
+            <div class="p-2.5 rounded-xl shadow-sm text-primary shrink-0 border border-primary/50 bg-primary/10">
+                <i data-lucide="info" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h4 class="text-base font-extrabold mb-1 text-slate-200">سجل الإجازات المخصومة من الرصيد</h4>
+                <p class="text-sm text-slate-400 leading-relaxed font-medium">
+                    هنا يمكنك مراجعة واعتماد الإجازات. يتم عرض الإجازات وفقاً للدورة المالية (من 26 إلى 25).
+                </p>
+            </div>
         </div>
-        
-        <!-- الزر مربوط بشكل صحيح بمسار hr:leave_create -->
-        <a href="{% url 'hr:leave_create' %}" class="flex items-center gap-2 bg-secondary hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-            <i data-lucide="plus-circle" class="w-5 h-5"></i>
-            تقديم طلب إجازة
-        </a>
+        <div class="flex flex-wrap gap-3 shrink-0 w-full md:w-auto">
+            <a href="{% url 'hr:permission_list' %}" class="flex-1 md:flex-none justify-center border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 hover:text-amber-400 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm">
+                <i data-lucide="clock-4" class="w-4 h-4"></i> سجل الأذونات
+            </a>
+            <a href="{% url 'hr:mission_list' %}" class="flex-1 md:flex-none justify-center border border-purple-500/50 bg-purple-500/10 hover:bg-purple-500/20 text-purple-500 hover:text-purple-400 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm">
+                <i data-lucide="map" class="w-4 h-4"></i> سجل المأموريات
+            </a>
+        </div>
     </div>
 
-    <!-- جدول البيانات -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <!-- 📅 شريط التنقل الذكي والأرشيف -->
+    <div class="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-sm backdrop-blur-sm relative z-40">
+        <div class="flex items-center gap-3 w-full lg:w-auto">
+            <div class="p-3 bg-slate-900 border border-slate-700 rounded-xl text-primary shrink-0">
+                <i data-lucide="calendar-range" class="w-6 h-6"></i>
+            </div>
+            <div id="cycle-info-container">
+                {% if search_query %}
+                    <h4 class="text-white font-bold text-lg leading-tight">نتائج البحث الشامل</h4>
+                    <p class="text-amber-400 font-mono text-xs mt-1 bg-amber-900/30 border border-amber-800/50 px-2 py-0.5 rounded-md inline-block">
+                        البحث عن: "{{ search_query }}"
+                    </p>
+                {% else %}
+                    <h4 class="text-white font-bold text-lg leading-tight">
+                        دورة استحقاق ({{ cycle_start.day }}/{{ cycle_start.month }} - {{ cycle_end.day }}/{{ cycle_end.month }}/{{ target_year }})
+                    </h4>
+                    <p class="text-emerald-400 font-mono text-xs mt-1 bg-emerald-900/30 border border-emerald-800/50 px-2 py-0.5 rounded-md inline-block">
+                        مرتبات شهر: {{ target_month }}
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2 w-full lg:w-auto relative">
+            <a href="?month={% if target_month == 1 %}12{% else %}{{ target_month|add:"-1" }}{% endif %}&year={% if target_month == 1 %}{{ target_year|add:"-1" }}{% else %}{{ target_year }}{% endif %}" class="flex-1 md:flex-none justify-center px-4 py-2.5 bg-slate-900 hover:bg-slate-700 border border-slate-600 rounded-xl text-sm font-bold text-slate-300 transition-all flex items-center gap-2">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i> السابق
+            </a>
+
+            <a href="?month={{ now.month }}&year={{ now.year }}" class="flex-1 md:flex-none justify-center px-4 py-2.5 bg-slate-900 hover:bg-slate-700 border border-slate-600 rounded-xl text-sm font-bold text-primary transition-all flex items-center gap-2">
+                <i data-lucide="calendar-clock" class="w-4 h-4"></i> الحالي
+            </a>
+
+            <a href="?month={% if target_month == 12 %}1{% else %}{{ target_month|add:"1" }}{% endif %}&year={% if target_month == 12 %}{{ target_year|add:"1" }}{% else %}{{ target_year }}{% endif %}" class="flex-1 md:flex-none justify-center px-4 py-2.5 bg-slate-900 hover:bg-slate-700 border border-slate-600 rounded-xl text-sm font-bold text-slate-300 transition-all flex items-center gap-2">
+                التالي <i data-lucide="chevron-left" class="w-4 h-4"></i>
+            </a>
+
+            <details class="relative group flex-1 md:flex-none">
+                <summary class="list-none flex justify-center w-full px-4 py-2.5 bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-600 rounded-xl text-sm font-bold transition-all items-center gap-2 cursor-pointer outline-none select-none">
+                    <i data-lucide="archive" class="w-4 h-4"></i> الأرشيف
+                    <i data-lucide="chevron-down" class="w-4 h-4 group-open:rotate-180 transition-transform"></i>
+                </summary>
+                <div class="absolute left-0 lg:right-0 mt-2 w-64 bg-slate-800 border border-slate-600 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-50 p-4">
+                    <form method="GET" class="flex flex-col gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 mb-1.5 block">اختر شهر الاستحقاق:</label>
+                            <select name="month" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-2.5 text-sm font-bold outline-none focus:border-primary transition-colors cursor-pointer appearance-none">
+                                <option value="1" {% if target_month == 1 %}selected{% endif %}>يناير (1)</option>
+                                <option value="2" {% if target_month == 2 %}selected{% endif %}>فبراير (2)</option>
+                                <option value="3" {% if target_month == 3 %}selected{% endif %}>مارس (3)</option>
+                                <option value="4" {% if target_month == 4 %}selected{% endif %}>أبريل (4)</option>
+                                <option value="5" {% if target_month == 5 %}selected{% endif %}>مايو (5)</option>
+                                <option value="6" {% if target_month == 6 %}selected{% endif %}>يونيو (6)</option>
+                                <option value="7" {% if target_month == 7 %}selected{% endif %}>يوليو (7)</option>
+                                <option value="8" {% if target_month == 8 %}selected{% endif %}>أغسطس (8)</option>
+                                <option value="9" {% if target_month == 9 %}selected{% endif %}>سبتمبر (9)</option>
+                                <option value="10" {% if target_month == 10 %}selected{% endif %}>أكتوبر (10)</option>
+                                <option value="11" {% if target_month == 11 %}selected{% endif %}>نوفمبر (11)</option>
+                                <option value="12" {% if target_month == 12 %}selected{% endif %}>ديسمبر (12)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 mb-1.5 block">اختر السنة:</label>
+                            <select name="year" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-2.5 text-sm font-bold outline-none focus:border-primary transition-colors cursor-pointer appearance-none">
+                                <option value="2024" {% if target_year == 2024 %}selected{% endif %}>2024</option>
+                                <option value="2025" {% if target_year == 2025 %}selected{% endif %}>2025</option>
+                                <option value="2026" {% if target_year == 2026 %}selected{% endif %}>2026</option>
+                                <option value="2027" {% if target_year == 2027 %}selected{% endif %}>2027</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-primary hover:bg-emerald-500 text-slate-950 font-black rounded-xl py-2.5 mt-1 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
+                            <i data-lucide="search" class="w-4 h-4"></i> عرض السجلات
+                        </button>
+                    </form>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <!-- قسم الإجراءات والبحث القوي اللحظي (AJAX) -->
+    <div class="p-6 rounded-2xl shadow-lg border border-slate-700 bg-slate-900/80 relative overflow-hidden flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5 backdrop-blur-sm z-30">
+        <div class="absolute right-0 top-0 w-1.5 h-full bg-primary"></div>
+
+        <div class="w-full lg:w-auto flex flex-col sm:flex-row justify-between gap-4">
+            <h3 class="text-xl font-black flex items-center gap-3 text-white whitespace-nowrap">
+                <div class="text-primary p-2 rounded-xl border border-primary/50 bg-primary/10"><i data-lucide="file-check-2" class="w-5 h-5"></i></div>
+                قائمة طلبات الإجازة
+            </h3>
+
+            <!-- 🔍 مربع البحث اللحظي بدون زر إدخال -->
+            <div class="relative w-full sm:w-64 lg:ml-4 m-0">
+                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-primary">
+                    <i data-lucide="search" id="search-icon" class="w-4 h-4"></i>
+                    <!-- أيقونة التحميل تظهر أثناء البحث -->
+                    <i data-lucide="loader-2" id="search-spinner" class="w-4 h-4 animate-spin hidden text-primary"></i>
+                </div>
+                <input type="text" id="liveSearchInput" value="{{ search_query }}" placeholder="ابحث بالاسم أو الكود..." class="bg-slate-950 border border-slate-700 text-white text-sm rounded-xl focus:ring-primary focus:border-primary block w-full pr-10 p-2.5 font-bold shadow-inner" autocomplete="off">
+            </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+            <!-- 🔘 أزرار فلترة الحالة المتصلة بقاعدة البيانات -->
+            <div class="flex border border-slate-700 p-1 rounded-xl w-full sm:w-auto bg-slate-950">
+                <a href="?status=all&month={{ target_month }}&year={{ target_year }}{% if search_query %}&q={{ search_query }}{% endif %}"
+                   class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all text-center {% if status_filter == 'all' or not status_filter %}text-primary bg-slate-800 border border-primary/40 shadow-sm{% else %}text-slate-400 hover:text-white border-transparent{% endif %}">الكل</a>
+
+                <a href="?status=pending&month={{ target_month }}&year={{ target_year }}{% if search_query %}&q={{ search_query }}{% endif %}"
+                   class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all text-center {% if status_filter == 'pending' %}text-primary bg-slate-800 border border-primary/40 shadow-sm{% else %}text-slate-400 hover:text-white border-transparent{% endif %}">انتظار</a>
+
+                <a href="?status=approved&month={{ target_month }}&year={{ target_year }}{% if search_query %}&q={{ search_query }}{% endif %}"
+                   class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all text-center {% if status_filter == 'approved' %}text-primary bg-slate-800 border border-primary/40 shadow-sm{% else %}text-slate-400 hover:text-white border-transparent{% endif %}">مقبولة</a>
+
+                <a href="?status=rejected&month={{ target_month }}&year={{ target_year }}{% if search_query %}&q={{ search_query }}{% endif %}"
+                   class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all text-center {% if status_filter == 'rejected' %}text-primary bg-slate-800 border border-primary/40 shadow-sm{% else %}text-slate-400 hover:text-white border-transparent{% endif %}">مرفوضة</a>
+            </div>
+
+            <a href="{% url 'hr:leave_create' %}" class="w-full sm:w-auto flex justify-center items-center gap-2 bg-primary hover:bg-opacity-80 text-black px-5 py-2.5 rounded-xl font-black transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 whitespace-nowrap">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                تقديم طلب
+            </a>
+        </div>
+    </div>
+
+    <!-- 📱 العرض المخصص للموبايل -->
+    <div class="block lg:hidden space-y-4" id="mobile-cards-container">
+        {% for leave in leaves %}
+        <div id="leave-card-{{ leave.id }}" class="bg-slate-900/90 border border-slate-700 rounded-2xl p-4 shadow-lg transition-all duration-300">
+            <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full border border-primary flex items-center justify-center text-primary font-black text-xs shrink-0 bg-primary/10">
+                        {{ leave.employee.name|slice:":2" }}
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-white text-base">{{ leave.employee.name }}</h4>
+                        <p class="text-xs text-slate-400 font-mono mt-0.5">كود: {{ leave.employee.emp_id }}</p>
+                    </div>
+                </div>
+                <span class="px-2.5 py-1 rounded-lg text-xs font-bold {% if leave.status == 'approved' %}bg-emerald-950/60 text-emerald-400 border border-emerald-800{% elif leave.status == 'rejected' %}bg-rose-950/60 text-rose-400 border border-rose-800{% else %}bg-amber-950/60 text-amber-400 border border-amber-800{% endif %}">
+                    {{ leave.get_status_display }}
+                </span>
+            </div>
+
+            <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-2 mb-4">
+                <div class="flex justify-between">
+                    <span class="text-slate-500">نوع الإجازة:</span>
+                    <span class="font-bold text-white">{{ leave.get_leave_type_display }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">الفترة:</span>
+                    <span class="font-mono text-primary">{{ leave.start_date|date:"Y-m-d" }} ⬅ {{ leave.end_date|date:"Y-m-d" }}</span>
+                </div>
+                <div class="flex justify-between items-center border-t border-slate-800 pt-2 mt-2">
+                    <span class="text-slate-500">المدة المخصومة:</span>
+                    <span class="font-black text-primary px-2 py-1 bg-primary/10 rounded-lg border border-primary/30">{{ leave.duration_days }} يوم</span>
+                </div>
+                {% if leave.reason %}
+                <div class="border-t border-slate-800 pt-2 mt-2">
+                    <span class="text-slate-500 block mb-1">الملاحظات:</span>
+                    <p class="text-slate-400">{{ leave.reason }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if leave.status == 'pending' %}
+            <div class="grid grid-cols-2 gap-2 mt-3">
+                <button onclick="handleQuickAction('{{ leave.id }}', 'approve')" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-2.5 rounded-xl text-sm flex items-center justify-center gap-1.5 shadow-md transition-colors">
+                    <i data-lucide="check" class="w-4 h-4"></i> اعتماد
+                </button>
+                <button onclick="handleQuickAction('{{ leave.id }}', 'reject')" class="bg-rose-950 text-rose-400 border border-rose-800 hover:bg-rose-600 hover:text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i> رفض
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="py-12 text-center text-slate-500 font-bold bg-slate-900/60 rounded-2xl border border-slate-800 shadow-inner">
+            <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-3 opacity-50"></i>
+            لا توجد سجلات تطابق بحثك.
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- 💻 العرض المخصص للشاشات الكبيرة (جدول منظم) -->
+    <div class="hidden lg:block bg-slate-900/60 rounded-2xl shadow-lg border border-slate-700 overflow-hidden backdrop-blur-sm relative z-20">
         <div class="overflow-x-auto">
-            <table class="w-full text-right border-collapse">
-                <thead class="bg-slate-50 text-slate-500 text-sm border-b border-slate-100">
+            <table class="w-full text-right border-collapse" id="leavesTable">
+                <thead class="text-sm bg-slate-950 border-b border-slate-700 text-slate-400">
                     <tr>
-                        <th class="py-4 px-6 font-bold">الموظف</th>
-                        <th class="py-4 px-6 font-bold">النوع</th>
-                        <th class="py-4 px-6 font-bold">من - إلى</th>
-                        <th class="py-4 px-6 font-bold">الحالة</th>
-                        <th class="py-4 px-6 font-bold text-center">إجراءات الإدارة</th>
+                        <th class="py-4 px-6 font-bold whitespace-nowrap">الموظف</th>
+                        <th class="py-4 px-6 font-bold whitespace-nowrap">نوع الإجازة</th>
+                        <th class="py-4 px-6 font-bold text-center whitespace-nowrap">المدة</th>
+                        <th class="py-4 px-6 font-bold whitespace-nowrap">من - إلى</th>
+                        <th class="py-4 px-6 font-bold whitespace-nowrap">ملاحظات</th>
+                        <th class="py-4 px-6 font-bold whitespace-nowrap text-center">الحالة</th>
+                        <th class="py-4 px-6 font-bold text-center whitespace-nowrap">إجراءات الإدارة</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-50 text-sm">
+                <tbody class="text-sm divide-y divide-slate-800">
                     {% for leave in leaves %}
-                    <tr class="hover:bg-purple-50/40 transition-colors">
-                        <td class="py-4 px-6 font-bold text-slate-800">{{ leave.employee.name }}</td>
-                        <td class="py-4 px-6 text-slate-600 font-medium">
-                            <span class="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg text-xs font-bold border border-slate-200">
-                                {{ leave.get_leave_type_display }}
-                            </span>
-                        </td>
-                        <td class="py-4 px-6 text-slate-600">
-                            <div class="flex items-center gap-2 bg-slate-50 w-fit px-3 py-1.5 rounded-lg border border-slate-100">
-                                <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
-                                <span class="font-semibold">{{ leave.start_date|date:"d M" }}</span>
-                                <span class="text-slate-300">&larr;</span> 
-                                <span class="font-semibold">{{ leave.end_date|date:"d M Y" }}</span>
+                    <tr id="leave-row-{{ leave.id }}" class="transition-colors hover:bg-slate-800/40">
+                        <td class="py-4 px-6">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full border border-primary/50 bg-primary/10 flex items-center justify-center text-primary font-black text-xs shrink-0">
+                                    {{ leave.employee.name|slice:":2" }}
+                                </div>
+                                <div>
+                                    <p class="font-bold text-base text-slate-200">{{ leave.employee.name }}</p>
+                                    <p class="text-[11px] font-mono text-slate-500 mt-0.5 w-fit rounded">كود: {{ leave.employee.emp_id }}</p>
+                                </div>
                             </div>
                         </td>
                         <td class="py-4 px-6">
+                            <span class="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700 bg-slate-950/50 text-slate-300 shadow-sm inline-block">
+                                {{ leave.get_leave_type_display }}
+                            </span>
+                        </td>
+                        <td class="py-4 px-6 text-center">
+                            <span class="font-black text-primary px-3 py-1.5 rounded-lg border border-primary/40 bg-primary/10 inline-block shadow-sm">
+                                {{ leave.duration_days }} يوم
+                            </span>
+                        </td>
+                        <td class="py-4 px-6">
+                            <div class="flex flex-col gap-1.5">
+                                <div class="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                                    <i data-lucide="calendar-arrow-right" class="w-3.5 h-3.5 text-emerald-500"></i>
+                                    بدء: <span class="font-mono text-slate-200">{{ leave.start_date|date:"Y-m-d" }}</span>
+                                </div>
+                                <div class="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                                    <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-rose-500"></i>
+                                    عودة: <span class="font-mono text-slate-200">{{ leave.end_date|date:"Y-m-d" }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-4 px-6 max-w-[150px]">
+                            {% if leave.reason %}
+                                <p class="text-xs text-slate-400 truncate font-medium border border-slate-800 bg-slate-950 p-2 rounded-lg" title="{{ leave.reason }}">
+                                    {{ leave.reason }}
+                                </p>
+                            {% else %}
+                                <span class="text-xs text-slate-600">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-4 px-6 text-center">
                             {% if leave.status == 'pending' %}
-                                <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold bg-yellow-100 text-yellow-700 border border-yellow-200 shadow-sm">
-                                    <i data-lucide="clock" class="w-3.5 h-3.5"></i> قيد الانتظار
+                                <span class="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-black text-amber-500 border border-amber-500/50 bg-amber-500/10 shadow-sm">
+                                    <i data-lucide="clock-3" class="w-3.5 h-3.5 animate-spin-slow"></i> قيد الانتظار
                                 </span>
                             {% elif leave.status == 'approved' %}
-                                <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold bg-green-100 text-green-700 border border-green-200 shadow-sm">
-                                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> مقبولة
+                                <span class="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-black text-emerald-500 border border-emerald-500/50 bg-emerald-500/10 shadow-sm">
+                                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> معتمدة
                                 </span>
                             {% else %}
-                                <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold bg-red-100 text-red-700 border border-red-200 shadow-sm">
-                                    <i data-lucide="x-circle" class="w-3.5 h-3.5"></i> مرفوضة
+                                <span class="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-black text-rose-500 border border-rose-500/50 bg-rose-500/10 shadow-sm">
+                                    <i data-lucide="x-octagon" class="w-3.5 h-3.5"></i> مرفوضة
                                 </span>
                             {% endif %}
                         </td>
-                        
                         <td class="py-4 px-6 text-center whitespace-nowrap">
                             {% if leave.status == 'pending' %}
                                 <div class="flex justify-center gap-2">
-                                    <a href="{% url 'hr:leave_approve' leave.id %}" class="bg-green-50 text-green-700 p-2 rounded-xl hover:bg-green-100 border border-green-200 transition-colors inline-flex items-center justify-center shadow-sm" title="اعتماد وقبول">
-                                        <i data-lucide="check" class="w-4 h-4"></i>
-                                    </a>
-                                    <a href="{% url 'hr:leave_reject' leave.id %}" class="bg-red-50 text-red-700 p-2 rounded-xl hover:bg-red-100 border border-red-200 transition-colors inline-flex items-center justify-center shadow-sm" title="رفض الطلب">
-                                        <i data-lucide="x" class="w-4 h-4"></i>
-                                    </a>
+                                    <button onclick="handleQuickAction('{{ leave.id }}', 'approve')" class="text-emerald-400 bg-emerald-950/40 p-2.5 rounded-xl hover:bg-emerald-500 hover:text-black border border-emerald-800 transition-all shadow-sm" title="اعتماد وقبول">
+                                        <i data-lucide="check" class="w-4 h-4 font-bold"></i>
+                                    </button>
+                                    <button onclick="handleQuickAction('{{ leave.id }}', 'reject')" class="text-rose-400 bg-rose-950/40 p-2.5 rounded-xl hover:bg-rose-500 hover:text-white border border-rose-800 transition-all shadow-sm" title="رفض الطلب">
+                                        <i data-lucide="x" class="w-4 h-4 font-bold"></i>
+                                    </button>
                                 </div>
                             {% else %}
-                                <span class="text-xs text-slate-400 font-medium bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 inline-block">
-                                    تمت معالجته سابقاً
+                                <span class="text-xs text-slate-500 font-bold px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950 inline-block">
+                                    تمت معالجته
                                 </span>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="py-12 text-center text-slate-500">
-                            <div class="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <i data-lucide="file-x-2" class="w-10 h-10 text-slate-400"></i>
+                        <td colspan="7" class="py-16 text-center">
+                            <div class="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-700 bg-slate-800/50 shadow-inner">
+                                <i data-lucide="folder-search" class="w-12 h-12 text-slate-500"></i>
                             </div>
-                            <p class="text-lg font-bold text-slate-700">لا يوجد طلبات إجازة حالياً</p>
+                            <p class="text-lg font-black text-slate-300">لا توجد سجلات تطابق بحثك</p>
                         </td>
                     </tr>
                     {% endfor %}
@@ -101,5 +332,233 @@
             </table>
         </div>
     </div>
+
+    <!-- 📄 حاوية أزرار التنقل (Pagination) -->
+    <div id="pagination-container">
+        {% if leaves.has_other_pages %}
+        <div class="flex justify-center mt-8 gap-2 flex-wrap pb-10">
+            {% if leaves.has_previous %}
+                <a href="?page={{ leaves.previous_page_number }}&{{ url_params }}" class="px-3 py-2 bg-slate-900 text-slate-300 rounded-xl border border-slate-700 hover:bg-slate-800 transition-colors font-bold text-sm shadow-sm flex items-center gap-1">
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i> السابق
+                </a>
+            {% endif %}
+
+            {% for i in leaves.paginator.page_range %}
+                {% if leaves.number == i %}
+                    <span class="px-4 py-2 bg-primary text-slate-900 font-black rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.3)] border border-primary flex items-center justify-center">
+                        {{ i }}
+                    </span>
+                {% elif i > leaves.number|add:'-3' and i < leaves.number|add:'3' %}
+                    <a href="?page={{ i }}&{{ url_params }}" class="px-4 py-2 bg-slate-900 text-slate-300 font-bold rounded-xl border border-slate-700 hover:bg-slate-700 hover:text-white transition-all flex items-center justify-center">
+                        {{ i }}
+                    </a>
+                {% endif %}
+            {% endfor %}
+
+            {% if leaves.has_next %}
+                <a href="?page={{ leaves.next_page_number }}&{{ url_params }}" class="px-3 py-2 bg-slate-900 text-slate-300 rounded-xl border border-slate-700 hover:bg-slate-800 transition-colors font-bold text-sm shadow-sm flex items-center gap-1">
+                    التالي <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+
+        const details = document.querySelector('details');
+        document.addEventListener('click', function(event) {
+            if (details && !details.contains(event.target)) {
+                details.removeAttribute('open');
+            }
+        });
+    });
+
+    // 🚀 محرك البحث اللحظي الموحد والمستقر
+    let searchTimeout;
+    const searchInput = document.getElementById('liveSearchInput');
+    const searchIcon = document.getElementById('search-icon');
+    const searchSpinner = document.getElementById('search-spinner');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim().toLowerCase();
+
+            // 1. فلترة العناصر الموجودة حالياً على الشاشة فورا
+            filterLocalElements(query);
+
+            if (searchIcon) searchIcon.classList.add('hidden');
+            if (searchSpinner) searchSpinner.classList.remove('hidden');
+
+            // 2. طلب البيانات المحدثة من السيرفر
+            searchTimeout = setTimeout(() => {
+                const url = new URL(window.location.href);
+                if (query) {
+                    url.searchParams.set('q', query);
+                    url.searchParams.set('search', query);
+                } else {
+                    url.searchParams.delete('q');
+                    url.searchParams.delete('search');
+                }
+                url.searchParams.delete('page');
+
+                fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+
+                    // تحديث محتوى الجدول والكروت
+                    const currentTable = document.querySelector('#leavesTable tbody');
+                    const newTable = doc.querySelector('#leavesTable tbody');
+                    if (currentTable && newTable) currentTable.innerHTML = newTable.innerHTML;
+
+                    const currentMobile = document.querySelector('#mobile-cards-container');
+                    const newMobile = doc.querySelector('#mobile-cards-container');
+                    if (currentMobile && newMobile) currentMobile.innerHTML = newMobile.innerHTML;
+
+                    const currentPagination = document.querySelector('#pagination-container');
+                    const newPagination = doc.querySelector('#pagination-container');
+                    if (currentPagination && newPagination) currentPagination.innerHTML = newPagination.innerHTML;
+
+                    const currentCycleInfo = document.querySelector('#cycle-info-container');
+                    const newCycleInfo = doc.querySelector('#cycle-info-container');
+                    if (currentCycleInfo && newCycleInfo) currentCycleInfo.innerHTML = newCycleInfo.innerHTML;
+
+                    window.history.pushState({}, '', url);
+
+                    // إعادة تطبيق الفلترة المحلية لضمان إبقاء النتيجة متطابقة
+                    const currentQuery = searchInput.value.trim().toLowerCase();
+                    if (currentQuery) {
+                        filterLocalElements(currentQuery);
+                    }
+
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+                    if (searchIcon) searchIcon.classList.remove('hidden');
+                    if (searchSpinner) searchSpinner.classList.add('hidden');
+                })
+                .catch(err => {
+                    console.error('Search error:', err);
+                    if (searchIcon) searchIcon.classList.remove('hidden');
+                    if (searchSpinner) searchSpinner.classList.add('hidden');
+                });
+            }, 400);
+        });
+    }
+
+    function filterLocalElements(query) {
+        const rows = document.querySelectorAll('#leavesTable tbody tr');
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(query) ? '' : 'none';
+        });
+
+        const cards = document.querySelectorAll('#mobile-cards-container > div');
+        cards.forEach(card => {
+            const text = card.innerText.toLowerCase();
+            card.style.display = text.includes(query) ? '' : 'none';
+        });
+    }
+
+    // 🟢 دالة الاعتماد والرفض المباشر
+    function handleQuickAction(leaveId, action) {
+        if (action === 'reject' && !confirm('هل أنت متأكد من رفض طلب الإجازة؟')) return;
+        if (action === 'approve' && !confirm('هل أنت متأكد من اعتماد الإجازة وخصم الرصيد؟')) return;
+
+        const url = action === 'approve' ? `/hr/leaves/${leaveId}/approve/` : `/hr/leaves/${leaveId}/reject/`;
+        const card = document.getElementById(`leave-card-${leaveId}`);
+        const row = document.getElementById(`leave-row-${leaveId}`);
+        const csrftoken = '{{ csrf_token }}';
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrftoken,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok || response.redirected) {
+                if (row) {
+                    const statusCell = row.children[5];
+                    const actionCell = row.children[6];
+
+                    if (action === 'approve') {
+                        statusCell.innerHTML = `
+                            <span class="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-black text-emerald-500 border border-emerald-500/50 bg-emerald-500/10 shadow-sm">
+                                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> معتمدة
+                            </span>`;
+                    } else {
+                        statusCell.innerHTML = `
+                            <span class="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-black text-rose-500 border border-rose-500/50 bg-rose-500/10 shadow-sm">
+                                <i data-lucide="x-octagon" class="w-3.5 h-3.5"></i> مرفوضة
+                            </span>`;
+                    }
+
+                    actionCell.innerHTML = `
+                        <span class="text-xs text-slate-500 font-bold px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950 inline-block">
+                            تمت معالجته
+                        </span>`;
+                }
+
+                if (card) {
+                    const statusBadge = card.querySelector('span.rounded-lg');
+                    const actionButtons = card.querySelector('.grid.grid-cols-2');
+
+                    if (statusBadge) {
+                        if (action === 'approve') {
+                            statusBadge.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800';
+                            statusBadge.innerText = 'معتمدة';
+                        } else {
+                            statusBadge.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-950/60 text-rose-400 border border-rose-800';
+                            statusBadge.innerText = 'مرفوضة';
+                        }
+                    }
+
+                    if (actionButtons) actionButtons.remove();
+                }
+
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                decrementNotificationCounters();
+
+            } else {
+                response.json().then(data => {
+                    alert(data.message || 'حدث خطأ أثناء معالجة الطلب.');
+                }).catch(() => {
+                    alert('حدث خطأ أثناء معالجة الطلب.');
+                });
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function decrementNotificationCounters() {
+        const ids = ['header-notification-count', 'sidebar-notification-count', 'dashboard-notification-count'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                let currentCount = parseInt(el.innerText) || 0;
+                if (currentCount > 0) {
+                    el.innerText = currentCount - 1;
+                    if (currentCount - 1 === 0) el.classList.add('hidden');
+                }
+            }
+        });
+    }
+</script>
+
+<style>
+    .animate-spin-slow { animation: spin 3s linear infinite; }
+</style>
 {% endblock %}

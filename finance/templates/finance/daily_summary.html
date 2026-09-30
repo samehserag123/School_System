@@ -1,12 +1,15 @@
-{% extends 'base.html' %}
+{% extends 'base_finance.html' %}
 
 {% block content %}
+<!-- مكتبة الحركات لإعطاء طابع حيوي للتنبيهات -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
 
-    body { 
-        background: #020617; 
-        font-family: 'Cairo', sans-serif; 
+    body {
+        background: #020617;
+        font-family: 'Cairo', sans-serif;
         color: #e2e8f0;
     }
 
@@ -15,7 +18,7 @@
         background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(2, 6, 23, 0.95));
         backdrop-filter: blur(15px);
         -webkit-backdrop-filter: blur(15px);
-        border: 1px solid rgba(245, 158, 11, 0.15); 
+        border: 1px solid rgba(245, 158, 11, 0.15);
         border-radius: 24px;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
         overflow: hidden;
@@ -143,10 +146,23 @@
         border-radius: 24px !important;
         box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
     }
+
+    /* 🟢 تصميم التنبيه الرقابي الجديد */
+    .alert-glass-danger {
+        background: rgba(220, 38, 38, 0.15); border-left: 5px solid #dc2626;
+        backdrop-filter: blur(10px); color: white; border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(220, 38, 38, 0.2);
+    }
+    .pulse-icon { animation: pulseWarning 1.5s infinite; }
+    @keyframes pulseWarning {
+        0% { transform: scale(1); opacity: 1; text-shadow: 0 0 10px #ff3131; }
+        50% { transform: scale(1.2); opacity: 0.7; text-shadow: 0 0 20px #ff3131; }
+        100% { transform: scale(1); opacity: 1; text-shadow: 0 0 10px #ff3131; }
+    }
 </style>
 
 <div class="container-fluid py-4" dir="rtl">
-    
+
     <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
         <div>
             <h2 class="fw-900 text-white m-0 d-flex align-items-center">
@@ -154,10 +170,45 @@
                 غرفة جرد وتصفية الحسابات اليومية
             </h2>
             <div class="mt-2 text-secondary font-bold">
-                تاريخ الجرد الجاري: <span class="badge bg-dark border border-secondary px-3 py-2 fs-6 text-white ms-1">{{ today }}</span>
+                تاريخ الجرد الجاري: 
+                <span class="badge {% if is_past_day %}bg-danger{% else %}bg-dark border border-secondary{% endif %} px-3 py-2 fs-6 text-white ms-1">
+                    {{ today }}
+                </span>
             </div>
         </div>
     </div>
+
+    <!-- ============================================================== -->
+    <!-- 🚨 🟢 قسم الإشعارات الذكية للأيام الساقطة مالياً -->
+    <!-- ============================================================== -->
+    {% if missed_count > 0 %}
+    <div class="alert alert-glass-danger p-4 mb-5 animate__animated animate__headShake">
+        <div class="d-flex align-items-center mb-3">
+            <i class="bi bi-shield-fill-exclamation text-danger fs-1 me-4 pulse-icon"></i>
+            <div>
+                <h5 class="fw-black text-danger mb-1" style="font-weight: 900;">تنبيه رقابي هام!</h5>
+                <p class="mb-0 text-white-50 fs-6">يوجد <b class="text-white mx-1">({{ missed_count }})</b> أيام عمل سابقة لم يتم إغلاق حساباتها. يرجى اختيار اليوم من القائمة أدناه لاستلامه.</p>
+            </div>
+        </div>
+        
+        <!-- 🟢 القائمة المنسدلة الاحترافية -->
+        <div class="bg-black bg-opacity-50 p-3 rounded-3 border border-danger d-flex align-items-center gap-3">
+            <i class="bi bi-calendar-event text-white fs-4"></i>
+            <div class="flex-grow-1">
+                <select class="form-select bg-dark text-white border-danger fw-bold shadow-none" id="missedDaysSelect" onchange="if(this.value) window.location.href='?date='+this.value;">
+                    <option value="">-- اضغط هنا لفتح قائمة الأيام الساقطة واختيار يوم لاستلامه --</option>
+                    {% for date in missed_days %}
+                        <option value="{{ date|date:'Y-m-d' }}">{{ date|date:"l, d F Y" }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if is_past_day %}
+                <a href="{% url 'daily_cashier_summary' %}" class="btn btn-warning fw-bold text-dark px-4"><i class="bi bi-arrow-return-right me-1"></i> العودة لليوم الحالي</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    <!-- ============================================================== -->
 
     <!-- كروت المؤشرات العلوية -->
     <div class="row g-4 mb-5">
@@ -171,14 +222,14 @@
         <div class="col-xl-4 col-md-6">
             <div class="stat-box stat-revenue">
                 <i class="bi bi-graph-up-arrow stat-icon"></i>
-                <h6 class="text-white-50 fw-bold mb-2 fs-6">إجمالي المقبوضات المحصلة اليوم</h6>
+                <h6 class="text-white-50 fw-bold mb-2 fs-6">إجمالي المقبوضات المحصلة باليوم المختار</h6>
                 <h2 class="fw-900 neon-text-success mb-0">+ {{ total_revenues|default:"0.00"|floatformat:2 }} <small class="fs-6 fw-normal">ج.م</small></h2>
             </div>
         </div>
         <div class="col-xl-4 col-md-6">
             <div class="stat-box stat-expense">
                 <i class="bi bi-graph-down-arrow stat-icon"></i>
-                <h6 class="text-white-50 fw-bold mb-2 fs-6">إجمالي المصروفات والمرتجعات اليوم</h6>
+                <h6 class="text-white-50 fw-bold mb-2 fs-6">إجمالي المصروفات والمرتجعات باليوم المختار</h6>
                 <h2 class="fw-900 neon-text-danger mb-0">- {{ total_expenses|default:"0.00"|floatformat:2 }} <small class="fs-6 fw-normal">ج.م</small></h2>
             </div>
         </div>
@@ -186,12 +237,12 @@
 
     <div class="row g-4">
         <div class="col-lg-7 col-xl-8">
-            
+
             <!-- جدول عهد الموظفين والمحصلين -->
             <div class="premium-card mb-4">
                 <div class="card-header-premium d-flex justify-content-between align-items-center">
                     <h5 class="text-white fw-bold m-0 d-flex align-items-center">
-                        <i class="bi bi-people-fill text-success me-2 fs-4"></i> 
+                        <i class="bi bi-people-fill text-success me-2 fs-4"></i>
                         أرصدة عهد الموظفين والمحصلين
                     </h5>
                     <span class="badge px-4 py-2 rounded-pill fw-900 fs-6" style="background-color: #39ff14; color: #000 !important; box-shadow: 0 0 15px rgba(57, 255, 20, 0.4);">
@@ -222,9 +273,9 @@
                                     </td>
                                     <td class="text-center">
                                         <!-- زر فتح المودال لإظهار تفاصيل الإيصالات -->
-                                        <button type="button" 
+                                        <button type="button"
                                                 class="btn btn-sm btn-dark border border-info text-info px-3 py-2 rounded-pill fw-bold shadow-sm"
-                                                data-bs-toggle="modal" 
+                                                data-bs-toggle="modal"
                                                 data-bs-target="#receiptsModal{{ cashier.user_id }}">
                                             <i class="bi bi-receipt-cutoff me-1"></i>
                                             {{ cashier.receipts_count }} إيصال
@@ -236,7 +287,7 @@
                                 <tr>
                                     <td colspan="3" class="text-center py-5 text-secondary">
                                         <i class="bi bi-person-x fs-1 d-block mb-2"></i>
-                                        لم يقم أي موظف بعمليات تحصيل حتى الآن اليوم.
+                                        لم يقم أي موظف بعمليات تحصيل في هذا اليوم المحُدد.
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -250,8 +301,8 @@
             <div class="premium-card">
                 <div class="card-header-premium d-flex justify-content-between align-items-center">
                     <h5 class="text-white fw-bold m-0 d-flex align-items-center">
-                        <i class="bi bi-cup-hot-fill text-danger me-2 fs-4"></i> 
-                        سجل المصروفات النثرية والعمومية اليومية
+                        <i class="bi bi-cup-hot-fill text-danger me-2 fs-4"></i>
+                        سجل المصروفات النثرية والعمومية (اليوم المختار)
                     </h5>
                     <a href="{% url 'add_expense_view' %}" class="btn btn-sm btn-outline-danger rounded-pill px-4 fw-bold">
                         إضافة أمر صرف +
@@ -276,7 +327,7 @@
                                 <tr>
                                     <td colspan="2" class="text-center py-5 text-secondary">
                                         <i class="bi bi-check-all text-success fs-1 d-block mb-2"></i>
-                                        لم يتم تسجيل أي مصروفات نقدية اليوم.
+                                        لم يتم تسجيل أي مصروفات نقدية في هذا اليوم.
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -296,11 +347,13 @@
                         محرك جرد الفئات النقدية (الفعلي)
                     </h5>
                 </div>
-                
+
                 <div class="card-body p-4">
                     <form method="POST" action="{% url 'close_daily_accounts_view' %}">
                         {% csrf_token %}
                         <input type="hidden" name="total_actual_hidden" id="id_total_actual_hidden" value="0">
+                        <!-- 🟢 السطر المخفي الضروري لتحديد اليوم الذي سيتم إغلاقه -->
+                        <input type="hidden" name="closing_date" value="{{ today|date:'Y-m-d' }}">
 
                         <div class="denom-grid">
                             <div class="denom-box">
@@ -361,8 +414,8 @@
                             <textarea name="notes" class="form-control bg-black border-secondary text-white p-3 fw-bold" rows="2" style="border-radius: 12px; resize: none;" placeholder="اكتب مبررات العجز أو الزيادة أو أي ملاحظات جردية هنا..."></textarea>
                         </div>
 
-                        <button type="submit" class="btn btn-success w-100 py-3 fw-bold fs-5 shadow-lg rounded-3" onclick="return confirm('هل أنت متأكد من صحة أعداد الفئات النقدية وتأكيد إغلاق اليومية الحالية؟ لا يمكن تعديل هذه البيانات لاحقاً.')">
-                            <i class="bi bi-lock-fill me-2 fs-5"></i> 
+                        <button type="submit" class="btn btn-success w-100 py-3 fw-bold fs-5 shadow-lg rounded-3" onclick="return confirm('هل أنت متأكد من صحة الفئات النقدية وتأكيد الاستلام؟ سيتم تصفير عهدة الموظفين لهذا اليوم فقط.')">
+                            <i class="bi bi-lock-fill me-2 fs-5"></i>
                             اعتماد الاستلام وإغلاق اليومية
                         </button>
                     </form>
@@ -435,11 +488,11 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const inputs = document.querySelectorAll('.denom-input');
-        
+
         inputs.forEach(input => {
             input.addEventListener('focus', function() { if(this.value === '0') this.value = ''; });
             input.addEventListener('blur', function() { if(this.value === '') this.value = '0'; });
-            
+
             input.addEventListener('input', function() {
                 let unit = parseFloat(this.getAttribute('data-unit'));
                 let count = parseFloat(this.value) || 0;
@@ -453,24 +506,24 @@
             document.querySelectorAll('.denom-input').forEach(input => {
                 grand += (parseFloat(input.getAttribute('data-unit')) * (parseFloat(input.value) || 0));
             });
-            
+
             document.getElementById('grandTotal').innerText = grand.toLocaleString('en-US', {minimumFractionDigits: 2});
             document.getElementById('id_total_actual_hidden').value = grand;
 
             let systemText = document.getElementById('systemTotal').innerText;
             let systemTotal = parseFloat(systemText.replace(/[^\d.-]/g, '')) || 0;
-            
+
             let diff = grand - systemTotal;
             let diffElement = document.getElementById('diffAmount');
-            
+
             if (Math.abs(diff) < 0.01) {
-                diffElement.className = "fs-3 neon-text-success"; 
+                diffElement.className = "fs-3 neon-text-success";
                 diffElement.innerText = "الخزينة مطابقة تماماً ✅";
             } else if (diff < 0) {
-                diffElement.className = "fs-4 neon-text-danger"; 
+                diffElement.className = "fs-4 neon-text-danger";
                 diffElement.innerText = "عجز بمقدار (- " + Math.abs(diff).toLocaleString('en-US', {minimumFractionDigits: 2}) + " ج.م)";
             } else {
-                diffElement.className = "fs-4 neon-text-warning"; 
+                diffElement.className = "fs-4 neon-text-warning";
                 diffElement.innerText = "زيادة بمقدار (+ " + diff.toLocaleString('en-US', {minimumFractionDigits: 2}) + " ج.م)";
             }
         }

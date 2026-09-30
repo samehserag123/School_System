@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'base_students.html' %}
 {% block content %}
 <div class="container-fluid py-4 animate__animated animate__fadeIn" dir="rtl">
     <div class="d-flex justify-content-between align-items-center mb-4 bg-dark bg-opacity-40 p-4 rounded-3 shadow-lg border-right border-info" style="border-right: 5px solid #0dcaf0 !important; backdrop-filter: blur(10px);">
@@ -30,7 +30,7 @@
     <form method="POST" action="">
         {% csrf_token %}
         <input type="hidden" name="target_grade_id" value="{{ selected_grade }}">
-        
+
         <div class="card border-0 shadow-lg" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1) !important;">
             <div class="card-header bg-dark bg-opacity-20 py-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
                 <h5 class="mb-0 fw-bold text-white"><i class="bi bi-book text-info me-1"></i> قائمة المواد المتاحة بالمنظومة</h5>
@@ -39,13 +39,13 @@
                     <label class="form-check-label text-info fw-bold" for="checkAllSubjects">تحديد كل المواد</label>
                 </div>
             </div>
-            
+
             <div class="card-body p-4 text-white">
                 <div class="row g-3">
                     {% for subject in all_subjects %}
                     <div class="col-md-4 col-sm-6">
                         <div class="p-3 rounded-3 d-flex align-items-center border border-secondary bg-dark bg-opacity-30 item-subject-box" style="transition: 0.2s;">
-                            <input type="checkbox" name="subjects" value="{{ subject.id }}" id="sub-{{ subject.id }}" class="form-check-input border-secondary shadow-none sub-chk me-2" 
+                            <input type="checkbox" name="subjects" value="{{ subject.id }}" id="sub-{{ subject.id }}" class="form-check-input border-secondary shadow-none sub-chk me-2"
                             {% if subject.id in assigned_subject_ids %}checked{% endif %}>
                             <label class="form-check-label fw-bold fs-6 text-white-50 ms-2" for="sub-{{ subject.id }}" style="cursor: pointer;">
                                 {{ subject.name }}
@@ -60,7 +60,7 @@
                     {% endfor %}
                 </div>
             </div>
-            
+
             {% if all_subjects %}
             <div class="card-footer bg-transparent border-top border-secondary py-3 d-flex justify-content-end">
                 <button type="submit" class="btn btn-info fw-bold px-4 text-dark shadow"><i class="bi bi-cloud-arrow-up-fill"></i> حفظ وتثبيت مواد هذا الصف الدراسي</button>

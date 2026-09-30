@@ -1,0 +1,214 @@
+{% extends 'hr/base_hr.html' %}
+
+{% block title %}سجل الأذونات الرسمية{% endblock %}
+{% block header_title %}الأذونات الرسمية{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- نموذج إضافة إذن جديد -->
+    <div class="lg:col-span-1">
+        <div class="bg-slate-900/80 p-6 rounded-2xl shadow-lg border border-slate-700">
+            <h3 class="text-lg font-black text-amber-500 mb-1 flex items-center gap-2">
+                <i data-lucide="clock-4" class="w-5 h-5"></i> تسجيل إذن انصراف
+            </h3>
+            <p class="text-xs text-slate-400 mb-6 font-medium">الحد الأقصى هو إذن واحد فقط للموظف شهرياً.</p>
+
+            <form method="POST" action="" onsubmit="return validatePermissionForm(this)" class="space-y-5">
+                {% csrf_token %}
+
+                <!-- 🔍 خانة البحث الذكية -->
+                <div class="relative">
+                    <label class="block text-sm font-bold text-slate-300 mb-2">وقت الخروج الفعلي (يجب أن يكون بعد 2 ظهراً) <span class="text-rose-500">*</span></label>
+                    <input type="time" name="departure_time" id="perm_departure" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-2.5 font-bold" required>
+                </div>
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-amber-500">
+                            <i data-lucide="search" class="w-4 h-4"></i>
+                        </div>
+                        <input type="text" id="perm-search-input" placeholder="اضغط هنا للبحث أو اكتب الكود..." class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full pr-10 p-2.5 font-bold transition-all shadow-sm" autocomplete="off">
+                        <input type="hidden" name="employee" id="perm-hidden-emp" required>
+
+                        <!-- سحب البيانات من الـ Form الخاص بجانغو مباشرة -->
+                        <ul id="perm-search-results" class="hidden absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-800">
+                            {% for emp in form.employee.field.queryset %}
+                                <li class="cursor-pointer px-3 py-2 text-sm font-bold text-slate-300 transition-colors perm-emp-option hover:bg-slate-700 hover:text-amber-400" data-id="{{ emp.id }}" data-name="{{ emp.name }}">
+                                    {{ emp.name }} <span class="text-amber-500 text-[10px] font-mono mr-1">كود: {{ emp.emp_id }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- حقل التاريخ والوقت -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-300 mb-2">تاريخ الإذن <span class="text-rose-500">*</span></label>
+                    <input type="date" name="date" id="perm_date" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-2.5 font-bold" required>
+                </div>
+
+                <div class="flex gap-4">
+                    <div class="w-1/2">
+                        <label class="block text-sm font-bold text-slate-300 mb-2">من الساعة <span class="text-rose-500">*</span></label>
+                        <input type="time" name="from_time" id="perm_from" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-2.5 font-bold" required>
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-sm font-bold text-slate-300 mb-2">إلى الساعة <span class="text-rose-500">*</span></label>
+                        <input type="time" name="to_time" id="perm_to" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-2.5 font-bold" required>
+                    </div>
+                </div>
+
+                <!-- حقل السبب -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-300 mb-2">السبب <span class="text-rose-500">*</span></label>
+                    <textarea name="reason" rows="2" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-2.5 font-medium" required></textarea>
+                </div>
+
+                <button type="submit" id="perm-submit-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-black font-black py-3 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all flex justify-center items-center gap-2 mt-4">
+                    <i data-lucide="check-square" class="w-5 h-5"></i> اعتماد الإذن (Enter)
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- جدول عرض الأذونات -->
+    <div class="lg:col-span-2">
+        <div class="bg-slate-900/60 rounded-2xl shadow-lg border border-slate-700 overflow-hidden backdrop-blur-sm">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-right text-slate-300">
+                    <thead class="text-xs text-slate-400 bg-slate-800/80 border-b border-slate-700">
+                        <tr>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider">الموظف</th>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider">تاريخ الإذن</th>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider">وقت الخروج</th>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider">السبب</th>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider text-center">الحالة</th>
+                            <th class="px-5 py-4 font-black uppercase tracking-wider text-center">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/50">
+                        {% for perm in permissions %}
+                        <tr class="hover:bg-slate-800/50 transition-colors">
+                            <td class="px-5 py-4 font-bold text-white">{{ perm.employee.name }}</td>
+                            <td class="px-5 py-4 font-mono text-xs font-bold text-amber-400">{{ perm.date|date:"Y-m-d" }}</td>
+                            <td class="px-5 py-4 text-xs font-medium text-slate-400">{{ perm.reason|truncatechars:40 }}</td>
+                            <td class="px-5 py-4 text-center">
+                                {% if perm.status == 'approved' %}
+                                    <span class="bg-emerald-950/50 text-emerald-400 px-2 py-1 rounded-md text-xs font-bold border border-emerald-800/50 shadow-sm">مقبول</span>
+                                {% elif perm.status == 'rejected' %}
+                                    <span class="bg-rose-950/50 text-rose-400 px-2 py-1 rounded-md text-xs font-bold border border-rose-800/50 shadow-sm">مرفوض</span>
+                                {% else %}
+                                    <span class="bg-amber-950/50 text-amber-400 px-2 py-1 rounded-md text-xs font-bold border border-amber-800/50 shadow-sm">قيد الانتظار</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-5 py-4 text-center">
+                                {% if perm.status == 'pending' %}
+                                <div class="flex items-center justify-center gap-2">
+                                    <a href="{% url 'hr:update_permission_status' perm.id 'approved' %}" class="text-emerald-500 hover:text-emerald-400 bg-emerald-950/30 hover:bg-emerald-900/50 p-2 rounded-lg border border-emerald-900 transition-all shadow-sm" title="موافقة">
+                                        <i data-lucide="check" class="w-4 h-4 font-bold"></i>
+                                    </a>
+                                    <a href="{% url 'hr:update_permission_status' perm.id 'rejected' %}" class="text-rose-500 hover:text-rose-400 bg-rose-950/30 hover:bg-rose-900/50 p-2 rounded-lg border border-rose-900 transition-all shadow-sm" title="رفض">
+                                        <i data-lucide="x" class="w-4 h-4 font-bold"></i>
+                                    </a>
+                                </div>
+                                {% else %}
+                                <span class="text-slate-600 text-xs font-bold bg-slate-800 px-2 py-1 rounded border border-slate-700">- تم اتخاذ إجراء -</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="px-5 py-12 text-center text-slate-500 font-bold"><i data-lucide="clock-4" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>لا توجد أذونات مسجلة.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    lucide.createIcons();
+
+    // تاريخ اليوم الافتراضي
+    const today = new Date().toISOString().split('T')[0];
+    const dateInput = document.getElementById('perm_date');
+    const fromInput = document.getElementById('perm_from');
+    if(dateInput) dateInput.value = today;
+
+    const searchInput = document.getElementById('perm-search-input');
+    const resultsList = document.getElementById('perm-search-results');
+    const hiddenInput = document.getElementById('perm-hidden-emp');
+    const options = document.querySelectorAll('.perm-emp-option');
+    let currentFocus = -1;
+
+    // فتح القائمة عند الضغط بالماوس
+    searchInput.addEventListener('click', function() {
+        resultsList.classList.remove('hidden');
+        options.forEach(opt => opt.style.display = 'block');
+    });
+
+    // البحث والتنقل
+    searchInput.addEventListener('keydown', function(e) {
+        let visibleOpts = Array.from(options).filter(opt => opt.style.display !== 'none');
+        if (e.key === 'ArrowDown') { e.preventDefault(); currentFocus++; addActive(visibleOpts); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); currentFocus--; addActive(visibleOpts); }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (currentFocus > -1 && visibleOpts[currentFocus]) visibleOpts[currentFocus].click();
+            else if (visibleOpts.length > 0) visibleOpts[0].click();
+        }
+    });
+
+    function addActive(opts) {
+        if (!opts || opts.length === 0) return;
+        opts.forEach(opt => opt.classList.remove('bg-slate-700', 'text-amber-400'));
+        if (currentFocus >= opts.length) currentFocus = 0;
+        if (currentFocus < 0) currentFocus = (opts.length - 1);
+        opts[currentFocus].classList.add('bg-slate-700', 'text-amber-400');
+        opts[currentFocus].scrollIntoView({ block: 'nearest' });
+    }
+
+    searchInput.addEventListener('input', function() {
+        currentFocus = -1;
+        const filter = this.value.toLowerCase();
+        resultsList.classList.remove('hidden');
+        options.forEach(opt => { opt.style.display = opt.innerText.toLowerCase().includes(filter) ? 'block' : 'none'; });
+    });
+
+    // الاختيار والانتقال للتاريخ
+    options.forEach(opt => {
+        opt.addEventListener('click', function() {
+            searchInput.value = this.getAttribute('data-name');
+            hiddenInput.value = this.getAttribute('data-id');
+            resultsList.classList.add('hidden');
+            setTimeout(() => {
+                dateInput.focus();
+                dateInput.showPicker ? dateInput.showPicker() : dateInput.select();
+            }, 50);
+        });
+    });
+
+    // التنقل بـ Enter
+    dateInput.addEventListener('keydown', e => {
+        if(e.key === 'Enter') { e.preventDefault(); fromInput.focus(); }
+    });
+
+    // إخفاء القائمة عند النقر خارجها
+    document.addEventListener('click', e => {
+        if (!searchInput.contains(e.target) && !resultsList.contains(e.target)) {
+            resultsList.classList.add('hidden');
+        }
+    });
+});
+
+function validatePermissionForm(form) {
+    if (!document.getElementById('perm-hidden-emp').value) {
+        alert('يجب اختيار الموظف أولاً من القائمة!');
+        document.getElementById('perm-search-input').focus();
+        return false;
+    }
+    const btn = document.getElementById('perm-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin text-black"></i> جاري الحفظ...`;
+    return true;
+}
+</script>
+{% endblock %}

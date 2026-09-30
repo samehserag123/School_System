@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_finance.html" %}
 {% load static %}
 
 {% block title %}سجل الطلاب المطور والكنترول العام{% endblock %}
@@ -457,7 +457,6 @@
                     <option value="Internal" {% if selected_specialization == 'Internal' %}selected{% endif %}>مشرف غرف</option>
                     <option value="Kitchen" {% if selected_specialization == 'Kitchen' %}selected{% endif %}>مطبخ</option>
                     <option value="Restaurant" {% if selected_specialization == 'Restaurant' %}selected{% endif %}>مطعم</option>
-
                     <option value="Tourism Services" {% if selected_specialization == 'Tourism Services' or selected_specialization == 'Tourism_Services' %}selected{% endif %}>خدمات سياحية</option>
                 </select>
             </div>
@@ -518,7 +517,6 @@
                     <div class="col-md-4">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-warning text-dark border-warning fw-bold"><i class="bi bi-mortarboard"></i></span>
-                            <!-- 🟢 التعديل الجوهري: جعل خيار الترفيع التلقائي هو الافتراضي ليعمل النظام آلياً per student -->
                             <select name="target_grade" id="targetGradeSelect" class="form-select form-select-sm bg-dark text-white border-warning fw-bold">
                                 <option value="auto" selected>⚡ تلقائي (الترفيع الطبيعي لجميع الصفوف)</option>
                                 <option value="graduate_action" class="text-warning fw-bold">🎓 إتمام الدراسة والتخرج (أكاديمي)</option>
@@ -561,7 +559,7 @@
                         <th>المتبقي</th>
                         <th>النتيجة الأكاديمية 🎓</th>
                         <th>الموقف المالي</th>
-                        <th width="140">إجراءات</th>
+                        <th style="min-width: 170px; white-space: nowrap;">إجراءات مالية</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -588,7 +586,6 @@
                             </div>
                         </td>
 
-                        <!-- خانة سداد المديونية القديمة مجهزة بالعودة والتمركز السلس -->
                         <td class="text-center" style="min-width:125px;">
                             <div class="mb-1">
                                 {% if student.old_debt_display > 0 %}
@@ -619,7 +616,7 @@
                             {{ student.calculated_remaining|floatformat:2 }}
                         </td>
 
-                        <!-- النتيجة الأكاديمية (مستقلة تماماً عن المالية) -->
+                        <!-- النتيجة الأكاديمية -->
                         <td class="text-center">
                             {% if student.enrollment_status == "Graduated" %}
                                 <span class="badge-status badge-graduated"><i class="bi bi-mortarboard-fill"></i> خريج 🎓</span>
@@ -636,7 +633,7 @@
                             {% endif %}
                         </td>
 
-                        <!-- الموقف المالي (للإعلام وحظر الشهادة/سحب الملف فقط) -->
+                        <!-- الموقف المالي -->
                         <td class="text-center">
                             {% if student.enrollment_status == "Graduated" %}
                                 {% if student.calculated_remaining > 0 %}
@@ -661,16 +658,21 @@
                             {% endif %}
                         </td>
 
-                        <!-- أزرار الإجراءات المربوطة بتمرير المسار والتركيز السلس -->
-                        <td class="text-center">
+                        <!-- 🟢 الإجراءات المالية -->
+                        <td class="text-center" style="white-space: nowrap;">
                             <div class="d-flex justify-content-center gap-1">
+
+                                <button type="button" class="btn btn-action-icon btn-success text-white shadow-sm border border-success" title="تحصيل إداري / إعادة قيد بالخزينة" onclick="openProCollectionModal('{{ student.id }}', '{{ student.get_full_name|escapejs }}', '{{ student.student_code }}')">
+                                    <i class="bi bi-cash-coin"></i>
+                                </button>
+
                                 <a href="{% url 'student_statement_print' student.id %}" class="btn btn-action-icon btn-outline-primary" title="كشف حساب مالي" target="_blank">
                                     <i class="bi bi-receipt"></i>
                                 </a>
 
                                 {% if student.fees_display > 0 %}
                                     <a href="{% url 'quick_collection' %}?student_id={{ student.id }}&next={{ request.get_full_path|urlencode }}#student-{{ student.id }}"
-                                        class="btn btn-action-icon btn-success" title="تحصيل سريع">
+                                        class="btn btn-action-icon btn-success" title="تحصيل سريع للأقساط">
                                          <i class="bi bi-lightning-charge-fill"></i>
                                     </a>
 
@@ -706,91 +708,211 @@
             </table>
         </div>
     </div>
+</form>
+<!-- 🟢🟢 تم إغلاق الفورم الرئيسي للترحيل الأكاديمي هنا لفك الاشتباك مع المودالات 🟢🟢 -->
 
-    <!-- 5. مودال النجاح بالتعديل والتمركز -->
-    <div class="modal fade animate__animated animate__bounceIn" id="editSuccessModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content modal-glass">
-                <div class="modal-header border-secondary bg-black bg-opacity-40">
-                    <h5 class="modal-title fw-black text-info">
-                        <i class="bi bi-check-circle-fill me-2 text-success"></i>تم حفظ وتحديث البيانات بنجاح
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body text-center py-4">
-                    <i class="bi bi-person-check-fill text-info animate__animated animate__pulse animate__infinite" style="font-size: 4rem; display: block; margin-bottom: 15px;"></i>
-                    <p class="fs-5 mb-1 text-white fw-bold">تمت عملية التحديث والمزامنة بنجاح للطالب:</p>
-                    <h3 id="successModalStudentName" class="fw-black text-warning mb-3"></h3>
-                    <p class="text-white-50 small mb-0 fw-semibold" id="successModalStudentInfo"></p>
-                </div>
-                <div class="modal-footer border-secondary bg-black bg-opacity-40 d-flex justify-content-between">
-                    <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">إغلاق التنبيه</button>
-                    <button type="button" class="btn btn-sm btn-info fw-black px-3 text-dark" id="btnScrollToStudent">
-                        <i class="bi bi-geo-alt-fill me-1"></i>الانتقال لمكانه بالجدول
-                    </button>
-                </div>
+<!-- 5. مودال النجاح بالتعديل والتمركز -->
+<div class="modal fade animate__animated animate__bounceIn" id="editSuccessModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-glass">
+            <div class="modal-header border-secondary bg-black bg-opacity-40">
+                <h5 class="modal-title fw-black text-info">
+                    <i class="bi bi-check-circle-fill me-2 text-success"></i>تم حفظ وتحديث البيانات بنجاح
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="bi bi-person-check-fill text-info animate__animated animate__pulse animate__infinite" style="font-size: 4rem; display: block; margin-bottom: 15px;"></i>
+                <p class="fs-5 mb-1 text-white fw-bold">تمت عملية التحديث والمزامنة بنجاح للطالب:</p>
+                <h3 id="successModalStudentName" class="fw-black text-warning mb-3"></h3>
+                <p class="text-white-50 small mb-0 fw-semibold" id="successModalStudentInfo"></p>
+            </div>
+            <div class="modal-footer border-secondary bg-black bg-opacity-40 d-flex justify-content-between">
+                <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">إغلاق التنبيه</button>
+                <button type="button" class="btn btn-sm btn-info fw-black px-3 text-dark" id="btnScrollToStudent">
+                    <i class="bi bi-geo-alt-fill me-1"></i>الانتقال لمكانه بالجدول
+                </button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- 6. التنقل بين الصفحات -->
-    <div id="paginationContainer">
-        {% if students.has_other_pages %}
-        <nav aria-label="Page navigation" class="mt-4 animate__animated animate__fadeInUp">
-            <ul class="pagination pagination-custom justify-content-center flex-wrap">
+<!-- 🟢 6. شاشة التحصيل الاحترافية (POS Style) للماليات -->
+<div class="modal fade animate__animated animate__zoomIn" id="proCollectionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-success" style="background: linear-gradient(145deg, #020617, #0f172a); border-width: 2px; box-shadow: 0 20px 50px rgba(16, 185, 129, 0.2);">
 
-                {% if students.number > 3 %}
-                <li class="page-item">
-                    <a class="page-link shadow-sm" href="?page=1{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" title="الصفحة الأولى">
-                        <i class="bi bi-chevron-double-right"></i> الأولى
-                    </a>
-                </li>
-                {% endif %}
+            <div class="modal-header border-success border-opacity-25" style="background: rgba(16, 185, 129, 0.1);">
+                <h5 class="modal-title fw-black text-success mx-auto" style="letter-spacing: 1px;">
+                    <i class="bi bi-receipt-cutoff me-2"></i>إيصال تحصيل رسوم إدارية
+                </h5>
+                <button type="button" class="btn-close btn-close-white position-absolute end-0 me-3" data-bs-dismiss="modal"></button>
+            </div>
 
-                {% if students.has_previous %}
-                <li class="page-item">
-                    <a class="page-link shadow-sm" href="?page={{ students.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" title="السابق">
-                        <i class="bi bi-chevron-right"></i>
-                    </a>
-                </li>
-                {% else %}
-                <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-right"></i></span></li>
-                {% endif %}
+            <form id="proCollectionForm" onsubmit="submitProCollection(event)">
+                {% csrf_token %}
+                <input type="hidden" name="student_id" id="pro_student_id">
 
-                {% for i in students.paginator.page_range %}
-                    {% if students.number == i %}
-                        <li class="page-item active" aria-current="page"><span class="page-link shadow-sm">{{ i }}</span></li>
-                    {% elif i > students.number|add:'-3' and i < students.number|add:'3' %}
-                        <li class="page-item">
-                            <a class="page-link shadow-sm" href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ i }}</a>
-                        </li>
-                    {% endif %}
-                {% endfor %}
+                <div class="modal-body px-4 py-4">
+                    <div class="text-center mb-4 pb-3 border-bottom border-secondary border-opacity-50">
+                        <h4 id="pro_student_name" class="fw-black text-white mb-1"></h4>
+                        <span class="badge bg-dark border border-secondary text-info font-monospace" id="pro_student_code"></span>
+                    </div>
 
-                {% if students.has_next %}
-                <li class="page-item">
-                    <a class="page-link shadow-sm" href="?page={{ students.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" title="التالي">
-                        <i class="bi bi-chevron-left"></i>
-                    </a>
-                </li>
-                {% else %}
-                <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i></span></li>
-                {% endif %}
+                    <div class="mb-4 text-center">
+                        <label class="form-label text-secondary small fw-bold mb-2 text-uppercase">المبلغ المُحصّل نقداً (EGP)</label>
+                        <div class="input-group input-group-lg justify-content-center mx-auto" style="max-width: 250px;">
+                            <span class="input-group-text bg-black text-success border-success fw-black fs-4">ج.م</span>
+                            <input type="number" name="amount" id="pro_amount" class="form-control bg-black text-white border-success fw-black fs-2 text-center shadow-none" required min="1" placeholder="0.00" style="color: #34d399 !important;">
+                        </div>
+                    </div>
 
-                {% if students.number < students.paginator.num_pages|add:'-2' %}
-                <li class="page-item">
-                    <a class="page-link shadow-sm" href="?page={{ students.paginator.num_pages }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
-                        الأخيرة <i class="bi bi-chevron-double-left"></i>
-                    </a>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
-        {% endif %}
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold mb-2">البيان / سبب التحصيل</label>
+                        <textarea name="notes" id="pro_notes" class="form-control bg-black border-secondary text-white fw-semibold" rows="2" placeholder="اكتب تفاصيل التحصيل (مثال: رسوم إعادة قيد لغياب متكرر)..." required></textarea>
+                    </div>
+
+                    <div class="alert alert-dark mt-4 mb-0 border-0 bg-opacity-50 text-center small text-info fw-bold py-2">
+                        <i class="bi bi-bell-fill me-1 text-warning"></i>
+                        سيتم حفظ المبلغ بالخزينة وإرسال إشعار لحظي لشئون الطلاب.
+                    </div>
+                </div>
+
+                <div class="modal-footer border-0 pt-0 pb-4 px-4 d-flex justify-content-between">
+                    <button type="button" class="btn btn-dark fw-bold px-4" data-bs-dismiss="modal">إلغاء</button>
+                    <!-- 🟢 الزر أصبح type="submit" للتفاعل مع المتصفح بشكل سليم -->
+                    <button type="submit" id="btnSubmitProCollection" class="btn btn-success fw-black text-dark px-5 shadow-lg" style="font-size: 1.1rem;">
+                        <i class="bi bi-printer-fill me-2"></i>تحصيل وطباعة
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
-</form>
+</div>
+
+<!-- 7. التنقل بين الصفحات -->
+<div id="paginationContainer">
+    {% if students.has_other_pages %}
+    <nav aria-label="Page navigation" class="mt-4 animate__animated animate__fadeInUp">
+        <ul class="pagination pagination-custom justify-content-center flex-wrap">
+
+            {% if students.number > 3 %}
+            <li class="page-item">
+                <a class="page-link shadow-sm" href="?page=1{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" title="الصفحة الأولى">
+                    <i class="bi bi-chevron-double-right"></i> الأولى
+                </a>
+            </li>
+            {% endif %}
+
+            {% if students.has_previous %}
+            <li class="page-item">
+                <a class="page-link shadow-sm" href="?page={{ students.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" title="السابق">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-right"></i></span></li>
+            {% endif %}
+
+            {% for i in students.paginator.page_range %}
+                {% if students.number == i %}
+                    <li class="page-item active" aria-current="page"><span class="page-link shadow-sm">{{ i }}</span></li>
+                {% elif i > students.number|add:'-3' and i < students.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link shadow-sm" href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ i }}</a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if students.has_next %}
+            <li class="page-item">
+                <a class="page-link shadow-sm" href="?page={{ students.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" title="التالي">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i></span></li>
+            {% endif %}
+
+            {% if students.number < students.paginator.num_pages|add:'-2' %}
+            <li class="page-item">
+                <a class="page-link shadow-sm" href="?page={{ students.paginator.num_pages }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                    الأخيرة <i class="bi bi-chevron-double-left"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
 
 <script>
+function openProCollectionModal(studentId, studentName, studentCode) {
+    document.getElementById('pro_student_id').value = studentId;
+    document.getElementById('pro_student_name').innerText = studentName;
+    document.getElementById('pro_student_code').innerText = "كود: " + studentCode;
+    document.getElementById('pro_amount').value = '';
+    document.getElementById('pro_notes').value = '';
+
+    let modalEl = document.getElementById('proCollectionModal');
+    let modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modal.show();
+
+    setTimeout(() => { document.getElementById('pro_amount').focus(); }, 400);
+}
+
+function submitProCollection(e) {
+    e.preventDefault();
+
+    let form = document.getElementById('proCollectionForm');
+    let amount = document.getElementById('pro_amount').value;
+    let notes = document.getElementById('pro_notes').value.trim();
+
+    if(!amount || amount <= 0) {
+        alert('⚠️ خطأ: يرجى إدخال مبلغ التحصيل أولاً!');
+        document.getElementById('pro_amount').focus();
+        return;
+    }
+    if(!notes) {
+        alert('⚠️ تنبيه: البيان أو سبب التحصيل مطلوب للتوثيق!');
+        document.getElementById('pro_notes').focus();
+        return;
+    }
+
+    if(!confirm(`هل أنت متأكد من تحصيل مبلغ (${amount} ج.م) بالخزينة وإرسال الإشعار؟`)) return;
+
+    let formData = new FormData(form);
+    let btn = document.getElementById('btnSubmitProCollection');
+    let originalHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري التحصيل...';
+    btn.disabled = true;
+
+    fetch("{% url 'ajax_collect_reenrollment_fee' %}", {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            alert("💸 " + data.message);
+            window.location.reload();
+        } else {
+            alert('❌ عذراً، خطأ من الخادم: ' + data.error);
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    }).catch(err => {
+        alert('تعذر الاتصال بالسيرفر. يرجى التحقق من الشبكة وسجل الأخطاء.');
+        console.error(err);
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    });
+}
+
 const STORAGE_KEY = 'selected_student_ids';
 
 function getStoredIds() {
@@ -949,7 +1071,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // التحكم في الترحيل والتخرج الأكاديمي الشفاف (بدون حظر مالي)
     const promoteForm = document.getElementById("promoteForm");
     if (promoteForm) {
         promoteForm.addEventListener("submit", function(e) {
@@ -965,7 +1086,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
             let nonPromotedCount = 0;
             document.querySelectorAll(".student-checkbox:checked").forEach(cb => {
-                let row = cb.closest("tr");
+                let row = closest("tr");
                 if (row) {
                     let status = row.getAttribute("data-academic-status");
                     if (status !== "Promoted" && status !== "passed") {
@@ -975,24 +1096,24 @@ document.addEventListener("DOMContentLoaded", function() {
             });
 
             if (nonPromotedCount > 0) {
-                if (!confirm(`⚠️ تنبيه أكاديمي من الكنترول: يوجد عدد (${nonPromotedCount}) طلاب محددين لم يتم اعتماد "نجاحهم" رسمياً في الكنترول بعد.\n\nهل تريد التجاوز وترحيلهم/تخرجهم أكاديمياً؟`)) {
+                if (!confirm(`⚠️ تنبيه أكاديمي من الكنترول: يوجد عدد (${nonPromotedCount}) طلاب محددين لم يتم اعتماد "نجاحهم" رسمياً.\n\nهل تريد التجاوز وترحيلهم/تخرجهم أكاديمياً؟`)) {
                     e.preventDefault();
                     return;
                 }
             }
 
             if (isGraduation) {
-                if (!confirm(`🎓 تأكيد التخرج الإداري والأكاديمي:\nسيتم تسجيل إتمام المرحلة لجميع الطلاب المحددين وتأرشفتهم. المديونيات المستحقة تظل مسجلة بحساباتهم وتمنع تسليم الشهادات وسحب الملفات لاحقاً.\n\nهل تريد الاعتماد؟`)) {
+                if (!confirm(`🎓 تأكيد التخرج الإداري والأكاديمي:\nسيتم تسجيل إتمام المرحلة لجميع الطلاب المحددين وتأرشفتهم.\n\nهل تريد الاعتماد؟`)) {
                     e.preventDefault();
                 }
             } else if (finalIds.length > 0) {
-                const actionText = isAuto ? 'الترحيل التلقائي الذكي حسب الصف الفعلي لكل طالب' : 'الترحيل للصف المحدد';
-                if (!confirm(`🚀 سيتم تنفيذ (${actionText}) لعدد (${finalIds.length}) طالب وطالبة تم تحديدهم. هل تريد الاستمرار؟`)) {
+                const actionText = isAuto ? 'الترحيل التلقائي الذكي' : 'الترحيل للصف المحدد';
+                if (!confirm(`🚀 سيتم تنفيذ (${actionText}) لعدد (${finalIds.length}) طالب تم تحديدهم. هل تريد الاستمرار؟`)) {
                     e.preventDefault();
                 }
             } else {
                 const totalVisibleText = document.getElementById("stat-total") ? document.getElementById("stat-total").innerText : "{{ total_count }}";
-                if (!confirm(`💡 لم تقم بتحديد طلاب يدوياً. سيقوم النظام بترحيل جميع طلاب الصف المفلتر وعددهم (${totalVisibleText} طالب) تلقائياً بناءً على نتائج الكنترول. هل تريد الاستمرار؟`)) {
+                if (!confirm(`💡 لم تقم بتحديد طلاب يدوياً. سيقوم النظام بترحيل جميع طلاب الصف المفلتر (${totalVisibleText} طالب). هل تريد الاستمرار؟`)) {
                     e.preventDefault();
                 }
             }

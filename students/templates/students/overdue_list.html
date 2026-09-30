@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_students.html" %}
 {% load static %}
 
 {% block title %}لوحة تحصيل المتابعة المالي والكول سنتر{% endblock %}
@@ -53,8 +53,8 @@
         background: #000000;
         white-space: nowrap;
     }
-    .table-premium tbody tr { 
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+    .table-premium tbody tr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         transition: all 0.2s;
         cursor: pointer;
     }
@@ -212,9 +212,9 @@
                                         <i class="bi bi-telephone-fill me-1"></i> {{ s.phone }}
                                     </a>
                                 {% endif %}
-                                
+
                                 {% if s.whatsapp_number and s.whatsapp_number != '---' %}
-                                    <a href="https://wa.me/2{{ s.whatsapp_number }}?text={{ 'السلام عليكم ولي أمر الطالب/ة ' }}{{ s.full_name }}{{ '، نذكركم بوجود مستحقات متأخرة بقيمة ' }}{{ s.total_required|floatformat:2 }}{{ ' ج.م. يرجى المبادرة بالسداد.'|urlencode }}" 
+                                    <a href="https://wa.me/2{{ s.whatsapp_number }}?text={{ 'السلام عليكم ولي أمر الطالب/ة ' }}{{ s.full_name }}{{ '، نذكركم بوجود مستحقات متأخرة بقيمة ' }}{{ s.total_required|floatformat:2 }}{{ ' ج.م. يرجى المبادرة بالسداد.'|urlencode }}"
                                        target="_blank" class="btn btn-sm btn-whatsapp px-3">
                                         <i class="bi bi-whatsapp me-1"></i> مراسلة
                                     </a>
@@ -381,7 +381,7 @@ function openNotesModal(studentId, studentName) {
     currentActiveStudentId = studentId;
     document.getElementById('notesStudentName').innerText = `سجل ملاحظات: ${studentName}`;
     document.getElementById('newCallNoteText').value = '';
-    
+
     loadStudentCallNotes(studentId);
     let modal = new bootstrap.Modal(document.getElementById('callNotesModal'));
     modal.show();

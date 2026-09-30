@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>متابعة حضور وغياب الطلاب - مدرسة طلعت حرب الثانوية الفندقية</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- ✈️ سكريبت تليجرام الرسمي لمنع إظهار شريط العنوان داخل تطبيق التليجرام -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.expand(); // توسيع الشاشة بالكامل
+                window.Telegram.WebApp.enableClosingConfirmation();
+            }
+        });
+    </script>
+
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f4f6f9;
+            color: #212529;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .header-box {
+            background: linear-gradient(135deg, #111827, #1f2937);
+            color: white;
+            padding: 28px 15px 35px;
+            border-bottom-left-radius: 28px;
+            border-bottom-right-radius: 28px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+        .search-card {
+            margin-top: -28px;
+            border-radius: 18px;
+            border: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        }
+        .status-badge {
+            font-size: 0.92rem;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-weight: 700;
+        }
+        .st-present { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
+        .st-absent { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
+        .st-excused { background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5; }
+        .st-unmarked { background-color: #e2e3e5; color: #41464b; border: 1px solid #d3d6d8; }
+
+        .student-result-card {
+            border-radius: 16px;
+            transition: transform 0.15s ease;
+        }
+        .exit-btn {
+            background-color: #dc3545;
+            color: white;
+            font-weight: 800;
+            border-radius: 14px;
+            padding: 12px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.25);
+            transition: all 0.2s ease;
+        }
+        .exit-btn:hover {
+            background-color: #bb2d3b;
+            color: white;
+            transform: scale(0.99);
+        }
+        /* مؤشر تحميل غير مزعج أثناء البحث */
+        .search-loading {
+            opacity: 0.55;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- الهيدر والترويسة المغلقة والمعزولة -->
+    <div class="header-box text-center position-relative">
+        <h4 class="fw-bold mb-1">🏫 مدرسة طلعت حرب الثانوية الفندقية</h4>
+        <p class="small text-light opacity-75 mb-2">منظومة استعلام أولياء الأمور اليومية</p>
+        <span class="badge bg-primary px-3 py-2 rounded-pill shadow-sm">📅 تاريخ اليوم: {{ today|date:"d / m / Y" }}</span>
+    </div>
+
+    <div class="container my-3 flex-grow-1" style="max-width: 620px;">
+
+        <!-- كارت البحث -->
+        <div class="card search-card p-3 bg-white mb-4">
+            <form id="search-form" action="" onsubmit="return false;">
+                <label for="q" class="form-label fw-bold">🔍 ابحث باسم الطالب:</label>
+                <div class="input-group">
+                    <input type="text" id="q" name="q" class="form-control form-control-lg fs-6"
+                           placeholder="اكتب اسم الطالب هنا..." value="{{ query }}" autocomplete="off">
+                    <button type="button" id="search-btn" class="btn btn-primary fw-bold px-4">بحث</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- حاوية النتائج التفاعلية لتقنية AJAX المباشرة -->
+        <div id="results-container">
+            {% if query %}
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="fw-bold m-0 text-secondary">نتائج البحث عن: "{{ query }}"</h6>
+                    <span class="badge bg-secondary rounded-pill">{{ results|length }} طالب</span>
+                </div>
+
+                {% for item in results %}
+                <div class="card student-result-card shadow-sm mb-3 border-0">
+                    <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-2 p-3">
+                        <div>
+                            <h6 class="fw-bold mb-1 text-dark fs-6">{{ item.student.get_full_name }}</h6>
+                            <small class="text-muted d-block fs-7">
+                                الصف: {{ item.student.grade.name|default:"غير محدد" }} | الفصل: {{ item.student.classroom.name|default:"غير محدد" }}
+                            </small>
+                        </div>
+
+                        <div>
+                            {% if item.status == 'present' %}
+                                <span class="status-badge st-present">✓ حاضر اليوم</span>
+                            {% elif item.status == 'absent' %}
+                                <span class="status-badge st-absent">✕ غائب اليوم</span>
+                            {% elif item.status == 'excused' %}
+                                <span class="status-badge st-excused">! غائب بعذر</span>
+                            {% else %}
+                                <span class="status-badge st-unmarked">لم يُرصد بعد</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if item.notes %}
+                    <div class="card-footer bg-light py-2 fs-7 text-muted border-0 rounded-bottom-4">
+                        📝 ملاحظات: {{ item.notes }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="text-center py-5 bg-white rounded-4 shadow-sm my-3">
+                    <div class="fs-1 mb-2">🚫</div>
+                    <h6 class="fw-bold text-dark mb-1">لم يتم العثور على طالب بهذا الاسم</h6>
+                    <p class="small text-muted mb-0">تأكد من كتابة الاسم الصحيح بدون أخطاء إملائية.</p>
+                </div>
+                {% endfor %}
+            {% else %}
+                <!-- حالة الانتظار قبل البحث -->
+                <div class="text-center py-4 text-muted bg-white rounded-4 shadow-sm p-4">
+                    <div class="mb-2 fs-1">👨‍🎓</div>
+                    <h6 class="fw-bold text-dark">مرحباً بكم في بوابة ولي الأمر</h6>
+                    <p class="small mb-0">يرجى كتابة اسم الطالب في الخانة أعلاه للاستعلام عن حضوره وغيابه لليوم.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- 🚪 زر الخروج النهائي والعودة للقناة مباشرة -->
+        <div class="mt-4 pt-2">
+            <a href="tg://resolve?domain=talaatharbsch"
+               onclick="setTimeout(function(){ window.location.href='https://t.me/talaatharbsch'; }, 800);"
+               class="exit-btn w-100">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                إنهاء وخروج والعودة للقناة
+            </a>
+        </div>
+
+    </div>
+
+    <footer class="text-center py-3 text-muted small mt-auto border-top bg-white">
+        جميع الحقوق محفوظة © مدرسة طلعت حرب الثانوية الفندقية
+    </footer>
+
+<script>
+    const searchInput = document.getElementById('q');
+    const searchBtn = document.getElementById('search-btn');
+    const resultsContainer = document.getElementById('results-container');
+    let debounceTimer;
+
+    // دالة البحث التفاعلي (AJAX) دون إعادة تحميل الصفحة نهائياً
+    async function performAjaxSearch() {
+        if (!searchInput || !resultsContainer) return;
+        const query = searchInput.value;
+
+        resultsContainer.classList.add('search-loading');
+
+        try {
+            const url = `?q=${encodeURIComponent(query)}`;
+            const response = await fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            
+            const htmlText = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlText, 'text/html');
+            const newResults = doc.getElementById('results-container');
+
+            if (newResults) {
+                resultsContainer.innerHTML = newResults.innerHTML;
+            }
+            
+            // 🔒 تنظيف الرابط في المتصفح دون ترك أثر في History
+            window.history.replaceState(null, '', url);
+        } catch (err) {
+            console.error("خطأ أثناء استعلام البيانات:", err);
+        } finally {
+            resultsContainer.classList.remove('search-loading');
+        }
+    }
+
+    if (searchInput) {
+        // البحث اللحظي السلس مع التأكد من عدم إرسال الطلب إذا كان الحرف الأخير مسافة
+        searchInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            const val = this.value;
+
+            if (val.endsWith(' ')) {
+                return; // الانتظار لحين كتابة الحرف التالي
+            }
+
+            debounceTimer = setTimeout(() => {
+                performAjaxSearch();
+            }, 250);
+        });
+
+        // الضغط على زر "بحث"
+        searchBtn?.addEventListener('click', () => {
+            clearTimeout(debounceTimer);
+            performAjaxSearch();
+        });
+
+        // منع إرسال النموذج المباشر بالضغط على Enter
+        document.getElementById('search-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            clearTimeout(debounceTimer);
+            performAjaxSearch();
+        });
+    }
+</script>
+
+</body>
+</html>
