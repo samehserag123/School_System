@@ -84,60 +84,6 @@ class ItemMaster(models.Model):
         return f"[{self.sku}] {self.name}"
 
 
-# class ItemMaster(models.Model):
-#     ITEM_TYPES = [
-#         ('saleable', 'مخزون للبيع (كتب/زي)'),
-#         ('consumable', 'مخزون استهلاكي (مطبخ/نظافة)'),
-#         ('asset', 'أصول ثابتة (تخت/أجهزة)'),
-#     ]
-
-#     UNIT_CHOICES = [
-#         ('piece', 'قطعة / عدد'),
-#         ('kg', 'كيلوجرام'),
-#         ('gram', 'جرام'),
-#         ('liter', 'لتر'),
-#         ('pack', 'عبوة / كرتونة'),
-#     ]
-
-#     TRACKING_CHOICES = [
-#         ('none', 'بدون تتبع خاص'),
-#         ('batch', 'تتبع برقم التشغيلة وصلاحية (للمطعم)'),
-#         ('serial', 'تتبع بالسيريال نمبر (للأصول والأجهزة)'),
-#     ]
-
-#     # إضافة db_index=True لسرعة البحث في القوائم المنسدلة
-#     sku = models.CharField("كود الصنف (SKU/Barcode)", max_length=50, unique=True, blank=True, db_index=True)
-#     name = models.CharField("اسم الصنف", max_length=200, db_index=True)
-#     category = models.ForeignKey(ItemCategory, on_delete=models.PROTECT, verbose_name="التصنيف", db_index=True)
-#     item_type = models.CharField("طبيعة الصنف", max_length=20, choices=ITEM_TYPES, default='saleable', db_index=True)
-#     unit_of_measure = models.CharField("وحدة القياس", max_length=20, choices=UNIT_CHOICES, default='piece')
-#     tracking_type = models.CharField("نوع التتبع", max_length=20, choices=TRACKING_CHOICES, default='none')
-
-#     # تنبيه النواقص
-#     reorder_level = models.DecimalField("حد الطلب (الحد الأدنى)", max_digits=10, decimal_places=2, default=0)
-
-#     # 🔗 الربط مع النظام القديم (اختياري للكتب والزي فقط)
-#     linked_subject = models.ForeignKey('students.Subject', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="المادة الدراسية (للكتب)")
-#     linked_grade = models.ForeignKey('students.Grade', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="الصف (للكتب والزي)")
-
-#     class Meta:
-#         verbose_name = "بطاقة صنف"
-#         verbose_name_plural = "3. بطاقات الأصناف (دليل المواد)"
-
-#     def save(self, *args, **kwargs):
-#         if not self.sku or not str(self.sku).strip():
-#             last_item = ItemMaster.objects.order_by('id').last()
-#             next_id = (last_item.id + 1) if last_item else 1
-#             generated_sku = f"SKU-{next_id:04d}"
-#             while ItemMaster.objects.filter(sku=generated_sku).exists():
-#                 next_id += 1
-#                 generated_sku = f"SKU-{next_id:04d}"
-#             self.sku = generated_sku
-#         super().save(*args, **kwargs)
-
-#     def __str__(self):
-#         return f"[{self.sku}] {self.name}"
-
 # ==========================================
 # 3. جدول حركات المخزون (القلب النابض للنظام)
 # ==========================================
@@ -205,8 +151,7 @@ class StockTransaction(models.Model):
             if is_outgoing:
                 current_stock = StockBalance.get_stock(self.item_id, self.warehouse_id)
                 if self.quantity > current_stock:
-                    warehouse_name = getattr(self.warehouse, 'name', '') if hasattr(self, '_warehouse_cache') else 'المستودع'
-                    raise ValidationError(f"🛑 الرصيد غير كافٍ في {warehouse_name}. المتاح: {current_stock}، والمطلوب صرفه: {self.quantity}")
+                    raise ValidationError(f"🛑 الرصيد غير كافٍ في {self.warehouse.name}. المتاح: {current_stock}، والمطلوب صرفه: {self.quantity}")
 
             # ⚡ 3. حفظ الحركة أولاً
             super().save(*args, **kwargs)
@@ -221,61 +166,6 @@ class StockTransaction(models.Model):
             return -abs(self.quantity)
         return abs(self.quantity)
 
-
-# class StockTransaction(models.Model):
-#     MOVEMENT_TYPES = [
-#         ('IN_OPENING', 'رصيد افتتاحي'),
-#         ('IN_PURCHASE', 'وارد مشتريات'),
-#         ('IN_RETURN', 'وارد مرتجع (من طالب أو قسم)'),
-#         ('OUT_STUDENT', 'منصرف لطالب (بيع/تسليم)'),
-#         ('OUT_DEPT', 'منصرف لقسم (تشغيل مطبخ/نظافة)'),
-#         ('OUT_WASTE', 'منصرف هالك / تالف'),
-#         ('TRANSFER', 'تحويل بين المستودعات'),
-#         ('ADJUST', 'تسوية جردية (عجز/زيادة)'),
-#     ]
-
-#     transaction_code = models.CharField("رقم الحركة", max_length=50, unique=True, editable=False, db_index=True)
-#     movement_type = models.CharField("نوع الحركة", max_length=20, choices=MOVEMENT_TYPES, db_index=True)
-
-#     item = models.ForeignKey(ItemMaster, on_delete=models.PROTECT, verbose_name="الصنف", db_index=True)
-#     warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, verbose_name="المستودع", db_index=True)
-
-#     quantity = models.DecimalField("الكمية", max_digits=12, decimal_places=2)
-
-#     # 🔗 الربط الذكي بالأنظمة الأخرى (أب المخازن)
-#     student = models.ForeignKey('students.Student', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="صرف لطالب")
-#     department = models.CharField("القسم المستلم (للمطعم/النظافة)", max_length=100, blank=True, null=True)
-#     finance_receipt = models.ForeignKey('finance.Payment', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="رقم الإيصال المالي")
-
-#     batch_number = models.CharField("رقم التشغيلة / الباتش", max_length=50, blank=True, null=True, db_index=True)
-#     expiry_date = models.DateField("تاريخ الصلاحية", blank=True, null=True, db_index=True)
-#     serial_number = models.CharField("السيريال نمبر (للأصول)", max_length=100, blank=True, null=True, db_index=True)
-
-#     # الفهرسة للتاريخ تسرع التقارير بشكل هائل
-#     date = models.DateTimeField("تاريخ الحركة", default=timezone.now, db_index=True)
-#     created_by = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name="أمين المخزن")
-#     notes = models.TextField("ملاحظات", blank=True, null=True)
-
-#     class Meta:
-#         verbose_name = "حركة مخزنية"
-#         verbose_name_plural = "4. الحركات المخزنية (وارد ومنصرف)"
-#         ordering = ['-date']
-
-#     def save(self, *args, **kwargs):
-#         if not self.transaction_code:
-#             import uuid
-#             # 🩹 إضافة الميكروثانية + جزء عشوائي قصير يمنع أي تعارض حتى لو اتسجلت
-#             # أكتر من حركة لنفس الصنف في نفس الثانية بالظبط (زي أصناف فاتورة واحدة)
-#             unique_suffix = uuid.uuid4().hex[:6]
-#             self.transaction_code = f"TRX-{timezone.now().strftime('%Y%m%d%H%M%S%f')}-{self.item.id}-{unique_suffix}"
-
-#         if self.movement_type in ['OUT_STUDENT', 'OUT_DEPT', 'OUT_WASTE', 'TRANSFER']:
-#             current_stock = StockBalance.get_stock(self.item, self.warehouse)
-#             if self.quantity > current_stock:
-#                 raise ValidationError(f"🛑 الرصيد غير كافٍ في {self.warehouse.name}. المتاح: {current_stock}، والمطلوب صرفه: {self.quantity}")
-
-#         super().save(*args, **kwargs)
-#         StockBalance.update_balance(self.item, self.warehouse)
 
 # ==========================================
 # 4. جدول الأرصدة الحية (لتسريع فتح الشاشات)
@@ -292,8 +182,12 @@ class StockBalance(models.Model):
 
     @classmethod
     def get_stock(cls, item, warehouse):
-        balance, _ = cls.objects.get_or_create(item=item, warehouse=warehouse)
-        return balance.quantity_on_hand
+        """الرصيد المتاح (يقبل كائن أو ID). قراءة فقط بدون إنشاء سجلات."""
+        item_id = getattr(item, 'pk', item)
+        warehouse_id = getattr(warehouse, 'pk', warehouse)
+        qty = cls.objects.filter(item_id=item_id, warehouse_id=warehouse_id) \
+                         .values_list('quantity_on_hand', flat=True).first()
+        return qty if qty is not None else Decimal('0.00')
 
     @classmethod
     def update_balance(cls, item_id, warehouse_id, delta_quantity):
@@ -395,6 +289,15 @@ class PurchaseInvoice(models.Model):
         verbose_name = "فاتورة مشتريات"
         verbose_name_plural = "7. فواتير المشتريات"
         ordering = ['-date', '-id']
+
+    def recalculate_totals(self, save=True):
+        """يحسب الإجمالي والصافي من أسطر الفاتورة (يتجاوز مشكلة أن الصافي 0.00)."""
+        total = self.items.aggregate(t=models.Sum('total_price'))['t'] or Decimal('0.00')
+        self.total_amount = total
+        self.net_amount = total - (self.discount or Decimal('0.00'))
+        if save:
+            self.save(update_fields=['total_amount', 'net_amount'])
+        return self.net_amount
 
     def __str__(self):
         supplier_name = self.supplier.name if self.supplier else "شراء نقدي / عام"

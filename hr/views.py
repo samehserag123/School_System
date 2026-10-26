@@ -21,6 +21,7 @@ from django.db.models import Max
 from django.http import JsonResponse
 import pandas as pd
 
+
 from .models import (
     Employee,
     Department,
@@ -60,7 +61,7 @@ def export_attendance_excel(request):
     year = request.GET.get('year', '')
 
     # 1. الترتيب أبجدياً حسب اسم الموظف ثم تاريخ الحضور
-    queryset = DailyAttendance.objects.select_related('employee').all().order_by('employee__name', 'date')
+    queryset = DailyAttendance.objects.select_related('employee__attendance_rule').all().order_by('employee__name', 'date')
 
     if search_query:
         queryset = queryset.filter(
@@ -271,6 +272,100 @@ def manual_checkout(request, record_id):
 
 
 @require_POST
+@login_required
+def manual_attendance_entry(request):
+    """
+    🟢 إدخال حضور/انصراف يدوي عند تعطل جهاز البصمة.
+    يمرّر الأوقات على نفس دالة الحساب التلقائي (calculate_daily_attendance)
+    فتُطبَّق قواعد التأخير والانصراف المبكر والعطلات والإجازات كما لو كانت بصمة حقيقية.
+    """
+    import logging
+    if not request.user.is_staff:
+        return JsonResponse({'status': 'error', 'message': 'غير مصرح لك باتخاذ هذا الإجراء.'}, status=403)
+
+    employee_id = request.POST.get('employee_id', '').strip()
+    date_str = request.POST.get('date', '').strip()
+    in_str = request.POST.get('check_in', '').strip()
+    out_str = request.POST.get('check_out', '').strip()
+    reason = request.POST.get('reason', '').strip()
+
+    employee = Employee.objects.select_related('attendance_rule').filter(id=employee_id).first() if employee_id.isdigit() else None
+    if not employee:
+        return JsonResponse({'status': 'error', 'message': 'يرجى اختيار الموظف.'}, status=400)
+
+    target_date = parse_date(date_str)
+    if not target_date:
+        return JsonResponse({'status': 'error', 'message': 'يرجى تحديد تاريخ صحيح.'}, status=400)
+    if target_date > timezone.localdate():
+        return JsonResponse({'status': 'error', 'message': 'لا يمكن إدخال حضور ليوم لم يأتِ بعد.'}, status=400)
+    if not reason:
+        return JsonResponse({'status': 'error', 'message': 'يرجى كتابة سبب الإدخال اليدوي (مثلاً: تعطل جهاز البصمة).'}, status=400)
+
+    try:
+        in_time = datetime.strptime(in_str, '%H:%M').time() if in_str else None
+        out_time = datetime.strptime(out_str, '%H:%M').time() if out_str else None
+    except ValueError:
+        return JsonResponse({'status': 'error', 'message': 'صيغة الوقت غير صحيحة.'}, status=400)
+
+    existing = DailyAttendance.objects.filter(employee=employee, date=target_date).first()
+    # لو أُدخل وقت واحد فقط نكمل الوقت الآخر من السجل الموجود
+    final_in = in_time or (existing.check_in if existing else None)
+    final_out = out_time or (existing.check_out if existing else None)
+    if not final_in and not final_out:
+        return JsonResponse({'status': 'error', 'message': 'يرجى إدخال وقت الحضور أو الانصراف.'}, status=400)
+
+    in_dt = datetime.combine(target_date, final_in) if final_in else None
+    out_dt = datetime.combine(target_date, final_out) if final_out else None
+    if in_dt and out_dt and out_dt <= in_dt:
+        rule = employee.attendance_rule
+        is_night = bool(rule and rule.work_start_time and rule.work_end_time and rule.work_end_time <= rule.work_start_time)
+        if is_night:
+            out_dt += timedelta(days=1)   # شفت ليلي: الانصراف في اليوم التالي
+        else:
+            return JsonResponse({'status': 'error', 'message': 'وقت الانصراف يجب أن يكون بعد وقت الحضور.'}, status=400)
+    logs = [x for x in (in_dt, out_dt) if x]
+
+    # بيانات الإجازات/المأموريات/العطلات + أيام العمل من لائحة الموظف
+    pre = prepare_preloaded_data(target_date, target_date)
+    DAY_FLAGS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+    rule = employee.attendance_rule
+    if rule:
+        is_work_day = bool(getattr(rule, DAY_FLAGS[target_date.weekday()], False))
+    else:
+        is_work_day = target_date.weekday() in [6, 0, 1, 2, 3]
+    pre['working_days_map'] = {(employee.id, target_date): is_work_day}
+
+    result = calculate_daily_attendance(employee, target_date, logs, pre)
+    if result['status'] == 'not_hired':
+        return JsonResponse({'status': 'error', 'message': 'التاريخ قبل تعيين الموظف.'}, status=400)
+
+    fields = ['check_in', 'check_out', 'status', 'actual_work_hours', 'overtime_hours',
+              'late_minutes', 'deduction_hours', 'administrative_penalty_days', 'absence_deduction_days']
+    defaults = {k: result[k] for k in fields}
+    if any(f.name == 'is_manual_override' for f in DailyAttendance._meta.fields):
+        defaults['is_manual_override'] = True
+
+    with transaction.atomic():
+        DailyAttendance.objects.update_or_create(employee=employee, date=target_date, defaults=defaults)
+
+    logging.getLogger(__name__).info(
+        'MANUAL ATTENDANCE by=%s emp=%s date=%s in=%s out=%s result=%s reason=%s',
+        request.user, employee.id, target_date, final_in, final_out, result['status'], reason
+    )
+
+    labels = {'present': 'حاضر', 'absent': 'غائب', 'holiday': 'عطلة (لا تُحتسب)',
+              'leave': 'إجازة', 'mission': 'مأمورية'}
+    msg = f"تم الحفظ. الحالة: {labels.get(result['status'], result['status'])}"
+    if result['late_minutes']:
+        msg += f" | تأخير {result['late_minutes']} دقيقة"
+    if result['deduction_hours']:
+        msg += f" | خصم {result['deduction_hours']} ساعة"
+    if result['administrative_penalty_days']:
+        msg += f" | جزاء {result['administrative_penalty_days']} يوم"
+    return JsonResponse({'status': 'success', 'message': msg})
+
+
+@require_POST
 def apply_fraud_penalty(request, record_id):
     """
     توقيع جزاء التحايل (الخروج بدون إذن ثم العودة للبصمة)
@@ -343,6 +438,12 @@ def penalty_add(request, employee_id=None):
             penalty.created_by = request.user if request.user.is_authenticated else None
             penalty.save()
             messages.success(request, f"تم توقيع الجزاء على الموظف {penalty.employee.name} بخصم {penalty.deduction_days} يوم بنجاح.")
+            # 🟢 العودة لنفس صفحة سجل الحضور (إن وُجد next آمن)
+            from django.utils.http import url_has_allowed_host_and_scheme
+            next_url = request.POST.get('next') or request.GET.get('next') or ''
+            if next_url and url_has_allowed_host_and_scheme(
+                    next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+                return redirect(next_url)
             return redirect('hr:penalty_list_for_employee', employee_id=penalty.employee.id)
     else:
         form = PenaltyRecordForm(initial={'date': timezone.localdate()})
@@ -446,72 +547,6 @@ def request_leave(request, employee_id):
         return redirect('leave_requests')
 
     return render(request, 'hr/request_leave.html', {'employee': employee})
-
-def calculate_monthly_payroll(employee, year, month):
-    """
-    محرك الرواتب: يحسب الراتب التناسبي، يمنع الإجازات للمعينين الجدد، ويحسب الجزاءات.
-    """
-    month_start = date(year, month, 1)
-
-    # 1. حساب الأيام المستحقة والأجر اليومي
-    active_days = employee.get_active_days_in_month(year, month)
-    daily_wage = employee.daily_wage
-
-    if active_days == 0:
-        return None # لا يستحق راتب هذا الشهر
-
-    # 2. هل يستحق رصيد إجازات هذا الشهر؟
-    # (الشرط: يجب أن يكون تعين قبل أو في أول يوم من الشهر)
-    is_eligible_for_leave = (employee.hire_date <= month_start)
-
-    # 3. حساب الراتب الإجمالي (النسبة والتناسب)
-    gross_salary = Decimal(str(active_days)) * daily_wage
-
-    # استبدال AttendanceRecord بـ DailyAttendance
-    absent_days = DailyAttendance.objects.filter(
-        employee=employee,
-        date__year=year,
-        date__month=month,
-        date__gte=employee.hire_date,
-        status='absent'
-    ).count()
-
-    if not is_eligible_for_leave:
-        unauthorized_leaves = DailyAttendance.objects.filter(
-            employee=employee,
-            date__year=year,
-            date__month=month,
-            date__gte=employee.hire_date,
-            status='leave'
-        ).count()
-        absent_days += unauthorized_leaves
-
-    # جلب الجزاءات الإدارية (بالأيام)
-    penalty_days_agg = PenaltyRecord.objects.filter(
-        employee=employee,
-        date__year=year,
-        date__month=month
-    ).aggregate(total_days=Sum('deduction_days'))
-    penalty_days = penalty_days_agg['total_days'] or 0
-
-    # 5. حساب الخصومات بناءً على الأجر اليومي
-    total_deduction_days = Decimal(str(absent_days)) + Decimal(str(penalty_days))
-    total_deductions_amount = total_deduction_days * daily_wage
-
-    # 6. الراتب الصافي
-    net_salary = max(Decimal('0.00'), gross_salary - total_deductions_amount)
-
-    return {
-        'employee_name': employee.name,
-        'active_days': active_days,
-        'daily_wage': round(daily_wage, 2),
-        'gross_salary': round(gross_salary, 2),
-        'absent_days': absent_days,
-        'penalty_days': penalty_days,
-        'total_deductions_amount': round(total_deductions_amount, 2),
-        'net_salary': round(net_salary, 2),
-        'has_leave_balance': is_eligible_for_leave,
-    }
 
 @transaction.atomic
 def leave_cancel(request, leave_id):
@@ -639,32 +674,116 @@ def mobile_approvals_view(request):
 
 
 
+def compute_salary_components(emp, cycle_start, cycle_end, effective_start, absence_days, late_hours,
+                              attendance_penalty_days, admin_penalty_days, sick_days, overtime_hours,
+                              effective_end=None):
+    """
+    🧮 المعادلات الموحّدة للراتب (تستخدمها كل الشاشات: الكشف المجمّع / مفردات الراتب / الإكسيل).
+
+    D  = أيام الشهر المرجعية (30، أو 12 للائحة 12 يوم)
+    S  = أيام الخدمة المكافئة داخل الدورة = D × (أيام الخدمة ÷ أيام الدورة)   (تساوي D للموظف طوال الدورة)
+    الحضور الفعلي = S − أيام الغياب
+    معامل التضخيم M = D ÷ الحضور الفعلي
+
+    - جزاءات الحضور (غياب/بصمة واحدة/تحايل...) والتأخير والانصراف المبكر: تُضرب في M
+    - الجزاء الإداري (PenaltyRecord): بأجر اليوم القياسي بدون تضخيم
+    - يوم الغياب نفسه والإجازة المرضية: بأجر اليوم القياسي بدون تضخيم
+    """
+    base_salary = float(emp.base_salary) if emp.base_salary else 0.0
+    D = 12.0 if (emp.attendance_rule and "12" in emp.attendance_rule.name) else 30.0
+
+    effective_end = effective_end or cycle_end   # 🟢 نهاية الخدمة داخل الدورة (الاستقالة)
+    cycle_days = max(1, (cycle_end - cycle_start).days + 1)
+    service_days = (effective_end - effective_start).days + 1
+    service_fraction = min(1.0, max(0.0, service_days / cycle_days))
+    service_equiv_days = D * service_fraction
+
+    attended_days = max(0.0, service_equiv_days - absence_days)
+    attendance_ratio = (attended_days / D) if attended_days > 0 else 1.0
+    multiplier = 1.0 / attendance_ratio
+
+    standard_day_rate = base_salary / D
+    standard_hourly_rate = base_salary / 240.0
+    effective_day_rate = standard_day_rate * multiplier
+    earned_base_salary = base_salary * service_fraction
+    effective_hourly_rate = standard_hourly_rate * multiplier
+
+    absence_deduction = absence_days * standard_day_rate
+    sick_deduction = sick_days * standard_day_rate
+    penalty_deduction = (attendance_penalty_days * effective_day_rate) + (admin_penalty_days * standard_day_rate)
+    # خصم التأخير: ساعات الخصم × الأجر اليومي القياسي (الراتب ÷ 30) — مطابق للنظام الآخر
+    late_deduction = late_hours * effective_day_rate
+    overtime_allowance = overtime_hours * standard_hourly_rate
+
+    return {
+        'base_salary': base_salary,
+        'multiplier': multiplier,
+        'absence_deduction': absence_deduction,
+        'sick_deduction': sick_deduction,
+        'penalty_deduction': penalty_deduction,
+        'late_deduction': late_deduction,
+        'overtime_allowance': overtime_allowance,
+        'base_salary': base_salary,                  # التعاقدي
+        'earned_base_salary': earned_base_salary,    # المستحق فعلياً
+    }
+
+
+def count_sick_leave_days(employee_id, start, end):
+    """
+    عدد أيام الإجازة المرضية المعتمدة الواقعة داخل [start, end].
+    القاعدة: كل يوم مرضي = خصم يوم واحد من الراتب (بأجر اليوم العادي).
+    الأيام تُحسب بالتقويم وبدون تكرار لو تداخلت طلبات.
+    """
+    leaves = LeaveRequest.objects.filter(
+        employee_id=employee_id, leave_type='sick', status='approved',
+        start_date__lte=end, end_date__gte=start
+    ).values_list('start_date', 'end_date')
+    days = set()
+    for lv_start, lv_end in leaves:
+        cur = max(lv_start, start)
+        last = min(lv_end, end)
+        while cur <= last:
+            days.add(cur)
+            cur += timedelta(days=1)
+    return len(days)
+
+
 def get_payroll_data(year, month):
     cycle_end = date(year, month, 25)
     cycle_start = date(year - 1, 12, 26) if month == 1 else date(year, month - 1, 26)
 
     # جلب جميع الموظفين النشطين
-    employees = Employee.objects.filter(is_active=True).select_related('department', 'attendance_rule').order_by('name')
+    employees = (
+        Employee.objects
+        .filter(Q(hire_date__isnull=True) | Q(hire_date__lte=cycle_end))                      # لم يُعيَّن بعد نهاية الدورة؟ استبعد
+        .filter(Q(is_active=True, end_date__isnull=True) | Q(end_date__gte=cycle_start))      # المستقيل يظهر في دورة استقالته
+        .select_related('department', 'attendance_rule')
+        .order_by('name')
+    )
 
     records = []
     totals = {
         'base': 0.0, 'overtime': 0.0, 'deductions': 0.0, 'net': 0.0,
         'abs_days': 0.0, 'abs_amt': 0.0, 'pen_days': 0.0, 'pen_amt': 0.0,
-        'late_hrs': 0.0, 'late_amt': 0.0
+        'late_hrs': 0.0, 'late_amt': 0.0, 'sick_days': 0.0, 'sick_amt': 0.0
     }
 
     for emp in employees:
         # 🟢 تحديد بداية فترة الحساب الفعلية للموظف (تاريخ تعيينه أو بداية الدورة أيهما أحدث)
         emp_effective_start = emp.hire_date if (emp.hire_date and emp.hire_date > cycle_start) else cycle_start
+        # 🟢 نهاية فترة الحساب الفعلية (تاريخ انتهاء العمل أو نهاية الدورة أيهما أقدم)
+        emp_effective_end = emp.end_date if (emp.end_date and emp.end_date < cycle_end) else cycle_end
+        if emp_effective_end < emp_effective_start:
+            continue
 
-        # جلب سجلات حضور الموظف ابتداءً من تاريخ التعيين فقط وحتى نهاية الدورة
+        # جلب سجلات حضور الموظف من تاريخ التعيين وحتى انتهاء عمله (أو نهاية الدورة)
         attendance_qs = emp.daily_attendance_records.filter(
             date__gte=emp_effective_start,
-            date__lte=cycle_end
+            date__lte=emp_effective_end
         )
 
         # حساب الساعات والأيام من السجلات المفلترة فقط
-        overtime_hours = attendance_qs.aggregate(
+        overtime_hours = attendance_qs.exclude(status='holiday').aggregate(
             total=Coalesce(Sum('overtime_hours'), Value(0.0), output_field=FloatField())
         )['total']
 
@@ -709,28 +828,22 @@ def get_payroll_data(year, month):
             attendance_penalties = 0.0
 
         penalty_days = attendance_penalties + admin_penalties
-        base_salary = float(emp.base_salary) if emp.base_salary else 0.0
+        sick_days = count_sick_leave_days(emp.id, emp_effective_start, emp_effective_end)   # 🟢 إجازة مرضية
 
-        days_in_month_rule = 12.0 if (emp.attendance_rule and "12" in emp.attendance_rule.name) else 30.0
-        actual_attended_days = max(0.0, days_in_month_rule - absence_days)
-
-        attendance_ratio = (actual_attended_days / days_in_month_rule) if (days_in_month_rule > 0 and actual_attended_days > 0) else 1.0
-        penalty_multiplier = 1.0 / attendance_ratio if attendance_ratio > 0 else 1.0
-
-        standard_day_rate = base_salary / days_in_month_rule if days_in_month_rule > 0 else 0.0
-        standard_hourly_rate = base_salary / 240.0
-
-        effective_day_rate = standard_day_rate * penalty_multiplier
-        effective_hourly_rate = standard_hourly_rate * penalty_multiplier
-
-        absence_deduction = absence_days * standard_day_rate
-        penalty_deduction = penalty_days * effective_day_rate
-        late_deduction = late_hours * effective_hourly_rate
-
-        overtime_allowance = overtime_hours * standard_hourly_rate
+        comp = compute_salary_components(
+            emp, cycle_start, cycle_end, emp_effective_start,
+            absence_days, late_hours, attendance_penalties, admin_penalties, sick_days, overtime_hours,
+            effective_end=emp_effective_end
+        )
+        base_salary = comp['earned_base_salary']
+        absence_deduction = comp['absence_deduction']
+        sick_deduction = comp['sick_deduction']
+        penalty_deduction = comp['penalty_deduction']
+        late_deduction = comp['late_deduction']
+        overtime_allowance = comp['overtime_allowance']
         insurance_deduction = float(emp.insurance_deduction) if (getattr(emp, 'is_insured', False) and emp.insurance_deduction) else 0.0
 
-        admin_deductions = late_deduction + absence_deduction + penalty_deduction
+        admin_deductions = late_deduction + absence_deduction + sick_deduction + penalty_deduction
         total_deductions_combined = admin_deductions + insurance_deduction
 
         max_possible_deduction = base_salary + overtime_allowance
@@ -748,6 +861,8 @@ def get_payroll_data(year, month):
         totals['pen_amt'] += penalty_deduction
         totals['late_hrs'] += late_hours
         totals['late_amt'] += late_deduction
+        totals['sick_days'] += sick_days
+        totals['sick_amt'] += sick_deduction
 
         records.append({
             'employee': emp,
@@ -758,6 +873,8 @@ def get_payroll_data(year, month):
             'penalty_deduction': round(penalty_deduction, 2),
             'late_hours': round(late_hours, 2),
             'late_deduction': round(late_deduction, 2),
+            'sick_days': sick_days,
+            'sick_deduction': round(sick_deduction, 2),
             'overtime_hours': overtime_hours,
             'overtime_allowance': round(overtime_allowance, 2),
             'insurance_deduction': round(insurance_deduction, 2),
@@ -798,6 +915,196 @@ def monthly_payroll_report(request):
     except Exception as server_err:
         print(f"❌ خطأ كشف الرواتب: {str(server_err)}")
         raise server_err
+
+
+# ============================================================
+# 📊 تقرير الشهر الشامل (Excel متعدد الشيتات)
+# ============================================================
+AR_WEEKDAYS = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد']
+
+
+def _write_report_sheet(wb, title, period_text, headers, rows, widths, sum_cols=(), date_cols=(), is_first=False):
+    """ينشئ شيت منسّقاً (RTL) بعنوان وترويسة وصفوف وإجمالي اختياري."""
+    ws = wb.active if is_first else wb.create_sheet()
+    ws.title = title
+    ws.sheet_view.rightToLeft = True
+
+    title_font = Font(name='Arial', size=13, bold=True)
+    header_font = Font(name='Arial', size=11, bold=True, color='FFFFFF')
+    body_font = Font(name='Arial', size=11)
+    bold_font = Font(name='Arial', size=11, bold=True)
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                    top=Side(style='thin'), bottom=Side(style='thin'))
+    header_fill = PatternFill(start_color='1F4E78', end_color='1F4E78', fill_type='solid')
+    total_fill = PatternFill(start_color='FFF2CC', end_color='FFF2CC', fill_type='solid')
+
+    n = len(headers)
+    last_col = openpyxl.utils.get_column_letter(n)
+    ws.merge_cells(f'A1:{last_col}1')
+    ws['A1'].value = f"{title} - {period_text}"
+    ws['A1'].font = title_font
+    ws['A1'].alignment = center
+    ws.row_dimensions[1].height = 28
+
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=c, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center
+        cell.border = border
+    ws.row_dimensions[2].height = 24
+
+    row_num = 3
+    for r in rows:
+        for c, val in enumerate(r, 1):
+            cell = ws.cell(row=row_num, column=c, value=val)
+            cell.font = body_font
+            cell.alignment = center
+            cell.border = border
+            if (c - 1) in date_cols and val:
+                cell.number_format = 'YYYY-MM-DD'
+        row_num += 1
+
+    if not rows:
+        ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=n)
+        ws.cell(row=3, column=1, value='لا توجد بيانات في هذه الفترة').alignment = center
+        ws.cell(row=3, column=1).font = bold_font
+    else:
+        ws.cell(row=row_num, column=1, value='الإجمالي / العدد').font = bold_font
+        ws.cell(row=row_num, column=2, value=len(rows)).font = bold_font
+        for c in range(1, n + 1):
+            cell = ws.cell(row=row_num, column=c)
+            cell.fill = total_fill
+            cell.border = border
+            cell.alignment = center
+        for ci in sum_cols:
+            total = sum((r[ci] or 0) for r in rows if isinstance(r[ci], (int, float)))
+            ws.cell(row=row_num, column=ci + 1, value=round(total, 2)).font = bold_font
+        ws.auto_filter.ref = f"A2:{last_col}{row_num - 1}"
+
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+    ws.freeze_panes = 'A3'
+    return ws
+
+
+@login_required
+def export_monthly_report_excel(request, year, month):
+    """
+    ملف Excel واحد بعدة شيتات عن دورة الشهر (26 -> 25):
+    المأموريات / الاستئذانات / الجزاءات / الإجازات / الغيابات / التأخيرات
+    """
+    year, month = int(year), int(month)
+    cycle_end = date(year, month, 25)
+    cycle_start = date(year - 1, 12, 26) if month == 1 else date(year, month - 1, 26)
+    period_text = f"دورة شهر {month}/{year} (من {cycle_start.strftime('%d/%m/%Y')} إلى {cycle_end.strftime('%d/%m/%Y')})"
+
+    def overlap_days(start, end):
+        return (min(end, cycle_end) - max(start, cycle_start)).days + 1
+
+    wb = openpyxl.Workbook()
+
+    # ---------- 1) المأموريات ----------
+    missions = MissionRequest.objects.select_related('employee').filter(
+        start_date__lte=cycle_end, end_date__gte=cycle_start
+    ).order_by('employee__name', 'start_date')
+    rows = []
+    for i, m in enumerate(missions, 1):
+        rows.append([i, m.employee.name, m.employee.emp_id, m.start_date, m.end_date,
+                     overlap_days(m.start_date, m.end_date), m.reason, m.get_status_display()])
+    _write_report_sheet(wb, 'المأموريات', period_text,
+                        ['م', 'الموظف', 'الكود', 'من تاريخ', 'إلى تاريخ', 'عدد الأيام بالدورة', 'الوجهة / التفاصيل', 'الحالة'],
+                        rows, [6, 30, 10, 14, 14, 14, 45, 14], sum_cols=[5], date_cols=[3, 4], is_first=True)
+
+    # ---------- 2) الاستئذانات ----------
+    perms = PermissionRequest.objects.select_related('employee').filter(
+        date__range=(cycle_start, cycle_end)
+    ).order_by('employee__name', 'date')
+    rows = []
+    for i, p in enumerate(perms, 1):
+        rows.append([i, p.employee.name, p.employee.emp_id, p.date, AR_WEEKDAYS[p.date.weekday()],
+                     p.departure_time.strftime('%H:%M') if p.departure_time else '-', p.reason, p.get_status_display()])
+    _write_report_sheet(wb, 'الاستئذانات', period_text,
+                        ['م', 'الموظف', 'الكود', 'التاريخ', 'اليوم', 'وقت الخروج', 'السبب', 'الحالة'],
+                        rows, [6, 30, 10, 14, 12, 12, 45, 14], date_cols=[3])
+
+    # ---------- 3) الجزاءات (إدارية + جزاءات الحضور) ----------
+    rows_raw = []
+    for pr in PenaltyRecord.objects.select_related('employee').filter(date__range=(cycle_start, cycle_end)):
+        pdate = pr.date.date() if hasattr(pr.date, 'date') else pr.date
+        rows_raw.append((pr.employee.name, pdate, [pr.employee.name, pr.employee.emp_id, pdate,
+                         'جزاء إداري - ' + pr.get_penalty_type_display(), float(pr.deduction_days), pr.reason, '']))
+    att_pen = DailyAttendance.objects.select_related('employee').filter(
+        date__range=(cycle_start, cycle_end), administrative_penalty_days__gt=0
+    ).exclude(status='holiday')
+    for a in att_pen:
+        if a.status == 'absent' and not a.check_in:
+            kind, why = 'جزاء حضور - غياب', 'غياب بدون بصمة'
+        elif a.status == 'absent' and a.check_in and not a.check_out:
+            kind, why = 'جزاء حضور - بصمة واحدة', 'بصمة واحدة فقط'
+        elif a.status == 'absent':
+            kind, why = 'جزاء حضور - تحايل / انصراف مبكر', 'خروج بدون إذن أو انصراف مبكر'
+        else:
+            kind, why = 'جزاء حضور', ''
+        note = 'يشمل يوم الغياب' if a.status == 'absent' else ''
+        rows_raw.append((a.employee.name, a.date, [a.employee.name, a.employee.emp_id, a.date, kind,
+                         float(a.administrative_penalty_days), why, note]))
+    rows_raw.sort(key=lambda x: (x[0], x[1]))
+    rows = [[i] + r[2] for i, r in enumerate(rows_raw, 1)]
+    _write_report_sheet(wb, 'الجزاءات', period_text,
+                        ['م', 'الموظف', 'الكود', 'التاريخ', 'نوع الجزاء', 'أيام الخصم', 'السبب / التفاصيل', 'ملاحظة'],
+                        rows, [6, 30, 10, 14, 34, 12, 45, 18], sum_cols=[5], date_cols=[3])
+
+    # ---------- 4) الإجازات ----------
+    leaves = LeaveRequest.objects.select_related('employee').filter(
+        start_date__lte=cycle_end, end_date__gte=cycle_start
+    ).order_by('employee__name', 'start_date')
+    rows = []
+    for i, l in enumerate(leaves, 1):
+        rows.append([i, l.employee.name, l.employee.emp_id, l.get_leave_type_display(), l.start_date, l.end_date,
+                     overlap_days(l.start_date, l.end_date), l.reason or '', l.get_status_display()])
+    _write_report_sheet(wb, 'الإجازات', period_text,
+                        ['م', 'الموظف', 'الكود', 'نوع الإجازة', 'من تاريخ', 'إلى تاريخ', 'عدد الأيام بالدورة', 'السبب', 'الحالة'],
+                        rows, [6, 30, 10, 24, 14, 14, 14, 40, 18], sum_cols=[6], date_cols=[4, 5])
+
+    # ---------- 5) الغيابات ----------
+    absences = DailyAttendance.objects.select_related('employee').filter(
+        date__range=(cycle_start, cycle_end), status='absent'
+    ).order_by('employee__name', 'date')
+    rows = []
+    for i, a in enumerate(absences, 1):
+        if not a.check_in:
+            why = 'غياب بدون بصمة'
+        elif not a.check_out:
+            why = 'بصمة واحدة فقط'
+        else:
+            why = 'جزاء تحايل / انصراف مبكر'
+        rows.append([i, a.employee.name, a.employee.emp_id, a.date, AR_WEEKDAYS[a.date.weekday()], why,
+                     a.check_in.strftime('%H:%M') if a.check_in else '-',
+                     a.check_out.strftime('%H:%M') if a.check_out else '-',
+                     float(a.administrative_penalty_days or 0)])
+    _write_report_sheet(wb, 'الغيابات', period_text,
+                        ['م', 'الموظف', 'الكود', 'التاريخ', 'اليوم', 'سبب الغياب', 'الحضور', 'الانصراف', 'إجمالي أيام الخصم'],
+                        rows, [6, 30, 10, 14, 12, 28, 10, 10, 16], sum_cols=[8], date_cols=[3])
+
+    # ---------- 6) التأخيرات ----------
+    lates = DailyAttendance.objects.select_related('employee').filter(
+        date__range=(cycle_start, cycle_end)
+    ).exclude(status='holiday').filter(Q(late_minutes__gt=0) | Q(deduction_hours__gt=0)).order_by('employee__name', 'date')
+    rows = []
+    for i, a in enumerate(lates, 1):
+        rows.append([i, a.employee.name, a.employee.emp_id, a.date, AR_WEEKDAYS[a.date.weekday()],
+                     a.check_in.strftime('%H:%M') if a.check_in else '-',
+                     int(a.late_minutes or 0), round(float(a.deduction_hours or 0), 2)])
+    _write_report_sheet(wb, 'التأخيرات', period_text,
+                        ['م', 'الموظف', 'الكود', 'التاريخ', 'اليوم', 'وقت الحضور', 'دقائق التأخير', 'ساعات الخصم'],
+                        rows, [6, 30, 10, 14, 12, 12, 14, 14], sum_cols=[6, 7], date_cols=[3])
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="Monthly_Report_{year}_{month}.xlsx"'
+    wb.save(response)
+    return response
 
 
 def export_payroll_excel(request, year, month):
@@ -869,7 +1176,8 @@ def export_payroll_excel(request, year, month):
             rec['late_deduction'] if rec['late_deduction'] > 0 else '-',
             rec['overtime_allowance'] if rec['overtime_allowance'] > 0 else '-',
             rec['deductions'] if rec['deductions'] > 0 else '-',
-            rec['net_salary'], '', ''
+            rec['net_salary'], '',
+            (f"إجازة مرضية {rec['sick_days']} يوم (-{rec['sick_deduction']})" if rec.get('sick_days') else '')
         ]
 
         for col_idx, value in enumerate(row_data, 1):
@@ -907,353 +1215,6 @@ def export_payroll_excel(request, year, month):
     return response
 
 
-# def monthly_payroll_report(request):
-#     try:
-#         today = timezone.localdate()
-#         year = int(request.GET.get('year', today.year))
-#         month = int(request.GET.get('month', today.month))
-
-#         cycle_end = date(year, month, 25)
-#         cycle_start = date(year - 1, 12, 26) if month == 1 else date(year, month - 1, 26)
-
-#         employees = Employee.objects.filter(is_active=True).select_related('attendance_rule').annotate(
-#             total_overtime=Coalesce(
-#                 Sum('daily_attendance_records__overtime_hours',
-#                     filter=Q(daily_attendance_records__date__gte=cycle_start, daily_attendance_records__date__lte=cycle_end)),
-#                 Value(0.0), output_field=FloatField()
-#             ),
-#             total_absence=Count(
-#                 'daily_attendance_records',
-#                 filter=Q(daily_attendance_records__date__gte=cycle_start,
-#                         daily_attendance_records__date__lte=cycle_end,
-#                         daily_attendance_records__status='absent'),
-#                 distinct=True
-#             ),
-#             total_penalty=Coalesce(
-#                 Sum(
-#                     Case(
-#                         When(
-#                             daily_attendance_records__status='absent',
-#                             daily_attendance_records__administrative_penalty_days__gte=1.0,
-#                             then=F('daily_attendance_records__administrative_penalty_days') - 1.0
-#                         ),
-#                         default=F('daily_attendance_records__administrative_penalty_days'),
-#                         output_field=FloatField()
-#                     ),
-#                     filter=Q(daily_attendance_records__date__gte=cycle_start,
-#                             daily_attendance_records__date__lte=cycle_end) &
-#                           ~Q(daily_attendance_records__status__in=['mission', 'leave', 'holiday', 'permission', 'excused'])
-#                 ),
-#                 Value(0.0), output_field=FloatField()
-#             ),
-#             total_deduction_hours=Coalesce(
-#                 Sum('daily_attendance_records__deduction_hours',
-#                     filter=Q(daily_attendance_records__date__gte=cycle_start,
-#                             daily_attendance_records__date__lte=cycle_end) &
-#                           ~Q(daily_attendance_records__status__in=['mission', 'leave', 'holiday', 'permission', 'excused'])),
-#                 Value(0.0), output_field=FloatField()
-#             )
-#         ).order_by('name')
-
-#         penalty_records_totals = dict(
-#             PenaltyRecord.objects.filter(date__gte=cycle_start, date__lte=cycle_end)
-#             .values('employee_id')
-#             .annotate(total=Sum('deduction_days'))
-#             .values_list('employee_id', 'total')
-#         )
-
-#         payroll_records = []
-#         total_company_base = total_company_overtime = total_company_deductions = total_company_net = 0.0
-
-#         for employee in employees:
-#             is_open_shift = (employee.attendance_rule and getattr(employee.attendance_rule, 'shift_type', '') == 'open')
-
-#             total_absence_days = 0 if is_open_shift else employee.total_absence
-#             total_deduction_hours = 0.0 if is_open_shift else employee.total_deduction_hours
-
-#             attendance_penalty_days = 0.0 if is_open_shift else employee.total_penalty
-#             admin_penalty_days = penalty_records_totals.get(employee.id, 0.0) or 0.0
-
-#             total_penalty_days = attendance_penalty_days + admin_penalty_days
-
-#             total_overtime_hours = employee.total_overtime
-#             base_salary = float(employee.base_salary) if employee.base_salary else 0.0
-
-#             # 🟢 المعالجة الجديدة: حساب نسبة الحضور وتطبيق مضاعف الجزاء
-#             days_in_month_rule = 12.0 if (employee.attendance_rule and "12" in employee.attendance_rule.name) else 30.0
-#             actual_attended_days = max(0.0, days_in_month_rule - total_absence_days)
-
-#             if days_in_month_rule > 0 and actual_attended_days > 0:
-#                 attendance_ratio = actual_attended_days / days_in_month_rule
-#             elif days_in_month_rule > 0 and actual_attended_days == 0:
-#                 attendance_ratio = 1.0 / days_in_month_rule  # الحد الأقصى للمضاعفة إذا غاب الشهر كله
-#             else:
-#                 attendance_ratio = 1.0
-
-#             penalty_multiplier = 1.0 / attendance_ratio if attendance_ratio > 0 else 1.0
-
-#             # المعدلات القياسية والمشددة
-#             standard_day_rate = base_salary / days_in_month_rule if days_in_month_rule > 0 else 0.0
-#             standard_hourly_rate = base_salary / 240.0
-
-#             effective_day_rate = standard_day_rate * penalty_multiplier
-#             effective_hourly_rate = standard_hourly_rate * penalty_multiplier
-
-#             # الخصومات النهائية
-#             absence_deduction = total_absence_days * standard_day_rate
-#             penalty_deduction = total_penalty_days * effective_day_rate
-#             late_deduction = total_deduction_hours * effective_hourly_rate
-
-#             overtime_allowance = total_overtime_hours * standard_hourly_rate
-#             insurance_monthly_deduction = float(employee.insurance_deduction) if employee.is_insured else 0.0
-
-#             admin_deductions = late_deduction + absence_deduction + penalty_deduction
-#             total_deductions_combined = admin_deductions + insurance_monthly_deduction
-
-#             max_possible_deduction = base_salary + overtime_allowance
-#             actual_total_deductions = min(total_deductions_combined, max_possible_deduction)
-
-#             net_salary = max(0.0, base_salary + overtime_allowance - actual_total_deductions)
-
-#             total_company_base += base_salary
-#             total_company_overtime += overtime_allowance
-#             total_company_deductions += actual_total_deductions
-#             total_company_net += net_salary
-
-#             payroll_records.append({
-#                 'employee': employee,
-#                 'base_salary': round(base_salary, 2),
-#                 'overtime_hours': total_overtime_hours,
-#                 'overtime_allowance': round(overtime_allowance, 2),
-#                 'insurance_deduction': round(insurance_monthly_deduction, 2),
-#                 'penalty_deduction': round(penalty_deduction, 2),
-#                 'absence_deduction': round(absence_deduction, 2),
-#                 'late_deduction': round(late_deduction, 2),
-#                 'admin_deductions': round(admin_deductions, 2),
-#                 'deductions': round(actual_total_deductions, 2),
-#                 'net_salary': round(net_salary, 2),
-#             })
-
-#         context = {
-#             'payroll_records': payroll_records,
-#             'year': year,
-#             'month': month,
-#             'total_company_base': round(total_company_base, 2),
-#             'total_company_overtime': round(total_company_overtime, 2),
-#             'total_company_deductions': round(total_company_deductions, 2),
-#             'total_company_net': round(total_company_net, 2),
-#             'months_range': range(1, 13),
-#             'years_range': range(today.year - 2, today.year + 3),
-#         }
-#         return render(request, 'hr/payroll_report.html', context)
-
-#     except Exception as server_err:
-#         print(f"❌ خطأ كشف الرواتب: {str(server_err)}")
-#         raise server_err
-
-
-
-# def export_payroll_excel(request, year, month):
-#     year = int(year)
-#     month = int(month)
-
-#     cycle_end = date(year, month, 25)
-#     cycle_start = date(year - 1, 12, 26) if month == 1 else date(year, month - 1, 26)
-
-#     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-#     response['Content-Disposition'] = f'attachment; filename="Payroll_Talaat_Harb_{year}_{month}.xlsx"'
-
-#     wb = openpyxl.Workbook()
-#     ws = wb.active
-#     ws.title = f"مرتبات {month}-{year}"
-#     ws.sheet_view.rightToLeft = True
-
-#     title_font = Font(name='Arial', size=14, bold=True)
-#     header_font = Font(name='Arial', size=12, bold=True)
-#     normal_font = Font(name='Arial', size=11, bold=True)
-#     center_aligned = Alignment(horizontal='center', vertical='center', wrap_text=True)
-#     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-#     header_fill = PatternFill(start_color='E2EFDA', end_color='E2EFDA', fill_type='solid')
-
-#     ws.merge_cells('A1:C2')
-#     ws['A1'].value = "محافظة القاهرة\nإدارة عين شمس التعليمية\nمدارس طلعت حرب الثانوية الفندقية"
-#     ws['A1'].font = header_font; ws['A1'].alignment = center_aligned
-
-#     ws.merge_cells('D1:O2')
-#     ws['D1'].value = f"كشف مرتبات العاملين بالمدرسة عن دورة شهر {month} لعام {year} (من {cycle_start.strftime('%d/%m')} إلى {cycle_end.strftime('%d/%m')})"
-#     ws['D1'].font = title_font; ws['D1'].alignment = center_aligned
-
-#     headers = {
-#         'A': 'م', 'B': 'الاســـــــــــــــم', 'C': 'الوظيفة', 'D': 'المرتب الأساسي',
-#         'K': 'إضافي', 'L': 'إجمالي الخصومات', 'M': 'صافى المرتب', 'N': 'التوقيــع', 'O': 'ملاحظات'
-#     }
-
-#     for col, text in headers.items():
-#         ws.merge_cells(f'{col}3:{col}4')
-#         cell = ws[f'{col}3']
-#         cell.value = text; cell.font = header_font; cell.alignment = center_aligned; cell.fill = header_fill; cell.border = thin_border
-#         ws[f'{col}4'].border = thin_border
-
-#     ws.merge_cells('E3:F3'); ws['E3'] = 'غياب'; ws['E3'].font = header_font; ws['E3'].alignment = center_aligned; ws['E3'].fill = header_fill; ws['E3'].border = thin_border
-#     ws.merge_cells('G3:H3'); ws['G3'] = 'جزاءات وتحايل'; ws['G3'].font = header_font; ws['G3'].alignment = center_aligned; ws['G3'].fill = header_fill; ws['G3'].border = thin_border
-#     ws.merge_cells('I3:J3'); ws['I3'] = 'تأخيرات'; ws['I3'].font = header_font; ws['I3'].alignment = center_aligned; ws['I3'].fill = header_fill; ws['I3'].border = thin_border
-
-#     sub_headers = {'E': 'أيام', 'F': 'المبلغ', 'G': 'أيام', 'H': 'المبلغ', 'I': 'ساعات', 'J': 'المبلغ'}
-#     for col, text in sub_headers.items():
-#         cell = ws[f'{col}4']
-#         cell.value = text; cell.font = Font(name='Arial', size=10, bold=True); cell.alignment = center_aligned; cell.fill = header_fill; cell.border = thin_border
-
-#     ws.column_dimensions['B'].width = 30
-#     for col in ['E', 'F', 'G', 'H', 'I', 'J']: ws.column_dimensions[col].width = 12
-
-#     employees = Employee.objects.filter(is_active=True).select_related('department', 'attendance_rule').annotate(
-#         total_overtime=Coalesce(
-#             Sum('daily_attendance_records__overtime_hours',
-#                 filter=Q(daily_attendance_records__date__gte=cycle_start, daily_attendance_records__date__lte=cycle_end)),
-#             Value(0.0), output_field=FloatField()
-#         ),
-#         total_absence=Count(
-#             'daily_attendance_records',
-#             filter=Q(daily_attendance_records__date__gte=cycle_start,
-#                     daily_attendance_records__date__lte=cycle_end,
-#                     daily_attendance_records__status='absent'),
-#             distinct=True
-#         ),
-#         total_penalty=Coalesce(
-#             Sum(
-#                 Case(
-#                     When(
-#                         daily_attendance_records__status='absent',
-#                         daily_attendance_records__administrative_penalty_days__gte=1.0,
-#                         then=F('daily_attendance_records__administrative_penalty_days') - 1.0
-#                     ),
-#                     default=F('daily_attendance_records__administrative_penalty_days'),
-#                     output_field=FloatField()
-#                 ),
-#                 filter=Q(daily_attendance_records__date__gte=cycle_start,
-#                         daily_attendance_records__date__lte=cycle_end) &
-#                       ~Q(daily_attendance_records__status__in=['mission', 'leave', 'holiday', 'permission', 'excused'])
-#             ),
-#             Value(0.0), output_field=FloatField()
-#         ),
-#         total_deduction_hours=Coalesce(
-#             Sum('daily_attendance_records__deduction_hours',
-#                 filter=Q(daily_attendance_records__date__gte=cycle_start,
-#                         daily_attendance_records__date__lte=cycle_end) &
-#                       ~Q(daily_attendance_records__status__in=['mission', 'leave', 'holiday', 'permission', 'excused'])),
-#             Value(0.0), output_field=FloatField()
-#         )
-#     ).order_by('name')
-
-#     penalty_records_totals = dict(
-#         PenaltyRecord.objects.filter(date__gte=cycle_start, date__lte=cycle_end)
-#         .values('employee_id')
-#         .annotate(total=Sum('deduction_days'))
-#         .values_list('employee_id', 'total')
-#     )
-
-#     row_num = 5
-#     total_base = total_overtime = total_deductions = total_net = 0.0
-#     total_abs_days = total_abs_amt = total_pen_days = total_pen_amt = total_late_hrs = total_late_amt = 0.0
-
-#     for index, emp in enumerate(employees, 1):
-#         is_open_shift = (emp.attendance_rule and getattr(emp.attendance_rule, 'shift_type', '') == 'open')
-
-#         absence_days = 0 if is_open_shift else emp.total_absence
-#         late_hours = 0.0 if is_open_shift else emp.total_deduction_hours
-
-#         attendance_penalties = 0.0 if is_open_shift else emp.total_penalty
-#         admin_penalties = penalty_records_totals.get(emp.id, 0.0) or 0.0
-#         penalty_days = attendance_penalties + admin_penalties
-
-#         overtime_hours = emp.total_overtime
-#         base_salary = float(emp.base_salary) if emp.base_salary else 0.0
-
-#         # 🟢 تطبيق نفس معادلة المضاعفة الخاصة بنسبة الحضور للإكسيل
-#         days_in_month_rule = 12.0 if (emp.attendance_rule and "12" in emp.attendance_rule.name) else 30.0
-#         actual_attended_days = max(0.0, days_in_month_rule - absence_days)
-
-#         if days_in_month_rule > 0 and actual_attended_days > 0:
-#             attendance_ratio = actual_attended_days / days_in_month_rule
-#         elif days_in_month_rule > 0 and actual_attended_days == 0:
-#             attendance_ratio = 1.0 / days_in_month_rule
-#         else:
-#             attendance_ratio = 1.0
-
-#         penalty_multiplier = 1.0 / attendance_ratio if attendance_ratio > 0 else 1.0
-
-#         standard_day_rate = base_salary / days_in_month_rule if days_in_month_rule > 0 else 0.0
-#         standard_hourly_rate = base_salary / 240.0
-
-#         effective_day_rate = standard_day_rate * penalty_multiplier
-#         effective_hourly_rate = standard_hourly_rate * penalty_multiplier
-
-#         absence_deduction = absence_days * standard_day_rate
-#         penalty_deduction = penalty_days * effective_day_rate
-#         late_deduction = late_hours * effective_hourly_rate
-
-#         overtime_allowance = overtime_hours * standard_hourly_rate
-#         insurance_deduction = float(emp.insurance_deduction) if emp.is_insured else 0.0
-
-#         initial_deductions = late_deduction + absence_deduction + penalty_deduction + insurance_deduction
-#         max_possible_deduction = base_salary + overtime_allowance
-#         actual_deductions = min(initial_deductions, max_possible_deduction)
-
-#         net_salary = max(0.0, base_salary + overtime_allowance - actual_deductions)
-
-#         total_base += base_salary
-#         total_abs_days += absence_days
-#         total_abs_amt += absence_deduction
-#         total_pen_days += penalty_days
-#         total_pen_amt += penalty_deduction
-#         total_late_hrs += late_hours
-#         total_late_amt += late_deduction
-#         total_overtime += overtime_allowance
-#         total_deductions += actual_deductions
-#         total_net += net_salary
-
-#         row_data = [
-#             index, emp.name, emp.department.name if emp.department else '-', round(base_salary, 2),
-#             absence_days if absence_days > 0 else '-', round(absence_deduction, 2) if absence_deduction > 0 else '-',
-#             round(penalty_days, 2) if penalty_days > 0 else '-', round(penalty_deduction, 2) if penalty_deduction > 0 else '-',
-#             round(late_hours, 2) if late_hours > 0 else '-', round(late_deduction, 2) if late_deduction > 0 else '-',
-#             round(overtime_allowance, 2) if overtime_allowance > 0 else '-',
-#             round(actual_deductions, 2) if actual_deductions > 0 else '-',
-#             round(net_salary, 2), '', ''
-#         ]
-
-#         for col_idx, value in enumerate(row_data, 1):
-#             cell = ws.cell(row=row_num, column=col_idx)
-#             cell.value = value; cell.font = normal_font; cell.alignment = center_aligned; cell.border = thin_border
-
-#         row_num += 1
-
-#     ws.merge_cells(start_row=row_num, start_column=1, end_row=row_num, end_column=3)
-#     ws.cell(row=row_num, column=1).value = "إجمالــى الكشف"
-#     ws.cell(row=row_num, column=1).font = title_font; ws.cell(row=row_num, column=1).alignment = center_aligned
-#     ws.cell(row=row_num, column=1).border = thin_border; ws.cell(row=row_num, column=1).fill = header_fill
-
-#     ws.cell(row=row_num, column=2).border = thin_border
-#     ws.cell(row=row_num, column=3).border = thin_border
-
-#     totals_data = [
-#         (4, total_base), (5, total_abs_days), (6, total_abs_amt),
-#         (7, total_pen_days), (8, total_pen_amt), (9, total_late_hrs),
-#         (10, total_late_amt), (11, total_overtime), (12, total_deductions), (13, total_net)
-#     ]
-
-#     for col_idx, total_val in totals_data:
-#         cell = ws.cell(row=row_num, column=col_idx)
-#         cell.value = round(total_val, 2) if total_val > 0 else '-'
-#         cell.font = Font(name='Arial', size=11, bold=True, color='FF0000')
-#         cell.alignment = center_aligned; cell.border = thin_border; cell.fill = header_fill
-
-#     ws.cell(row=row_num, column=14).border = thin_border; ws.cell(row=row_num, column=14).fill = header_fill
-#     ws.cell(row=row_num, column=15).border = thin_border; ws.cell(row=row_num, column=15).fill = header_fill
-
-#     wb.save(response)
-#     return response
-
 
 
 def calculate_daily_attendance(employee, target_date, logs, preloaded_data):
@@ -1264,9 +1225,8 @@ def calculate_daily_attendance(employee, target_date, logs, preloaded_data):
     rule = getattr(employee, 'attendance_rule', None)
     shift_type = getattr(rule, 'shift_type', 'fixed') if rule else 'fixed'
 
-    # 0. حماية الموظفين المضافين حديثاً (تجاهل التواريخ السابقة للتعيين)
-    hire_date = getattr(employee, 'hire_date', None)
-    if hire_date and target_date < hire_date:
+    # 0. حماية: تجاهل أي يوم قبل التعيين أو بعد انتهاء العمل / الاستقالة
+    if not employee.is_employed_on(target_date):
         return {
             'check_in': None, 'check_out': None, 'status': 'not_hired',
             'actual_work_hours': 0.0, 'overtime_hours': 0.0, 'late_minutes': 0,
@@ -1294,25 +1254,19 @@ def calculate_daily_attendance(employee, target_date, logs, preloaded_data):
         }
 
     # 3. أيام العطلات (الأسبوعية أو الرسمية)
+    # أي بصمة في يوم عطلة لا تُحسب إطلاقاً: لا ساعات عمل ولا إضافي ولا خصم ولا جزاء.
+    # نحتفظ بأوقات البصمة للاطلاع فقط.
     if not is_working_day or is_public_holiday:
-        log_count = len({log.time().replace(second=0, microsecond=0) for log in logs}) if logs else 0
-        actual_hours = 0.0
-        overtime_hours = 0.0
-
-        if log_count > 1:
-            actual_hours = (max(logs) - min(logs)).total_seconds() / 3600.0
-            overtime_hours = actual_hours
-        elif log_count == 1:
-            actual_hours = target_hours if shift_type == 'flexible' else 0.0
-
         return {
             'check_in': min(logs).time() if logs else None,
             'check_out': max(logs).time() if logs else None,
             'status': 'holiday',
-            'actual_work_hours': round(actual_hours, 2),
-            'overtime_hours': round(overtime_hours, 2),
-            'late_minutes': 0, 'deduction_hours': 0.0,
-            'administrative_penalty_days': 0.0, 'absence_deduction_days': 0.0
+            'actual_work_hours': 0.0,
+            'overtime_hours': 0.0,
+            'late_minutes': 0,
+            'deduction_hours': 0.0,
+            'administrative_penalty_days': 0.0,
+            'absence_deduction_days': 0.0
         }
 
     # 4. حالات المأموريات والإجازات
@@ -1352,6 +1306,14 @@ def calculate_daily_attendance(employee, target_date, logs, preloaded_data):
     check_in_dt = min(logs)
     check_out_dt = max(logs)
     log_count = len({log.time().replace(second=0, microsecond=0) for log in logs})
+
+    if log_count == 1 and shift_type == 'flexible':
+        # 🟢 الدوام المرن: بصمة واحدة تكفي ليكون الموظف حاضراً (لا غياب ولا جزاء ولا خصم)
+        return {
+            'check_in': check_in_dt.time(), 'check_out': None, 'status': 'present',
+            'actual_work_hours': target_hours, 'overtime_hours': 0.0, 'late_minutes': 0,
+            'deduction_hours': 0.0, 'administrative_penalty_days': 0.0, 'absence_deduction_days': 0.0
+        }
 
     if log_count == 1:
         return {
@@ -1414,7 +1376,12 @@ def upload_and_process_attendance(request):
             logs_by_emp_and_date = {}
             distinct_dates = set()
 
-            active_emps = list(Employee.objects.filter(is_active=True).select_related('attendance_rule'))
+            # 🟢 يشمل النشطين + من انتهى عمله (أيامه الأخيرة قد تكون داخل الملف). الفلترة بالتاريخ داخل calculate_daily_attendance
+            active_emps = list(
+                Employee.objects.filter(
+                    Q(is_active=True) | Q(end_date__isnull=False)
+                ).select_related('attendance_rule')
+            )
             emp_dict_by_emp_id = {str(emp.emp_id).strip(): emp for emp in active_emps if getattr(emp, 'emp_id', None)}
             emp_dict_by_id = {str(emp.id): emp for emp in active_emps}
 
@@ -1513,11 +1480,16 @@ def upload_and_process_attendance(request):
 
             # 🟢 4. خريطة أيام العمل الأسبوعية بناءً على التواريخ المستخرجة
             working_days_map = {}
+            DAY_FLAGS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
             for emp in active_emps:
                 rule = getattr(emp, 'attendance_rule', None)
-                work_days = getattr(rule, 'work_days', [0, 1, 2, 3, 4, 6]) if rule else [0, 1, 2, 3, 4]
                 for d in distinct_dates:
-                    working_days_map[(emp.id, d)] = d.weekday() in work_days
+                    if rule:
+                        # أيام العمل تُقرأ من لائحة الموظف نفسها (الاثنين..الأحد في AttendanceRule)
+                        working_days_map[(emp.id, d)] = bool(getattr(rule, DAY_FLAGS[d.weekday()], False))
+                    else:
+                        # بدون لائحة: الأحد..الخميس
+                        working_days_map[(emp.id, d)] = d.weekday() in [6, 0, 1, 2, 3]
 
             preloaded_data = {
                 'missions_set': missions_set,
@@ -1779,73 +1751,67 @@ def calculate_monthly_salary(request, employee_id, year, month):
     from calendar import monthrange
     employee = Employee.objects.get(id=employee_id)
 
-    # جلب جميع أيام حضور وغياب الموظف خلال الشهر
+    # 🟢 دورة الراتب (26 من الشهر السابق -> 25 من الشهر الحالي) مثل الكشف المجمّع تماماً
+    cycle_end = date(year, month, 25)
+    cycle_start = date(year - 1, 12, 26) if month == 1 else date(year, month - 1, 26)
+    emp_effective_start = employee.hire_date if (employee.hire_date and employee.hire_date > cycle_start) else cycle_start
+    emp_effective_end = employee.end_date if (employee.end_date and employee.end_date < cycle_end) else cycle_end   # 🟢 الاستقالة
+
+    # جلب جميع أيام حضور وغياب الموظف خلال دورة الراتب (حتى انتهاء عمله)
     attendances = DailyAttendance.objects.filter(
         employee=employee,
-        date__year=year,
-        date__month=month
+        date__gte=emp_effective_start,
+        date__lte=emp_effective_end
     )
 
-    total_overtime = attendances.aggregate(Sum('overtime_hours'))['overtime_hours__sum'] or 0.0
-    total_deductions_hours = attendances.aggregate(Sum('deduction_hours'))['deduction_hours__sum'] or 0.0
+    counted_days = attendances.exclude(status='holiday')   # أيام العطلة لا تدخل في أي حساب
+    total_overtime = counted_days.aggregate(Sum('overtime_hours'))['overtime_hours__sum'] or 0.0
+    total_deductions_hours = counted_days.aggregate(Sum('deduction_hours'))['deduction_hours__sum'] or 0.0
     total_absence_days = attendances.filter(status='absent').count()
 
     # 🟢 حساب أيام الإجازة المرضية المعتمدة الواقعة داخل هذا الشهر (تُخصم من الراتب
     # يوماً بيوم تماماً مثل الغياب: يوم مرضي = خصم يوم، يومين مرضي = خصم يومين... إلخ)
-    month_start = date(year, month, 1)
-    month_end = date(year, month, monthrange(year, month)[1])
-    sick_leaves_this_month = LeaveRequest.objects.filter(
-        employee=employee,
-        leave_type='sick',
-        status='approved',
-        start_date__lte=month_end,
-        end_date__gte=month_start,
-    )
-    total_sick_days = 0
-    for lv in sick_leaves_this_month:
-        overlap_start = max(lv.start_date, month_start)
-        overlap_end = min(lv.end_date, month_end)
-        total_sick_days += (overlap_end - overlap_start).days + 1
+    month_start = emp_effective_start
+    month_end = emp_effective_end
+    total_sick_days = count_sick_leave_days(employee.id, month_start, month_end)
 
-    # 🔴 1. تجميع كل أيام الجزاء الصارمة التي تم توقيعها على الموظف خلال الشهر
-    total_penalty_days = attendances.aggregate(Sum('administrative_penalty_days'))['administrative_penalty_days__sum'] or 0.0
+    # 🔴 1. تجميع أيام الجزاء (يوم الغياب بدون إذن = 3 أيام إجمالاً: يوم الغياب نفسه + يومان جزاء)
+    # لذلك نطرح 1 من جزاء السجلات الغائبة لأن اليوم نفسه يُحسب في total_absence_days
+    total_penalty_days = counted_days.aggregate(
+        total=Coalesce(
+            Sum(
+                Case(
+                    When(status='absent', administrative_penalty_days__gte=1.0,
+                         then=F('administrative_penalty_days') - 1.0),
+                    default=F('administrative_penalty_days'),
+                    output_field=FloatField()
+                )
+            ),
+            Value(0.0), output_field=FloatField()
+        )
+    )['total']
 
     # 🟢 إضافة أيام خصم الجزاءات الإدارية الموقّعة (PenaltyRecord) لنفس الشهر
     penalty_records_this_month = PenaltyRecord.objects.filter(
-        employee=employee, date__year=year, date__month=month
+        employee=employee, date__gte=emp_effective_start, date__lte=cycle_end
     )
     total_penalty_record_days = penalty_records_this_month.aggregate(
         Sum('deduction_days')
     )['deduction_days__sum'] or 0.0
-    total_penalty_days += total_penalty_record_days
 
-    base_salary = float(employee.base_salary) if employee.base_salary else 0.0
-
-    # 1. حساب خصم الغياب المباشر (بناءً على 30 يوماً كشهر محاسبي ثابت)
-    # حساب أجر اليوم بناءً على اللائحة (12 يوم أو 30 يوم)
-    days_in_month_rule = 12 if (employee.attendance_rule and "12" in employee.attendance_rule.name) else 30.0
-    day_rate = base_salary / days_in_month_rule
-    absent_multiplier = float(employee.attendance_rule.absent_deduction_days) if employee.attendance_rule else 1.0
-    absence_deduction = total_absence_days * day_rate * absent_multiplier
-
-    # 🟢 خصم الإجازة المرضية (يوم بيوم بدون معامل مضاعف، بعكس الغياب بدون إذن)
-    sick_deduction = total_sick_days * day_rate
-
-    # 🔴 2. حساب قيمة الجزاءات الإدارية المادية (أيام الجزاء × أجر اليوم)
-    penalty_deduction = total_penalty_days * day_rate
-
-    # 3. 🟢 حساب خصم التأخير الديناميكي (تتضخم قيمة ساعة الخصم كلما زاد الغياب)
-    actual_working_days = 30 - total_absence_days
-    if actual_working_days > 0:
-        dynamic_delay_rate = base_salary / actual_working_days
-        late_deduction = total_deductions_hours * dynamic_delay_rate
-    else:
-        # حماية برمجية لتجنب القسمة على صفر إذا غاب الموظف طوال الشهر
-        late_deduction = 0.0
-
-    # 4. حساب قيمة الإضافي (بناءً على افتراض 240 ساعة عمل شهرياً)
-    hourly_rate_standard = base_salary / 240.0
-    overtime_allowance = total_overtime * hourly_rate_standard
+    # 🧮 نفس المعادلات الموحّدة المستخدمة في الكشف المجمّع (تضخيم الجزاءات والتأخير، والإداري بدون تضخيم)
+    comp = compute_salary_components(
+        employee, cycle_start, cycle_end, emp_effective_start,
+        total_absence_days, total_deductions_hours, total_penalty_days, total_penalty_record_days,
+        total_sick_days, total_overtime,
+        effective_end=emp_effective_end
+    )
+    base_salary = comp['earned_base_salary']
+    absence_deduction = comp['absence_deduction']
+    sick_deduction = comp['sick_deduction']
+    penalty_deduction = comp['penalty_deduction']
+    late_deduction = comp['late_deduction']
+    overtime_allowance = comp['overtime_allowance']
 
     # 🛡️ محرك فحص واحتساب البيانات التأمينية المضافة حديثاً للموظف
     if employee.is_insured:
@@ -1860,7 +1826,9 @@ def calculate_monthly_salary(request, employee_id, year, month):
         ins_number = "غير مؤمن عليه"
 
     # 🔴 5. صافي الراتب النهائي بعد التسويات وخصم الاستقطاع التأميني والجزاءات الإدارية
-    net_salary = base_salary + overtime_allowance - late_deduction - absence_deduction - sick_deduction - penalty_deduction - ins_deduction
+    total_deductions_combined = late_deduction + absence_deduction + sick_deduction + penalty_deduction + ins_deduction
+    actual_total_deductions = min(total_deductions_combined, base_salary + overtime_allowance)   # نفس سقف الكشف المجمّع
+    net_salary = max(0.0, base_salary + overtime_allowance - actual_total_deductions)
 
     context = {
         'employee': employee,
@@ -1872,7 +1840,7 @@ def calculate_monthly_salary(request, employee_id, year, month):
         'total_sick_days': total_sick_days,
         'penalty_deduction': round(penalty_deduction, 2), # 👈 تمرير قيمة الجزاء للتمبلت لطباعتها في مفردات الراتب
         'penalty_records': penalty_records_this_month, # 🟢 تفاصيل كل جزاء موقّع (نوعه وسببه ويوم خصمه) لعرضها في القسيمة
-
+        'base_salary': round(base_salary, 2),
         # 🛡️ إرسال المت المتغيرات التأمينية الجديدة لكي تظهر في صفحة مفردات الراتب (payroll_slip.html)
         'is_insured': employee.is_insured,
         'insurance_number': ins_number,
@@ -1886,226 +1854,78 @@ def calculate_monthly_salary(request, employee_id, year, month):
 
 
 
-
-# def process_daily_attendance_for_employee(employee, target_date, logs, preloaded_data=None):
-#     rule = employee.attendance_rule
-
-#     # 1. فحص وجود مأمورية، إجازة، إذن، أو عطلة رسمية في هذا اليوم
-#     # 🟢 استخدام التخزين المؤقت للسرعة الصاروخية أثناء المعالجة المجمعة
-#     if preloaded_data:
-#         has_mission = any(m.employee == employee and m.start_date <= target_date <= m.end_date for m in preloaded_data['missions'])
-#         has_leave = any(l.employee == employee and l.start_date <= target_date <= l.end_date for l in preloaded_data['leaves'])
-#         has_permission = any(p.employee == employee and p.date == target_date for p in preloaded_data['permissions'])
-#         is_public_holiday = any(h.start_date <= target_date <= h.end_date for h in preloaded_data['holidays'])
-#     else:
-#         # الوضع العادي في حالة تم استدعاء الدالة بشكل فردي
-#         has_mission = MissionRequest.objects.filter(employee=employee, start_date__lte=target_date, end_date__gte=target_date, status='approved').exists()
-#         has_leave = LeaveRequest.objects.filter(employee=employee, start_date__lte=target_date, end_date__gte=target_date, status='approved').exists()
-#         has_permission = PermissionRequest.objects.filter(employee=employee, date=target_date, status='approved').exists()
-#         is_public_holiday = PublicHoliday.objects.filter(start_date__lte=target_date, end_date__gte=target_date).exists()
-
-#     # 2. أيام العطلات الأسبوعية لا تُعالج ما لم يبصم فيها
-#     if not employee.check_is_working_day(target_date):
-#         if not logs:
-#             DailyAttendance.objects.update_or_create(employee=employee, date=target_date, defaults={'status': 'holiday'})
-#             return
-
-#     # 3. 🛡️ حماية المأموريات (لا تخضع لأي جزاء وتعتبر حضوراً كاملاً)
-#     if has_mission:
-#         DailyAttendance.objects.update_or_create(
-#             employee=employee, date=target_date,
-#             defaults={'status': 'mission', 'administrative_penalty_days': 0.0, 'late_minutes': 0, 'deduction_hours': 0.0, 'absence_deduction_days': 0.0}
-#         )
-#         return
-
-#     # 4. معالجة الغياب (عدم وجود بصمات نهائياً)
-#     if not logs:
-#         if has_leave:
-#             DailyAttendance.objects.update_or_create(
-#                 employee=employee, date=target_date,
-#                 defaults={'status': 'leave', 'administrative_penalty_days': 0.0}
-#             )
-#         elif is_public_holiday:
-#             DailyAttendance.objects.update_or_create(
-#                 employee=employee, date=target_date,
-#                 defaults={'status': 'holiday', 'administrative_penalty_days': 0.0}
-#             )
-#         else:
-#             DailyAttendance.objects.update_or_create(
-#                 employee=employee, date=target_date,
-#                 defaults={'status': 'absent', 'administrative_penalty_days': 3.0}
-#             )
-#         return
-
-#     # 5. معالجة الحضور (تحليل البصمات)
-#     check_in_dt = min(logs)
-#     check_out_dt = max(logs)
-#     check_in = check_in_dt.time()
-#     check_out = check_out_dt.time()
-
-#     admin_penalty = 0.0
-#     late_minutes = 0
-#     deduction_hours = 0.0
-
-#     status = 'holiday' if is_public_holiday else 'present'
-
-#     log_count = len(set([log.time().replace(second=0, microsecond=0) for log in logs]))
-
-#     # 🟢 تعديل الدوام المرن: إذا كان الدوام مرن، يكفي بصمة واحدة لنعتبره أكمل الساعات
-#     is_flexible = (getattr(rule, 'shift_type', '') == 'flexible')
-#     target_hours = float(rule.target_work_hours) if getattr(rule, 'target_work_hours', None) else 8.0
-
-#     if is_flexible and log_count >= 1:
-#         # الدوام المرن: بصمة واحدة أو أكثر تعني حضور كامل المدة
-#         actual_hours = target_hours
-#     else:
-#         # الدوام الثابت: يتطلب بصمتين لحساب الساعات الفعلية
-#         actual_hours = (check_out_dt - check_in_dt).total_seconds() / 3600.0 if log_count > 1 else 0.0
-
-#     overtime_hours = 0.0
-
-#     # 🔴 فحص بصمة واحدة (للدوام الثابت فقط)
-#     if log_count == 1:
-#         if is_flexible:
-#             # تم الإعفاء: الدوام المرن لا يعاقب على بصمة واحدة
-#             pass
-#         elif has_permission or is_public_holiday:
-#             # لديه إذن معتمد أو اليوم عطلة رسمية: يُعفى من جزاء البصمة الواحدة
-#             pass
-#         else:
-#             # الدوام الثابت وليس لديه إذن: بصمة واحدة = 3 أيام جزاء
-#             admin_penalty = 3.0
-#             status = 'absent'
-
-#     # 🔴 فحص التأخيرات (للدوام الثابت فقط) - النسخة الاحترافية المعدلة
-#     if not is_flexible and getattr(rule, 'shift_type', '') == 'fixed' and log_count > 1 and not is_public_holiday:
-#         rule_start = rule.work_start_time
-#         if check_in > rule_start:
-#             diff = datetime.combine(target_date, check_in) - datetime.combine(target_date, rule_start)
-#             late_minutes = int(diff.total_seconds() / 60)
-
-#             if late_minutes > rule.grace_period:
-#                 # 🟢 تحويل كل دقائق التأخير إلى كسر عشري تراكمي (مثال: 59 دقيقة = 0.98)
-#                 # ليتم ضربها لاحقاً في محرك الرواتب بالمعادلة الديناميكية التي اخترتها
-#                 deduction_hours = (late_minutes / 60.0) * rule.late_deduction_multiplier
-#         from datetime import time
-#         if check_out < time(14, 0):
-#             admin_penalty = 3.0  # توقيع جزاء 3 أيام فوراً
-#             status = 'absent'    # تحويل حالة اليوم إلى غياب رغم وجود بصمتين
-#             deduction_hours = 0.0 # تصفير ساعات التأخير الصباحية (إن وجدت) لعدم ازدواجية الخصم    # تم إزالة شرط الـ 30 دقيقة والجزاء الإداري القاطع، ليصبح النظام أكثر مرونة وعدلاً
-
-#     # 🔵 فحص نقص الساعات (للدوام المرن)
-#     elif is_flexible and log_count > 1 and not is_public_holiday:
-#         actual_hours = (check_out_dt - check_in_dt).total_seconds() / 3600.0
-#         if actual_hours < target_hours:
-#             shortfall_hours = target_hours - actual_hours
-#             deduction_hours = shortfall_hours * rule.late_deduction_multiplier
-
-#     # 🟢 حساب الإضافي (Overtime) لمن عمل في عطلة رسمية
-#     if is_public_holiday and log_count > 1:
-#         overtime_hours = (check_out_dt - check_in_dt).total_seconds() / 3600.0
-#     elif is_public_holiday and is_flexible and log_count == 1:
-#         overtime_hours = target_hours
-
-#     # الحفظ النهائي في الداتابيز
-#     DailyAttendance.objects.update_or_create(
-#         employee=employee, date=target_date,
-#         defaults={
-#             'check_in': check_in,
-#             'check_out': check_out,
-#             'status': status,
-#             'actual_work_hours': round(actual_hours, 2),
-#             'overtime_hours': round(overtime_hours, 2),
-#             'late_minutes': late_minutes,
-#             'deduction_hours': round(deduction_hours, 2),
-#             'administrative_penalty_days': admin_penalty,
-#             'absence_deduction_days': 0.0
-#         }
-#     )
-
-
-
-
 def employee_list(request):
+    # 1. جلب معاملات البحث والفلترة من الرابط
+    date_param = request.GET.get('date', '').strip()
+    search_query = request.GET.get('q', '').strip()
+    tab_param = request.GET.get('tab', '').strip()
+
+    # 2. تحديد التبويب النشط
+    if tab_param:
+        active_tab = tab_param
+    elif date_param or request.GET.get('page') or search_query:
+        active_tab = 'attendance'
+    else:
+        active_tab = 'dashboard'
+
     try:
-        # 1. جلب الموظفين والأقسام في استعلام واحد محسن وترتيبهم أبجدياً
-        employees_query = Employee.objects.all().select_related('department').order_by('name')
-        employees = list(employees_query)  # تثبيت في الذاكرة سريعة القراءة
+        # 3. جلب البيانات الأساسية (تركها كـ QuerySet لتوليد Lazy Loading)
+        employees = Employee.objects.all().select_related('department').order_by('name')
         departments = Department.objects.all()
 
-        # 2. جلب طلبات الإجازات لجدول الإجازات وتثبيتها
-        leave_requests_query = LeaveRequest.objects.all().select_related('employee').order_by('employee__name', '-id')
-        leave_requests = list(leave_requests_query)  # تثبيت في الذاكرة
+        # جلب آخر الإجازات فقط للجدول لتجنب إغراق الذاكرة
+        leave_requests = LeaveRequest.objects.all().select_related('employee').order_by('-id')[:50]
 
-        # 3. جلب معاملات البحث والفلترة من الرابط
-        date_param = request.GET.get('date')
-        search_query = request.GET.get('q', '').strip()  # جلب كلمة البحث (اسم أو كود الموظف)
-
-        # الاستعلام الأساسي (كل السجلات مرتبة تنازلياً)
+        # 4. استعلام الحضور والغياب الأساسي
         attendance_query = DailyAttendance.objects.all().select_related('employee').order_by('-date', 'employee__name')
 
-        # 🟢 تطبيق فلتر التاريخ (إذا اختار المستخدم تاريخاً محدداً)
+        # 🟢 تطبيق فلتر التاريخ
+        target_date = ""
         if date_param:
-            try:
-                target_date = pd.to_datetime(date_param).date()
+            parsed_date = parse_date(date_param)
+            if parsed_date:
+                target_date = parsed_date
                 attendance_query = attendance_query.filter(date=target_date)
-            except:
+            else:
                 target_date = timezone.now().date()
-        else:
-            target_date = ""  # نتركها فارغة لكي يظهر Placeholder في الفلتر
 
-        # 🔍 تطبيق فلتر البحث الذكي الفصل بين كود البصمة والاسم
+        # 🔍 تطبيق فلتر البحث الذكي
         if search_query:
             if search_query.isdigit():
-                # 🟢 مطابقة تامة Exact Match لكود البصمة إذا كان المدخل رقماً
                 attendance_query = attendance_query.filter(employee__emp_id=search_query)
             else:
-                # 🔵 بحث مرن بالهمزات والحروف المتشابهة لاسم الموظف إذا كان المدخل نصاً
                 pattern = search_query
                 pattern = re.sub(r'[اأإآ]', r'[اأإآ]', pattern)
                 pattern = re.sub(r'[هة]', r'[هة]', pattern)
                 pattern = re.sub(r'[يى]', r'[يى]', pattern)
 
-                attendance_query = attendance_query.filter(
-                    Q(employee__name__iregex=pattern)
-                )
+                attendance_query = attendance_query.filter(employee__name__iregex=pattern)
 
-        # 4. تفعيل جلب السجلات والترقيم (Pagination) لعدم إرهاق المتصفح (50 سجل لكل صفحة)
+        # 5. الترقيم (Pagination)
         paginator = Paginator(attendance_query, 50)
         page_number = request.GET.get('page')
         attendance_page = paginator.get_page(page_number)
 
-        # حساب إحصائيات اليوم الحالي للوحة القيادة (للحفاظ على دقة العدادات)
+        # 6. إحصائيات سريعة ومباشرة عبر قاعدة البيانات (SQL Count)
         today = timezone.now().date()
         today_attendance_count = DailyAttendance.objects.filter(date=today, status__in=['present', 'late']).count()
         today_late_count = DailyAttendance.objects.filter(date=today, late_minutes__gt=0).count()
+        total_emp = Employee.objects.count()
+        pending_leaves = LeaveRequest.objects.filter(status='pending').count()
 
     except Exception as e:
         print(f"🔴 خطأ داخلي في الـ View: {str(e)}")
         employees, departments, leave_requests = [], [], []
-        attendance_page = []
+        attendance_page = None
         target_date = timezone.now().date()
-        today_attendance_count, today_late_count = 0, 0
-
-    # ⚡ الحساب الذكي الفائق السرعة داخل الذاكرة (0 استعلامات SQL إضافية)
-    total_emp = len(employees)
-    pending_leaves = sum(1 for l in leave_requests if l.status == 'pending')
-
-    # تحديد التبويب النشط ذكياً (إذا بحث أو فلتر، يبقى في تبويب الحضور)
-    tab_param = request.GET.get('tab')
-    if tab_param:
-        active_tab = tab_param
-    elif request.GET.get('date') or request.GET.get('page') or request.GET.get('q'):
-        active_tab = 'attendance'
-    else:
-        active_tab = 'dashboard'
+        today_attendance_count, today_late_count, total_emp, pending_leaves = 0, 0, 0, 0
 
     context = {
         'employees': employees,
         'departments': departments,
         'leave_requests': leave_requests,
-        'attendance': attendance_page, # 🚀 تمرير كائن الـ Paginator
-        'latest_attendance': attendance_page.object_list[:5] if attendance_page else [], # أخذ أول 5 عناصر
+        'attendance': attendance_page,
+        'latest_attendance': attendance_page.object_list[:5] if attendance_page else [],
 
         # العدادات الإحصائية
         'total_employees': total_emp,
@@ -2184,6 +2004,8 @@ def attendance_list(request):
         'search_query': search_query,
         'months_range': range(1, 13),
         'years_range': range(today.year - 2, today.year + 3),
+        'all_employees': Employee.objects.filter(is_active=True).order_by('name'),
+        'today': today,
     }
 
     return render(request, 'hr/attendance_list.html', context)
@@ -2549,28 +2371,50 @@ def employee_update_view(request, employee_id):
     return render(request, 'hr/employee_form.html', {'form': form, 'employee': employee})
 
 
-# أضف هذه الدالة في نهاية ملف views.py تماماً لكي تقرأ بيانات الموظف وتفتح له الفورم المخصص
-# def employee_update_view(request, employee_id):
-#     employee = Employee.objects.get(id=employee_id)
-#     if request.method == 'POST':
-#         # تمرير instance=employee يضمن التعديل على نفس الموظف بدلاً من إنشاء واحد جديد
-#         form = EmployeeForm(request.POST, request.FILES, instance=employee)
-#         if form.is_valid():
-#             form.save()
-#             messages.success(request, f'تم تحديث بيانات الموظف "{employee.name}" بنجاح!')
-#             return redirect('hr:employee_list')
-#         else:
-#             messages.error(request, 'عذراً، يرجى مراجعة البيانات وتصحيح الأخطاء.')
-#     else:
-#         form = EmployeeForm(instance=employee)
 
-#     return render(request, 'hr/employee_form.html', {'form': form, 'employee': employee})
-
-    # ---------------------------------------------------------
-# دوال إدارة المأموريات الخارجية
+# ---------------------------------------------------------
+# دوال إدارة المأموريات الخارجية (محسنة بالفلتر التلقائي والباجنيشن)
 # ---------------------------------------------------------
 def mission_list(request):
-    missions = MissionRequest.objects.all().order_by('-start_date')
+    today = timezone.localdate()
+
+    # تحديد الدورة المالية الحالية افتراضياً (من 26 إلى 25) لضمان السرعة وعدم جلب كل البيانات
+    if today.day >= 26:
+        default_y = today.year if today.month < 12 else today.year + 1
+        default_m = today.month + 1 if today.month < 12 else 1
+    else:
+        default_y = today.year
+        default_m = today.month
+
+    selected_period = request.GET.get('salary_period', '').strip()
+
+    if not selected_period:
+        y, m = default_y, default_m
+        selected_period = f"{y:04d}-{m:02d}"
+    else:
+        try:
+            parts = selected_period.split('-')
+            y, m = int(parts[0]), int(parts[1])
+        except Exception:
+            y, m = default_y, default_m
+
+    # حساب نطاق الدورة المالية بدقة
+    cycle_end = date(y, m, 25)
+    prev_m = m - 1 if m > 1 else 12
+    prev_y = y if m > 1 else y - 1
+    cycle_start = date(prev_y, prev_m, 26)
+
+    # الاستعلام مع التحسين (select_related) وتصفية النطاق المالي
+    missions_qs = MissionRequest.objects.select_related('employee').filter(
+        start_date__gte=cycle_start,
+        start_date__lte=cycle_end
+    ).order_by('-start_date')
+
+    # 📄 إعداد الباجنيشن (عرض 25 سجل لكل صفحة)
+    paginator = Paginator(missions_qs, 25)
+    page_number = request.GET.get('page')
+    missions = paginator.get_page(page_number)
+
     if request.method == 'POST':
         form = MissionRequestForm(request.POST)
         if form.is_valid():
@@ -2580,21 +2424,56 @@ def mission_list(request):
     else:
         form = MissionRequestForm()
 
-    return render(request, 'hr/mission_list.html', {'missions': missions, 'form': form})
+    return render(request, 'hr/mission_list.html', {
+        'missions': missions,
+        'form': form,
+        'selected_period': selected_period
+    })
 
-def update_mission_status(request, req_id, status):
-    mission = get_object_or_404(MissionRequest, id=req_id)
-    if status in ['approved', 'rejected']:
-        mission.status = status
-        mission.save()
-        messages.success(request, f'تم تحديث حالة المأمورية إلى: {mission.get_status_display()}')
-    return redirect('hr:mission_list')
 
 # ---------------------------------------------------------
-# دوال إدارة الأذونات الرسمية
+# دوال إدارة الأذونات الرسمية (محسنة بالفلتر التلقائي والباجنيشن)
 # ---------------------------------------------------------
 def permission_list(request):
-    permissions = PermissionRequest.objects.all().order_by('-date')
+    today = timezone.localdate()
+
+    # تحديد الدورة المالية الحالية افتراضياً
+    if today.day >= 26:
+        default_y = today.year if today.month < 12 else today.year + 1
+        default_m = today.month + 1 if today.month < 12 else 1
+    else:
+        default_y = today.year
+        default_m = today.month
+
+    selected_period = request.GET.get('salary_period', '').strip()
+
+    if not selected_period:
+        y, m = default_y, default_m
+        selected_period = f"{y:04d}-{m:02d}"
+    else:
+        try:
+            parts = selected_period.split('-')
+            y, m = int(parts[0]), int(parts[1])
+        except Exception:
+            y, m = default_y, default_m
+
+    # حساب نطاق الدورة المالية
+    cycle_end = date(y, m, 25)
+    prev_m = m - 1 if m > 1 else 12
+    prev_y = y if m > 1 else y - 1
+    cycle_start = date(prev_y, prev_m, 26)
+
+    # الاستعلام مع التحسين وتصفية النطاق المالي
+    permissions_qs = PermissionRequest.objects.select_related('employee').filter(
+        date__gte=cycle_start,
+        date__lte=cycle_end
+    ).order_by('-date')
+
+    # 📄 إعداد الباجنيشن (عرض 25 سجل لكل صفحة)
+    paginator = Paginator(permissions_qs, 25)
+    page_number = request.GET.get('page')
+    permissions = paginator.get_page(page_number)
+
     if request.method == 'POST':
         form = PermissionRequestForm(request.POST)
         if form.is_valid():
@@ -2604,7 +2483,22 @@ def permission_list(request):
     else:
         form = PermissionRequestForm()
 
-    return render(request, 'hr/permission_list.html', {'permissions': permissions, 'form': form})
+    return render(request, 'hr/permission_list.html', {
+        'permissions': permissions,
+        'form': form,
+        'selected_period': selected_period
+    })
+
+
+def update_mission_status(request, req_id, status):
+    mission = get_object_or_404(MissionRequest, id=req_id)
+    if status in ['approved', 'rejected']:
+        mission.status = status
+        mission.save()
+        messages.success(request, f'تم تحديث حالة المأمورية إلى: {mission.get_status_display()}')
+    return redirect('hr:mission_list')
+
+
 
 def update_permission_status(request, req_id, status):
     permission = get_object_or_404(PermissionRequest, id=req_id)

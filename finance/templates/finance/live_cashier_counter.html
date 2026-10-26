@@ -1,18 +1,20 @@
 {% extends "base_finance.html" %}
 {% load static %}
+{% load l10n %}
 
 {% block title %}شاشة الكاونتر والتحصيل المباشر السريع (POS){% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+{# أيقونات بدون حجب رسم الصفحة + SweetAlert بـ defer (لا يحجب التحليل) #}
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"></noscript>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
 
 <style>
     :root {
         --bg-main: #020617;
-        --glass-surface: rgba(15, 23, 42, 0.95);
-        --glass-card: rgba(30, 41, 59, 0.85);
+        --glass-surface: #0f172a;
         --glass-border: rgba(255, 255, 255, 0.15);
         --neon-cyan: #38bdf8;
         --neon-emerald: #34d399;
@@ -21,102 +23,73 @@
 
     body { background-color: var(--bg-main) !important; color: #f8fafc !important; }
 
+    /* ⚡ بدون backdrop-filter (ثقيل جداً على الأجهزة الضعيفة) - الخلفية شبه معتمة أصلاً */
     .glass-card {
         background: var(--glass-surface) !important;
-        backdrop-filter: blur(20px);
         border: 1px solid var(--glass-border) !important;
         border-radius: 20px !important;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     }
 
-    .search-glass-card {
-        position: relative !important;
-        z-index: 1050 !important;
-        overflow: visible !important;
-    }
+    .search-glass-card { position: relative !important; z-index: 1050 !important; overflow: visible !important; }
 
     .custom-search-input {
-        background-color: #020617 !important;
-        color: #ffffff !important;
-        border: 2px solid var(--neon-cyan) !important;
-        border-radius: 14px !important;
-        padding: 16px 20px !important;
-        font-size: 1.25rem !important;
-        font-weight: 800 !important;
-        direction: rtl !important;
-        text-align: right !important;
+        background-color: #020617 !important; color: #fff !important;
+        border: 2px solid var(--neon-cyan) !important; border-radius: 14px !important;
+        padding: 16px 20px !important; font-size: 1.25rem !important; font-weight: 800 !important;
+        direction: rtl !important; text-align: right !important;
     }
-
-    .custom-search-input:focus {
-        box-shadow: 0 0 30px rgba(56, 189, 248, 0.6) !important;
-        border-color: #38bdf8 !important;
-        outline: none !important;
-    }
+    .custom-search-input:focus { box-shadow: 0 0 20px rgba(56, 189, 248, 0.5) !important; outline: none !important; }
 
     .search-results-dropdown {
-        position: absolute !important;
-        top: 100% !important;
-        right: 0 !important;
-        left: 0 !important;
-        z-index: 999999 !important;
-        background-color: #090d16 !important;
-        border: 2px solid var(--neon-cyan) !important;
-        border-radius: 16px !important;
-        margin-top: 8px !important;
-        max-height: 420px !important;
-        overflow-y: auto !important;
-        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.98) !important;
+        position: absolute !important; top: 100% !important; right: 0 !important; left: 0 !important;
+        z-index: 1060 !important; background-color: #090d16 !important;
+        border: 2px solid var(--neon-cyan) !important; border-radius: 16px !important;
+        margin-top: 8px !important; max-height: 420px !important; overflow-y: auto !important;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9) !important;
     }
+    .student-search-card { padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,.1); cursor: pointer; }
+    .student-search-card:hover, .student-search-card.active { background: rgba(56, 189, 248, 0.25) !important; }
 
-    .student-search-card {
-        padding: 14px 18px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        cursor: pointer;
-        transition: all 0.2s ease-in-out;
-    }
-
-    .student-search-card:hover {
-        background: rgba(56, 189, 248, 0.25) !important;
-        padding-right: 25px;
-    }
-
-    /* 🟢 تصميم كروت الإحصائيات مع تفتيح الألوان */
     .stat-badge {
-        border-radius: 14px;
-        padding: 12px 10px;
-        text-align: center;
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        transition: transform 0.2s, border-color 0.2s;
+        border-radius: 14px; padding: 12px 10px; text-align: center;
+        background: #0f172a; border: 1px solid rgba(255,255,255,.18);
     }
+    .clickable-card { cursor: pointer; transition: transform .15s; }
+    .clickable-card:hover { transform: translateY(-3px); border-color: #f87171 !important; background: rgba(220,38,38,.2) !important; }
 
-    .clickable-card {
-        cursor: pointer;
-    }
-    .clickable-card:hover {
-        transform: translateY(-3px);
-        border-color: #f87171 !important;
-        background: rgba(220, 38, 38, 0.2) !important;
-    }
-
-    /* 🟢 توضيح وتفتيح ألوان عناوين الكروت لمنع الغموض */
-    .stat-label-old { color: #fca5a5 !important; font-weight: 800; font-size: 0.95rem; }
-    .stat-label-current { color: #7dd3fc !important; font-weight: 800; font-size: 0.95rem; }
-    .stat-label-late { color: #f87171 !important; font-weight: 800; font-size: 0.95rem; }
-    /* 🟢 أضف هذا السطر مع كلاسات التنسيق */
-    .stat-label-discount { color: #c084fc !important; font-weight: 800; font-size: 0.95rem; }
-    .stat-label-paid { color: #6ee7b7 !important; font-weight: 800; font-size: 0.95rem; }
+    .stat-label-old { color: #fca5a5 !important; font-weight: 800; font-size: .95rem; }
+    .stat-label-current { color: #7dd3fc !important; font-weight: 800; font-size: .95rem; }
+    .stat-label-late { color: #f87171 !important; font-weight: 800; font-size: .95rem; }
+    .stat-label-discount { color: #c084fc !important; font-weight: 800; font-size: .95rem; }
+    .stat-label-paid { color: #6ee7b7 !important; font-weight: 800; font-size: .95rem; }
     .stat-label-remaining { color: #fde047 !important; font-weight: 900; font-size: 1rem; }
 
-    /* 🟢 إخفاء أسهم التمرير من حقول الأرقام لتبدو كشاشة POS احترافية */
     input[type=number]::-webkit-inner-spin-button,
-    input[type=number]::-webkit-outer-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-    input[type=number] {
-        -moz-appearance: textfield;
-    }
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    /* بديل خفيف لـ animate.css */
+    @keyframes fxFade { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+    .fx-fade { animation: fxFade .25s ease-out; }
+    @keyframes fxRow { from { background: rgba(52,211,153,.35); } to { background: transparent; } }
+    .row-new { animation: fxRow 1.6s ease-out; }
+
+    /* البحث الذكي: عناوين المجموعات + تمييز الكلمات المطابقة */
+    .sr-group { padding: 6px 18px; font-size: .8rem; font-weight: 800; letter-spacing: .3px;
+                background: #020617; color: #7dd3fc; border-bottom: 1px solid rgba(255,255,255,.08); position: sticky; top: 0; z-index: 1; }
+    .sr-group.g0 { color: #34d399; } .sr-group.g3 { color: #fbbf24; }
+    mark.sm { background: rgba(251,191,36,.25); color: #fde047; border-radius: 3px; padding: 0 2px; }
+    .mt-badge { font-size: .7rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; }
+    .mt-g0 { background: rgba(52,211,153,.2); color: #34d399; border: 1px solid #34d399; }
+    .mt-g1 { background: rgba(56,189,248,.15); color: #38bdf8; border: 1px solid #38bdf8; }
+    .mt-g2 { background: rgba(148,163,184,.15); color: #cbd5e1; border: 1px solid #64748b; }
+    .mt-g3 { background: rgba(251,191,36,.15); color: #fbbf24; border: 1px solid #fbbf24; }
+
+    #receiptHint { min-height: 1.2em; }
+    #todayPaymentsTable td, #todayPaymentsTable th { white-space: nowrap; }
+    .stat-badge.needs-attention { animation: pulseOldDebt 1.4s ease-in-out infinite; box-shadow: 0 0 0 2px #ef4444; }
+    @keyframes pulseOldDebt { 50% { box-shadow: 0 0 0 7px rgba(239, 68, 68, .25); } }
 </style>
 
 <div class="container-fluid py-3" dir="rtl">
@@ -135,29 +108,26 @@
         </div>
     </div>
 
-    <!-- 🟢 2. محرك البحث الذكي -->
+    <!-- 2. محرك البحث -->
     <div class="glass-card search-glass-card p-4 mb-4">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <label for="studentSearchInput" class="form-label text-info fw-black fs-5 m-0">
-                <i class="bi bi-search me-1"></i> ابحث عن الطالب (الاسم الرباعي / الكود / القومي / هاتف ولي الأمر):
+                <i class="bi bi-search me-1"></i> ابحث عن الطالب (الاسم / الكود / القومي / هاتف ولي الأمر):
             </label>
-            <button class="btn btn-outline-danger btn-sm font-weight-bold px-3" type="button" onclick="resetCounterForm()">
+            <button class="btn btn-outline-danger btn-sm font-weight-bold px-3" type="button" onclick="resetCounterForm()" title="مسح كل شيء (Esc مرتين)">
                 <i class="bi bi-eraser-fill me-1"></i> مسح وتفريغ
             </button>
         </div>
 
         <div class="position-relative">
-            <input type="text" id="studentSearchInput"
-                   class="form-control custom-search-input"
-                   placeholder="اكتب اسم الطالب أو الكود هنا للبحث الفوري..."
-                   autocomplete="off" autofocus>
-
+            <input type="text" id="studentSearchInput" class="form-control custom-search-input"
+                   placeholder="اكتب اسم الطالب أو الكود هنا للبحث الفوري..." autocomplete="off" autofocus>
             <div id="searchResultsList" class="search-results-dropdown d-none"></div>
         </div>
     </div>
 
-    <!-- 🟢 3. منطقة كارت الطالب المختار والتحصيل السريع -->
-    <div id="studentWorkspace" class="d-none animate__animated animate__fadeIn mb-4">
+    <!-- 3. مساحة عمل الطالب -->
+    <div id="studentWorkspace" class="d-none mb-4">
         <div class="row g-3">
 
             <div class="col-lg-8">
@@ -177,61 +147,47 @@
                         </div>
                     </div>
 
-                    <!-- 🟢 الكروت الـ 5 بعناوين واضحة ناصعة وإمكانية الضغط للتحويل لصفحة تسوية المديونية -->
                     <div class="row g-2 mb-4">
                         <div class="col-6 col-md">
                             <div class="stat-badge border-danger clickable-card" onclick="payOldDebtDirectly()" title="اضغط للانتقال لصفحة تسوية المديونية القديمة">
-                                <span class="stat-label-old d-block mb-1">
-                                    <i class="bi bi-clock-history me-1"></i> مديونية قديمة
-                                </span>
+                                <span class="stat-label-old d-block mb-1"><i class="bi bi-clock-history me-1"></i> مديونية قديمة</span>
                                 <strong id="dispOldDebt" class="text-danger fs-5 fw-black">0.00</strong>
                             </div>
                         </div>
                         <div class="col-6 col-md">
                             <div class="stat-badge border-info">
-                                <span class="stat-label-current d-block mb-1">
-                                    <i class="bi bi-receipt me-1"></i> المطلوب حالياً
-                                </span>
+                                <span class="stat-label-current d-block mb-1"><i class="bi bi-receipt me-1"></i> المطلوب حالياً</span>
                                 <strong id="dispFees" class="text-info fs-5 fw-black">0.00</strong>
                             </div>
                         </div>
                         <div class="col-6 col-md">
                             <div class="stat-badge border-danger">
-                                <span class="stat-label-late d-block mb-1">
-                                    <i class="bi bi-exclamation-octagon me-1"></i> غرامة تأخير
-                                </span>
+                                <span class="stat-label-late d-block mb-1"><i class="bi bi-exclamation-octagon me-1"></i> غرامة تأخير</span>
                                 <strong id="dispLateFine" class="text-danger fs-5 fw-black">0.00</strong>
                             </div>
                         </div>
-                        <!-- 🟢 1. كارت عداد الخصم الجديد -->
                         <div class="col-6 col-md">
-                            <div class="stat-badge" style="border-color: #c084fc !important;">
-                                <span class="stat-label-discount d-block mb-1">
-                                    <i class="bi bi-percent me-1"></i> عداد الخصم
-                                </span>
-                                <strong id="dispDiscount" class="fs-5 fw-black" style="color: #c084fc;">0.00</strong>
+                            <div class="stat-badge" style="border-color:#c084fc !important;">
+                                <span class="stat-label-discount d-block mb-1"><i class="bi bi-percent me-1"></i> عداد الخصم</span>
+                                <strong id="dispDiscount" class="fs-5 fw-black" style="color:#c084fc;">0.00</strong>
                             </div>
                         </div>
                         <div class="col-6 col-md">
                             <div class="stat-badge border-success">
-                                <span class="stat-label-paid d-block mb-1">
-                                    <i class="bi bi-check-circle me-1"></i> المحصل المسدد
-                                </span>
+                                <span class="stat-label-paid d-block mb-1"><i class="bi bi-check-circle me-1"></i> المحصل المسدد</span>
                                 <strong id="dispPaid" class="text-success fs-5 fw-black">0.00</strong>
                             </div>
                         </div>
                         <div class="col-12 col-md">
                             <div class="stat-badge border-warning">
-                                <span class="stat-label-remaining d-block mb-1">
-                                    <i class="bi bi-wallet2 me-1"></i> المتبقي الشامل
-                                </span>
+                                <span class="stat-label-remaining d-block mb-1"><i class="bi bi-wallet2 me-1"></i> المتبقي الشامل</span>
                                 <strong id="dispRemaining" class="text-warning fs-4 fw-black">0.00</strong>
                             </div>
                         </div>
                     </div>
 
                     <div class="d-flex gap-2 flex-wrap pt-2">
-                        <a id="btnPrintStatement" href="#" target="_blank" class="btn btn-sm btn-outline-primary fw-bold px-3">
+                        <a id="btnPrintStatement" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary fw-bold px-3">
                             <i class="bi bi-printer-fill me-1"></i> كشف حساب مالي
                         </a>
                         <a id="btnAssignPlan" href="#" class="btn btn-sm btn-outline-info fw-bold px-3">
@@ -240,20 +196,23 @@
                         <a id="btnWithdraw" href="#" class="btn btn-sm btn-outline-danger fw-bold px-3">
                             <i class="bi bi-box-seam me-1"></i> سحب الملف
                         </a>
-                        <a id="btnAddSale" href="{% url 'add_book_sale' %}" target="_blank" class="btn btn-sm btn-outline-success fw-bold px-3">
+                        <a id="btnAddSale" href="{% url 'add_book_sale' %}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success fw-bold px-3">
                             <i class="bi bi-cart-check-fill me-1"></i> عملية تسهيل (كتب / زي)
                         </a>
                     </div>
                 </div>
             </div>
 
-            <!-- نموذج التحصيل السريع -->
+            <!-- نموذج التحصيل -->
             <div class="col-lg-4">
                 <div class="glass-card p-4 border-success">
                     <h5 class="fw-bold text-success mb-3 border-bottom border-secondary pb-2">
                         <i class="bi bi-cash-stack me-1"></i> استلام نقدية وإصدار إيصال
                     </h5>
-                    <form id="paymentCounterForm">
+                    <form id="paymentCounterForm" autocomplete="off"
+                          data-prefix="{{ active_book.prefix|default:'' }}"
+                          data-has-book="{% if active_book %}1{% else %}0{% endif %}"
+                          data-book-label="{% if active_book %}{{ active_book.prefix|default:'' }}{{ active_book.start_serial|unlocalize }} → {{ active_book.prefix|default:'' }}{{ active_book.end_serial|unlocalize }}{% endif %}">
                         {% csrf_token %}
                         <input type="hidden" name="student" id="formStudentId">
 
@@ -261,7 +220,7 @@
                             <label class="form-label text-white-50 small font-weight-bold">فئة الإيراد:</label>
                             <select name="category" id="formCategory" class="form-select bg-black text-white border-secondary fw-bold" required>
                                 {% for cat in categories %}
-                                    <option value="{{ cat.id }}" {% if "اساس" in cat.name or "أساس" in cat.name or "مصروف" in cat.name %}selected{% endif %}>
+                                    <option value="{{ cat.id|unlocalize }}" {% if "اساس" in cat.name or "أساس" in cat.name or "مصروف" in cat.name %}selected{% endif %}>
                                         {{ cat.name }}
                                     </option>
                                 {% endfor %}
@@ -270,12 +229,27 @@
 
                         <div class="mb-3">
                             <label class="form-label text-white-50 small font-weight-bold">المبلغ المحصل (ج.م):</label>
-                            <input type="number" name="amount" id="formAmount" step="0.01" min="0.01" class="form-control form-control-lg bg-black text-success border-success fw-black text-center" placeholder="0.00" required>
+                            <input type="number" name="amount" id="formAmount" step="0.01" min="0.01" inputmode="decimal"
+                                   class="form-control form-control-lg bg-black text-success border-success fw-black text-center"
+                                   placeholder="0.00" required>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label text-white-50 small font-weight-bold">رقم الإيصال الورقي:</label>
-                            <input type="number" name="receipt_number" id="formReceiptNumber" value="{{ next_receipt_number|default:'' }}" class="form-control bg-black text-white border-secondary text-center fw-bold" required>
+                            {# type=text لدعم البادئة (A-EXP-1005). لو كتب الموظف الأرقام فقط تُضاف البادئة تلقائياً #}
+                            <input type="text" name="receipt_number" id="formReceiptNumber"
+                                   value="{{ next_receipt_number|default_if_none:''|unlocalize }}"
+                                   dir="ltr" spellcheck="false" autocomplete="off"
+                                   class="form-control bg-black text-white border-secondary text-center fw-bold font-monospace" required>
+                            <div id="receiptHint" class="small fw-bold mt-1 {% if active_book and next_receipt_number %}text-success{% else %}text-warning{% endif %}">
+                                {% if active_book and next_receipt_number %}
+                                    ✔ دفتر نشط: <span dir="ltr">{{ active_book.prefix|default:'' }}{{ active_book.start_serial|unlocalize }} → {{ active_book.prefix|default:'' }}{{ active_book.end_serial|unlocalize }}</span>
+                                {% elif active_book %}
+                                    ⚠️ انتهى الدفتر النشط. فعّل دفتراً جديداً.
+                                {% else %}
+                                    ⚠️ لا يوجد دفتر نشط. أدخل الرقم يدوياً.
+                                {% endif %}
+                            </div>
                         </div>
 
                         <button type="submit" id="btnSubmitPayment" class="btn btn-success btn-lg w-100 fw-black shadow-lg">
@@ -288,15 +262,16 @@
         </div>
     </div>
 
-    <!-- 🟢 4. جدول حركات اليوم الموحد -->
+    <!-- 4. جدول حركات اليوم -->
     <div class="glass-card p-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="fw-black text-info m-0 d-flex align-items-center gap-2">
                 <i class="bi bi-clock-history"></i>
-                سجل حركات اليومية الموحد (مؤقت لليوم الحالي فقط)
+                سجل حركات اليومية (آخر 100 حركة لليوم الحالي)
             </h5>
-            <span id="todayCountBadge" class="badge bg-black border border-secondary text-secondary px-3 py-2">
-                إجمالي عمليات اليوم: {{ today_payments.count }} إيصال
+            <span id="todayCountBadge" class="badge bg-black border border-secondary text-secondary px-3 py-2"
+                  data-total="{{ today_total|default:0|unlocalize }}">
+                إجمالي عمليات اليوم: {{ today_total|default:0 }} إيصال
             </span>
         </div>
 
@@ -304,7 +279,7 @@
             <table class="table table-dark table-hover text-center align-middle mb-0" id="todayPaymentsTable">
                 <thead class="bg-black text-info border-bottom border-secondary">
                     <tr>
-                        <th>#</th>
+                        <th>م</th>
                         <th>التاريخ / الوقت</th>
                         <th>رقم الإيصال</th>
                         <th class="text-start ps-3">اسم الطالب</th>
@@ -316,11 +291,9 @@
                 <tbody id="todayPaymentsBody">
                     {% for p in today_payments %}
                     <tr>
-                        <td class="text-muted fw-bold row-num">{{ forloop.counter }}</td>
-                        <td class="text-white-50 small">
-                            {{ p.payment_date|date:"Y-m-d" }}
-                        </td>
-                        <td><span class="badge bg-primary bg-opacity-20 text-info border border-info px-2 py-1 font-monospace">#{{ p.receipt_number }}</span></td>
+                        <td class="text-muted fw-bold">{{ p.id|unlocalize }}</td>
+                        <td class="text-white-50 small">{{ p.payment_date|date:"Y-m-d" }}</td>
+                        <td><span class="badge bg-primary bg-opacity-20 text-info border border-info px-2 py-1 font-monospace" dir="ltr">#{{ p.receipt_number|default_if_none:p.id|unlocalize }}</span></td>
                         <td class="text-start ps-3 fw-bold text-white">{{ p.student.get_full_name }}</td>
                         <td><span class="badge bg-secondary text-white">{{ p.revenue_category.name }}</span></td>
                         <td class="text-success fw-black fs-6">+{{ p.amount_paid|floatformat:2 }} ج.م</td>
@@ -342,400 +315,507 @@
 </div>
 
 <script>
-let searchTimeout;
-let currentStudentData = null;
-let currentFocus = -1; // متغير لتتبع التنقل بالكيبورد
+(function () {
+    'use strict';
 
-// 🟢 التركيز الفوري على خانة المبلغ
-function focusAmountInput() {
-    setTimeout(() => {
-        const amountField = document.getElementById('formAmount');
-        if (amountField && !amountField.disabled) {
-            amountField.focus();
-            amountField.select();
+    /* ============ مراجع العناصر والإعدادات ============ */
+    const $ = id => document.getElementById(id);
+    const searchInput = $('studentSearchInput');
+    const resultsBox  = $('searchResultsList');
+    const workspace   = $('studentWorkspace');
+    const form        = $('paymentCounterForm');
+    const amountInput = $('formAmount');
+    const receiptInput = $('formReceiptNumber');
+    const categorySel = $('formCategory');
+    const receiptHint = $('receiptHint');
+    const btnSubmit   = $('btnSubmitPayment');
+    const tbody       = $('todayPaymentsBody');
+    const countBadge  = $('todayCountBadge');
+
+    const URLS = {
+        search:  '/finance/api/student-search/',
+        nextNo:  '/finance/api/next-receipt-number/',
+        collect: '/finance/api/counter-collect/',
+        counter: "{% url 'live_cashier_counter' %}"
+    };
+    const AJAX = { 'X-Requested-With': 'XMLHttpRequest' };
+    const MAX_ROWS = 100;
+    const CACHE_TTL = 15000;                     // 15 ثانية فقط حتى لا تظهر أرصدة قديمة
+    const SUBMIT_HTML = btnSubmit.innerHTML;
+    const DEFAULT_CATEGORY = categorySel ? categorySel.value : '';
+
+    const cfg = {                                // حالة الدفتر (تتحدث من السيرفر)
+        prefix: form.dataset.prefix || '',
+        hasBook: form.dataset.hasBook === '1',
+        label: form.dataset.bookLabel || ''
+    };
+
+    let current = null;          // الطالب المختار
+    let results = [];            // نتائج البحث الحالية
+    let focusIdx = -1;
+    let searchTimer = null;
+    let searchSeq = 0;
+    let searchAbort = null;
+    let receiptDirty = false;    // هل عدّل الموظف الرقم يدوياً؟
+    let submitting = false;
+    let todayTotal = Math.max(parseInt(countBadge.dataset.total, 10) || 0, tbody.querySelectorAll('tr:not(#emptyRow)').length);
+    const cache = new Map();
+
+    /* ============ أدوات مساعدة ============ */
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fmt = v => (parseFloat(v) || 0).toFixed(2);
+    const setText = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+
+    /* ===== تطبيع عربي مطابق للسيرفر (للتمييز اللوني ومفتاح الكاش) ===== */
+    const TASHKEEL = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g;
+    const AR_MAP = { 'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ٱ': 'ا', 'ى': 'ي', 'ی': 'ي', 'ئ': 'ي', 'ؤ': 'و', 'ة': 'ه', 'ک': 'ك' };
+    function norm(str) {
+        return String(str == null ? '' : str)
+            .replace(/[٠-٩]/g, d => d.charCodeAt(0) - 1632)
+            .replace(/[۰-۹]/g, d => d.charCodeAt(0) - 1776)
+            .replace(TASHKEEL, '')
+            .replace(/[ـء]/g, '')
+            .replace(/[أإآٱىیئؤةک]/g, c => AR_MAP[c])
+            .toLowerCase()
+            .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+    function highlight(name, qNorm) {
+        const qTokens = qNorm.split(' ').filter(Boolean);
+        const qCompact = qNorm.replace(/ /g, '');
+        return String(name || '').split(/\s+/).map(w => {
+            const n = norm(w);
+            const hit = n && (qTokens.some(t => n.includes(t)) || (n.length >= 3 && qCompact.includes(n)));
+            return hit ? '<mark class="sm">' + esc(w) + '</mark>' : esc(w);
+        }).join(' ');
+    }
+    const GROUPS = [
+        { cls: 'g0', title: '✅ مطابق', badge: 'مطابق' },
+        { cls: 'g1', title: '🔎 نتائج قريبة', badge: 'قريب' },
+        { cls: 'g2', title: '📋 يحتوي على بحثك', badge: 'يحتوي' },
+        { cls: 'g3', title: '🤔 هل تقصد؟ (تشابه إملائي)', badge: 'مشتبه به' }
+    ];
+
+    function notify(opts) {
+        if (window.Swal) {
+            return Swal.fire(Object.assign({ background: '#0f172a', color: '#fff', confirmButtonColor: '#38bdf8', confirmButtonText: 'مفهوم' }, opts));
         }
-    }, 120);
-}
-
-// 🟢 التوجيه المباشر لصفحة التسوية
-function payOldDebtDirectly() {
-    if (currentStudentData && currentStudentData.old_debt > 0) {
-        window.location.href = `/finance/student/${currentStudentData.id}/settle-debt/?from=counter`;
-    } else if (currentStudentData) {
-        Swal.fire({
-            icon: 'info',
-            title: 'تنبيه',
-            text: 'هذا الطالب خالِص المديونية القديمة بالكامل ولا توجد عليه أي مستحقات سابقة.',
-            confirmButtonText: 'مفهوم',
-            confirmButtonColor: '#38bdf8',
-            background: '#0f172a',
-            color: '#fff'
-        });
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    {% if selected_student %}
-        // 🟢 1. معالجة وتحديد قيم الطالب المختار الممرر مباشرة من السيرفر
-        const rawOldDebt = parseFloat("{{ selected_student.previous_debt|default:'0' }}") || parseFloat("{{ account.previous_balance|default:'0' }}") || 0;
-        const rawTotalRem = parseFloat("{{ account.total_remaining|default:'0' }}") || 0;
-
-        // 🟢 قراءة قيمة الخصم بكافة المسميات المحتملة
-        const rawDiscount = parseFloat("{{ account.discount|default:'0' }}") || parseFloat("{{ account.total_discount|default:'0' }}") || parseFloat("{{ account.discount_amount|default:'0' }}") || 0;
-
-        const studentData = {
-            id: "{{ selected_student.id }}",
-            full_name: "{{ selected_student.get_full_name|escapejs }}",
-            code: "{{ selected_student.student_code|default:'---'|escapejs }}",
-            national_id: "{{ selected_student.national_id|default:'---'|escapejs }}",
-            grade: "{{ selected_student.grade.name|default:''|escapejs }}",
-            classroom: "{{ selected_student.classroom.name|default:''|escapejs }}",
-            specialization: "{{ selected_student.get_specialization_display|default:'غير محدد'|escapejs }}",
-            is_assigned: {% if account and account.installment_plan %}true{% else %}false{% endif %},
-
-            old_debt: rawOldDebt,
-            fees: parseFloat("{{ account.total_fees|default:0 }}") || 0,
-            late_fine: 0,
-            discount: rawDiscount, // 🟢 إضافة حقل الخصم ليتغذى منه العداد بالشاشة
-            paid: parseFloat("{{ account.total_paid|default:0 }}") || 0,
-            total_obligation: rawTotalRem + rawOldDebt
-        };
-
-        selectStudent(studentData);
-
-    {% else %}
-        // 🟢 2. جلب سريع وفوري من الـ API عند وجود student_id في رابط الصفحة
-        const studentId = new URLSearchParams(window.location.search).get('student_id');
-
-        if (studentId) {
-            fetch(`/finance/api/student-search/?q=${encodeURIComponent(studentId)}`, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(res => res.ok ? res.json() : Promise.reject(res))
-            .then(data => {
-                if (data.status === 'success' && data.results && data.results.length > 0) {
-                    const matchedStudent = data.results.find(s => String(s.id) === String(studentId)) || data.results[0];
-                    if (matchedStudent) {
-                        selectStudent(matchedStudent);
-                    }
-                }
-            })
-            .catch(err => console.error("حدث خطأ أثناء جلب بيانات الطالب الممرر:", err));
-        }
-    {% endif %}
-});
-
-// 🟢 محرك البحث ودعم الكيبورد (الأسهم و Enter)
-const searchInput = document.getElementById('studentSearchInput');
-const resultsBox = document.getElementById('searchResultsList');
-
-searchInput.addEventListener('input', function() {
-    clearTimeout(searchTimeout);
-    const query = this.value.trim();
-    currentFocus = -1; // إعادة تعيين التحديد
-
-    if (query.length < 2) {
-        resultsBox.classList.add('d-none');
-        return;
+        alert((opts.title ? opts.title + '\n' : '') + (opts.text || ''));
+        return Promise.resolve();
     }
 
-    searchTimeout = setTimeout(() => {
-        fetch(`/finance/api/student-search/?q=${encodeURIComponent(query)}`)
-            .then(res => res.json())
-            .then(data => {
-                resultsBox.innerHTML = '';
-                if (data.status === 'success' && data.results.length > 0) {
-                    data.results.forEach((student, index) => {
-                        const div = document.createElement('div');
-                        div.className = 'student-search-card d-flex justify-content-between align-items-center search-item';
-                        div.setAttribute('data-index', index);
-
-                        let totalDue = student.total_obligation;
-                        let debtBadge = totalDue > 0
-                            ? `<span class="badge bg-danger text-white border border-danger px-3 py-2 fw-black fs-6">مستحق: ${totalDue.toFixed(2)} ج.م</span>`
-                            : `<span class="badge bg-success text-white border border-success px-3 py-2 fw-black fs-6">خالص ✅</span>`;
-
-                        let assignedText = student.is_assigned
-                            ? `<span class="badge bg-success bg-opacity-20 text-success border border-success px-2 py-1 ms-1">مسكن ماليًا ✅</span>`
-                            : `<span class="badge bg-warning bg-opacity-20 text-warning border border-warning px-2 py-1 ms-1">غير مسكن ⚠️</span>`;
-
-                        div.innerHTML = `
-                            <div>
-                                <strong class="text-warning d-block fs-5 mb-1">${student.full_name}</strong>
-                                <div class="d-flex align-items-center gap-2 flex-wrap text-white small fw-bold">
-                                    <span class="badge bg-primary px-2 py-1">${student.grade} - ${student.specialization || 'غير محدد'}</span>
-                                    ${assignedText}
-                                    <span class="text-info">| كود: ${student.code}</span>
-                                    <span class="text-white-50">| قومي: ${student.national_id}</span>
-                                </div>
-                            </div>
-                            <div class="text-end ms-3">
-                                ${debtBadge}
-                            </div>
-                        `;
-                        // التحديد بالماوس
-                        div.onclick = () => selectStudent(student);
-                        // التحديد بالكيبورد
-                        div.dataset.student = JSON.stringify(student);
-                        resultsBox.appendChild(div);
-                    });
-
-                    if (data.has_more) {
-                        const moreDiv = document.createElement('div');
-                        moreDiv.className = 'p-3 text-center text-info bg-black fw-bold small border-top border-secondary unselectable';
-                        moreDiv.innerHTML = `<i class="bi bi-info-circle-fill text-warning me-1"></i> يظهر أعلى 15 نتيجة فقط.. اكتب اسم الأب أو كود الطالب للتحديد بدقة.`;
-                        resultsBox.appendChild(moreDiv);
-                    }
-
-                    resultsBox.classList.remove('d-none');
-                } else {
-                    resultsBox.innerHTML = '<div class="p-4 text-center text-warning fw-black fs-5 unselectable"><i class="bi bi-exclamation-triangle-fill me-2"></i> لا توجد نتائج مطابقة لبحثك</div>';
-                    resultsBox.classList.remove('d-none');
-                }
-            });
-    }, 250);
-});
-
-// 🟢 تفعيل التنقل بالأسهم
-searchInput.addEventListener('keydown', function(e) {
-    const items = resultsBox.querySelectorAll('.search-item');
-    if (!items || items.length === 0 || resultsBox.classList.contains('d-none')) return;
-
-    if (e.key === 'ArrowDown') {
-        currentFocus++;
-        addActive(items);
-    } else if (e.key === 'ArrowUp') {
-        currentFocus--;
-        addActive(items);
-    } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (currentFocus > -1) {
-            items[currentFocus].click();
-        } else if (items.length > 0) {
-            items[0].click(); // إذا ضغط Enter دون استخدام الأسهم، اختار أول نتيجة
-        }
-    }
-});
-
-function addActive(items) {
-    if (!items) return false;
-    items.forEach(item => {
-        item.style.background = '';
-        item.style.paddingRight = '18px';
-    });
-    if (currentFocus >= items.length) currentFocus = 0;
-    if (currentFocus < 0) currentFocus = (items.length - 1);
-
-    // تمييز العنصر المحدد بالكيبورد
-    items[currentFocus].style.background = 'rgba(56, 189, 248, 0.25)';
-    items[currentFocus].style.paddingRight = '25px';
-    items[currentFocus].scrollIntoView({ block: 'nearest' });
-}
-
-// 🟢 دالة مساعدة فائقة السرعة لتنسيق المبالغ المالية
-const fmtNum = val => (parseFloat(val) || 0).toFixed(2);
-
-function selectStudent(s) {
-    if (!s) return;
-    currentStudentData = s;
-
-    // 1. إخفاء القائمة المنسدلة وتعبئة خانة البحث
-    resultsBox.classList.add('d-none');
-    searchInput.value = s.full_name || '';
-
-    // 2. تحديث النصوص الأساسية باستخدام textContent (أسرع من innerText لأنه لا يسبب Reflow)
-    document.getElementById('dispName').textContent = s.full_name || '---';
-    document.getElementById('dispCode').textContent = s.code || '---';
-    document.getElementById('dispNational').textContent = s.national_id || '---';
-    document.getElementById('dispGrade').textContent = `${s.grade || ''} - ${s.specialization || 'غير محدد'}`;
-
-    // 3. تحديث شارة التسكين
-    const assignedBadge = document.getElementById('dispAssignedBadge');
-    if (assignedBadge) {
-        assignedBadge.className = s.is_assigned ? "badge bg-success px-3 py-1" : "badge bg-warning text-dark px-3 py-1";
-        assignedBadge.textContent = s.is_assigned ? "مسكن ماليًا ✅" : "غير مسكن ماليًا ⚠️";
+    function setHint(text, kind) {
+        receiptHint.textContent = text;
+        receiptHint.className = 'small fw-bold mt-1 ' + (kind === 'ok' ? 'text-success' : kind === 'bad' ? 'text-danger' : 'text-warning');
     }
 
-    // 🟢 4. تحديث العدادات المالية (تمت إضافة عداد الخصم هنا)
-    document.getElementById('dispOldDebt').textContent = fmtNum(s.old_debt);
-    document.getElementById('dispFees').textContent = fmtNum(s.fees);
-    document.getElementById('dispLateFine').textContent = fmtNum(s.late_fine);
-
-    // 🟢 السطر الذي يحل المشكلة ويعرض الخصم في العداد البنفسجي
-    const dispDiscountEl = document.getElementById('dispDiscount');
-    if (dispDiscountEl) {
-        dispDiscountEl.textContent = fmtNum(s.discount);
+    function focusAmount() {
+        setTimeout(() => { if (amountInput && !amountInput.disabled) { amountInput.focus(); amountInput.select(); } }, 80);
     }
 
-    document.getElementById('dispPaid').textContent = fmtNum(s.paid);
-    document.getElementById('dispRemaining').textContent = fmtNum(s.total_obligation);
+    /* ============ رقم الإيصال (حسب نوع/بادئة الدفتر) ============ */
+    function normalizeReceipt() {
+        let v = receiptInput.value.trim();
+        if (v && cfg.prefix && /^\d+$/.test(v)) v = cfg.prefix + v;   // 1005 => A-EXP-1005
+        receiptInput.value = v;
+        return v;
+    }
 
-    // 5. ربط البيانات بالفورم والأزرار
-    document.getElementById('formStudentId').value = s.id;
+    function applyNextReceipt(d) {
+        if (typeof d.prefix === 'string') cfg.prefix = d.prefix;
+        if (typeof d.has_active_book === 'boolean') cfg.hasBook = d.has_active_book;
+        if (typeof d.book_label === 'string') cfg.label = d.book_label;
 
-    const counterBackUrl = `{% url 'live_cashier_counter' %}?student_id=${s.id}`;
-    document.getElementById('btnPrintStatement').href = `/finance/student/${s.id}/print-statement/`;
-    document.getElementById('btnAssignPlan').href = `/finance/assign-plan/${s.id}/?from=counter`;
-    document.getElementById('btnWithdraw').href = `/finance/student-inventory/${s.id}/?from=counter`;
-    document.getElementById('btnAddSale').href = `{% url 'add_book_sale' %}?student_id=${s.id}&next=${encodeURIComponent(counterBackUrl)}`;
-
-    // 6. إظهار مساحة عمل الطالب
-    document.getElementById('studentWorkspace').classList.remove('d-none');
-
-    // 🟢 7. تنفيذ التركيز وتنسيق الإيصال بعد اكتمال رسم الصفحة (Non-blocking UI)
-    requestAnimationFrame(() => {
-        refreshReceiptNumber();
-        focusAmountInput();
-    });
-}
-
-function refreshReceiptNumber() {
-    const receiptInput = document.getElementById('formReceiptNumber');
-    if (!receiptInput) return;
-
-    fetch('/finance/api/next-receipt-number/')
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success' && data.next_receipt_number) {
-                receiptInput.value = data.next_receipt_number;
-            }
-        })
-        .catch(() => { /* لو فشل الطلب، نسيب الرقم الحالي كما هو بدل ما نكسر الشاشة */ });
-}
-
-document.getElementById('paymentCounterForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const globalLoader = document.getElementById("global-loader");
-    if (globalLoader) globalLoader.classList.remove("active");
-
-    const form = this;
-    const formData = new FormData(form);
-    const btnSubmit = document.getElementById('btnSubmitPayment');
-
-    btnSubmit.disabled = true;
-    btnSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> جاري الحفظ...`;
-
-    fetch('/finance/api/counter-collect/', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-        },
-        body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-        btnSubmit.disabled = false;
-        btnSubmit.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> تأكيد ودفع وإسقاط باليومية`;
-
-        if (data.status === 'success') {
-            Swal.fire({
-                icon: 'success',
-                title: 'تم التحصيل بنجاح!',
-                text: data.message,
-                timer: 1500,
-                showConfirmButton: false,
-                background: '#0f172a',
-                color: '#fff'
-            });
-
-            document.getElementById('formAmount').value = '';
-            if (data.next_receipt_number) {
-                document.getElementById('formReceiptNumber').value = data.next_receipt_number;
-            }
-
-            // 🟢 تحديث جميع الأرصدة (تتطلب أن يرسل الـ API القيم الجديدة، أو تحديثها بناءً على المتاح)
-            document.getElementById('dispPaid').innerText = data.new_paid.toFixed(2);
-            document.getElementById('dispLateFine').innerText = data.new_late_fine.toFixed(2);
-            document.getElementById('dispRemaining').innerText = data.new_total_obligation.toFixed(2);
-
-            // تحديث المديونية القديمة إذا أعادها الـ API (يفضل تعديل الـ API ليرجع new_old_debt)
-            if (data.new_old_debt !== undefined) {
-                document.getElementById('dispOldDebt').innerText = data.new_old_debt.toFixed(2);
-                currentStudentData.old_debt = data.new_old_debt;
-            }
-
-            if (currentStudentData) {
-                currentStudentData.paid = data.new_paid;
-                currentStudentData.late_fine = data.new_late_fine;
-                currentStudentData.total_obligation = data.new_total_obligation;
-            }
-
-            const emptyRow = document.getElementById('emptyRow');
-            if (emptyRow) emptyRow.remove();
-
-            // 🟢 إعادة ترتيب أرقام الصفوف الموجودة لتبدأ من 2 بعد إدراج الصف الأول
-            const tbody = document.getElementById('todayPaymentsBody');
-            const existingRows = tbody.querySelectorAll('tr');
-            existingRows.forEach((row, idx) => {
-                const numTd = row.querySelector('.row-num');
-                if (numTd) numTd.innerText = idx + 2;
-            });
-
-            const newRow = document.createElement('tr');
-            newRow.className = 'animate__animated animate__fadeInDown bg-dark bg-opacity-50'; // تمييز الصف الجديد
-            newRow.innerHTML = `
-                <td class="text-white fw-bold row-num">1</td>
-                <td class="text-white-50 small">${data.payment.time}</td>
-                <td><span class="badge bg-primary bg-opacity-20 text-info border border-info px-2 py-1 font-monospace">#${data.payment.receipt_number}</span></td>
-                <td class="text-start ps-3 fw-bold text-white">${data.payment.student_name}</td>
-                <td><span class="badge bg-secondary text-white">${data.payment.category_name}</span></td>
-                <td class="text-success fw-black fs-6">+${data.payment.amount_paid.toFixed(2)} ج.م</td>
-                <td class="text-muted small">@${data.payment.collector}</td>
-            `;
-            tbody.insertBefore(newRow, tbody.firstChild);
-
-            const countBadge = document.getElementById('todayCountBadge');
-            const currentCount = tbody.querySelectorAll('tr').length;
-            countBadge.innerText = `إجمالي عمليات اليوم: ${currentCount} إيصال`;
-
-            focusAmountInput();
-
+        if (d.next_receipt_number) {
+            receiptInput.value = d.next_receipt_number;
+            receiptDirty = false;
+            setHint('✔ دفتر نشط: ' + cfg.label, 'ok');
+        } else if (d.book_closed) {
+            receiptInput.value = '';
+            setHint('⚠️ تم استخدام آخر إيصال وإغلاق الدفتر. فعّل دفتراً جديداً.', 'bad');
+        } else if (cfg.hasBook) {
+            receiptInput.value = '';
+            setHint('⚠️ انتهى الدفتر النشط. فعّل دفتراً جديداً.', 'bad');
         } else {
-            Swal.fire({
-                icon: 'error',
-                title: 'تنبيه!',
-                text: data.message,
-                confirmButtonText: 'مفهوم',
-                confirmButtonColor: '#38bdf8',
-                background: '#0f172a',
-                color: '#fff'
-            }).then(() => {
-                focusAmountInput();
-            });
+            setHint('⚠️ لا يوجد دفتر نشط. أدخل الرقم يدوياً.', 'warn');
         }
-    })
-    .catch(err => {
-        btnSubmit.disabled = false;
-        btnSubmit.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> تأكيد ودفع وإسقاط باليومية`;
-        Swal.fire({
-            icon: 'error',
-            title: 'خطأ تقني',
-            text: 'حدث خطأ أثناء الحفظ، يرجى إعادة المحاولة.',
-            background: '#0f172a',
-            color: '#fff'
-        }).then(() => {
-            focusAmountInput();
-        });
-    });
-});
-
-function resetCounterForm() {
-    searchInput.value = '';
-    resultsBox.classList.add('d-none');
-    document.getElementById('studentWorkspace').classList.add('d-none');
-    document.getElementById('formAmount').value = '';
-    currentStudentData = null;
-    currentFocus = -1;
-    refreshReceiptNumber(); // 🟢 تأكيد إن الرقم المعروض هو الأحدث دايماً
-    searchInput.focus();
-}
-
-document.addEventListener('click', function(e) {
-    if (e.target !== searchInput && !resultsBox.contains(e.target)) {
-        resultsBox.classList.add('d-none');
     }
-});
+
+    function refreshReceipt(force) {
+        if (receiptDirty && !force) return;           // لا نكتب فوق ما كتبه الموظف
+        fetch(URLS.nextNo, { headers: AJAX })
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(d => { if (d && d.status === 'success') applyNextReceipt(d); })
+            .catch(() => { /* نترك الرقم الحالي كما هو */ });
+    }
+
+    receiptInput.addEventListener('input', () => { receiptDirty = true; });
+    receiptInput.addEventListener('blur', normalizeReceipt);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshReceipt(false); });
+
+    /* ============ البحث ============ */
+    function showResults() { resultsBox.classList.remove('d-none'); }
+    function hideResults() { resultsBox.classList.add('d-none'); focusIdx = -1; }
+
+    function renderResults(data, qNorm) {
+        results = (data && data.results) || [];
+        focusIdx = -1;
+
+        if (!results.length) {
+            resultsBox.innerHTML = '<div class="p-4 text-center text-warning fw-black fs-5"><i class="bi bi-exclamation-triangle-fill me-2"></i> لا توجد نتائج مطابقة لبحثك</div>';
+            showResults();
+            return;
+        }
+
+        // بحث رقمي (كود/قومي/هاتف) ونتيجة واحدة مطابقة تماماً => اختيار تلقائي (مفيد مع الباركود)
+        if (results.length === 1 && results[0].match_group === 0 && /^\d{4,}$/.test(qNorm.replace(/ /g, ''))) {
+            selectStudent(results[0]);
+            return;
+        }
+
+        let html = '';
+        let lastGroup = -1;
+        results.forEach((s, i) => {
+            const g = (typeof s.match_group === 'number') ? s.match_group : 1;
+            if (g !== lastGroup) {
+                html += '<div class="sr-group ' + GROUPS[g].cls + '">' + GROUPS[g].title + '</div>';
+                lastGroup = g;
+            }
+            const due = Number(s.total_obligation) || 0;
+            const debtBadge = due > 0
+                ? `<span class="badge bg-danger text-white px-3 py-2 fw-black fs-6">مستحق: ${due.toFixed(2)} ج.م</span>`
+                : `<span class="badge bg-success text-white px-3 py-2 fw-black fs-6">خالص ✅</span>`;
+            const assigned = s.is_assigned
+                ? '<span class="badge bg-success bg-opacity-20 text-success border border-success px-2 py-1 ms-1">مسكن ماليًا ✅</span>'
+                : '<span class="badge bg-warning bg-opacity-20 text-warning border border-warning px-2 py-1 ms-1">غير مسكن ⚠️</span>';
+            html += `<div class="student-search-card d-flex justify-content-between align-items-center search-item" data-index="${i}">
+                <div>
+                    <strong class="text-warning d-block fs-5 mb-1">${highlight(s.full_name, qNorm)}
+                        <span class="mt-badge mt-${GROUPS[g].cls} ms-2">${GROUPS[g].badge}</span></strong>
+                    <div class="d-flex align-items-center gap-2 flex-wrap text-white small fw-bold">
+                        <span class="badge bg-primary px-2 py-1">${esc(s.grade)} - ${esc(s.specialization || 'غير محدد')}</span>
+                        ${assigned}
+                        <span class="text-info">| كود: ${highlight(s.code, qNorm)}</span>
+                        <span class="text-white-50">| قومي: ${highlight(s.national_id, qNorm)}</span>
+                    </div>
+                </div>
+                <div class="text-end ms-3">${debtBadge}</div>
+            </div>`;
+        });
+
+        if (data.has_more) {
+            const total = data.total ? ' من أصل ' + data.total : '';
+            html += '<div class="p-3 text-center text-info bg-black fw-bold small border-top border-secondary"><i class="bi bi-info-circle-fill text-warning me-1"></i> يظهر أفضل 15 نتيجة' + total + '.. أضف كلمة أخرى (اسم الأب أو الكود) للتحديد بدقة.</div>';
+        }
+        resultsBox.innerHTML = html;
+        showResults();
+    }
+
+    function runSearch(q) {
+        const qNorm = norm(q);
+        const key = qNorm.replace(/ /g, '');              // "عبد الحميد" و"عبدالحميد" نفس مفتاح الكاش
+        const hit = cache.get(key);
+        if (hit && Date.now() - hit.ts < CACHE_TTL) { searchSeq++; renderResults(hit.data, qNorm); return; }
+
+        if (searchAbort) searchAbort.abort();
+        searchAbort = new AbortController();
+        const seq = ++searchSeq;
+
+        fetch(URLS.search + '?q=' + encodeURIComponent(q), { headers: AJAX, signal: searchAbort.signal })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)))
+            .then(data => {
+                if (seq !== searchSeq) return;
+                cache.set(key, { ts: Date.now(), data: data });
+                renderResults(data, qNorm);
+            })
+            .catch(err => {
+                if (err && err.name === 'AbortError') return;
+                if (seq !== searchSeq) return;
+                resultsBox.innerHTML = '<div class="p-4 text-center text-danger fw-black">تعذر تنفيذ البحث، تأكد من الاتصال وأعد المحاولة.</div>';
+                showResults();
+            });
+    }
+
+    searchInput.addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        const q = this.value.trim();
+        if (norm(q).replace(/ /g, '').length < 2) {
+            searchSeq++;
+            if (searchAbort) searchAbort.abort();
+            hideResults();
+            return;
+        }
+        searchTimer = setTimeout(() => runSearch(q), 200);
+    });
+
+    resultsBox.addEventListener('click', e => {
+        const item = e.target.closest('.search-item');
+        if (item) selectStudent(results[parseInt(item.dataset.index, 10)]);
+    });
+
+    function paintActive(items) {
+        items.forEach(i => i.classList.remove('active'));
+        if (focusIdx >= items.length) focusIdx = 0;
+        if (focusIdx < 0) focusIdx = items.length - 1;
+        items[focusIdx].classList.add('active');
+        items[focusIdx].scrollIntoView({ block: 'nearest' });
+    }
+
+    searchInput.addEventListener('keydown', function (e) {
+        const open = !resultsBox.classList.contains('d-none');
+        const items = open ? resultsBox.querySelectorAll('.search-item') : [];
+
+        if (e.key === 'Escape') {
+            if (open) { hideResults(); } else { resetCounterForm(); }   // Esc مرتين = مسح كامل
+            return;
+        }
+        if (!items.length) return;
+
+        if (e.key === 'ArrowDown') { e.preventDefault(); focusIdx++; paintActive(items); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); focusIdx--; paintActive(items); }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            (items[focusIdx > -1 ? focusIdx : 0]).click();
+        }
+    });
+
+    document.addEventListener('click', e => {
+        if (e.target !== searchInput && !resultsBox.contains(e.target)) hideResults();
+    });
+
+    /* ============ اختيار الطالب وتحديث العدادات ============ */
+    function paintCounters(s) {
+        setText('dispOldDebt', fmt(s.old_debt));
+        setText('dispFees', fmt(s.fees));
+        setText('dispLateFine', fmt(s.late_fine));
+        setText('dispDiscount', fmt(s.discount));
+        setText('dispPaid', fmt(s.paid));
+        setText('dispRemaining', fmt(s.total_obligation));
+        syncSubmit();
+    }
+
+    function syncSubmit() {
+        if (submitting) return;
+        // 🔒 لا تحصيل لأي إيصال طالما عليه مديونية قديمة: تُسدَّد أولاً من خانة "مديونية قديمة"
+        const hasOldDebt = !!current && (Number(current.old_debt) || 0) > 0;
+        const settled = current && (Number(current.total_obligation) || 0) <= 0;
+        const oldCard = document.querySelector('.stat-badge.clickable-card');
+        if (oldCard) oldCard.classList.toggle('needs-attention', hasOldDebt);
+        btnSubmit.disabled = !current || settled || hasOldDebt;
+        btnSubmit.innerHTML = hasOldDebt
+            ? '<i class="bi bi-lock-fill me-1"></i> سدّد المديونية القديمة أولاً (اضغط على خانة المديونية القديمة)'
+            : (settled ? '<i class="bi bi-check2-all me-1"></i> الطالب خالص - لا توجد مستحقات' : SUBMIT_HTML);
+    }
+
+    function selectStudent(s) {
+        if (!s) return;
+        current = s;
+        hideResults();
+        searchInput.value = s.full_name || '';
+
+        setText('dispName', s.full_name || '---');
+        setText('dispCode', s.code || '---');
+        setText('dispNational', s.national_id || '---');
+        setText('dispGrade', (s.grade || '') + ' - ' + (s.specialization || 'غير محدد'));
+
+        const badge = $('dispAssignedBadge');
+        badge.className = s.is_assigned ? 'badge bg-success px-3 py-1' : 'badge bg-warning text-dark px-3 py-1';
+        badge.textContent = s.is_assigned ? 'مسكن ماليًا ✅' : 'غير مسكن ماليًا ⚠️';
+
+        paintCounters(s);
+
+        $('formStudentId').value = s.id;
+        amountInput.value = '';
+        if (categorySel) categorySel.value = DEFAULT_CATEGORY;      // لا تبقى فئة الطالب السابق
+
+        const back = URLS.counter + '?student_id=' + s.id;
+        $('btnPrintStatement').href = '/finance/student/' + s.id + '/print-statement/';
+        $('btnAssignPlan').href = '/finance/assign-plan/' + s.id + '/?from=counter';
+        $('btnWithdraw').href = '/finance/student-inventory/' + s.id + '/?from=counter';
+        $('btnAddSale').href = "{% url 'add_book_sale' %}?student_id=" + s.id + '&next=' + encodeURIComponent(back);
+
+        workspace.classList.remove('d-none');
+        workspace.classList.add('fx-fade');
+        focusAmount();
+    }
+
+    window.payOldDebtDirectly = function () {
+        if (!current) return;
+        if ((Number(current.old_debt) || 0) > 0) {
+            window.location.href = '/finance/student/' + current.id + '/settle-debt/?from=counter';
+        } else {
+            notify({ icon: 'info', title: 'تنبيه', text: 'هذا الطالب خالِص المديونية القديمة بالكامل ولا توجد عليه أي مستحقات سابقة.' });
+        }
+    };
+
+    /* ============ مسح وتفريغ كامل (فلاتر + نموذج + عدادات + رابط) ============ */
+    window.resetCounterForm = function () {
+        clearTimeout(searchTimer);
+        searchSeq++;
+        if (searchAbort) searchAbort.abort();
+
+        searchInput.value = '';
+        hideResults();
+        results = [];
+        cache.clear();
+
+        workspace.classList.add('d-none');
+        amountInput.value = '';
+        if (categorySel) categorySel.value = DEFAULT_CATEGORY;
+        $('formStudentId').value = '';
+        current = null;
+
+        ['dispOldDebt', 'dispFees', 'dispLateFine', 'dispDiscount', 'dispPaid', 'dispRemaining']
+            .forEach(id => setText(id, '0.00'));
+        syncSubmit();
+
+        // إزالة ?student_id= من الرابط حتى لا يعاد اختيار الطالب عند تحديث الصفحة
+        if (window.history && history.replaceState) history.replaceState(null, '', location.pathname);
+
+        receiptDirty = false;
+        refreshReceipt(true);
+        searchInput.focus();
+    };
+
+    /* ============ التحصيل ============ */
+    function td(text, cls) {
+        const c = document.createElement('td');
+        if (cls) c.className = cls;
+        c.textContent = text;
+        return c;
+    }
+    function badgeCell(text, cls, ltr) {
+        const c = document.createElement('td');
+        const b = document.createElement('span');
+        b.className = cls;
+        if (ltr) b.dir = 'ltr';
+        b.textContent = text;
+        c.appendChild(b);
+        return c;
+    }
+
+    function addTodayRow(p) {
+        const empty = $('emptyRow');
+        if (empty) empty.remove();
+
+        const tr = document.createElement('tr');
+        tr.className = 'row-new';
+        tr.appendChild(td(p.id, 'text-muted fw-bold'));
+        tr.appendChild(td(p.time, 'text-white-50 small'));
+        tr.appendChild(badgeCell('#' + p.receipt_number, 'badge bg-primary bg-opacity-20 text-info border border-info px-2 py-1 font-monospace', true));
+        tr.appendChild(td(p.student_name, 'text-start ps-3 fw-bold text-white'));
+        tr.appendChild(badgeCell(p.category_name, 'badge bg-secondary text-white'));
+        tr.appendChild(td('+' + fmt(p.amount_paid) + ' ج.م', 'text-success fw-black fs-6'));
+        tr.appendChild(td('@' + p.collector, 'text-muted small'));
+        tbody.insertBefore(tr, tbody.firstChild);
+
+        while (tbody.rows.length > MAX_ROWS) tbody.deleteRow(-1);   // لا يكبر الجدول بلا حد
+
+        todayTotal++;
+        countBadge.textContent = 'إجمالي عمليات اليوم: ' + todayTotal + ' إيصال';
+    }
+
+    function setSubmitting(on) {
+        submitting = on;
+        if (on) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جاري الحفظ...';
+        } else {
+            btnSubmit.innerHTML = SUBMIT_HTML;
+            syncSubmit();
+        }
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (submitting || !current) return;
+        if ((Number(current.old_debt) || 0) > 0) {
+            notify({ icon: 'warning', title: 'التحصيل محجوب', text: 'على الطالب مديونية قديمة (' + (Number(current.old_debt) || 0).toFixed(2) + ' ج.م). سدّدها أولاً بالضغط على خانة "مديونية قديمة".' });
+            return;
+        }
+
+        const receipt = normalizeReceipt();
+        const amount = parseFloat(amountInput.value);
+        const due = Number(current.total_obligation) || 0;
+
+        if (!(amount > 0)) { notify({ icon: 'warning', title: 'تنبيه', text: 'أدخل مبلغاً صحيحاً أكبر من الصفر.' }).then(focusAmount); return; }
+        if (amount > due + 0.0001) {
+            notify({ icon: 'warning', title: 'تنبيه', text: 'المبلغ (' + amount.toFixed(2) + ') يتجاوز إجمالي المستحق (' + due.toFixed(2) + ' ج.م).' }).then(focusAmount);
+            return;
+        }
+        if (!receipt) { notify({ icon: 'warning', title: 'تنبيه', text: 'رقم الإيصال مطلوب.' }); receiptInput.focus(); return; }
+
+        const fd = new FormData(form);
+        setSubmitting(true);
+
+        fetch(URLS.collect, {
+            method: 'POST',
+            headers: Object.assign({ 'X-CSRFToken': fd.get('csrfmiddlewaretoken') }, AJAX),
+            body: fd
+        })
+        .then(r => r.json().catch(() => ({ status: 'error', message: 'استجابة غير صالحة من الخادم.' })))
+        .then(data => {
+            if (data.status !== 'success') {
+                notify({ icon: 'error', title: 'تنبيه!', text: data.message || 'تعذر إتمام العملية.' }).then(focusAmount);
+                if (data.next_receipt_number !== undefined) applyNextReceipt(data);
+                return;
+            }
+
+            cache.clear();                              // الأرصدة تغيّرت
+
+            current.paid = data.new_paid;
+            current.late_fine = data.new_late_fine;
+            current.total_obligation = data.new_total_obligation;
+            if (data.new_old_debt !== undefined) current.old_debt = data.new_old_debt;
+            paintCounters(current);
+
+            amountInput.value = '';
+            applyNextReceipt(data);                     // يعالج الدفتر المنتهي بدل ترك رقم قديم
+            addTodayRow(data.payment);
+
+            if (window.Swal) {
+                Swal.fire({ icon: 'success', title: 'تم التحصيل بنجاح!', text: data.message, timer: 1500, showConfirmButton: false, background: '#0f172a', color: '#fff' });
+            }
+            if (data.book_closed) {
+                notify({ icon: 'warning', title: 'انتهى الدفتر', text: 'تم استخدام آخر إيصال في الدفتر وإغلاقه. فعّل دفتراً جديداً قبل التحصيل التالي.' });
+            }
+            focusAmount();
+        })
+        .catch(() => {
+            notify({ icon: 'error', title: 'خطأ تقني', text: 'حدث خطأ أثناء الحفظ، تحقق من الاتصال ثم راجع سجل اليوم قبل إعادة المحاولة لتجنب التكرار.' }).then(focusAmount);
+        })
+        .finally(() => setSubmitting(false));
+    });
+
+    /* ============ تحميل الطالب الممرر من الرابط (من الـ API مباشرة) ============ */
+    function loadInitialStudent() {
+        const urlId = new URLSearchParams(location.search).get('student_id');
+        const sid = "{{ selected_student.id|default_if_none:''|unlocalize }}" || urlId;
+        if (!sid) return;
+        const code = "{{ selected_student.student_code|default_if_none:''|escapejs }}";
+
+        const pick = d => (d && d.results && d.results.length)
+            ? (d.results.find(s => String(s.id) === String(sid)) || null) : null;
+
+        fetch(URLS.search + '?id=' + encodeURIComponent(sid), { headers: AJAX })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+                const s = pick(d);
+                if (s) { selectStudent(s); return null; }
+                if (code.length >= 2) {                // احتياطي لو الـ API لا يدعم id
+                    return fetch(URLS.search + '?q=' + encodeURIComponent(code), { headers: AJAX })
+                        .then(r => r.ok ? r.json() : null)
+                        .then(d2 => { const s2 = pick(d2); if (s2) selectStudent(s2); });
+                }
+            })
+            .catch(() => {});
+    }
+
+    syncSubmit();
+    loadInitialStudent();
+})();
 </script>
 {% endblock %}

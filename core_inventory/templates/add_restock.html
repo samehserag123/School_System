@@ -4,22 +4,19 @@
 {% block title %}تسجيل فاتورة مشتريات وتوريد مخزني{% endblock %}
 
 {% block page_title %}
-<div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3 animate__animated animate__fadeIn">
+<div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3">
     <div class="d-flex align-items-center gap-3">
-        <div class="icon-header-box bg-emerald bg-opacity-10 p-3 rounded-4 border border-success border-opacity-25 shadow-sm">
-            <i class="bi bi-receipt text-success fs-2"></i>
-        </div>
+        <div class="hdr-icon"><i class="bi bi-receipt"></i></div>
         <div>
-            <h4 class="fw-black text-white m-0">فاتورة مشتريات الموردين (ERP)</h4>
-            <p class="text-success opacity-75 small m-0 fw-semibold">تسجيل فواتير المشتريات، ترصيد حسابات الموردين، وتحديث المخزن بضغطة واحدة | {{ active_year }}</p>
+            <h4 class="fw-bold text-white m-0">فاتورة مشتريات الموردين</h4>
+            <p class="hdr-sub m-0">تسجيل فواتير المشتريات، ترصيد حسابات الموردين، وتحديث المخزن | {{ active_year }}</p>
         </div>
     </div>
-
     <div class="d-flex gap-2">
-        <a href="{% url 'inventory_report' %}" class="btn btn-outline-success btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm border-opacity-25">
+        <a href="{% url 'inventory_report' %}" class="btn btn-outline-success btn-sm fw-semibold px-3 py-2 rounded-3">
             <i class="bi bi-box-seam me-1"></i> منظومة الجرد
         </a>
-        <a href="/" class="btn btn-outline-light btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm border-opacity-25">
+        <a href="/" class="btn btn-outline-light btn-sm fw-semibold px-3 py-2 rounded-3">
             <i class="bi bi-house-door-fill text-info me-1"></i> الرئيسية
         </a>
     </div>
@@ -27,289 +24,449 @@
 {% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<!-- Tom Select CSS للبحث الذكي -->
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
 
 <style>
     :root {
-        --bg-main: #030712;
-        --glass-surface: rgba(15, 23, 42, 0.75);
-        --glass-border: rgba(255, 255, 255, 0.08);
-        --neon-cyan: #06b6d4;
-        --neon-emerald: #10b981;
-        --neon-amber: #f59e0b;
-        --neon-rose: #f43f5e;
+        --bg-main: #0b1120;
+        --surface: #111a2e;
+        --surface-2: #162036;
+        --field-bg: #0c1426;
+        --line: rgba(148, 163, 184, .18);
+        --line-strong: rgba(148, 163, 184, .32);
+        --text: #e5ebf5;
+        --muted: #8b9bb4;
+        --accent: #10b981;
+        --accent-dark: #059669;
+        --info: #38bdf8;
+        --warn: #f59e0b;
+        --danger: #f87171;
     }
 
-    body { background-color: var(--bg-main) !important; color: #f8fafc !important; }
+    body { background-color: var(--bg-main) !important; color: var(--text) !important; }
 
-    /* Glass Cards */
-    .glass-card { background: var(--glass-surface) !important; backdrop-filter: blur(24px); border: 1px solid var(--glass-border) !important; border-radius: 20px !important; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); }
-    .glass-modal { background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(30px); border: 1px solid var(--neon-cyan) !important; border-radius: 24px; box-shadow: 0 0 40px rgba(6, 182, 212, 0.2); }
+    /* فئات مساعدة (احتياطية في حال لم تكن معرّفة في base.html) */
+    .fw-black { font-weight: 800; }
+    .text-emerald { color: var(--accent) !important; }
+    .font-num { font-variant-numeric: tabular-nums; }
 
-    /* Inputs */
-    .form-control-neon, .form-select-neon { background-color: rgba(2, 6, 23, 0.7) !important; color: #ffffff !important; border: 1px solid var(--glass-border) !important; border-radius: 12px !important; padding: 12px 16px !important; font-weight: 700 !important; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    .form-control-neon:focus, .form-select-neon:focus { border-color: var(--neon-cyan) !important; box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.15) !important; background-color: rgba(15, 23, 42, 0.9) !important; }
+    .hdr-icon { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 14px;
+                background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.3); color: var(--accent); font-size: 1.6rem; }
+    .hdr-sub { color: var(--muted); font-size: .85rem; }
 
+    .page-wrap { max-width: 1280px; margin-inline: auto; }
+
+    /* ===== الأقسام (بدون blur لتسريع الأداء) ===== */
+    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+                  padding: 16px 22px; border-bottom: 1px solid var(--line); }
+    .panel-title { margin: 0; font-size: 1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+    .panel-body { padding: 22px; }
+
+    .field-label { display: block; margin-bottom: 6px; font-size: .82rem; font-weight: 600; color: var(--muted); }
+    .field-label i { margin-inline-end: 4px; }
+    .req { color: var(--danger); }
+
+    /* ===== الحقول ===== */
+    .fld { color-scheme: dark; width: 100%; min-height: 42px; background: var(--field-bg); color: var(--text); border: 1px solid var(--line);
+           border-radius: 10px; padding: 8px 12px; font-weight: 600; transition: border-color .15s, box-shadow .15s; }
+    .fld:focus { outline: 0; border-color: var(--info); box-shadow: 0 0 0 3px rgba(56,189,248,.15); background: var(--field-bg); color: #fff; }
+    .fld::placeholder { color: #55647d; font-weight: 400; }
+    select.fld option { background: #0f172a; color: #fff; }
+    .fld.is-invalid, .ts-wrapper.is-invalid .ts-control { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(248,113,113,.15) !important; }
     input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     input[type=number] { -moz-appearance: textfield; }
-    input[type="date"]::-webkit-calendar-picker-indicator {
-        filter: invert(1) brightness(1.5);
-        cursor: pointer;
-    }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) brightness(1.5); cursor: pointer; }
 
-    /* Table */
-    .invoice-table { border-collapse: separate; border-spacing: 0 8px; }
-    .invoice-table th { background: transparent !important; color: #94a3b8; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; border: none; padding-bottom: 4px; }
-    .invoice-table td { background: rgba(30, 41, 59, 0.4); vertical-align: middle; padding: 8px; border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border); }
-    .invoice-table td:first-child { border-right: 1px solid var(--glass-border); border-top-right-radius: 14px; border-bottom-right-radius: 14px; }
-    .invoice-table td:last-child { border-left: 1px solid var(--glass-border); border-top-left-radius: 14px; border-bottom-left-radius: 14px; }
-    .row-anim { animation: fadeInDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    /* ===== جدول الأصناف ===== */
+    .items-scroll { overflow-x: auto; }
+    .items-table { width: 100%; min-width: 860px; border-collapse: collapse; }
+    .items-table thead th { padding: 10px 10px; font-size: .78rem; font-weight: 700; color: var(--muted); background: var(--surface-2);
+                            border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+    .items-table thead th:first-child { border-top-right-radius: 10px; }
+    .items-table thead th:last-child { border-top-left-radius: 10px; }
+    .items-table tbody td { padding: 10px; vertical-align: middle; border-bottom: 1px solid var(--line); }
+    .items-table tbody tr:hover td { background: rgba(255,255,255,.015); }
+    .items-table tbody tr.is-dup td { background: rgba(245,158,11,.07); }
+    .row-no { width: 34px; text-align: center; color: var(--muted); font-weight: 700; font-size: .85rem; }
+    .qty-input, .price-input { text-align: center; font-weight: 800; }
+    .qty-input { color: var(--info); }
+    .price-input { color: var(--warn); }
+    .row-total { display: block; text-align: center; font-weight: 800; color: var(--accent); white-space: nowrap; }
 
-    /* Buttons */
-    .btn-neon-action { background: rgba(6, 182, 212, 0.1); color: var(--neon-cyan); border: 1px solid rgba(6, 182, 212, 0.3); font-weight: 800; transition: all 0.3s; }
-    .btn-neon-action:hover { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(6, 182, 212, 0.4); }
-    .btn-neon-submit { background: linear-gradient(135deg, var(--neon-emerald), #059669); color: #fff; border: none; font-weight: 900; transition: all 0.3s; }
-    .btn-neon-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4); color: #fff;}
-    .btn-add-supplier { border-radius: 12px 0 0 12px !important; border: 1px solid var(--neon-cyan); color: var(--neon-cyan); background: rgba(6, 182, 212, 0.1); font-weight: 900; transition: 0.3s; }
-    .btn-add-supplier:hover { background: var(--neon-cyan); color: #000; box-shadow: 0 0 15px rgba(6, 182, 212, 0.5); }
+    .btn-remove { width: 34px; height: 34px; border-radius: 50%; border: 0; background: transparent; color: var(--muted); transition: .15s; }
+    .btn-remove:hover:not(:disabled) { background: rgba(248,113,113,.15); color: var(--danger); }
+    .btn-remove:disabled { opacity: .3; cursor: not-allowed; }
 
-    /* Custom Tom-Select Dark Styling */
-    .ts-control {
-        background-color: rgba(2, 6, 23, 0.7) !important;
-        color: #ffffff !important;
-        border: 1px solid var(--glass-border) !important;
-        border-radius: 12px !important;
-        padding: 10px 14px !important;
-        font-weight: 700 !important;
-    }
-    .ts-control input {
-        color: #ffffff !important;
-    }
-    .ts-dropdown {
-        background-color: #0f172a !important;
-        color: #ffffff !important;
-        border: 1px solid var(--neon-cyan) !important;
-        border-radius: 12px !important;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8) !important;
-        z-index: 1050 !important;
-    }
-    .ts-dropdown .option {
-        color: #e2e8f0 !important;
-        padding: 10px 14px !important;
-    }
-    .ts-dropdown .option.active, .ts-dropdown .option:hover {
-        background-color: rgba(6, 182, 212, 0.25) !important;
-        color: var(--neon-cyan) !important;
-    }
-    .ts-dropdown .no-results {
-        color: #94a3b8 !important;
-        background: transparent !important;
-        padding: 10px !important;
+    .btn-add { background: rgba(16,185,129,.1); color: var(--accent); border: 1px solid rgba(16,185,129,.35); font-weight: 700; border-radius: 10px; padding: 8px 16px; }
+    .btn-add:hover { background: var(--accent); color: #04130d; }
+    kbd.k { background: #0c1426; border: 1px solid var(--line-strong); color: var(--muted); border-radius: 5px; padding: 0 6px; font-size: .72rem; margin-inline-start: 6px; }
+
+    .dup-warning { margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: .88rem; font-weight: 600;
+                   background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.35); color: #fbbf24; }
+
+    /* ===== شريط الإجمالي (ثابت أسفل الشاشة) ===== */
+    .summary-bar { position: sticky; bottom: 12px; z-index: 30; margin-top: 20px; padding: 16px 22px;
+                   background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: 0 -6px 24px rgba(0,0,0,.4); }
+    .stat { min-width: 90px; }
+    .stat small { display: block; color: var(--muted); font-size: .75rem; font-weight: 600; }
+    .stat b { font-size: 1.1rem; color: #fff; }
+    .grand small { display: block; color: var(--muted); font-size: .78rem; font-weight: 700; }
+    .grand-val { font-size: 1.9rem; font-weight: 800; color: var(--accent); line-height: 1.15; }
+    .btn-save { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff; border: 0; font-weight: 800;
+                border-radius: 12px; padding: 12px 28px; transition: transform .15s, box-shadow .15s; }
+    .btn-save:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(16,185,129,.35); color: #fff; }
+    .btn-save:disabled { opacity: .75; cursor: wait; }
+
+    /* ===== رسائل الأخطاء والتنبيهات ===== */
+    .form-errors { background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.4); color: #fca5a5; border-radius: 12px; padding: 12px 18px; margin-bottom: 18px; }
+    .form-errors ul { margin: 6px 0 0; padding-inline-start: 20px; font-size: .9rem; }
+    .toast-box { position: fixed; top: 18px; inset-inline-start: 18px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+    .toast-i { background: #0f172a; border: 1px solid var(--line-strong); border-inline-start: 4px solid var(--accent); color: #fff;
+               padding: 10px 16px; border-radius: 10px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.5); animation: tin .2s ease-out; }
+    .toast-i.err { border-inline-start-color: var(--danger); }
+    @keyframes tin { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+    /* ===== سجل الفواتير ===== */
+    .log-table { width: 100%; border-collapse: collapse; }
+    .log-table th { padding: 10px 12px; font-size: .78rem; color: var(--muted); background: var(--surface-2); border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+    .log-table td { padding: 12px; border-bottom: 1px solid var(--line); color: var(--text); }
+    .log-table tbody tr:hover td { background: rgba(255,255,255,.02); }
+
+
+    /* ===== سجل الفواتير: صفوف قابلة للنقر + تاريخ واضح ===== */
+    .log-row { cursor: pointer; transition: background .12s; }
+    .log-row:hover td, .log-row:focus-visible td { background: rgba(56,189,248,.09) !important; }
+    .log-row:focus-visible { outline: 2px solid var(--info); outline-offset: -2px; }
+    .inv-date { color: #f8fafc; font-weight: 700; font-size: .92rem; letter-spacing: .2px; }
+    .log-view { color: var(--info); opacity: .7; }
+    .log-row:hover .log-view { opacity: 1; }
+    .hist-stats { display: flex; gap: 22px; flex-wrap: wrap; padding: 10px 22px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.015); font-size: .85rem; color: var(--muted); }
+    .hist-stats b { color: #fff; font-variant-numeric: tabular-nums; }
+    #histResults { transition: opacity .15s; }
+    #histResults.is-loading { opacity: .45; pointer-events: none; }
+    .hist-scope { font-size: .8rem; font-weight: 600; color: var(--info); background: rgba(56,189,248,.12); border-radius: 20px; padding: 2px 12px; }
+
+    /* ===== نافذة تفاصيل الفاتورة (قراءة فقط) ===== */
+    .d-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .d-box { background: var(--field-bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; min-width: 0; }
+    .d-box small { display: block; color: var(--muted); font-size: .75rem; font-weight: 600; margin-bottom: 2px; }
+    .d-box b { color: #fff; font-weight: 700; word-break: break-word; }
+    .d-date { background: rgba(56,189,248,.12); border-color: rgba(56,189,248,.45); }
+    .d-date b { font-size: 1.05rem; color: #fff; }
+    .d-date .iso { display: block; color: #bae6fd; font-size: .85rem; font-weight: 700; font-family: monospace; margin-top: 2px; }
+    .det-table { width: 100%; border-collapse: collapse; min-width: 560px; }
+    .det-table th { padding: 9px 10px; font-size: .78rem; color: var(--muted); background: var(--surface-2); border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+    .det-table td { padding: 10px; border-bottom: 1px solid var(--line); color: var(--text); }
+    .det-table tfoot td { border-bottom: 0; font-weight: 800; background: var(--surface-2); }
+
+    /* ===== النافذة المنبثقة ===== */
+    .modal-panel { background: var(--surface) !important; border: 1px solid var(--line-strong) !important; border-radius: 16px; color: var(--text); }
+
+    /* ===== Tom Select (ثيم داكن) ===== */
+    .ts-wrapper { width: 100%; }
+    .ts-control, .ts-wrapper.single .ts-control { background-color: var(--field-bg) !important; color: var(--text) !important; border: 1px solid var(--line) !important;
+        border-radius: 10px !important; min-height: 42px; padding: 8px 12px !important; font-weight: 600; box-shadow: none !important; }
+    .ts-wrapper.focus .ts-control { border-color: var(--info) !important; box-shadow: 0 0 0 3px rgba(56,189,248,.15) !important; }
+    .ts-control input, .ts-wrapper.single .ts-control .item { color: var(--text) !important; }
+    .ts-control input::placeholder { color: #55647d; }
+    .ts-wrapper.single .ts-control {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%238b9bb4' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+        background-position: right .75rem center !important; padding-inline-end: 2.25rem !important; }
+    .ts-wrapper:dir(rtl).single .ts-control { background-position: left .75rem center !important; }
+    .ts-dropdown { background: #0f172a !important; color: var(--text) !important; border: 1px solid var(--line-strong) !important; border-radius: 10px !important;
+        box-shadow: 0 16px 36px rgba(0,0,0,.6) !important; z-index: 2100 !important; margin-top: 4px; }
+    .ts-dropdown .option { padding: 9px 14px !important; color: #cbd5e1 !important; }
+    .ts-dropdown .option.active, .ts-dropdown .option:hover { background: rgba(56,189,248,.16) !important; color: #fff !important; }
+    .ts-dropdown .no-results { color: var(--muted) !important; padding: 10px 14px !important; }
+    .ts-dropdown .ts-sku { color: var(--info); font-family: monospace; font-size: .8rem; opacity: .85; }
+    .ts-dropdown-content { max-height: 280px; }
+
+    @media (max-width: 767px) {
+        .panel-body { padding: 16px; }
+        .grand-val { font-size: 1.5rem; }
+        .btn-save { width: 100%; }
     }
 </style>
 
-<div class="container-fluid px-3 max-w-1200 mx-auto mt-3">
+<div class="toast-box" id="toastBox" aria-live="polite"></div>
+
+<div class="page-wrap px-3 mt-3 mb-5">
 
     {% if messages %}
         {% for message in messages %}
-            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show fw-bold fs-6 rounded-4 shadow mb-4 border-0" role="alert" style="background: rgba(16, 185, 129, 0.15); color: #34d399; backdrop-filter: blur(10px);">
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show fw-semibold rounded-3 mb-4" role="alert">
                 {{ message }}
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="إغلاق"></button>
             </div>
         {% endfor %}
     {% endif %}
 
-    <!-- 1. نموذج الفاتورة المتطور -->
-    <div class="glass-card p-4 p-md-5 mb-5 animate__animated animate__fadeInUp">
-        <form method="POST" action="{% url 'admin_add_restock' %}" id="invoiceForm">
-            {% csrf_token %}
+    <form method="POST" action="{% url 'admin_add_restock' %}" id="invoiceForm" novalidate autocomplete="off">
+        {% csrf_token %}
 
-            <!-- القسم العلوي: بيانات الفاتورة (4 أعمدة متناسقة تماماً) -->
-            <div class="row g-3 mb-5 pb-4 border-bottom border-secondary border-opacity-25">
+        <div id="formErrors" class="form-errors d-none" role="alert"></div>
 
-                <!-- 1. المورد (اختياري مع زر الإضافة السريعة) -->
-                <div class="col-lg-3 col-md-6">
-                    <label class="form-label fw-bold text-white small text-uppercase letter-spacing-1 mb-2">
-                        <i class="bi bi-buildings text-info me-1"></i> المورد <span class="text-white-50 opacity-50 fw-normal">(اختياري)</span>
-                    </label>
-                    <div class="input-group">
-                        <select name="supplier_id" id="supplierSelect" class="form-select form-select-neon text-info" style="border-radius: 0 12px 12px 0 !important;">
-                            <option value="">-- بدون مورد (نقدي) --</option>
-                            {% for sup in suppliers %}
-                                <option value="{{ sup.id }}">{{ sup.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <button class="btn btn-add-supplier px-3" type="button" data-bs-toggle="modal" data-bs-target="#quickAddSupplierModal" title="تسجيل مورد جديد لحظياً">
-                            <i class="bi bi-person-plus-fill fs-5"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- 2. المستودع المستلم (إجباري) -->
-                <div class="col-lg-3 col-md-6">
-                    <label class="form-label fw-bold text-white small text-uppercase letter-spacing-1 mb-2">
-                        <i class="bi bi-shop text-warning me-1"></i> المستودع المستلم <span class="text-danger">*</span>
-                    </label>
-                    <select name="warehouse_id" class="form-select form-select-neon text-warning" required>
-                        <option value="">-- تحديد المستودع --</option>
-                        {% for wh in warehouses %}
-                            <option value="{{ wh.id }}">{{ wh.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- 3. تاريخ الفاتورة (افتراضي تاريخ اليوم) -->
-                <div class="col-lg-3 col-md-6">
-                    <label class="form-label fw-bold text-white small text-uppercase letter-spacing-1 mb-2">
-                        <i class="bi bi-calendar-event text-emerald me-1"></i> تاريخ الفاتورة <span class="text-danger">*</span>
-                    </label>
-                    <input type="date" name="invoice_date" class="form-control form-control-neon text-emerald fw-bold" value="{% now 'Y-m-d' %}" required>
-                </div>
-
-                <!-- 4. رقم الفاتورة (اختياري) -->
-                <div class="col-lg-3 col-md-6">
-                    <label class="form-label fw-bold text-white small text-uppercase letter-spacing-1 mb-2">
-                        <i class="bi bi-upc-scan text-secondary me-1"></i> رقم الفاتورة
-                    </label>
-                    <input type="text" name="invoice_number" class="form-control form-control-neon font-monospace text-muted" placeholder="توليد آلي">
-                </div>
-
+        <!-- 1. بيانات الفاتورة -->
+        <div class="panel mb-4">
+            <div class="panel-head">
+                <h5 class="panel-title"><i class="bi bi-file-earmark-text text-info"></i> بيانات الفاتورة</h5>
             </div>
-
-            <!-- القسم الأوسط: جدول الأصناف الديناميكي -->
-            <div class="d-flex justify-content-between align-items-end mb-3">
-                <h5 class="fw-black text-white m-0"><i class="bi bi-cart-check-fill text-emerald me-2"></i> أصناف الفاتورة</h5>
-                <button type="button" class="btn btn-neon-action rounded-pill px-4 py-2" onclick="addRow()">
-                    <i class="bi bi-plus-lg me-1"></i> إضافة صنف <kbd class="bg-dark border border-secondary ms-1 small rounded-1 px-1">Alt+A</kbd>
-                </button>
-            </div>
-
-            <div class="table-responsive mb-4" style="overflow-x: visible;">
-                <table class="table invoice-table w-100" id="invoiceTable">
-                    <!-- تعديل رأس الجدول -->
-                    <thead>
-                        <tr>
-                            <th width="30%">الصنف / المادة <span class="text-danger">*</span></th>
-                            <th width="20%">الصف الدراسي <span class="text-white-50 opacity-50 fw-normal">(اختياري)</span></th>
-                            <th width="15%">الكمية <span class="text-danger">*</span></th>
-                            <th width="15%">سعر الوحدة <span class="text-danger">*</span></th>
-                            <th width="15%">الإجمالي (ج.م)</th>
-                            <th width="5%" class="text-center"><i class="bi bi-gear"></i></th>
-                        </tr>
-                    </thead>
-                    <tbody id="invoiceBody">
-                        <tr class="row-anim">
-                            <td>
-                                <select name="item_id[]" class="form-select form-select-neon item-select text-white" required>
-                                    <option value="">-- ابحث واختر الصنف --</option>
-                                </select>
-                            </td>
-                            <td>
-                                <select name="grade_id[]" class="form-select form-select-neon text-info small">
-                                    <option value="">-- بدون ربط (عام) --</option>
-                                    {% for grade in grades %}
-                                        <option value="{{ grade.id }}">{{ grade.name }}</option>
+            <div class="panel-body">
+                <div class="row g-3">
+                    <div class="col-lg-3 col-md-6">
+                        <label class="field-label"><i class="bi bi-buildings text-info"></i> المورد <span class="fw-normal opacity-75">(اختياري)</span></label>
+                        <div class="d-flex gap-2">
+                            <div class="flex-grow-1" style="min-width:0">
+                                <select name="supplier_id" id="supplierSelect">
+                                    <option value="">-- بدون مورد (نقدي) --</option>
+                                    {% for sup in suppliers %}
+                                        <option value="{{ sup.id }}">{{ sup.name }}</option>
                                     {% endfor %}
                                 </select>
-                            </td>
-                            <td>
-                                <input type="number" name="quantity[]" class="form-control form-control-neon text-center fw-black qty-input text-info" min="1" step="1" required placeholder="0" onwheel="this.blur()" oninput="calculateRow(this); this.value = this.value.replace(/[^0-9]/g, '')">
-                            </td>
-                            <td>
-                                <input type="number" name="price[]" class="form-control form-control-neon text-center fw-black price-input text-warning" min="0" step="0.01" required placeholder="0.00" onwheel="this.blur()" oninput="calculateRow(this)">
-                            </td>
-                            <td>
-                                <input type="text" class="form-control form-control-neon text-center fw-black row-total text-emerald border-0 bg-transparent" readonly value="0.00">
-                            </td>
-                            <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-outline-secondary border-0 rounded-circle disabled"><i class="bi bi-dash-lg"></i></button>
-                            </td>
+                            </div>
+                            <button class="btn btn-outline-info px-3" style="border-radius:10px" type="button" data-bs-toggle="modal" data-bs-target="#quickAddSupplierModal" title="تسجيل مورد جديد">
+                                <i class="bi bi-person-plus-fill"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-3 col-md-6">
+                        <label class="field-label"><i class="bi bi-shop text-warning"></i> المستودع المستلم <span class="req">*</span></label>
+                        <select name="warehouse_id" id="warehouseSelect" class="fld">
+                            <option value="">-- تحديد المستودع --</option>
+                            {% for wh in warehouses %}
+                                <option value="{{ wh.id }}">{{ wh.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-lg-3 col-md-6">
+                        <label class="field-label"><i class="bi bi-calendar-event text-emerald"></i> تاريخ الفاتورة <span class="req">*</span></label>
+                        <input type="date" name="invoice_date" id="invoiceDate" class="fld" value="{% now 'Y-m-d' %}">
+                    </div>
+
+                    <div class="col-lg-3 col-md-6">
+                        <label class="field-label"><i class="bi bi-upc-scan"></i> رقم الفاتورة</label>
+                        <input type="text" name="invoice_number" class="fld font-monospace" placeholder="توليد آلي">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. أصناف الفاتورة -->
+        <div class="panel">
+            <div class="panel-head">
+                <h5 class="panel-title"><i class="bi bi-cart-check-fill text-emerald"></i> أصناف الفاتورة</h5>
+                <button type="button" class="btn-add" id="addRowBtn">
+                    <i class="bi bi-plus-lg me-1"></i> إضافة صنف <kbd class="k">Alt+A</kbd>
+                </button>
+            </div>
+            <div class="panel-body pt-2">
+                <div class="items-scroll">
+                    <table class="items-table" id="invoiceTable">
+                        <thead>
+                            <tr>
+                                <th class="text-center">#</th>
+                                <th style="width:34%">الصنف / المادة <span class="req">*</span></th>
+                                <th style="width:19%">الصف الدراسي <span class="fw-normal opacity-75">(اختياري)</span></th>
+                                <th style="width:12%" class="text-center">الكمية <span class="req">*</span></th>
+                                <th style="width:14%" class="text-center">سعر الوحدة <span class="req">*</span></th>
+                                <th style="width:14%" class="text-center">الإجمالي (ج.م)</th>
+                                <th style="width:44px"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoiceBody"></tbody>
+                    </table>
+                </div>
+
+                <div id="dupWarning" class="dup-warning d-none">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    <span></span>
+                </div>
+
+                <div class="mt-4">
+                    <label class="field-label"><i class="bi bi-chat-left-text"></i> ملاحظات</label>
+                    <input type="text" name="note" class="fld" placeholder="اكتب أي ملاحظات إضافية هنا...">
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. الإجمالي والحفظ -->
+        <div class="summary-bar">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-4 flex-wrap">
+                    <div class="stat"><small>عدد الأصناف</small><b class="font-num" id="statCount">0</b></div>
+                    <div class="stat"><small>إجمالي الكميات</small><b class="font-num" id="statQty">0</b></div>
+                    <div class="grand">
+                        <small>الصافي المطلوب للمورد</small>
+                        <div class="grand-val font-num"><span id="grandTotal">0.00</span> <span class="fs-6 text-secondary fw-semibold">ج.م</span></div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <span class="text-secondary small d-none d-lg-inline">Ctrl + Enter للحفظ السريع</span>
+                    <button type="submit" class="btn btn-save" id="submitBtn">
+                        <i class="bi bi-shield-check me-2"></i> حفظ الفاتورة واعتماد الأرصدة
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- سجل فواتير المشتريات -->
+    {% now "Y" as current_year %}
+    <div class="panel mt-5" id="historyPanel">
+        <div class="panel-head">
+            <h5 class="panel-title">
+                <i class="bi bi-clock-history text-info"></i> فواتير المشتريات المعتمدة
+                <span class="hist-scope" id="histScope"></span>
+            </h5>
+            <form id="histFilter" method="get" action="{% url 'admin_add_restock' %}" class="d-flex align-items-center gap-2">
+                <label for="monthFilter" class="field-label m-0"><i class="bi bi-funnel"></i> تصفية بالشهر</label>
+                <select name="month" id="monthFilter" class="fld" style="width:auto;min-width:190px">
+                    <option value="">كل الشهور ({{ filter_year|default:current_year }})</option>
+                    <option value="1" {% if selected_month|stringformat:"s" == "1" %}selected{% endif %}>يناير</option>
+                    <option value="2" {% if selected_month|stringformat:"s" == "2" %}selected{% endif %}>فبراير</option>
+                    <option value="3" {% if selected_month|stringformat:"s" == "3" %}selected{% endif %}>مارس</option>
+                    <option value="4" {% if selected_month|stringformat:"s" == "4" %}selected{% endif %}>أبريل</option>
+                    <option value="5" {% if selected_month|stringformat:"s" == "5" %}selected{% endif %}>مايو</option>
+                    <option value="6" {% if selected_month|stringformat:"s" == "6" %}selected{% endif %}>يونيو</option>
+                    <option value="7" {% if selected_month|stringformat:"s" == "7" %}selected{% endif %}>يوليو</option>
+                    <option value="8" {% if selected_month|stringformat:"s" == "8" %}selected{% endif %}>أغسطس</option>
+                    <option value="9" {% if selected_month|stringformat:"s" == "9" %}selected{% endif %}>سبتمبر</option>
+                    <option value="10" {% if selected_month|stringformat:"s" == "10" %}selected{% endif %}>أكتوبر</option>
+                    <option value="11" {% if selected_month|stringformat:"s" == "11" %}selected{% endif %}>نوفمبر</option>
+                    <option value="12" {% if selected_month|stringformat:"s" == "12" %}selected{% endif %}>ديسمبر</option>
+                </select>
+            </form>
+        </div>
+        <div class="hist-stats" id="histStats"></div>
+
+        <div id="histResults">
+            <div class="table-responsive">
+                <table class="log-table">
+                    <thead>
+                        <tr>
+                            <th width="50" class="text-center">#</th>
+                            <th width="140">التاريخ</th>
+                            <th>رقم الفاتورة</th>
+                            <th>المورد</th>
+                            <th>المستودع</th>
+                            <th class="text-end pe-4">الصافي (ج.م)</th>
+                            <th width="50"></th>
                         </tr>
+                    </thead>
+                    <tbody>
+                        {% for inv in recent_invoices %}
+                        <tr class="log-row" tabindex="0" role="button" title="عرض تفاصيل الفاتورة"
+                            data-id="{{ inv.pk }}"
+                            data-number="{{ inv.invoice_number }}"
+                            data-date="{{ inv.date|date:'Y-m-d' }}"
+                            data-supplier="{{ inv.supplier.name|default:'نقدي / عام' }}"
+                            data-warehouse="{{ inv.warehouse.name }}"
+                            data-net="{{ inv.net_amount|stringformat:'s' }}">
+                            <td class="text-center text-secondary">{{ forloop.counter }}</td>
+                            <td><span class="inv-date font-num">{{ inv.date|date:"Y-m-d" }}</span></td>
+                            <td class="fw-bold font-monospace text-info">{{ inv.invoice_number }}</td>
+                            <td class="fw-semibold">{{ inv.supplier.name|default:"نقدي / عام" }}</td>
+                            <td><span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-50 px-2 py-1">{{ inv.warehouse.name }}</span></td>
+                            <td class="text-end pe-4 fw-bold text-emerald font-num">{{ inv.net_amount }}</td>
+                            <td class="text-center log-view"><i class="bi bi-eye-fill"></i></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="py-5 text-center text-secondary fw-semibold">لا توجد فواتير مسجلة في هذه الفترة.</td>
+                        </tr>
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>
-
-            <!-- القسم السفلي: الملاحظات والإجمالي -->
-            <div class="row g-4 align-items-center bg-dark bg-opacity-50 p-4 rounded-4 border border-secondary border-opacity-25 mt-2">
-                <div class="col-lg-7">
-                    <input type="text" name="note" class="form-control form-control-neon bg-transparent border-secondary" placeholder="اكتب أي ملاحظات إضافية هنا...">
-                </div>
-                <div class="col-lg-5 text-start text-lg-end">
-                    <p class="text-muted fw-bold mb-1 small text-uppercase">الصافي المطلوب للمورد</p>
-                    <h1 class="fw-black text-emerald m-0" style="text-shadow: 0 0 20px rgba(16,185,129,0.4);">
-                        <span id="grandTotal">0.00</span> <span class="fs-5 text-white-50">ج.م</span>
-                    </h1>
-                </div>
-            </div>
-
-            <div class="d-grid mt-5">
-                <button type="submit" class="btn btn-neon-submit btn-lg py-4 rounded-4 fs-4 shadow-lg">
-                    <i class="bi bi-shield-check me-2"></i> حفظ الفاتورة واعتماد الأرصدة رسمياً
-                </button>
-            </div>
-        </form>
-    </div>
-
-    <!-- 2. سجل الفواتير السابقة -->
-    <div class="glass-card p-4 animate__animated animate__fadeInUp mb-5 delay-1s">
-        <h5 class="fw-black text-white mb-4 d-flex align-items-center gap-2">
-            <i class="bi bi-clock-history fs-4 text-info"></i> أحدث فواتير المشتريات المعتمدة
-        </h5>
-        <div class="table-responsive">
-            <table class="table invoice-table m-0">
-                <thead>
-                    <tr>
-                        <th width="50">#</th>
-                        <th width="140">التاريخ</th>
-                        <th>رقم الفاتورة</th>
-                        <th>المورد</th>
-                        <th>المستودع</th>
-                        <th class="text-end pe-4">الصافي</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for inv in recent_invoices %}
-                    <tr>
-                        <td class="text-white-50">{{ forloop.counter }}</td>
-                        <td class="small text-white-50 fw-bold">{{ inv.date|date:"Y-m-d" }}</td>
-                        <td class="fw-bold font-monospace text-info">{{ inv.invoice_number }}</td>
-                        <td class="fw-bold text-white">{{ inv.supplier.name|default:"نقدي / عام" }}</td>
-                        <td><span class="badge bg-secondary bg-opacity-25 text-light border border-secondary px-2 py-1">{{ inv.warehouse.name }}</span></td>
-                        <td class="text-end pe-4"><span class="fw-black text-emerald fs-6">{{ inv.net_amount }}</span></td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="py-5 text-center text-muted fw-bold">لا توجد فواتير مسجلة مسبقاً في النظام. بمجرد حفظ أول فاتورة، ستظهر هنا تلقائياً.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            {{ invoices_data|json_script:"invoicesData" }}
         </div>
     </div>
 </div>
 
-<!-- Modal الإضافة السريعة للمورد (AJAX) -->
-<div class="modal fade" id="quickAddSupplierModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content glass-modal text-white">
-            <div class="modal-header border-bottom border-secondary border-opacity-25">
-                <h5 class="modal-title fw-black text-info"><i class="bi bi-person-plus-fill me-2"></i> تسجيل مورد جديد فوراً</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- قالب سطر الصنف (يُنسخ ولا يُعاد بناؤه كنص) -->
+<template id="rowTemplate">
+    <tr>
+        <td class="row-no">1</td>
+        <td><select name="item_id[]" class="item-select"></select></td>
+        <td>
+            <select name="grade_id[]" class="fld grade-select">
+                <option value="">-- عام (بدون ربط) --</option>
+                {% for grade in grades %}
+                    <option value="{{ grade.id }}">{{ grade.name }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td><input type="number" name="quantity[]" class="fld qty-input" min="1" step="1" inputmode="numeric" placeholder="0" onwheel="this.blur()"></td>
+        <td><input type="number" name="price[]" class="fld price-input" min="0" step="0.01" inputmode="decimal" placeholder="0.00" onwheel="this.blur()"></td>
+        <td><span class="row-total font-num">0.00</span></td>
+        <td class="text-center"><button type="button" class="btn-remove" title="حذف السطر" aria-label="حذف السطر"><i class="bi bi-x-lg"></i></button></td>
+    </tr>
+</template>
+
+<!-- نافذة تفاصيل الفاتورة (للعرض فقط) -->
+<div class="modal fade" id="invoiceDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content modal-panel">
+            <div class="modal-header" style="border-color:var(--line)!important">
+                <h5 class="modal-title fw-bold text-white"><i class="bi bi-receipt-cutoff text-info me-2"></i> فاتورة <span class="font-monospace text-info" id="dNumber"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
             </div>
             <div class="modal-body p-4">
-                <form id="ajaxSupplierForm">
+                <div class="d-meta">
+                    <div class="d-box d-date"><small><i class="bi bi-calendar-event me-1"></i> تاريخ الفاتورة</small><b id="dDate"></b><span class="iso" id="dDateIso"></span></div>
+                    <div class="d-box"><small>المورد</small><b id="dSupplier"></b></div>
+                    <div class="d-box"><small>المستودع</small><b id="dWarehouse"></b></div>
+                    <div class="d-box"><small>الصافي</small><b class="text-emerald font-num" id="dNet"></b></div>
+                </div>
+                <div class="d-box mb-3 d-none" id="dNoteBox"><small>ملاحظات</small><b id="dNote"></b></div>
+                <div class="items-scroll">
+                    <table class="det-table">
+                        <thead>
+                            <tr>
+                                <th class="text-center" width="44">#</th>
+                                <th>الصنف</th>
+                                <th>الصف الدراسي</th>
+                                <th class="text-center">الكمية</th>
+                                <th class="text-center">سعر الوحدة</th>
+                                <th class="text-center">الإجمالي</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dItems"></tbody>
+                        <tfoot id="dFoot"></tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-color:var(--line)!important">
+                <button type="button" class="btn btn-outline-light px-4" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إضافة مورد سريع -->
+<div class="modal fade" id="quickAddSupplierModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-panel">
+            <div class="modal-header border-bottom" style="border-color:var(--line)!important">
+                <h5 class="modal-title fw-bold text-info"><i class="bi bi-person-plus-fill me-2"></i> تسجيل مورد جديد</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="ajaxSupplierForm" novalidate>
+                    <div id="supError" class="form-errors d-none py-2"></div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-white-50 small">اسم المورد / الشركة <span class="text-danger">*</span></label>
-                        <input type="text" id="supName" class="form-control form-control-neon" required placeholder="مثال: مطبعة الشروق">
+                        <label class="field-label">اسم المورد / الشركة <span class="req">*</span></label>
+                        <input type="text" id="supName" class="fld" placeholder="مثال: مطبعة الشروق">
                     </div>
                     <div class="mb-4">
-                        <label class="form-label fw-bold text-white-50 small">رقم الهاتف (اختياري)</label>
-                        <input type="text" id="supPhone" class="form-control form-control-neon" placeholder="01xxxxxxxxx">
+                        <label class="field-label">رقم الهاتف (اختياري)</label>
+                        <input type="text" id="supPhone" class="fld" placeholder="01xxxxxxxxx" inputmode="tel">
                     </div>
-                    <button type="button" class="btn btn-info w-100 fw-black rounded-3 py-2 shadow" onclick="saveSupplierAjax()">
+                    <button type="submit" id="supSaveBtn" class="btn btn-info w-100 fw-bold rounded-3 py-2">
                         <i class="bi bi-check2-circle"></i> حفظ وإدراج
                     </button>
                 </form>
@@ -318,157 +475,479 @@
     </div>
 </div>
 
-<!-- Tom Select JS للبحث الذكي -->
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-
 <script>
-    const allItemsData = JSON.parse('{{ items_json|default:"[]"|escapejs }}');
-    let itemOptionsHTML = '<option value="">-- ابحث واختر الصنف --</option>';
+(function () {
+    'use strict';
 
-    if (Array.isArray(allItemsData)) {
-        allItemsData.forEach(item => {
-            if (item.item_type === 'saleable' || !item.item_type) {
-                const skuText = item.sku ? `[${item.sku}] ` : '';
-                itemOptionsHTML += `<option value="${item.id}">${skuText}${item.name}</option>`;
-            }
-        });
+    /* ================= بيانات الأصناف (تُجهَّز مرة واحدة فقط) ================= */
+    const MAX_RESULTS = 50;
+
+    // تطبيع النص العربي: يتجاهل التشكيل والهمزات والتاء المربوطة والياء، ويحوّل الأرقام الهندية
+    function norm(s) {
+        return String(s == null ? '' : s).toLowerCase()
+            .replace(/[\u064B-\u0652\u0640]/g, '')
+            .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+            .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+            .replace(/\s+/g, ' ').trim();
     }
 
-    // بناء خيارات الصفوف الدراسية لاستخدامها في السطور الديناميكية
-    let gradeOptionsHTML = '<option value="">-- بدون ربط (عام) --</option>';
-    {% for grade in grades %}
-        gradeOptionsHTML += '<option value="{{ grade.id }}">{{ grade.name }}</option>';
-    {% endfor %}
+    let rawItems = [];
+    try { rawItems = JSON.parse('{{ items_json|default:"[]"|escapejs }}'); } catch (e) { console.error('items_json parse error', e); }
 
-    // دالة تفعيل البحث الذكي على أي عنصر select
-    function initSmartSelect(element) {
-        if (!element || element.tomselect) return;
-        new TomSelect(element, {
+    const ITEMS = (Array.isArray(rawItems) ? rawItems : [])
+        .filter(i => !i.item_type || i.item_type === 'saleable')
+        .map(i => {
+            const cost = i.cost_price != null ? i.cost_price : (i.purchase_price != null ? i.purchase_price : null);
+            return {
+                value: String(i.id),
+                name: i.name || '',
+                sku: i.sku || '',
+                cost: cost,
+                s: norm((i.sku || '') + ' ' + (i.name || ''))
+            };
+        });
+
+    function searchItems(query) {
+        const tokens = norm(query).split(' ').filter(Boolean);
+        const out = [];
+        for (let i = 0; i < ITEMS.length && out.length < MAX_RESULTS; i++) {
+            const it = ITEMS[i];
+            if (tokens.every(t => it.s.indexOf(t) !== -1)) out.push(it);
+        }
+        return out;
+    }
+
+    /* ================= عناصر الصفحة ================= */
+    const form = document.getElementById('invoiceForm');
+    const body = document.getElementById('invoiceBody');
+    const tpl = document.getElementById('rowTemplate');
+    const submitBtn = document.getElementById('submitBtn');
+    const errBox = document.getElementById('formErrors');
+    let submitting = false, totalsQueued = false;
+
+    const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    function toast(msg, isErr) {
+        const box = document.getElementById('toastBox');
+        const el = document.createElement('div');
+        el.className = 'toast-i' + (isErr ? ' err' : '');
+        el.textContent = msg;
+        box.appendChild(el);
+        setTimeout(() => el.remove(), 3500);
+    }
+
+    /* ================= قائمة البحث الذكي ================= */
+    function initItemSelect(select) {
+        return new TomSelect(select, {
+            valueField: 'value',
+            labelField: 'name',
+            searchField: ['s'],
+            maxOptions: MAX_RESULTS,
             create: false,
-            placeholder: "-- اكتب للبحث بالاسم أو الكود --",
+            openOnFocus: true,
+            preload: 'focus',
+            shouldLoad: () => true,
+            loadThrottle: null, // البحث محلي فلا حاجة لتأخير 300ms
+            dropdownParent: 'body',
+            placeholder: 'اكتب الاسم أو الكود للبحث...',
+            // ترتيب النتائج: تطابق الكود الكامل ثم البدء بالكلمة ثم باقي النتائج
+            score: function (search) {
+                const q = norm(search), tokens = q.split(' ').filter(Boolean);
+                return function (opt) {
+                    if (!tokens.length) return 1;
+                    if (!tokens.every(t => opt.s.indexOf(t) !== -1)) return 0;
+                    if (opt.sku && norm(opt.sku) === q) return 4;
+                    return opt.s.indexOf(q) === 0 ? 3 : (opt.s.indexOf(q) > 0 ? 2 : 1);
+                };
+            },
+            load: function (query, callback) {
+                callback(searchItems(query).map(o => Object.assign({}, o)));
+            },
             render: {
-                no_results: function(data, escape) {
-                    return '<div class="no-results">لا توجد نتائج تطابق: "' + escape(data.input) + '"</div>';
-                }
-            }
+                option: (d, e) => '<div class="d-flex justify-content-between align-items-center gap-3"><span>' + e(d.name) + '</span>' +
+                                  (d.sku ? '<span class="ts-sku">' + e(d.sku) + '</span>' : '') + '</div>',
+                item: (d, e) => '<div>' + e(d.name) + '</div>',
+                no_results: (d, e) => '<div class="no-results">لا توجد نتائج تطابق: "' + e(d.input) + '"</div>'
+            },
+            onChange: function (value) { onItemChosen(this, value); }
         });
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.item-select').forEach(select => {
-            select.innerHTML = itemOptionsHTML;
-            initSmartSelect(select);
+    function onItemChosen(ts, value) {
+        const tr = ts.input.closest('tr');
+        ts.wrapper.classList.remove('is-invalid');
+        if (value) {
+            const opt = ts.options[value];
+            const priceEl = tr.querySelector('.price-input');
+            if (opt && opt.cost != null && priceEl.value === '') {
+                priceEl.value = opt.cost;
+                recalcRow(tr);
+            }
+            const q = tr.querySelector('.qty-input');
+            setTimeout(() => { q.focus(); q.select(); }, 0);
+        }
+        queueTotals();
+    }
+
+    /* ================= إدارة الأسطر ================= */
+    function rows() { return Array.from(body.rows); }
+
+    function addRow(focus) {
+        const tr = tpl.content.firstElementChild.cloneNode(true);
+        body.appendChild(tr);
+        initItemSelect(tr.querySelector('select.item-select'));
+        refreshRows();
+        if (focus) {
+            tr.querySelector('select.item-select').tomselect.focus();
+            tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+        return tr;
+    }
+
+    function removeRow(tr) {
+        if (body.rows.length <= 1) return;
+        const ts = tr.querySelector('select.item-select').tomselect;
+        if (ts) ts.destroy();
+        tr.remove();
+        refreshRows();
+    }
+
+    function refreshRows() {
+        const all = rows();
+        all.forEach((tr, i) => {
+            tr.querySelector('.row-no').textContent = i + 1;
+            tr.querySelector('.btn-remove').disabled = all.length === 1;
         });
+        queueTotals();
+    }
+
+    function recalcRow(tr) {
+        const q = parseFloat(tr.querySelector('.qty-input').value) || 0;
+        const p = parseFloat(tr.querySelector('.price-input').value) || 0;
+        tr.querySelector('.row-total').textContent = fmt(round2(q * p));
+        queueTotals();
+    }
+
+    // تجميع الحسابات الكلية مرة واحدة لكل إطار رسم بدل كل ضغطة مفتاح
+    function queueTotals() {
+        if (totalsQueued) return;
+        totalsQueued = true;
+        requestAnimationFrame(() => { totalsQueued = false; recalcTotals(); });
+    }
+
+    function recalcTotals() {
+        let total = 0, qty = 0, count = 0;
+        const seen = new Map();
+        const all = rows();
+        all.forEach(tr => {
+            const q = parseFloat(tr.querySelector('.qty-input').value) || 0;
+            const p = parseFloat(tr.querySelector('.price-input').value) || 0;
+            const itemId = tr.querySelector('select.item-select').value;
+            total += round2(q * p);
+            qty += q;
+            if (itemId) {
+                count++;
+                const key = itemId + '|' + tr.querySelector('.grade-select').value;
+                if (!seen.has(key)) seen.set(key, []);
+                seen.get(key).push(tr);
+            }
+            tr.classList.remove('is-dup');
+        });
+        let dupRows = 0;
+        seen.forEach(list => { if (list.length > 1) { dupRows += list.length; list.forEach(tr => tr.classList.add('is-dup')); } });
+
+        document.getElementById('grandTotal').textContent = fmt(round2(total));
+        document.getElementById('statCount').textContent = count;
+        document.getElementById('statQty').textContent = qty.toLocaleString('en-US');
+
+        const w = document.getElementById('dupWarning');
+        w.classList.toggle('d-none', dupRows === 0);
+        if (dupRows) w.querySelector('span').textContent = 'تنبيه: يوجد صنف مكرر في ' + dupRows + ' أسطر (مظللة بالأصفر) — تأكد أنه مقصود.';
+    }
+
+    /* ================= أحداث الجدول (Event Delegation) ================= */
+    body.addEventListener('input', e => {
+        const t = e.target;
+        if (t.classList.contains('qty-input') || t.classList.contains('price-input')) {
+            t.classList.remove('is-invalid');
+            recalcRow(t.closest('tr'));
+        }
+    });
+    body.addEventListener('change', e => {
+        if (e.target.classList.contains('grade-select')) queueTotals();
+    });
+    body.addEventListener('click', e => {
+        const btn = e.target.closest('.btn-remove');
+        if (btn) removeRow(btn.closest('tr'));
     });
 
-    // اختصار لوحة المفاتيح لإضافة سطر سريعاً (Alt + A)
-    document.addEventListener('keydown', function(event) {
-        if (event.altKey && event.key.toLowerCase() === 'a') {
-            event.preventDefault();
-            addRow();
+    // Enter: الكمية → السعر → السطر التالي (أو سطر جديد)
+    form.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' || e.isComposing) return;
+        if (e.ctrlKey || e.metaKey) { e.preventDefault(); form.requestSubmit(submitBtn); return; }
+        const t = e.target;
+        if (t.tagName !== 'INPUT') return;
+        e.preventDefault(); // منع الإرسال العرضي للفاتورة
+        const tr = t.closest('#invoiceBody tr');
+        if (!tr) return;
+        if (t.classList.contains('qty-input')) {
+            const p = tr.querySelector('.price-input'); p.focus(); p.select();
+        } else if (t.classList.contains('price-input')) {
+            const next = tr.nextElementSibling || addRow(false);
+            next.querySelector('select.item-select').tomselect.focus();
         }
     });
 
-    function addRow() {
-        const tbody = document.getElementById('invoiceBody');
-        const tr = document.createElement('tr');
-        tr.className = 'row-anim';
+    document.getElementById('addRowBtn').addEventListener('click', () => addRow(true));
 
-        tr.innerHTML = `
-            <td>
-                <select name="item_id[]" class="form-select form-select-neon item-select text-white" required>
-                    ${itemOptionsHTML}
-                </select>
-            </td>
-            <td>
-                <select name="grade_id[]" class="form-select form-select-neon text-info small">
-                    ${gradeOptionsHTML}
-                </select>
-            </td>
-            <td>
-                <input type="number" name="quantity[]" class="form-control form-control-neon text-center fw-black qty-input text-info" min="1" step="1" required placeholder="0" onwheel="this.blur()" oninput="calculateRow(this); this.value = this.value.replace(/[^0-9]/g, '')">
-            </td>
-            <td>
-                <input type="number" name="price[]" class="form-control form-control-neon text-center fw-black price-input text-warning" min="0" step="0.01" required placeholder="0.00" onwheel="this.blur()" oninput="calculateRow(this)">
-            </td>
-            <td>
-                <input type="text" class="form-control form-control-neon text-center fw-black row-total text-emerald border-0 bg-transparent" readonly value="0.00">
-            </td>
-            <td class="text-center">
-                <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-circle" onclick="removeRow(this)" title="حذف السطر"><i class="bi bi-x-lg fw-black"></i></button>
-            </td>
-        `;
-        tbody.appendChild(tr);
+    // Alt + A  (نستخدم event.code ليعمل مع لوحة المفاتيح العربية أيضاً)
+    document.addEventListener('keydown', e => {
+        if (e.altKey && e.code === 'KeyA') { e.preventDefault(); addRow(true); }
+    });
 
-        // تفعيل البحث الذكي على القائمة الجديدة
-        const newSelect = tr.querySelector('.item-select');
-        initSmartSelect(newSelect);
+    /* ================= المورد ================= */
+    const supplierTS = new TomSelect('#supplierSelect', {
+        create: false, allowEmptyOption: true, dropdownParent: 'body',
+        placeholder: 'ابحث عن مورد...'
+    });
+
+    /* ================= التحقق قبل الحفظ ================= */
+    function showErrors(list) {
+        errBox.innerHTML = '<b><i class="bi bi-exclamation-octagon-fill me-1"></i> يرجى تصحيح التالي قبل الحفظ:</b><ul>' +
+            list.slice(0, 8).map(m => '<li>' + esc(m) + '</li>').join('') +
+            (list.length > 8 ? '<li>... و ' + (list.length - 8) + ' ملاحظات أخرى</li>' : '') + '</ul>';
+        errBox.classList.remove('d-none');
+        errBox.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
 
-    function removeRow(btn) {
-        const row = btn.closest('tr');
-        row.style.animation = 'fadeOutUp 0.3s forwards';
-        setTimeout(() => {
-            row.remove();
-            calculateGrandTotal();
-        }, 300);
-    }
+    function validate() {
+        const errors = [];
+        let firstBad = null;
+        const mark = (el, focusEl) => { el.classList.add('is-invalid'); if (!firstBad) firstBad = focusEl || el; };
 
-    function calculateRow(inputElement) {
-        const row = inputElement.closest('tr');
-        const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-        const price = parseFloat(row.querySelector('.price-input').value) || 0;
-        const total = qty * price;
-        row.querySelector('.row-total').value = total.toFixed(2);
-        calculateGrandTotal();
-    }
+        const wh = document.getElementById('warehouseSelect');
+        const dt = document.getElementById('invoiceDate');
+        wh.classList.remove('is-invalid'); dt.classList.remove('is-invalid');
+        if (!wh.value) { errors.push('اختر المستودع المستلم'); mark(wh); }
+        if (!dt.value) { errors.push('حدد تاريخ الفاتورة'); mark(dt); }
 
-    function calculateGrandTotal() {
-        let grandTotal = 0;
-        document.querySelectorAll('.row-total').forEach(input => {
-            grandTotal += parseFloat(input.value) || 0;
+        // حذف الأسطر الفارغة تماماً تلقائياً (إن وُجد غيرها)
+        rows().forEach(tr => {
+            const empty = !tr.querySelector('select.item-select').value &&
+                          !tr.querySelector('.qty-input').value && !tr.querySelector('.price-input').value;
+            if (empty && body.rows.length > 1) removeRow(tr);
         });
-        document.getElementById('grandTotal').innerText = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        rows().forEach((tr, i) => {
+            const n = i + 1;
+            const ts = tr.querySelector('select.item-select').tomselect;
+            const q = tr.querySelector('.qty-input'), p = tr.querySelector('.price-input');
+            if (!ts.getValue()) { errors.push('السطر ' + n + ': اختر الصنف'); mark(ts.wrapper, ts.control_input); }
+            const qv = parseFloat(q.value);
+            if (!(qv >= 1) || !Number.isInteger(qv)) { errors.push('السطر ' + n + ': الكمية يجب أن تكون رقماً صحيحاً أكبر من صفر'); mark(q); }
+            const pv = parseFloat(p.value);
+            if (p.value === '' || !(pv >= 0)) { errors.push('السطر ' + n + ': أدخل سعر الوحدة'); mark(p); }
+        });
+        return { errors, firstBad };
     }
 
-    // دالة حفظ المورد الجديد لحظياً بالـ AJAX
-    function saveSupplierAjax() {
-        const name = document.getElementById('supName').value.trim();
-        const phone = document.getElementById('supPhone').value.trim();
-
-        if (!name) {
-            alert('الرجاء إدخال اسم المورد');
+    form.addEventListener('submit', e => {
+        if (submitting) { e.preventDefault(); return; }
+        errBox.classList.add('d-none');
+        const { errors, firstBad } = validate();
+        if (errors.length) {
+            e.preventDefault();
+            showErrors(errors);
+            if (firstBad) setTimeout(() => firstBad.focus && firstBad.focus(), 250);
             return;
         }
+        submitting = true;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جارٍ الحفظ...';
+    });
 
-        fetch("/inventory/api/add-supplier/", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify({ name: name, phone: phone })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const select = document.getElementById('supplierSelect');
-                const newOption = new Option(data.supplier.name, data.supplier.id, true, true);
-                select.add(newOption);
+    // عند الرجوع بزر المتصفح لا يبقى الزر معطلاً
+    window.addEventListener('pageshow', ev => {
+        if (ev.persisted) {
+            submitting = false; submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-shield-check me-2"></i> حفظ الفاتورة واعتماد الأرصدة';
+        }
+    });
 
-                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('quickAddSupplierModal'));
-                if (modalInstance) {
-                    modalInstance.hide();
-                }
-                document.getElementById('ajaxSupplierForm').reset();
-            } else {
-                alert("حدث خطأ: " + (data.error || 'عذراً، لم تنجح العملية'));
-            }
-        })
-        .catch(error => {
-            console.error("Error:", error);
-            alert("حدث خطأ في الاتصال بالخادم.");
-        });
+    /* ================= إضافة مورد سريعة (AJAX) ================= */
+    const supForm = document.getElementById('ajaxSupplierForm');
+    const supErr = document.getElementById('supError');
+    const supBtn = document.getElementById('supSaveBtn');
+    const supModalEl = document.getElementById('quickAddSupplierModal');
+
+    supModalEl.addEventListener('shown.bs.modal', () => document.getElementById('supName').focus());
+
+    supForm.addEventListener('submit', async e => {
+        e.preventDefault();
+        const name = document.getElementById('supName').value.trim();
+        const phone = document.getElementById('supPhone').value.trim();
+        supErr.classList.add('d-none');
+        if (!name) { supErr.textContent = 'الرجاء إدخال اسم المورد'; supErr.classList.remove('d-none'); return; }
+
+        supBtn.disabled = true;
+        try {
+            const res = await fetch('/inventory/api/add-supplier/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value },
+                body: JSON.stringify({ name: name, phone: phone })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'لم تنجح العملية');
+
+            const id = String(data.supplier.id);
+            supplierTS.addOption({ value: id, text: data.supplier.name });
+            supplierTS.setValue(id);
+            const inst = bootstrap.Modal.getInstance(supModalEl);
+            if (inst) inst.hide();
+            supForm.reset();
+            toast('تمت إضافة المورد: ' + data.supplier.name);
+        } catch (err) {
+            supErr.textContent = 'حدث خطأ: ' + (err.message || 'تعذّر الاتصال بالخادم');
+            supErr.classList.remove('d-none');
+        } finally {
+            supBtn.disabled = false;
+        }
+    });
+
+
+    /* ================= سجل الفواتير: التصفية + عرض التفاصيل ================= */
+    const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    const histBox = document.getElementById('histResults');
+    const monthSel = document.getElementById('monthFilter');
+    let invoicesMap = {}, filterToken = 0;
+
+    function loadInvoiceData() {
+        invoicesMap = {};
+        try {
+            const el = document.getElementById('invoicesData');
+            const arr = el ? JSON.parse(el.textContent) : [];
+            if (Array.isArray(arr)) arr.forEach(x => { invoicesMap[String(x.id)] = x; });
+        } catch (e) { console.error('invoicesData parse error', e); }
     }
+
+    function refreshHistStats() {
+        const trs = histBox.querySelectorAll('.log-row');
+        let total = 0;
+        trs.forEach(r => { total += parseFloat(r.dataset.net) || 0; });
+        document.getElementById('histStats').innerHTML =
+            '<span>عدد الفواتير: <b>' + trs.length + '</b></span><span>إجمالي الصافي: <b>' + fmt(round2(total)) + ' ج.م</b></span>';
+        const opt = monthSel.options[monthSel.selectedIndex];
+        document.getElementById('histScope').textContent = monthSel.value ? opt.textContent : 'كل شهور العام الحالي';
+    }
+
+    function longDate(iso) {
+        const d = new Date(iso + 'T00:00:00');
+        if (isNaN(d)) return iso;
+        return d.toLocaleDateString('ar-EG-u-nu-latn', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    function td(text, cls) {
+        const c = document.createElement('td');
+        c.textContent = text;
+        if (cls) c.className = cls;
+        return c;
+    }
+
+    function openInvoice(tr) {
+        const inv = invoicesMap[tr.dataset.id];
+        const iso = String((inv && inv.date) || tr.dataset.date || '').slice(0, 10);
+        const net = parseFloat((inv && inv.net) != null ? inv.net : tr.dataset.net) || 0;
+
+        document.getElementById('dNumber').textContent = (inv && inv.number) || tr.dataset.number;
+        document.getElementById('dDate').textContent = longDate(iso);
+        document.getElementById('dDateIso').textContent = iso;
+        document.getElementById('dSupplier').textContent = (inv && inv.supplier) || tr.dataset.supplier;
+        document.getElementById('dWarehouse').textContent = (inv && inv.warehouse) || tr.dataset.warehouse;
+        document.getElementById('dNet').textContent = fmt(net) + ' ج.م';
+
+        const note = inv && inv.note;
+        document.getElementById('dNoteBox').classList.toggle('d-none', !note);
+        document.getElementById('dNote').textContent = note || '';
+
+        const tb = document.getElementById('dItems'), tf = document.getElementById('dFoot');
+        tb.innerHTML = ''; tf.innerHTML = '';
+        const lines = inv && Array.isArray(inv.items) ? inv.items : [];
+        if (!lines.length) {
+            const r = document.createElement('tr');
+            const c = td('لا تتوفر تفاصيل الأصناف لهذه الفاتورة.', 'text-center text-secondary py-4');
+            c.colSpan = 6; r.appendChild(c); tb.appendChild(r);
+        } else {
+            let qtySum = 0;
+            lines.forEach((l, i) => {
+                const q = parseFloat(l.qty) || 0, p = parseFloat(l.price) || 0;
+                const t = l.total != null ? parseFloat(l.total) : q * p;
+                qtySum += q;
+                const r = document.createElement('tr');
+                r.appendChild(td(i + 1, 'text-center text-secondary'));
+                const nameCell = td(l.name || '—', 'fw-semibold');
+                if (l.sku) { const sk = document.createElement('div'); sk.className = 'small text-info font-monospace'; sk.textContent = l.sku; nameCell.appendChild(sk); }
+                r.appendChild(nameCell);
+                r.appendChild(td(l.grade || 'عام', 'text-secondary'));
+                r.appendChild(td(q.toLocaleString('en-US'), 'text-center fw-bold text-info font-num'));
+                r.appendChild(td(fmt(p), 'text-center fw-bold text-warning font-num'));
+                r.appendChild(td(fmt(round2(t)), 'text-center fw-bold text-emerald font-num'));
+                tb.appendChild(r);
+            });
+            const f = document.createElement('tr');
+            const label = td('الإجمالي', 'text-end'); label.colSpan = 3;
+            f.appendChild(label);
+            f.appendChild(td(qtySum.toLocaleString('en-US'), 'text-center text-info font-num'));
+            f.appendChild(td('', ''));
+            f.appendChild(td(fmt(net), 'text-center text-emerald font-num'));
+            tf.appendChild(f);
+        }
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('invoiceDetailModal')).show();
+    }
+
+    histBox.addEventListener('click', e => {
+        const tr = e.target.closest('.log-row');
+        if (tr) openInvoice(tr);
+    });
+    histBox.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const tr = e.target.closest('.log-row');
+        if (tr) { e.preventDefault(); openInvoice(tr); }
+    });
+
+    // التصفية بدون إعادة تحميل الصفحة، حتى لا تضيع بيانات الفاتورة التي يتم إدخالها
+    document.getElementById('histFilter').addEventListener('submit', e => e.preventDefault());
+    monthSel.addEventListener('change', async () => {
+        const token = ++filterToken;
+        const url = new URL(window.location.href);
+        if (monthSel.value) url.searchParams.set('month', monthSel.value); else url.searchParams.delete('month');
+        histBox.classList.add('is-loading');
+        try {
+            const res = await fetch(url.toString(), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+            const fresh = doc.getElementById('histResults');
+            if (!fresh) throw new Error('missing results');
+            if (token !== filterToken) return; // وصل طلب أحدث
+            histBox.innerHTML = fresh.innerHTML;
+            history.replaceState(null, '', url.toString());
+            loadInvoiceData();
+            refreshHistStats();
+        } catch (err) {
+            console.error(err);
+            toast('تعذّر تحميل الفواتير، حاول مرة أخرى', true);
+        } finally {
+            if (token === filterToken) histBox.classList.remove('is-loading');
+        }
+    });
+
+    loadInvoiceData();
+    refreshHistStats();
+
+    /* ================= بدء التشغيل ================= */
+    addRow(false);
+})();
 </script>
 {% endblock %}

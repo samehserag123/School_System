@@ -173,8 +173,8 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {% for field in form %}
-                    <!-- 🟢 تم إضافة hire_date هنا في السلسلة النصية للشروط -->
-                    {% if field.name in 'emp_id,name,hire_date,department,attendance_rule,base_salary,is_active' %}
+                    <!-- 🟢 تم إضافة end_date هنا في السلسلة النصية للشروط -->
+                    {% if field.name in 'emp_id,name,hire_date,end_date,department,attendance_rule,base_salary,is_active' %}
                         <div class="flex flex-col">
                             <label class="text-slate-300 font-bold text-sm mb-2 ml-1">
                                 {{ field.label }} {% if field.field.required %}<span class="text-rose-500">*</span>{% endif %}

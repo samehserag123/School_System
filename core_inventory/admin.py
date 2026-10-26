@@ -20,12 +20,31 @@ class ItemCategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'parent')
     search_fields = ('name',)
 
+class GradeStateFilter(admin.SimpleListFilter):
+    title = "الصف الدراسي"
+    parameter_name = "grade_state"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("none", "بدون صف (عام)"),
+            ("has", "مربوط بصف"),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == "none":
+            return queryset.filter(linked_grade__isnull=True)
+        if self.value() == "has":
+            return queryset.filter(linked_grade__isnull=False)
+        return queryset
+
+
 @admin.register(ItemMaster)
 class ItemMasterAdmin(admin.ModelAdmin):
-    list_display = ('sku', 'name', 'category', 'item_type', 'unit_of_measure', 'tracking_type')
-    list_filter = ('item_type', 'category', 'tracking_type')
+    list_display = ('sku', 'name', 'category', 'linked_grade', 'item_type', 'unit_of_measure', 'tracking_type')
+    list_filter = (GradeStateFilter, 'linked_grade', 'item_type', 'category', 'tracking_type')
     search_fields = ('sku', 'name')
-    list_select_related = ('category',)  # تسريع الاستعلام بمنع N+1
+    list_select_related = ('category', 'linked_grade', 'unit_of_measure')
+    list_per_page = 200
 
 # ==========================================
 # 2. حركات المخزون والأرصدة الحية

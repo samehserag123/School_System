@@ -79,6 +79,10 @@
     .stat-card:hover::after { left: 100%; }
 
     /* 🟢 تحسين الفلاتر */
+    /* البحث السريع: حالة التحميل + تمييز الكلمات المطابقة */
+    #tableBody { transition: opacity .15s ease; }
+    #tableBody.is-loading { opacity: .5; pointer-events: none; }
+    mark.sm { background: rgba(251,191,36,.25); color: #fde047; border-radius: 3px; padding: 0 2px; }
     .filter-section { background-color: #1a1d21; border: 1px solid #2d3238; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
     .filter-section .form-select, .filter-section .form-control { background-color: #212529; border-color: #3d4349; color: #fff; transition: border-color 0.2s; }
     .filter-section .form-select:focus, .filter-section .form-control:focus { border-color: #0dcaf0; box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.15); }
@@ -238,7 +242,7 @@
             <div class="row g-3">
                 <div class="col-md-4">
                     <div class="input-group">
-                        <input type="text" id="tableSearch" onkeyup="debouncedSearch()" class="form-control" placeholder="ابحث باسم الطالب، الرقم القومي..." value="{{ search_query|default:'' }}" autofocus>
+                        <input type="text" id="tableSearch" oninput="debouncedSearch()" onkeydown="searchKeydown(event)" autocomplete="off" spellcheck="false" enterkeyhint="search" class="form-control" placeholder="ابحث باسم الطالب، الرقم القومي..." value="{{ search_query|default:'' }}" autofocus>
                         <button class="btn btn-outline-danger fw-bold" type="button" onclick="clearFilters()" title="إعادة تعيين ومسح كافة الفلاتر">
                             <i class="bi bi-eraser-fill"></i> مسح
                         </button>
@@ -835,21 +839,232 @@ function getStatusColor(status) {
     }
 }
 
-let debounceTimer;
-function debouncedSearch() {
-    clearTimeout(debounceTimer);
+/* =====================================================================
+   ⚡ محرك البحث السريع (نفس فلسفة شاشة الكاونتر)
+   - input بدل keyup (يلتقط اللصق والمسح والكتابة بالعربي)
+   - مهلة 200ms بدل 600ms
+   - AbortController: أي طلب قديم يُلغى فور بدء طلب أحدث (لا سباق نتائج)
+   - كاش 15 ثانية للنتائج المتكررة (الرجوع بالمسح/الصفحات = فوري)
+   - تطبيع عربي للاستعلام (أرقام هندية، تشكيل، تطويل، مسافات)
+   - تمييز الكلمات المطابقة داخل الجدول
+   - بدون قفز للصفحة أثناء الكتابة
+   ===================================================================== */
+const SEARCH_DELAY = 200;
+const CACHE_TTL = 15000;
+const CACHE_MAX = 40;
+const pageCache = new Map();
+let debounceTimer = null;
+let filterAbort = null;
+let filterSeq = 0;
+let cacheEpoch = 0;       // يزيد عند أي تعديل (POST) فيُبطل الكاش
+let lastKey = null;
 
-    // إظهار اللودر بمجرد بدء الكتابة ليعرف المستخدم أن هناك عملية جارية
-    const currentTable = document.getElementById("tableBody");
-    if(currentTable) currentTable.style.opacity = '0.5';
+// أي عملية تعديل (تغيير حالة، قرار إداري، علاجي...) تمسح الكاش حتى لا تظهر بيانات قديمة
+(function () {
+    const _fetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+        const m = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+        if (m !== 'GET') { pageCache.clear(); cacheEpoch++; lastKey = null; }
+        return _fetch(input, init);
+    };
+})();
 
-    // زيادة الوقت إلى 600 ملي ثانية لمنع الضغط على السيرفر أثناء الكتابة السريعة
-    debounceTimer = setTimeout(() => {
-        runFilters(1);
-        if(currentTable) currentTable.style.opacity = '1';
-    }, 600);
+const TASHKEEL = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g;
+const AR_MAP = { 'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ٱ': 'ا', 'ى': 'ي', 'ی': 'ي', 'ئ': 'ي', 'ؤ': 'و', 'ة': 'ه', 'ک': 'ك' };
+
+// تطبيع كامل (للتمييز اللوني ومعرفة طول البحث فقط)
+function norm(str) {
+    return String(str == null ? '' : str)
+        .replace(/[٠-٩]/g, d => d.charCodeAt(0) - 1632)
+        .replace(/[۰-۹]/g, d => d.charCodeAt(0) - 1776)
+        .replace(TASHKEEL, '')
+        .replace(/[ـء]/g, '')
+        .replace(/[أإآٱىیئؤةک]/g, c => AR_MAP[c])
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
+// تنظيف آمن للاستعلام المُرسل للسيرفر (لا يغيّر الهمزات حتى لا يكسر المطابقة في قاعدة البيانات)
+function cleanQuery(str) {
+    return String(str == null ? '' : str)
+        .replace(/[٠-٩]/g, d => d.charCodeAt(0) - 1632)
+        .replace(/[۰-۹]/g, d => d.charCodeAt(0) - 1776)
+        .replace(TASHKEEL, '')
+        .replace(/ـ/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function highlightRows() {
+    const input = document.getElementById('tableSearch');
+    const qNorm = norm(cleanQuery(input ? input.value : ''));
+    if (!qNorm) return;
+    const tokens = qNorm.split(' ').filter(Boolean);
+    const compact = qNorm.replace(/ /g, '');
+    document.querySelectorAll('#tableBody td.text-end a, #tableBody td > strong.text-info').forEach(el => {
+        const text = el.textContent.trim();
+        if (!text) return;
+        el.innerHTML = text.split(/\s+/).map(w => {
+            const n = norm(w);
+            const hit = n && (tokens.some(t => n.includes(t)) || (n.length >= 3 && compact.includes(n)));
+            return hit ? '<mark class="sm">' + escHtml(w) + '</mark>' : escHtml(w);
+        }).join(' ');
+    });
+}
+
+function setLoading(on) {
+    const tb = document.getElementById('tableBody');
+    if (tb) tb.classList.toggle('is-loading', !!on);
+}
+
+function debouncedSearch() {
+    clearTimeout(debounceTimer);
+    const len = norm(document.getElementById('tableSearch').value).replace(/ /g, '').length;
+    if (len === 1) return;     // حرف واحد = نتائج ضخمة بلا فائدة (مثل شاشة الكاونتر: حرفان فأكثر)
+    debounceTimer = setTimeout(() => runFilters(1, { noScroll: true, dedupe: true }), SEARCH_DELAY);
+}
+
+function searchKeydown(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();    // يمنع إرسال نموذج الترحيل بالخطأ عند الضغط على Enter
+        runFilters(1, { noScroll: true });
+    } else if (e.key === 'Escape') {
+        const input = e.target;
+        if (input.value) { input.value = ''; runFilters(1, { noScroll: true }); }
+    }
+}
+
+function buildFilterUrl(pageNumber) {
+    const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+    const url = new URL(window.location.pathname, window.location.origin);
+    const params = url.searchParams;
+    const search = cleanQuery(val('tableSearch'));
+
+    if (search) params.set('q', search);
+    if (val('f-grade')) params.set('grade_id', val('f-grade'));
+    if (val('f-class')) params.set('classroom_id', val('f-class'));
+    if (val('f-spec')) params.set('specialization', val('f-spec'));
+    if (val('f-gender')) params.set('gender', val('f-gender'));
+    if (val('f-religion')) params.set('religion', val('f-religion'));
+    if (val('f-integ')) params.set('is_disability', val('f-integ'));
+    if (val('f-quick')) params.set('quick_filter', val('f-quick'));
+    params.set('page', pageNumber);
+    return url;
+}
+
+const COUNTER_IDS = ['count-all', 'count-male', 'count-female', 'count-muslim', 'count-christian', 'count-integ'];
+
+function extractParts(html, light) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const q = sel => doc.querySelector(sel);
+    const nav = q('nav[aria-label="Page navigation"]');
+    const counters = {};
+    COUNTER_IDS.forEach(id => { const el = doc.getElementById(id); if (el) counters[id] = el.innerText; });
+    return {
+        tbody: (q('#tableBody') || {}).innerHTML,
+        quick: light ? null : (q('#quickFiltersContainer') || {}).innerHTML,   // الوضع الخفيف لا يحسب عدادات الفلاتر السريعة
+        nav: nav ? nav.innerHTML : null,
+        info: (q('.card-footer > .text-white-50.small') || {}).innerHTML,
+        counters: counters
+    };
+}
+
+function applyParts(p, opts) {
+    const tb = document.getElementById('tableBody');
+    if (tb && p.tbody != null) tb.innerHTML = p.tbody;
+
+    const quick = document.getElementById('quickFiltersContainer');
+    if (quick && p.quick != null) quick.innerHTML = p.quick;
+
+    const oldNav = document.querySelector('nav[aria-label="Page navigation"]');
+    if (oldNav && p.nav != null) {
+        oldNav.innerHTML = p.nav;
+    } else if (!oldNav && p.nav != null) {
+        const footer = document.querySelector('.card-footer');
+        if (footer) {
+            const nav = document.createElement('nav');
+            nav.setAttribute('aria-label', 'Page navigation');
+            nav.className = 'mb-0';
+            nav.innerHTML = p.nav;
+            footer.appendChild(nav);
+        }
+    } else if (oldNav && p.nav == null) {
+        oldNav.remove();
+    }
+
+    const info = document.querySelector('.card-footer > .text-white-50.small');
+    if (info && p.info != null) info.innerHTML = p.info;
+
+    Object.keys(p.counters).forEach(id => updateCounter(id, p.counters[id]));
+
+    const selAll = document.getElementById('selectAllStudents');
+    if (selAll) selAll.checked = false;          // الصفوف الجديدة غير محددة
+
+    highlightRows();
+    setLoading(false);
+    hideGlobalLoader();
+    if (!opts.noScroll) {
+        const fs = document.querySelector('.filter-section');
+        if (fs) fs.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function runFilters(pageNumber = 1, opts) {
+    opts = (opts && typeof opts === 'object' && !(opts instanceof Event)) ? opts : {};
+    clearTimeout(debounceTimer);
+
+    const url = buildFilterUrl(pageNumber);
+    const key = url.search;
+    if (opts.dedupe && key === lastKey) return;     // نفس الطلب السابق (مثل إضافة مسافة)
+    window.history.replaceState({}, '', url.toString());
+
+    if (filterAbort) filterAbort.abort();
+    const seq = ++filterSeq;
+
+    const hit = pageCache.get(key);
+    if (hit && Date.now() - hit.ts < CACHE_TTL) {   // نتيجة فورية من الكاش
+        lastKey = key;
+        applyParts(hit.parts, opts);
+        return;
+    }
+
+    filterAbort = new AbortController();
+    const epoch = cacheEpoch;
+    setLoading(true);
+
+    const light = !!opts.noScroll;                    // بحث أثناء الكتابة => رد خفيف من السيرفر
+    const fetchUrl = new URL(url.toString());
+    if (light) fetchUrl.searchParams.set('light', '1');
+
+    fetch(fetchUrl.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' }, signal: filterAbort.signal })
+        .then(r => r.ok ? r.text() : Promise.reject(new Error('http ' + r.status)))
+        .then(html => {
+            if (seq !== filterSeq) return;           // وصل رد قديم: تجاهله
+            const parts = extractParts(html, light);
+            if (epoch === cacheEpoch) {
+                pageCache.set(key, { ts: Date.now(), parts: parts });
+                if (pageCache.size > CACHE_MAX) pageCache.delete(pageCache.keys().next().value);
+            }
+            lastKey = key;
+            applyParts(parts, opts);
+        })
+        .catch(err => {
+            if (err && err.name === 'AbortError') return;
+            if (seq !== filterSeq) return;
+            console.error('حدث خطأ أثناء الفلترة:', err);
+            setLoading(false);
+            hideGlobalLoader();
+        });
+}
+
+document.addEventListener('DOMContentLoaded', highlightRows);
 function clearFilters() {
     document.getElementById("tableSearch").value = "";
     document.getElementById("f-grade").value = "";
@@ -1168,71 +1383,6 @@ window.addEventListener("load", function() {
 
 function goToPage(pageNumber) {
     runFilters(pageNumber);
-}
-
-function runFilters(pageNumber = 1) {
-    const search = document.getElementById("tableSearch").value.trim();
-    const fGrade = document.getElementById("f-grade").value;
-    const fClass = document.getElementById("f-class").value;
-    const fSpec = document.getElementById("f-spec").value;
-    const fGender = document.getElementById("f-gender").value;
-    const fRelig = document.getElementById("f-religion").value;
-    const fInteg = document.getElementById("f-integ").value;
-    const fQuick = document.getElementById("f-quick") ? document.getElementById("f-quick").value : "";
-
-    const url = new URL(window.location.pathname, window.location.origin);
-    const params = url.searchParams;
-
-    if (search) params.set('q', search);
-    if (fGrade) params.set('grade_id', fGrade);
-    if (fClass) params.set('classroom_id', fClass);
-    if (fSpec) params.set('specialization', fSpec);
-    if (fGender) params.set('gender', fGender);
-    if (fRelig) params.set('religion', fRelig);
-    if (fInteg) params.set('is_disability', fInteg);
-    if (fQuick) params.set('quick_filter', fQuick);
-
-    params.set('page', pageNumber);
-    window.history.replaceState({}, '', url.toString());
-
-    fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(response => response.text())
-    .then(html => {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-
-        const currentTable = document.getElementById("tableBody");
-        const newTable = doc.getElementById("tableBody");
-        if (currentTable && newTable) currentTable.innerHTML = newTable.innerHTML;
-
-        const currentQuickFilters = document.getElementById("quickFiltersContainer");
-        const newQuickFilters = doc.getElementById("quickFiltersContainer");
-        if (currentQuickFilters && newQuickFilters) currentQuickFilters.innerHTML = newQuickFilters.innerHTML;
-
-        const oldPagination = document.querySelector('nav[aria-label="Page navigation"]');
-        const newPagination = doc.querySelector('nav[aria-label="Page navigation"]');
-        if (oldPagination && newPagination) {
-            oldPagination.innerHTML = newPagination.innerHTML;
-        } else if (newPagination) {
-            const footer = document.querySelector('.card-footer');
-            if (footer) footer.appendChild(newPagination);
-        } else if (oldPagination && !newPagination) {
-            oldPagination.remove();
-        }
-
-        const oldInfo = document.querySelector('.text-white-50.small');
-        const newInfo = doc.querySelector('.text-white-50.small');
-        if (oldInfo && newInfo) oldInfo.innerHTML = newInfo.innerHTML;
-
-        ['count-all', 'count-male', 'count-female', 'count-muslim', 'count-christian', 'count-integ'].forEach(id => {
-            let el = doc.getElementById(id);
-            if(el) updateCounter(id, el.innerText);
-        });
-
-        hideGlobalLoader();
-        document.querySelector('.filter-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    })
-    .catch(err => { console.error('حدث خطأ أثناء الفلترة:', err); hideGlobalLoader(); });
 }
 
 function filterByQuickStat(key, value) {

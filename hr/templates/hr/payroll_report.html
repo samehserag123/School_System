@@ -116,6 +116,9 @@
                                 {% if record.penalty_deduction > 0 %}
                                     <div class="text-[11px] font-bold text-rose-300/70 mt-1">(متضمن جزاء إداري)</div>
                                 {% endif %}
+                                {% if record.sick_deduction > 0 %}
+                                    <div class="text-[11px] font-bold text-amber-300/80 mt-1">(متضمن إجازة مرضية {{ record.sick_days }} يوم)</div>
+                                {% endif %}
                             {% else %}
                                 <span class="text-slate-600">-</span>
                             {% endif %}
@@ -180,7 +183,8 @@
                         row.style.display = '';
                         hasVisibleRow = true;
                         if (searchTerm !== '') {
-                            const regex = new RegExp(`(${e.target.value})`, 'gi');
+                            const escaped = e.target.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const regex = new RegExp(`(${escaped})`, 'gi');
                             nameElement.innerHTML = originalName.replace(regex, '<span class="bg-blue-600 text-white px-1 rounded">$1</span>');
                         } else {
                             nameElement.innerHTML = originalName;

@@ -28,6 +28,18 @@
                 تصدير Excel
             </button>
 
+            <button type="button" onclick="exportMonthlyReport()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-bold transition-all shadow-md cursor-pointer" title="ملف Excel بشيتات: المأموريات والاستئذانات والجزاءات والإجازات والغيابات والتأخيرات">
+                <i data-lucide="layers" class="w-5 h-5"></i>
+                تقرير الشهر (Excel)
+            </button>
+
+            {% if request.user.is_staff %}
+            <button type="button" onclick="openManualEntryModal('', '', '', '', '')" class="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-5 py-3 rounded-xl font-bold transition-all shadow-md cursor-pointer">
+                <i data-lucide="keyboard" class="w-5 h-5"></i>
+                إدخال حضور يدوي
+            </button>
+            {% endif %}
+
             <a href="{% url 'hr:upload_attendance' %}" class="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md">
                 <i data-lucide="upload-cloud" class="w-5 h-5"></i>
                 رفع ملف البصمة
@@ -136,7 +148,7 @@
 
                         <!-- 🟢 تعديل خلية الانصراف لإضافة زر الانصراف اليدوي -->
                         <td class="py-3 px-5 text-gray-900 font-black text-center font-mono text-base">
-                            {% if record.check_in and not record.check_out and request.user.is_staff %}
+                            {% if record.check_in and not record.check_out and request.user.is_staff and record.status != 'holiday' and record.employee.attendance_rule.shift_type != 'flexible' %}
                                 <button type="button"
                                         onclick="openManualCheckoutModal({{ record.id }}, '{{ record.employee.name|escapejs }}')"
                                         class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 mx-auto animate-pulse">
@@ -150,17 +162,17 @@
                             {% endif %}
                         </td>
 
-                        <!-- الخصم -->
+                        <!-- تأخير / خصم (دقائق التأخير وساعات الخصم فقط) -->
                         <td class="py-3 px-5 text-center">
-                            {% if record.total_day_penalty > 0 %}
-                                <span class="inline-flex items-center justify-center bg-red-100 text-red-800 font-black text-sm px-3 py-1.5 rounded-lg border border-red-300 shadow-sm">
-                                    {{ record.total_day_penalty|floatformat:1 }} يوم
+                            {% if record.late_minutes > 0 %}
+                                <span class="inline-flex flex-col items-center bg-amber-50 text-amber-800 font-black text-sm px-3 py-1.5 rounded-lg border border-amber-200 shadow-sm">
+                                    {{ record.late_minutes }} دقيقة
+                                    <span class="text-[11px] font-bold text-amber-600">(خصم: {{ record.deduction_hours|floatformat:1 }} س)</span>
                                 </span>
-                                {% if record.direct_admin_penalty > 0 and record.administrative_penalty_days > 0 %}
-                                    <span class="block text-[11px] text-gray-500 font-bold mt-1">
-                                        (تحايل {{ record.administrative_penalty_days|floatformat:1 }} + إداري {{ record.direct_admin_penalty|floatformat:1 }})
-                                    </span>
-                                {% endif %}
+                            {% elif record.deduction_hours > 0 %}
+                                <span class="inline-flex items-center bg-amber-50 text-amber-800 font-black text-sm px-3 py-1.5 rounded-lg border border-amber-200 shadow-sm">
+                                    خصم: {{ record.deduction_hours|floatformat:1 }} س
+                                </span>
                             {% else %}
                                 <span class="text-gray-300 font-bold">-</span>
                             {% endif %}
@@ -175,12 +187,19 @@
                             {% endif %}
                         </td>
 
-                        <!-- الجزاء الإداري الحالي -->
+                        <!-- الجزاءات (إجمالي جزاء اليوم: تلقائي/تحايل + إداري) -->
                         <td class="py-3 px-5 text-center">
-                            {% if record.administrative_penalty_days > 0 %}
+                            {% if record.total_day_penalty > 0 %}
                                 <span class="inline-flex items-center justify-center bg-red-100 text-red-800 font-black text-sm px-3 py-1.5 rounded-lg border border-red-300 shadow-sm">
-                                    {{ record.administrative_penalty_days|floatformat:1 }} يوم
+                                    {{ record.total_day_penalty|floatformat:1 }} يوم
                                 </span>
+                                {% if record.direct_admin_penalty > 0 and record.administrative_penalty_days > 0 %}
+                                    <span class="block text-[11px] text-gray-500 font-bold mt-1">
+                                        (غياب/تحايل {{ record.administrative_penalty_days|floatformat:1 }} + إداري {{ record.direct_admin_penalty|floatformat:1 }})
+                                    </span>
+                                {% elif record.direct_admin_penalty > 0 %}
+                                    <span class="block text-[11px] text-gray-500 font-bold mt-1">(جزاء إداري)</span>
+                                {% endif %}
                             {% else %}
                                 <span class="text-gray-300 font-bold">-</span>
                             {% endif %}
@@ -191,6 +210,14 @@
                             {% if record.status == 'present' %}
                                 <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
                                     <span class="w-2 h-2 rounded-full bg-emerald-600"></span> حاضر
+                                </span>
+                            {% elif record.status == 'absent' and not record.check_in %}
+                                <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-red-100 text-red-800 border border-red-300 shadow-sm">
+                                    <span class="w-2 h-2 rounded-full bg-red-600"></span> غائب (بدون بصمة)
+                                </span>
+                            {% elif record.status == 'absent' and record.check_in and not record.check_out %}
+                                <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-orange-100 text-orange-900 border border-orange-400 shadow-sm">
+                                    <span class="w-2 h-2 rounded-full bg-orange-600"></span> بصمة واحدة فقط (غياب)
                                 </span>
                             {% elif record.status == 'absent' and record.administrative_penalty_days > 0 %}
                                 <span class="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg text-xs font-black bg-rose-100 text-rose-900 border border-rose-400 shadow-sm">
@@ -241,9 +268,16 @@
                                         <i data-lucide="undo-2" class="w-4 h-4"></i> إلغاء الجزاء
                                     </button>
                                 {% endif %}
-                                <a href="{% url 'hr:penalty_add' employee_id=record.employee.id %}" class="text-xs bg-white text-rose-700 border border-rose-200 hover:bg-rose-700 hover:text-white px-3 py-1.5 rounded-lg transition-all font-bold shadow-sm flex items-center justify-center gap-1.5 mx-auto" title="توقيع جزاء إداري عام بسبب مخصص">
+                                <a href="{% url 'hr:penalty_add' employee_id=record.employee.id %}?next={{ request.get_full_path|urlencode }}" class="text-xs bg-white text-rose-700 border border-rose-200 hover:bg-rose-700 hover:text-white px-3 py-1.5 rounded-lg transition-all font-bold shadow-sm flex items-center justify-center gap-1.5 mx-auto" title="توقيع جزاء إداري عام بسبب مخصص">
                                     <i data-lucide="gavel" class="w-4 h-4"></i> جزاء إداري
                                 </a>
+                                {% if request.user.is_staff %}
+                                <button type="button"
+                                        onclick="openManualEntryModal('{{ record.employee.id }}', '{{ record.date|date:"Y-m-d" }}', '{{ record.check_in|time:"H:i" }}', '{{ record.check_out|time:"H:i" }}', '{{ record.employee.name|escapejs }}')"
+                                        class="text-xs bg-white text-amber-700 border border-amber-300 hover:bg-amber-500 hover:text-white px-3 py-1.5 rounded-lg transition-all font-bold shadow-sm flex items-center justify-center gap-1.5 mx-auto" title="إدخال أو تعديل الحضور والانصراف يدوياً (عند تعطل جهاز البصمة)">
+                                    <i data-lucide="keyboard" class="w-4 h-4"></i> إدخال يدوي
+                                </button>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -270,6 +304,12 @@
             </div>
 
             {% if attendance.paginator.num_pages > 1 %}
+            <form class="page-jump-form flex items-center gap-2" data-max="{{ attendance.paginator.num_pages }}">
+                <label class="text-sm font-black text-gray-700">اذهب إلى صفحة</label>
+                <input type="number" inputmode="numeric" min="1" max="{{ attendance.paginator.num_pages }}" value="{{ attendance.number }}"
+                       class="page-jump-input w-20 text-center px-2 py-2 rounded-xl border-2 border-gray-300 focus:border-blue-600 focus:ring-0 text-sm font-mono font-black text-gray-800">
+                <button type="submit" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white font-black rounded-xl text-sm shadow-sm transition-all">اذهب</button>
+            </form>
             <div class="flex gap-2">
                 {% if attendance.has_previous %}
                     <a href="?page=1&q={{ search_query|default:'' }}&month={{ month }}&year={{ year }}" class="ajax-link px-4 py-2 bg-white border border-gray-300 rounded-xl text-sm font-black text-gray-800 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all shadow-sm" title="الصفحة الأولى">
@@ -334,6 +374,62 @@
         </div>
     </div>
 </div>
+<!-- 🟢 نافذة الإدخال اليدوي للحضور والانصراف -->
+<div id="manualEntryModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-200 max-w-md w-full overflow-hidden font-cairo">
+        <div class="p-5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+                    <i data-lucide="keyboard" class="w-5 h-5"></i>
+                </div>
+                <h3 class="text-sm font-bold text-gray-800">إدخال حضور / انصراف يدوي</h3>
+            </div>
+            <button type="button" onclick="closeManualEntryModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="p-5 space-y-4">
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800 leading-relaxed font-bold">
+                يُحسب اليوم بنفس قواعد البصمة (التأخير والانصراف المبكر والعطلات والإجازات). لو أدخلت وقتاً واحداً يُكمَّل الآخر من السجل الموجود.
+            </div>
+            <div class="space-y-1.5">
+                <label class="text-xs font-black text-gray-700 block">الموظف</label>
+                <select id="me_employee" class="w-full px-3 py-2.5 rounded-xl border-2 border-gray-300 focus:border-blue-600 focus:ring-0 text-sm font-bold text-gray-800">
+                    <option value="">— اختر الموظف —</option>
+                    {% for e in all_employees %}
+                    <option value="{{ e.id }}">{{ e.name }} ({{ e.emp_id }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="space-y-1.5">
+                <label class="text-xs font-black text-gray-700 block">التاريخ</label>
+                <input type="date" id="me_date" max="{{ today|date:'Y-m-d' }}" class="w-full px-3 py-2.5 rounded-xl border-2 border-gray-300 focus:border-blue-600 focus:ring-0 text-sm font-mono font-bold text-gray-800">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1.5">
+                    <label class="text-xs font-black text-gray-700 block">وقت الحضور</label>
+                    <input type="time" id="me_in" class="w-full px-3 py-2.5 rounded-xl border-2 border-gray-300 focus:border-blue-600 focus:ring-0 text-sm font-mono font-bold text-gray-800">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-xs font-black text-gray-700 block">وقت الانصراف</label>
+                    <input type="time" id="me_out" class="w-full px-3 py-2.5 rounded-xl border-2 border-gray-300 focus:border-blue-600 focus:ring-0 text-sm font-mono font-bold text-gray-800">
+                </div>
+            </div>
+            <div class="space-y-1.5">
+                <label class="text-xs font-black text-gray-700 block">السبب (إلزامي)</label>
+                <input type="text" id="me_reason" placeholder="مثال: تعطل جهاز البصمة" class="w-full px-3 py-2.5 rounded-xl border-2 border-gray-300 focus:border-blue-600 focus:ring-0 text-sm font-bold text-gray-800">
+            </div>
+        </div>
+        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+            <button type="button" onclick="closeManualEntryModal()" class="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-black rounded-xl text-xs transition-colors shadow-sm">إلغاء</button>
+            <button type="button" id="btn-save-manual-entry" onclick="submitManualEntry()" class="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-black rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span>حفظ</span>
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- 🚀 سكريبت البحث الحي، التصدير الشامل، وتسجيل الانصراف -->
 <script>
 // 🟢 دالة تصدير جميع البيانات/الصفحات إلى Excel عبر الـ Back-end
@@ -389,7 +485,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.status === 'success') {
-                triggerSearch();
+                refreshCurrentPage();
             } else {
                 alert('خطأ: ' + (data.message || 'حدث خطأ غير متوقع'));
             }
@@ -421,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.status === 'success') {
-                triggerSearch();
+                refreshCurrentPage();
             } else {
                 alert('خطأ: ' + (data.message || 'حدث خطأ غير متوقع'));
             }
@@ -431,6 +527,65 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             if (loadingOverlay) loadingOverlay.classList.add('hidden');
             if (tableContainer) tableContainer.style.opacity = '1';
+        }
+    };
+
+    // 📊 تصدير تقرير الشهر الشامل (حسب الشهر والسنة المختارين)
+    window.exportMonthlyReport = function() {
+        const y = (document.getElementById('year-select') || {}).value || '{{ year }}';
+        const m = (document.getElementById('month-select') || {}).value || '{{ month }}';
+        window.location.href = `/hr/reports/monthly-excel/${y}/${m}/`;
+    };
+
+    // 🟡 الإدخال اليدوي للحضور والانصراف
+    window.openManualEntryModal = function(empId, dateStr, checkIn, checkOut, empName) {
+        document.getElementById('me_employee').value = empId || '';
+        document.getElementById('me_date').value = dateStr || '';
+        document.getElementById('me_in').value = checkIn || '';
+        document.getElementById('me_out').value = checkOut || '';
+        document.getElementById('me_reason').value = '';
+        document.getElementById('manualEntryModal').classList.remove('hidden');
+    };
+
+    window.closeManualEntryModal = function() {
+        document.getElementById('manualEntryModal').classList.add('hidden');
+    };
+
+    window.submitManualEntry = async function() {
+        const empId = document.getElementById('me_employee').value;
+        const dateStr = document.getElementById('me_date').value;
+        const checkIn = document.getElementById('me_in').value;
+        const checkOut = document.getElementById('me_out').value;
+        const reason = document.getElementById('me_reason').value.trim();
+        const btn = document.getElementById('btn-save-manual-entry');
+
+        if (!empId || !dateStr) { alert('يرجى اختيار الموظف والتاريخ.'); return; }
+        if (!checkIn && !checkOut) { alert('يرجى إدخال وقت الحضور أو الانصراف.'); return; }
+        if (!reason) { alert('يرجى كتابة سبب الإدخال اليدوي.'); return; }
+
+        if (btn) btn.disabled = true;
+        try {
+            const body = new URLSearchParams({
+                employee_id: empId, date: dateStr, check_in: checkIn, check_out: checkOut, reason: reason
+            });
+            const response = await fetch('/hr/attendance/manual-entry/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrfToken},
+                body: body.toString()
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                closeManualEntryModal();
+                alert(data.message);
+                refreshCurrentPage();
+            } else {
+                alert('خطأ: ' + (data.message || 'فشلت عملية الحفظ'));
+            }
+        } catch (error) {
+            console.error('Manual Entry Error:', error);
+            alert('حدث خطأ أثناء الاتصال بالخادم.');
+        } finally {
+            if (btn) btn.disabled = false;
         }
     };
 
@@ -482,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.status === 'success') {
                 closeCheckoutModal();
-                triggerSearch();
+                refreshCurrentPage();
             } else {
                 alert('خطأ: ' + (data.message || 'فشلت عملية الحفظ'));
             }
@@ -531,6 +686,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // 🟢 تحديث الصفحة الحالية (تحتفظ برقم الصفحة) - تُستخدم بعد أي عملية على موظف
+    function refreshCurrentPage() {
+        if (!filterForm) return;
+        const params = new URLSearchParams(new FormData(filterForm));
+        const page = new URLSearchParams(window.location.search).get('page') || '1';
+        params.set('page', page);
+        fetchAndUpdate(`${filterForm.action}?${params.toString()}`);
+    }
+
     function triggerSearch() {
         if (!filterForm) return;
         const formData = new FormData(filterForm);
@@ -557,6 +721,23 @@ document.addEventListener('DOMContentLoaded', () => {
         filterForm.addEventListener('submit', (e) => {
             e.preventDefault();
             triggerSearch();
+        });
+    }
+
+    // 🟢 الذهاب لرقم صفحة مباشرة (الكتابة ثم Enter أو زر "اذهب")
+    if (tableContainer) {
+        tableContainer.addEventListener('submit', (e) => {
+            const form = e.target.closest('.page-jump-form');
+            if (!form) return;
+            e.preventDefault();
+            const input = form.querySelector('.page-jump-input');
+            const max = parseInt(form.dataset.max, 10) || 1;
+            let page = parseInt(input.value, 10);
+            if (isNaN(page)) return;
+            page = Math.min(Math.max(page, 1), max);
+            const params = new URLSearchParams(new FormData(filterForm));
+            params.set('page', page);
+            fetchAndUpdate(`${filterForm.action}?${params.toString()}`);
         });
     }
 

@@ -1,3 +1,8 @@
+import re
+import difflib
+import threading
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
 from django.contrib.auth.views import LoginView
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse
@@ -213,51 +218,32 @@ def normalize_arabic_text(text):
 def live_cashier_counter(request):
     """
     شاشة التحصيل المباشر وسجل اليومية المؤقت لموظف الخزينة
+    (أرصدة الطالب تُجلب من student_search_api بدل حسابها هنا مرة ثانية)
     """
     try:
         today = timezone.localtime().date()
         current_year = AcademicYear.objects.filter(is_active=True).first()
         categories = RevenueCategory.objects.all()
 
-        # 🟢 1. التقاط الطالب الممرر من رابط التسكين إن وجد
-        student_id = request.GET.get('student_id')
+        # الطالب الممرر من الرابط (id والكود فقط - الباقي يُجلب من الـ API)
+        student_id = request.GET.get('student_id', '')
         selected_student = None
-        account = None
-        if student_id:
-            selected_student = Student.objects.filter(id=student_id).first()
-            if selected_student:
-                account = StudentAccount.objects.filter(
-                    student=selected_student,
-                    academic_year=current_year
-                ).select_related('installment_plan').first()
+        if student_id.isdigit():
+            selected_student = Student.objects.only('id', 'student_code').filter(id=int(student_id)).first()
 
-        # 🟢 2. جلب حركات اليوم غير الملغاة
-        today_payments = Payment.objects.filter(
-            payment_date=today
-        ).select_related('student', 'revenue_category', 'collected_by').order_by('-id')
-
+        # حركات اليوم: آخر 100 فقط + العدد الكلي (استعلام عدّ واحد)
+        base_qs = Payment.objects.filter(payment_date=today)
         if hasattr(Payment, 'is_cancelled'):
-            today_payments = today_payments.filter(is_cancelled=False)
+            base_qs = base_qs.filter(is_cancelled=False)
+        today_total = base_qs.count()
+        today_payments = (base_qs
+                          .select_related('student', 'revenue_category', 'collected_by')
+                          .order_by('-id')[:100])
 
-        # 🟢 3. جلب الدفتر النشط والسيريال التالي
-        active_book = None
-        next_receipt_number = None
+        # الدفتر النشط والسيريال التالي (نفس منطق الـ API وصفحة المديونية)
+        next_receipt_number, active_book = None, None
         try:
-            active_book = ReceiptBook.objects.filter(user=request.user, is_active=True).first()
-            if active_book:
-                last_used = Payment.objects.filter(
-                    collected_by=request.user,
-                    receipt_number__gte=active_book.start_serial,
-                    receipt_number__lte=active_book.end_serial
-                ).order_by('-receipt_number').first()
-
-                if last_used and last_used.receipt_number:
-                    try:
-                        next_receipt_number = int(last_used.receipt_number) + 1
-                    except (ValueError, TypeError):
-                        next_receipt_number = active_book.start_serial
-                else:
-                    next_receipt_number = active_book.start_serial
+            next_receipt_number, active_book = _compute_next_receipt_number(request.user)
         except Exception:
             pass
 
@@ -266,10 +252,10 @@ def live_cashier_counter(request):
             'current_year': current_year,
             'categories': categories,
             'today_payments': today_payments,
+            'today_total': today_total,
             'active_book': active_book,
             'next_receipt_number': next_receipt_number,
             'selected_student': selected_student,
-            'account': account,
         }
         return render(request, 'finance/live_cashier_counter.html', context)
 
@@ -296,116 +282,329 @@ def get_first_day_of_next_month(d):
     return date(d.year, d.month + 1, 1)
 
 
+# ───────────────────────── 1) التطبيع العربي ─────────────────────────
+# BEGIN-PURE
+_AR_DIGITS = str.maketrans('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹', '01234567890123456789')
+_AR_MAP = str.maketrans({
+    'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ٱ': 'ا',
+    'ى': 'ي', 'ی': 'ي', 'ئ': 'ي',
+    'ؤ': 'و',
+    'ة': 'ه',
+    'ک': 'ك',
+    'ـ': None,      # التطويل
+    'ء': None,      # الهمزة المنفردة
+})
+_TASHKEEL = re.compile(r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]')
+_NON_WORD = re.compile(r'[^\w\s]', re.UNICODE)
+
+
+def ar_normalize(text):
+    """توحيد النص العربي للمقارنة (يُستعمل لبيانات الطلاب ولنص البحث معاً)."""
+    if not text:
+        return ''
+    t = str(text).translate(_AR_DIGITS)
+    t = _TASHKEEL.sub('', t)
+    t = t.translate(_AR_MAP).lower()
+    t = _NON_WORD.sub(' ', t.replace('_', ' '))
+    return re.sub(r'\s+', ' ', t).strip()
+
+
+def _compact(text):
+    return ar_normalize(text).replace(' ', '')
+
+
+def _build_entry(row):
+    """row = (id, first_name, last_name, student_code, national_id, *phones)"""
+    sid, fn, ln, code, nat = row[0], row[1], row[2], row[3], row[4]
+    norm = ar_normalize(f"{fn or ''} {ln or ''}")
+    tokens = norm.split()
+
+    starts, ends, pos = [], set(), 0
+    for t in tokens:
+        starts.append(pos)
+        pos += len(t)
+        ends.add(pos)
+
+    ids = []
+    for v in (code, nat) + tuple(row[5:]):
+        c = _compact(v)
+        if c:
+            ids.append(c)
+
+    return {
+        'id': sid,
+        'norm': norm,
+        'compact': norm.replace(' ', ''),
+        'tokens': tokens,
+        'tokset': set(tokens),
+        'starts': starts,            # بدايات الكلمات داخل النص المضغوط
+        'startset': set(starts),
+        'ends': ends,
+        'ids': ids,                  # الكود / القومي / الهواتف (مضغوطة)
+    }
+
+
+# ───────────────────────── 2) التقييم والترتيب ─────────────────────────
+# tier: 0 مطابق تام | 1 يبدأ بالنص | 2 كلمات كاملة | 3 بدايات كلمات
+#       4 يحتوي النص | 5 يحتوي كل الكلمات | 6 مشتبه به (أخطاء كتابة)
+def _tier_to_group(tier):
+    if tier <= 1:
+        return 0      # ✅ مطابق
+    if tier <= 3:
+        return 1      # 🔎 قريب
+    if tier <= 5:
+        return 2      # يحتوي
+    return 3          # 🤔 هل تقصد؟
+
+
+def _score_entry(e, q):
+    qc, qt = q['compact'], q['tokens']
+    best = None
+
+    # ── كود / قومي / هاتف ──
+    for v in e['ids']:
+        if v == qc:
+            s = (0, 0)
+        elif v.startswith(qc):
+            s = (1, 0)
+        elif len(qc) >= 3 and qc in v:
+            s = (4, v.find(qc))
+        else:
+            continue
+        if best is None or s < best:
+            best = s
+    if qc.isdigit():                     # بحث رقمي: لا معنى لمقارنة الاسم
+        return best
+
+    # ── الاسم ──
+    nc, nt = e['compact'], e['tokens']
+    if not nc:
+        return best
+
+    s = None
+    if nc == qc:
+        s = (0, 0)
+    elif nc.startswith(qc):
+        s = (1, 0)
+    else:
+        # عبارة تبدأ وتنتهي عند حدود كلمات (تتجاهل المسافات)
+        idx = nc.find(qc)
+        while idx != -1:
+            if idx in e['startset'] and (idx + len(qc)) in e['ends']:
+                s = (2, idx)
+                break
+            idx = nc.find(qc, idx + 1)
+        # كل كلمات البحث موجودة كاملة بأي ترتيب
+        if s is None and qt and all(t in e['tokset'] for t in qt):
+            s = (2, min(nc.find(t) for t in qt))
+        # بدايات كلمات
+        if s is None and qt and all(any(w.startswith(t) for w in nt) for t in qt):
+            s = (3, min(nc.find(t) for t in qt))
+        if s is None:
+            for i in e['starts']:
+                if nc.startswith(qc, i):
+                    s = (3, i)
+                    break
+        # يحتوي
+        if s is None:
+            i = nc.find(qc)
+            if i != -1:
+                s = (4, i)
+        if s is None and qt and all(t in nc for t in qt):
+            s = (5, min(nc.find(t) for t in qt))
+
+    if s is not None and (best is None or s < best):
+        best = s
+    return best
+
+
+def _fuzzy_score(e, q):
+    """تشابه تقريبي (أخطاء إملائية) - يُستدعى فقط عند قلة النتائج الدقيقة."""
+    qc, qt = q['compact'], q['tokens']
+    nt, nc = e['tokens'], e['compact']
+    if not nt or len(qc) < 3:
+        return None
+
+    total = 0.0
+    ok = True
+    for t in qt:
+        lt = len(t)
+        if lt <= 3:
+            ok = False
+            break
+        need = 0.8 if lt <= 5 else 0.78
+        best_r = 0.0
+        for w in nt:
+            if abs(len(w) - lt) > 2:
+                continue
+            sm = difflib.SequenceMatcher(None, t, w)
+            if sm.real_quick_ratio() < need or sm.quick_ratio() < need:
+                continue
+            r = sm.ratio()
+            if r > best_r:
+                best_r = r
+        if best_r < need:
+            ok = False
+            break
+        total += best_r
+    if ok and qt:
+        return (6, 1.0 - total / len(qt))
+
+    # احتياطي: اسم مكتوب بمسافات مختلفة مع خطأ إملائي ("عبدالحميذ")
+    if len(qc) >= 6:
+        r = difflib.SequenceMatcher(None, qc, nc[:len(qc) + 2]).ratio()
+        if r >= 0.85:
+            return (6, 1.0 - r)
+    return None
+# END-PURE
+
+
+# ───────────────────────── 3) فهرس الطلاب في الذاكرة ─────────────────────────
+_SEARCH_INDEX = {'ver': None, 'ts': 0.0, 'data': []}
+_SEARCH_LOCK = threading.Lock()
+_SEARCH_TTL = 60  # ثانية (بالإضافة لإبطال فوري عند حفظ/حذف طالب)
+
+
+def _get_search_index():
+    idx = _SEARCH_INDEX
+    ver = cache.get('student_search_ver')
+    now = time.time()
+    if idx['data'] and idx['ver'] == ver and now - idx['ts'] < _SEARCH_TTL:
+        return idx['data']
+
+    with _SEARCH_LOCK:
+        now = time.time()
+        if idx['data'] and idx['ver'] == ver and now - idx['ts'] < _SEARCH_TTL:
+            return idx['data']
+
+        phone_fields = [f for f in ('guardian_phone', 'parent_phone') if hasattr(Student, f)]
+        rows = (Student.objects
+                .filter(Q(is_active=True) | Q(previous_debt__gt=0))
+                .values_list('id', 'first_name', 'last_name', 'student_code', 'national_id', *phone_fields))
+        idx['data'] = [_build_entry(r) for r in rows]
+        idx['ver'] = ver
+        idx['ts'] = now
+        return idx['data']
+
+
+def _rank_students(raw_query):
+    """يرجع قائمة مرتبة: [(tier, pos, len_diff, name_norm, id), ...]"""
+    qn = ar_normalize(raw_query)
+    qc = qn.replace(' ', '')
+    if len(qc) < 2:
+        return []
+    q = {'norm': qn, 'compact': qc, 'tokens': qn.split()}
+
+    index = _get_search_index()
+    hits, seen = [], set()
+    for e in index:
+        s = _score_entry(e, q)
+        if s:
+            hits.append((s[0], s[1], abs(len(e['compact']) - len(qc)), e['norm'], e['id']))
+            seen.add(e['id'])
+
+    # التشابه التقريبي فقط لو النتائج الدقيقة قليلة (للحفاظ على السرعة)
+    if len(hits) < 15 and len(qc) >= 3 and not qc.isdigit():
+        for e in index:
+            if e['id'] in seen:
+                continue
+            s = _fuzzy_score(e, q)
+            if s:
+                hits.append((s[0], s[1], abs(len(e['compact']) - len(qc)), e['norm'], e['id']))
+
+    hits.sort()
+    return hits
+
+
+@receiver([post_save, post_delete], sender=Student)
+def _invalidate_student_search_index(sender, **kwargs):
+    """أي إضافة/تعديل/حذف طالب يُبطل الفهرس فوراً."""
+    cache.set('student_search_ver', time.time(), None)
+
+
+
+
+
 @login_required
 def student_search_api(request):
     """
-    API بحث حي فائق السرعة يطبق فترة السماح للغرامات،
-    ويعزل المديونية القديمة، ويُرجع كافة الحسابات المالية (بما فيها الخصم).
+    بحث حي ذكي:
+      ?q=نص البحث      → نتائج مرتبة بالأفضلية (match_group: 0 مطابق، 1 قريب، 2 يحتوي، 3 مشتبه به)
+      ?id=رقم الطالب   → طالب واحد بالـ id (للتحميل من الروابط)
     """
     try:
         raw_query = request.GET.get('q', '').strip()
-        if not raw_query or len(raw_query) < 2:
-            return JsonResponse({'status': 'empty', 'results': [], 'has_more': False})
+        student_id = request.GET.get('id', '').strip()
+
+        ranked = []          # (tier, pos, len_diff, name_norm, id)
+        total_hits = 0
+
+        if student_id.isdigit():
+            ranked = [(0, 0, 0, '', int(student_id))]
+            total_hits = 1
+        else:
+            if len(ar_normalize(raw_query).replace(' ', '')) < 2:
+                return JsonResponse({'status': 'empty', 'results': [], 'has_more': False})
+            ranked = _rank_students(raw_query)
+            total_hits = len(ranked)
+
+        has_more = total_hits > 15
+        ranked = ranked[:15]
+        if not ranked:
+            return JsonResponse({'status': 'success', 'results': [], 'has_more': False, 'total': 0})
 
         today = timezone.localtime().date()
-
-        # 🟢 1. جلب السنة النشطة بأقل استهلاك
         current_year = AcademicYear.objects.filter(is_active=True).only('id').first()
         if not current_year:
-            return JsonResponse({'status': 'success', 'results': [], 'has_more': False})
+            return JsonResponse({'status': 'success', 'results': [], 'has_more': False, 'total': 0})
 
-        # 🟢 التعديل: إظهار الطلاب النشطين أو غير النشطين ممن عليهم مديونية سابقة
-        students_qs = Student.objects.filter(
-            Q(is_active=True) | Q(previous_debt__gt=0)
-        ).select_related(
-            'grade', 'classroom'
-        ).only(
-            'id', 'first_name', 'last_name', 'student_code', 'national_id',
-            'specialization', 'previous_debt', 'grade__name', 'classroom__name'
-        )
+        ids_ordered = [r[4] for r in ranked]
+        tier_by_id = {r[4]: r[0] for r in ranked}
 
-        has_guardian = hasattr(Student, 'guardian_phone')
-        has_parent = hasattr(Student, 'parent_phone')
-        has_cancel = hasattr(Payment, 'is_cancelled')
-
-        search_words = raw_query.split()
-
-        for word in search_words:
-            norm_word = normalize_arabic_text(word)
-
-            word_condition = (
-                Q(first_name__icontains=word) |
-                Q(last_name__icontains=word) |
-                Q(student_code__icontains=word) |
-                Q(national_id__icontains=word)
-            )
-
-            if norm_word != word:
-                word_condition |= (
-                    Q(first_name__icontains=norm_word) |
-                    Q(last_name__icontains=norm_word)
-                )
-
-            if has_guardian:
-                word_condition |= Q(guardian_phone__icontains=word)
-            elif has_parent:
-                word_condition |= Q(parent_phone__icontains=word)
-
-            students_qs = students_qs.filter(word_condition)
-
-        # حصر النتائج في 15 طالب لضمان الاستجابة اللحظية
-        students_list = list(students_qs.distinct()[:16])
-        has_more = len(students_list) > 15
-        students = students_list[:15]
-
+        # بيانات الطلاب الكاملة للـ 15 المختارين فقط (استعلام واحد)
+        students_map = {
+            s.id: s for s in Student.objects
+            .filter(id__in=ids_ordered)
+            .filter(Q(is_active=True) | Q(previous_debt__gt=0))
+            .select_related('grade', 'classroom')
+            .only('id', 'first_name', 'last_name', 'student_code', 'national_id',
+                  'specialization', 'previous_debt', 'grade__name', 'classroom__name')
+        }
+        students = [students_map[i] for i in ids_ordered if i in students_map]  # يحفظ ترتيب الأفضلية
         if not students:
-            return JsonResponse({'status': 'success', 'results': [], 'has_more': False})
+            return JsonResponse({'status': 'success', 'results': [], 'has_more': False, 'total': 0})
 
         student_ids = [s.id for s in students]
+        has_cancel = hasattr(Payment, 'is_cancelled')
 
-        # 🟢 3. جلب الحسابات المالية بأقل حقول ممكنة
         accounts = {
             acc.student_id: acc
             for acc in StudentAccount.objects.filter(
-                student_id__in=student_ids,
-                academic_year=current_year
+                student_id__in=student_ids, academic_year=current_year
             ).select_related('installment_plan').only(
                 'id', 'student_id', 'total_fees', 'discount',
                 'installment_plan_id', 'installment_plan__administrative_fee'
             )
         }
 
-        # 🟢 4. حساب مجموع المدفوعات في استعلام واحد مجمع
         paid_qs = Payment.objects.filter(student_id__in=student_ids, academic_year=current_year)
         if has_cancel:
             paid_qs = paid_qs.filter(is_cancelled=False)
-
-        # استبعاد مدفوعات المديونية القديمة لحساب مصروفات السنة فقط
         paid_qs = paid_qs.exclude(revenue_category__name__icontains="مديوني")
-
         paid_map = {
             item['student_id']: item['total_paid'] or Decimal('0.00')
             for item in paid_qs.values('student_id').annotate(total_paid=Sum('amount_paid'))
         }
 
-        # 🟢 5. جلب أقساط الطلاب مع تطبيق شرط أول الشهر الجديد للغرامة
-        all_installments = StudentInstallment.objects.filter(
-            student_id__in=student_ids,
-            academic_year=current_year
-        ).only('student_id', 'due_date', 'late_fee')
-
         student_late_fees = {}
-        for inst in all_installments:
-            s_id = inst.student_id
-            if s_id not in student_late_fees:
-                student_late_fees[s_id] = Decimal('0.00')
+        for inst in StudentInstallment.objects.filter(
+                student_id__in=student_ids, academic_year=current_year
+        ).only('student_id', 'due_date', 'late_fee'):
+            sid = inst.student_id
+            student_late_fees.setdefault(sid, Decimal('0.00'))
+            if today >= get_first_day_of_next_month(inst.due_date):
+                student_late_fees[sid] += (inst.late_fee or Decimal('0.00'))
 
-            # شرط فترة السماح: تضاف الغرامة فقط إذا تاريخ اليوم >= أول يوم بالشهر الجديد
-            penalty_start = get_first_day_of_next_month(inst.due_date)
-            if today >= penalty_start:
-                student_late_fees[s_id] += (inst.late_fee or Decimal('0.00'))
-
-        # 🟢 6. تجهيز المصفوفة النهائية واستخراج كافة الحقول المالية بدقة
         results = []
         for s in students:
             account = accounts.get(s.id)
@@ -419,18 +618,16 @@ def student_search_api(request):
                 getattr(account.installment_plan, 'administrative_fee', Decimal('0.00'))
                 if (account and account.installment_plan) else Decimal('0.00')
             )
-
-            # الغرامة المستحقة بعد انقضاء فترة السماح
             raw_late_fine = max(inst_late_fee, plan_admin_fee) if inst_late_fee > 0 else Decimal('0.00')
 
             total_required_gross = fees + old_debt + raw_late_fine
             total_covered = paid + discount
-
             total_obligation = max(Decimal('0.00'), total_required_gross - total_covered)
             excess_paid = max(Decimal('0.00'), total_covered - (fees + old_debt))
             effective_late_fine = max(Decimal('0.00'), raw_late_fine - excess_paid)
 
             is_assigned = (account is not None and account.installment_plan_id is not None) or (fees > 0)
+            tier = tier_by_id.get(s.id, 6)
 
             results.append({
                 'id': s.id,
@@ -444,13 +641,16 @@ def student_search_api(request):
                 'old_debt': float(old_debt),
                 'fees': float(fees),
                 'late_fine': float(effective_late_fine),
-                'discount': float(discount),  # 👈 يتم تمريره هنا للفرونت إند لدعم "عداد الخصم"
+                'discount': float(discount),
                 'paid': float(paid),
                 'remaining': float(total_obligation),
                 'total_obligation': float(total_obligation),
+                'match_tier': tier,
+                'match_group': _tier_to_group(tier),
             })
 
-        return JsonResponse({'status': 'success', 'results': results, 'has_more': has_more})
+        return JsonResponse({'status': 'success', 'results': results,
+                             'has_more': has_more, 'total': total_hits})
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
@@ -586,44 +786,14 @@ def student_search_api(request):
 #         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
-def _compute_next_receipt_number(user, lock_book=False):
-    """
-    🟢 دالة موحّدة لحساب رقم الإيصال التالي المتاح لدفتر المستخدم النشط.
-    - بتُستخدم في 3 أماكن: عرض الصفحة، تحديث الرقم عند اختيار طالب جديد،
-      والحفظ الفعلي وقت التحصيل (فيه lock هنا لمنع التصادم).
-    - lock_book=True: بتقفل صف الدفتر (select_for_update) - تُستخدم فقط
-      داخل transaction.atomic() وقت الحفظ الفعلي، لمنع تصادم رقمين
-      متطابقين بين كاشيرين مختلفين بيعملوا في نفس اللحظة بالظبط.
-    """
-    book_qs = ReceiptBook.objects.filter(user=user, is_active=True)
-    if lock_book:
-        book_qs = book_qs.select_for_update()
-    active_book = book_qs.first()
-
-    if not active_book:
-        return None, None
-
-    last_used = Payment.objects.filter(
-        collected_by=user,
-        receipt_number__gte=active_book.start_serial,
-        receipt_number__lte=active_book.end_serial
-    ).order_by('-receipt_number').first()
-
-    if last_used and last_used.receipt_number:
-        try:
-            next_receipt_number = int(last_used.receipt_number) + 1
-        except (ValueError, TypeError):
-            next_receipt_number = active_book.start_serial
-    else:
-        next_receipt_number = active_book.start_serial
-
-    return next_receipt_number, active_book
 
 @login_required
 def counter_collect_payment_api(request):
     """
-    API التحصيل المباشر السريع (POS) مع العزل المحاسبي للمديونية القديمة،
-    تحديث الأرصدة لحظياً، وتحسين سرعة الاستعلامات.
+    API التحصيل المباشر السريع (POS):
+    - كل الحسابات المالية تتم داخل معاملة واحدة بعد قفل الدفتر والطالب (لا تضارب بين كاشيرين).
+    - رقم الإيصال: صيغة + نطاق + عدم التكرار حسب بادئة الدفتر، ويُغلق الدفتر عند آخر رقم.
+    - يمنع سداد مبلغ أكبر من المديونية القديمة (كان يضيع الفائض بلا أثر في العدادات).
     """
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'طريقة الطلب غير مسموح بها.'}, status=405)
@@ -639,80 +809,78 @@ def counter_collect_payment_api(request):
 
         try:
             amount = Decimal(amount_str)
-        except Exception:
+        except (InvalidOperation, TypeError, ValueError):
             return JsonResponse({'status': 'error', 'message': 'المبلغ المدخل غير صالح.'})
 
         if amount <= 0:
             return JsonResponse({'status': 'error', 'message': 'المبلغ يجب أن يكون أكبر من الصفر.'})
 
-        # ⚡ 1. استعلامات سريعة ومحددة
-        student = get_object_or_404(Student, id=student_id)
         category = get_object_or_404(RevenueCategory.objects.only('id', 'name'), id=category_id)
-
         today = timezone.localtime().date()
         current_year = AcademicYear.objects.filter(is_active=True).first()
+        is_old_debt_payment = ("مديوني" in category.name)
 
-        account = StudentAccount.objects.filter(
-            student=student,
-            academic_year=current_year
-        ).select_related('installment_plan').first()
-
-        fees = getattr(account, 'total_fees', Decimal('0.00')) if account else Decimal('0.00')
-        discount = getattr(account, 'discount', Decimal('0.00')) if account else Decimal('0.00')
-
-        # 🟢 استبعاد المديونية القديمة من مدفوعات المصروفات الدراسية
-        paid = Payment.objects.filter(
-            student=student,
-            academic_year=current_year,
-            is_cancelled=False
-        ).exclude(revenue_category__name="مديونية قديمة").aggregate(
-            total=Sum('amount_paid')
-        )['total'] or Decimal('0.00')
-
-        old_debt = getattr(student, 'previous_debt', Decimal('0.00')) or Decimal('0.00')
-
-        # ⚡ 2. فحص الأقساط المتأخرة باستهلاك خفيف للذاكرة
-        installments = StudentInstallment.objects.filter(
-            student=student,
-            academic_year=current_year
-        ).only('due_date', 'late_fee')
-
-        inst_late_fee = Decimal('0.00')
-        for inst in installments:
-            if today >= get_first_day_of_next_month(inst.due_date):
-                inst_late_fee += (inst.late_fee or Decimal('0.00'))
-
-        plan_admin_fee = getattr(account.installment_plan, 'administrative_fee', Decimal('0.00')) if (account and account.installment_plan) else Decimal('0.00')
-        raw_late_fine = max(inst_late_fee, plan_admin_fee) if inst_late_fee > 0 else Decimal('0.00')
-
-        total_required_gross = fees + old_debt + raw_late_fine
-        total_covered = paid + discount
-        total_obligation = max(Decimal('0.00'), total_required_gross - total_covered)
-
-        if total_obligation <= 0:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'عفواً! لا يمكن تحصيل أي مبالغ لهذا الطالب لأن إجمالي مديونيته مسددة بالكامل (0.00).'
-            })
-
-        if amount > total_obligation:
-            return JsonResponse({
-                'status': 'error',
-                'message': f'🛑 لا يمكن تحصيل مبلغ ({amount:.2f} ج.م) لأنه يتجاوز أقصى إجمالي مستحق على الطالب وهو ({total_obligation:.2f} ج.م).'
-            })
-
-        receipt_no = receipt_no_str if receipt_no_str else None
-
-        # ⚡ 3. التحقق من رقم الإيصال
-        if receipt_no and Payment.objects.filter(receipt_number=receipt_no).exists():
-            return JsonResponse({'status': 'error', 'message': f'🛑 رقم الإيصال ({receipt_no}) مستخدم مسبقاً في النظام!'})
-
-        # 🛡️ 4. الحفظ الآمن داخل معاملة ذرية (Transaction) مع قفل دفتر الإيصال
-        # النشط لهذا الكاشير، لمنع تصادم رقمين متطابقين لو حصل submit مزدوج
-        # (تابين مفتوحين، أو ضغط سريع على الزر مرتين)
         with transaction.atomic():
-            _compute_next_receipt_number(request.user, lock_book=True)  # 🔒 قفل الدفتر لحد ما نخلص
+            # 🔒 1) قفل الدفتر ثم الطالب (نفس الترتيب في كل الدوال لتفادي deadlock)
+            book = (ReceiptBook.objects.select_for_update()
+                    .filter(user=request.user, is_active=True).first())
+            student = get_object_or_404(Student.objects.select_for_update(), id=student_id)
 
+            # 🧾 2) التحقق من رقم الإيصال داخل القفل
+            if book and not receipt_no_str:
+                return JsonResponse({'status': 'error', 'message': '🛑 رقم الإيصال مطلوب لأن لديك دفتراً نشطاً.'})
+            receipt_no, err = validate_receipt_for_book(book, receipt_no_str)
+            if err:
+                return JsonResponse({'status': 'error', 'message': err})
+
+            # 💰 3) الأرصدة الحقيقية (بعد قفل الطالب)
+            account = StudentAccount.objects.filter(
+                student=student, academic_year=current_year
+            ).select_related('installment_plan').first()
+
+            fees = getattr(account, 'total_fees', Decimal('0.00')) if account else Decimal('0.00')
+            discount = getattr(account, 'discount', Decimal('0.00')) if account else Decimal('0.00')
+
+            # نفس شرط student_search_api: استبعاد مدفوعات المديونية القديمة بالاحتواء
+            paid = (Payment.objects
+                    .filter(student=student, academic_year=current_year, is_cancelled=False)
+                    .exclude(revenue_category__name__icontains="مديوني")
+                    .aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00'))
+
+            old_debt = student.previous_debt or Decimal('0.00')
+
+            inst_late_fee = Decimal('0.00')
+            for inst in StudentInstallment.objects.filter(
+                    student=student, academic_year=current_year).only('due_date', 'late_fee'):
+                if today >= get_first_day_of_next_month(inst.due_date):
+                    inst_late_fee += (inst.late_fee or Decimal('0.00'))
+
+            plan_admin_fee = (
+                getattr(account.installment_plan, 'administrative_fee', Decimal('0.00'))
+                if (account and account.installment_plan) else Decimal('0.00')
+            )
+            raw_late_fine = max(inst_late_fee, plan_admin_fee) if inst_late_fee > 0 else Decimal('0.00')
+
+            total_required_gross = fees + old_debt + raw_late_fine
+            total_obligation = max(Decimal('0.00'), total_required_gross - (paid + discount))
+
+            if total_obligation <= 0:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'عفواً! لا يمكن تحصيل أي مبالغ لهذا الطالب لأن إجمالي مديونيته مسددة بالكامل (0.00).'
+                })
+            if amount > total_obligation:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'🛑 لا يمكن تحصيل مبلغ ({amount:.2f} ج.م) لأنه يتجاوز أقصى إجمالي مستحق على الطالب وهو ({total_obligation:.2f} ج.م).'
+                })
+            if is_old_debt_payment and amount > old_debt:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'🛑 المبلغ ({amount:.2f} ج.م) يتجاوز المديونية القديمة المتبقية ({old_debt:.2f} ج.م).'
+                })
+
+            # 💾 4) الحفظ
             payment = Payment.objects.create(
                 student=student,
                 academic_year=current_year,
@@ -725,24 +893,23 @@ def counter_collect_payment_api(request):
                 is_settlement_only=False
             )
 
-            # 🟢 إذا كان السداد للمديونية القديمة: يتم خصمها من رصيد الطالب وحفظها في قاعدة البيانات
-            is_old_debt_payment = ("مديونية قديمة" in category.name)
             if is_old_debt_payment:
                 new_old_debt = max(Decimal('0.00'), old_debt - amount)
                 student.previous_debt = new_old_debt
                 student.save(update_fields=['previous_debt'])
                 new_paid = paid
-                total_required_gross = max(Decimal('0.00'), total_required_gross - amount)
             else:
                 new_old_debt = old_debt
                 new_paid = paid + amount
 
-            # 🟢 حساب رقم الإيصال التالي الحقيقي بعد حفظ هذه الدفعة (لسه جوه نفس القفل)
-            new_next_receipt_number, _ = _compute_next_receipt_number(request.user)
+            # 📕 5) إغلاق الدفتر عند آخر رقم + الرقم التالي الحقيقي
+            book_closed = bool(book and receipt_no and _close_book_if_finished(book, receipt_no))
+            new_next_receipt, new_book = _compute_next_receipt_number(request.user)
 
-        # ⚡ 5. حساب المتبقي النهائي والغرامة الفعلية
+        # 📊 6) الأرصدة الجديدة (خارج القفل - حسابات فقط)
+        new_gross = fees + new_old_debt + raw_late_fine
         new_covered = new_paid + discount
-        new_total_obligation = max(Decimal('0.00'), total_required_gross - new_covered)
+        new_total_obligation = max(Decimal('0.00'), new_gross - new_covered)
         excess_new = max(Decimal('0.00'), new_covered - (fees + new_old_debt))
         new_effective_late_fine = max(Decimal('0.00'), raw_late_fine - excess_new)
 
@@ -752,8 +919,12 @@ def counter_collect_payment_api(request):
             'new_paid': float(new_paid),
             'new_late_fine': float(new_effective_late_fine),
             'new_total_obligation': float(new_total_obligation),
-            'new_old_debt': float(new_old_debt),  # 👈 تمرير المديونية القديمة المحدثة للشاشة
-            'next_receipt_number': new_next_receipt_number,  # 🟢 الرقم الحقيقي بعد الحفظ (مش فاضي بقى)
+            'new_old_debt': float(new_old_debt),
+            'next_receipt_number': new_next_receipt,
+            'book_closed': book_closed,
+            'has_active_book': bool(new_book),
+            'prefix': (new_book.prefix or '') if new_book else '',
+            'book_label': _book_label(new_book),
             'payment': {
                 'id': payment.id,
                 'receipt_number': payment.receipt_number or payment.id,
@@ -765,8 +936,161 @@ def counter_collect_payment_api(request):
             }
         })
 
+    except IntegrityError:
+        return JsonResponse({'status': 'error',
+                             'message': '🛑 رقم الإيصال تم حجزه للتو! حدّث الرقم وأعد المحاولة.'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'حدث خطأ غير متوقع: {str(e)}'}, status=500)
+
+# @login_required
+# def counter_collect_payment_api(request):
+#     """
+#     API التحصيل المباشر السريع (POS) مع العزل المحاسبي للمديونية القديمة،
+#     تحديث الأرصدة لحظياً، وتحسين سرعة الاستعلامات.
+#     """
+#     if request.method != 'POST':
+#         return JsonResponse({'status': 'error', 'message': 'طريقة الطلب غير مسموح بها.'}, status=405)
+
+#     try:
+#         student_id = request.POST.get('student')
+#         category_id = request.POST.get('category')
+#         amount_str = request.POST.get('amount', '0').strip()
+#         receipt_no_str = request.POST.get('receipt_number', '').strip()
+
+#         if not student_id or not category_id or not amount_str:
+#             return JsonResponse({'status': 'error', 'message': 'يرجى استكمال كافة البيانات المطلوبة.'})
+
+#         try:
+#             amount = Decimal(amount_str)
+#         except Exception:
+#             return JsonResponse({'status': 'error', 'message': 'المبلغ المدخل غير صالح.'})
+
+#         if amount <= 0:
+#             return JsonResponse({'status': 'error', 'message': 'المبلغ يجب أن يكون أكبر من الصفر.'})
+
+#         # ⚡ 1. استعلامات سريعة ومحددة
+#         student = get_object_or_404(Student, id=student_id)
+#         category = get_object_or_404(RevenueCategory.objects.only('id', 'name'), id=category_id)
+
+#         today = timezone.localtime().date()
+#         current_year = AcademicYear.objects.filter(is_active=True).first()
+
+#         account = StudentAccount.objects.filter(
+#             student=student,
+#             academic_year=current_year
+#         ).select_related('installment_plan').first()
+
+#         fees = getattr(account, 'total_fees', Decimal('0.00')) if account else Decimal('0.00')
+#         discount = getattr(account, 'discount', Decimal('0.00')) if account else Decimal('0.00')
+
+#         # 🟢 استبعاد المديونية القديمة من مدفوعات المصروفات الدراسية
+#         paid = Payment.objects.filter(
+#             student=student,
+#             academic_year=current_year,
+#             is_cancelled=False
+#         ).exclude(revenue_category__name="مديونية قديمة").aggregate(
+#             total=Sum('amount_paid')
+#         )['total'] or Decimal('0.00')
+
+#         old_debt = getattr(student, 'previous_debt', Decimal('0.00')) or Decimal('0.00')
+
+#         # ⚡ 2. فحص الأقساط المتأخرة باستهلاك خفيف للذاكرة
+#         installments = StudentInstallment.objects.filter(
+#             student=student,
+#             academic_year=current_year
+#         ).only('due_date', 'late_fee')
+
+#         inst_late_fee = Decimal('0.00')
+#         for inst in installments:
+#             if today >= get_first_day_of_next_month(inst.due_date):
+#                 inst_late_fee += (inst.late_fee or Decimal('0.00'))
+
+#         plan_admin_fee = getattr(account.installment_plan, 'administrative_fee', Decimal('0.00')) if (account and account.installment_plan) else Decimal('0.00')
+#         raw_late_fine = max(inst_late_fee, plan_admin_fee) if inst_late_fee > 0 else Decimal('0.00')
+
+#         total_required_gross = fees + old_debt + raw_late_fine
+#         total_covered = paid + discount
+#         total_obligation = max(Decimal('0.00'), total_required_gross - total_covered)
+
+#         if total_obligation <= 0:
+#             return JsonResponse({
+#                 'status': 'error',
+#                 'message': 'عفواً! لا يمكن تحصيل أي مبالغ لهذا الطالب لأن إجمالي مديونيته مسددة بالكامل (0.00).'
+#             })
+
+#         if amount > total_obligation:
+#             return JsonResponse({
+#                 'status': 'error',
+#                 'message': f'🛑 لا يمكن تحصيل مبلغ ({amount:.2f} ج.م) لأنه يتجاوز أقصى إجمالي مستحق على الطالب وهو ({total_obligation:.2f} ج.م).'
+#             })
+
+#         book = ReceiptBook.objects.filter(user=request.user, is_active=True).first()
+#         receipt_no, err = validate_receipt_for_book(book, receipt_no_str)
+#         if err:
+#             return JsonResponse({'status': 'error', 'message': err})
+
+#         # 🛡️ 4. الحفظ الآمن داخل معاملة ذرية (Transaction) مع قفل دفتر الإيصال
+#         # النشط لهذا الكاشير، لمنع تصادم رقمين متطابقين لو حصل submit مزدوج
+#         # (تابين مفتوحين، أو ضغط سريع على الزر مرتين)
+#         with transaction.atomic():
+#             _compute_next_receipt_number(request.user, lock_book=True)  # 🔒 قفل الدفتر لحد ما نخلص
+
+#             payment = Payment.objects.create(
+#                 student=student,
+#                 academic_year=current_year,
+#                 revenue_category=category,
+#                 amount_paid=amount,
+#                 payment_date=today,
+#                 collected_by=request.user,
+#                 receipt_number=receipt_no,
+#                 notes="تحصيل مباشر من شاشة الكاونتر",
+#                 is_settlement_only=False
+#             )
+
+#             # 🟢 إذا كان السداد للمديونية القديمة: يتم خصمها من رصيد الطالب وحفظها في قاعدة البيانات
+#             is_old_debt_payment = ("مديونية قديمة" in category.name)
+#             if is_old_debt_payment:
+#                 new_old_debt = max(Decimal('0.00'), old_debt - amount)
+#                 student.previous_debt = new_old_debt
+#                 student.save(update_fields=['previous_debt'])
+#                 new_paid = paid
+#                 total_required_gross = max(Decimal('0.00'), total_required_gross - amount)
+#             else:
+#                 new_old_debt = old_debt
+#                 new_paid = paid + amount
+
+#             if book and receipt_no:
+#                 _close_book_if_finished(book, receipt_no)
+#             # 🟢 حساب رقم الإيصال التالي الحقيقي بعد حفظ هذه الدفعة (لسه جوه نفس القفل)
+#             new_next_receipt_number, _ = _compute_next_receipt_number(request.user)
+
+#         # ⚡ 5. حساب المتبقي النهائي والغرامة الفعلية
+#         new_covered = new_paid + discount
+#         new_total_obligation = max(Decimal('0.00'), total_required_gross - new_covered)
+#         excess_new = max(Decimal('0.00'), new_covered - (fees + new_old_debt))
+#         new_effective_late_fine = max(Decimal('0.00'), raw_late_fine - excess_new)
+
+#         return JsonResponse({
+#             'status': 'success',
+#             'message': f'✅ تم تحصيل مبلغ {amount:.2f} ج.م بنجاح برقم إيصال #{receipt_no or payment.id}',
+#             'new_paid': float(new_paid),
+#             'new_late_fine': float(new_effective_late_fine),
+#             'new_total_obligation': float(new_total_obligation),
+#             'new_old_debt': float(new_old_debt),  # 👈 تمرير المديونية القديمة المحدثة للشاشة
+#             'next_receipt_number': new_next_receipt_number,  # 🟢 الرقم الحقيقي بعد الحفظ (مش فاضي بقى)
+#             'payment': {
+#                 'id': payment.id,
+#                 'receipt_number': payment.receipt_number or payment.id,
+#                 'student_name': student.get_full_name(),
+#                 'category_name': category.name,
+#                 'amount_paid': float(payment.amount_paid),
+#                 'time': timezone.localtime(timezone.now()).strftime('%Y-%m-%d %I:%M %p'),
+#                 'collector': request.user.username
+#             }
+#         })
+
+#     except Exception as e:
+#         return JsonResponse({'status': 'error', 'message': f'حدث خطأ غير متوقع: {str(e)}'}, status=500)
 
 
 # @login_required
@@ -1263,39 +1587,137 @@ from finance.models import Payment, ReceiptBook, RevenueCategory, AcademicYear
 from treasury.models import GeneralLedger
 
 
+def _book_number(value, prefix):
+    """يستخرج الرقم من نص الإيصال لو يطابق بادئة الدفتر، وإلا None."""
+    v = str(value or '').strip()
+    if prefix:
+        if not v.startswith(prefix):
+            return None
+        v = v[len(prefix):]
+    return int(v) if v.isdigit() else None
+
+
+def _compute_next_receipt_number(user, lock_book=False):
+    """
+    يرجع (رقم الإيصال التالي كنص مع البادئة أو None لو الدفتر منتهٍ، الدفتر).
+    - يفحص نطاق الدفتر فقط بتطابق دقيق على النص الكامل (بادئة + رقم).
+    - لا يتأثر بالترتيب النصي في CharField.
+    - يتخطى أي رقم محجوز في Payment أو GeneralLedger.
+    - lock_book=True يقفل صف الدفتر (داخل transaction.atomic فقط).
+    """
+    qs = ReceiptBook.objects.filter(user=user, is_active=True)
+    if lock_book:
+        qs = qs.select_for_update()
+    book = qs.first()
+    if not book:
+        return None, None
+
+    prefix = book.prefix or ''
+    start, end = book.start_serial, book.end_serial
+    CHUNK = 500
+
+    used_all = set()       # أرقام محجوزة (Payment أو الخزينة)
+    last_by_user = None    # آخر رقم استعمله صاحب الدفتر
+
+    for lo in range(start, end + 1, CHUNK):
+        hi = min(lo + CHUNK - 1, end)
+        keys = [f"{prefix}{n}" for n in range(lo, hi + 1)]
+
+        for rn, cb in (Payment.objects.filter(receipt_number__in=keys)
+                       .values_list('receipt_number', 'collected_by_id')):
+            n = _book_number(rn, prefix)
+            if n is None:
+                continue
+            used_all.add(n)
+            if cb == user.id and (last_by_user is None or n > last_by_user):
+                last_by_user = n
+
+        for rn in (GeneralLedger.objects.filter(receipt_number__in=keys)
+                   .values_list('receipt_number', flat=True)):
+            n = _book_number(rn, prefix)
+            if n is not None:
+                used_all.add(n)
+
+    candidate = (last_by_user + 1) if last_by_user is not None else start
+    while candidate <= end and candidate in used_all:
+        candidate += 1
+
+    if candidate > end:
+        return None, book
+    return f"{prefix}{candidate}", book
+
 
 def get_next_available_receipt(user):
-    """🟢 دالة فحص حية ومباشرة لقاعدة البيانات لمنع التعليق على أي سيريال محجوز"""
-    active_book = ReceiptBook.objects.filter(user=user, is_active=True).first()
-    if not active_book:
-        return None, False
-
-    candidate = active_book.start_serial
-    # فحص حي لكل رقم بالدور بداخل الجدولين
-    while True:
-        str_cand = str(candidate)
-        in_payment = Payment.objects.filter(receipt_number=candidate).exists()
-        in_ledger = GeneralLedger.objects.filter(
-            Q(receipt_number=str_cand) | Q(receipt_number__icontains=str_cand)
-        ).exists()
-
-        if not in_payment and not in_ledger:
-            return candidate, True
-
-        candidate += 1
-        if candidate > active_book.end_serial + 1000:
-            break
-
-    return candidate, True
+    """تستعملها صفحة pay_debt. ترجع (الرقم المبادَأ أو None، هل يوجد دفتر نشط)."""
+    next_no, book = _compute_next_receipt_number(user)
+    return next_no, bool(book)
 
 
+def validate_receipt_for_book(book, raw):
+    """
+    يوحّد ويتحقق من رقم الإيصال المدخل. يرجع (النص النهائي أو None, رسالة خطأ أو None).
+    - لو كتب الموظف الرقم فقط (1005) والدفتر له بادئة تُضاف تلقائياً.
+    - يتحقق من الصيغة والنطاق والتكرار (Payment + GeneralLedger).
+    - فارغ => (None, None)
+    """
+    raw = (raw or '').strip()
+    if not raw:
+        return None, None
+
+    if book:
+        prefix = book.prefix or ''
+        if prefix and raw.isdigit():
+            raw = f"{prefix}{raw}"
+        n = _book_number(raw, prefix)
+        if n is None:
+            return None, f"🛑 تنسيق رقم الإيصال غير صحيح. الصيغة المطلوبة: {prefix}{book.start_serial}"
+        if n < book.start_serial or n > book.end_serial:
+            return None, (f"🛑 رقم الإيصال ({raw}) خارج نطاق دفترك "
+                          f"({prefix}{book.start_serial} إلى {prefix}{book.end_serial}).")
+
+    if (Payment.objects.filter(receipt_number=raw).exists()
+            or GeneralLedger.objects.filter(receipt_number=raw).exists()):
+        return None, f"🛑 رقم الإيصال ({raw}) مستخدم مسبقاً في النظام!"
+
+    return raw, None
+
+
+def _close_book_if_finished(book, receipt_str):
+    """يقفل الدفتر عند استعمال آخر رقم. يرجع True لو أُغلق."""
+    n = _book_number(receipt_str, book.prefix or '')
+    if n is not None and n >= book.end_serial:
+        ReceiptBook.objects.filter(id=book.id).update(is_active=False)
+        return True
+    return False
+
+
+def _book_label(book):
+    if not book:
+        return ''
+    p = book.prefix or ''
+    return f"{p}{book.start_serial} → {p}{book.end_serial}"
+
+
+@login_required
+def next_receipt_number_api(request):
+    """
+    يستعمله الكاونتر لتحديث الرقم بعد التحصيل/المسح/عودة التبويب.
+    urls.py:  path('api/next-receipt-number/', views.next_receipt_number_api, name='next_receipt_number_api')
+    """
+    next_no, book = _compute_next_receipt_number(request.user)
+    return JsonResponse({
+        'status': 'success',
+        'next_receipt_number': next_no,
+        'has_active_book': bool(book),
+        'prefix': (book.prefix or '') if book else '',
+        'book_label': _book_label(book),
+    })
 
 @user_passes_test(is_manager, login_url='/login/')
 def pay_old_debt(request, student_id):
     student = get_object_or_404(Student, id=student_id)
     calculated_old_debt = student.previous_debt or Decimal('0.00')
 
-    # 1. تحديد الشاشة القادم منها الموظف للحفاظ على تجربة المستخدم
     referer = request.META.get('HTTP_REFERER', '')
     from_screen = request.GET.get('from') or request.GET.get('next') or request.POST.get('from_screen') or ''
     if not from_screen:
@@ -1304,7 +1726,6 @@ def pay_old_debt(request, student_id):
         elif 'quick-collection' in referer or 'quick_collection' in referer:
             from_screen = 'quick_collection'
 
-    # 2. حماية فورية: إذا كانت المديونية صفر
     if calculated_old_debt <= Decimal('0.00'):
         messages.info(request, f"✨ الطالب ({student.get_full_name()}) خالِص المديونية القديمة بالكامل وليس عليه أي مستحقات.")
         if from_screen == 'counter' or 'counter' in referer:
@@ -1312,17 +1733,16 @@ def pay_old_debt(request, student_id):
         return redirect('student_list')
 
     current_year = AcademicYear.objects.filter(is_active=True).first()
-    next_receipt_number, has_active_book = get_next_available_receipt(request.user)
 
     if request.method == 'POST':
-        # إعداد رابط إعادة التوجيه مع الحفاظ على معلمة from
         redirect_on_error = f"{request.path}?from={from_screen}" if from_screen else request.path
+
+        # استثناء إداري: سداد بدون إيصال ورقي (تحويل بنكي...) بسبب موثّق (الصفحة للمدير فقط)
+        no_receipt = request.POST.get('no_receipt') == '1'
+        no_receipt_reason = (request.POST.get('no_receipt_reason') or '').strip()[:150]
 
         try:
             amount_raw = request.POST.get('amount', '0').strip()
-            receipt_no_raw = request.POST.get('receipt_number', '').strip()
-
-            # تحويل آمن للمبلغ
             try:
                 amount = Decimal(amount_raw)
             except (InvalidOperation, TypeError):
@@ -1333,25 +1753,26 @@ def pay_old_debt(request, student_id):
                 messages.error(request, f"⚠️ المبلغ المدخل غير صحيح أو يتجاوز المديونية المستحقة ({calculated_old_debt} ج.م).")
                 return redirect(redirect_on_error)
 
-            receipt_no = int(receipt_no_raw) if (receipt_no_raw and receipt_no_raw.isdigit()) else None
-
-            # 3. التحقق من التكرار فقط في حال إدخال رقم إيصال فعلي
-            if receipt_no is not None:
-                str_rec = str(receipt_no)
-                in_payment = Payment.objects.filter(receipt_number=receipt_no).exists()
-                # مطابقة دقيقة بدلاً من icontains لمنع التداخل مع الأرقام المشابهة
-                in_ledger = GeneralLedger.objects.filter(receipt_number=str_rec).exists()
-
-                if in_payment or in_ledger:
-                    messages.error(
-                        request,
-                        f"🛑 رقم الإيصال ({receipt_no}) مستخدم مسبقاً بالنظام! أول رقم متاح بالدفتر هو ({next_receipt_number or 'غير محدد'})."
-                    )
-                    return redirect(redirect_on_error)
-
-            # 4. المعاملة المالية وقفل السجل لتفادي Race Conditions
             with transaction.atomic():
-                # جلب سجل الطالب وقفله للتعديل داخل المعاملة
+                # قفل الدفتر ثم التحقق من الرقم داخل القفل (نفس ترتيب القفل في الكاونتر)
+                book = ReceiptBook.objects.select_for_update().filter(user=request.user, is_active=True).first()
+                if no_receipt:
+                    # الاستثناء: لا رقم إيصال، لكن السبب/رقم التحويل إلزامي للمراجعة
+                    if len(no_receipt_reason) < 3:
+                        messages.error(request, "🛑 اكتب رقم التحويل أو سبب السداد بدون إيصال ورقي.")
+                        return redirect(redirect_on_error)
+                    receipt_no = None
+                    pay_notes = f"سداد مديونية قديمة - بدون إيصال ورقي ({no_receipt_reason})"
+                else:
+                    if book and not (request.POST.get('receipt_number') or '').strip():
+                        messages.error(request, "🛑 رقم الإيصال مطلوب لأن لديك دفتراً نشطاً.")
+                        return redirect(redirect_on_error)
+                    receipt_no, err = validate_receipt_for_book(book, request.POST.get('receipt_number'))
+                    if err:
+                        messages.error(request, err)
+                        return redirect(redirect_on_error)
+                    pay_notes = "سداد مديونية قديمة"
+
                 student_locked = Student.objects.select_for_update().get(id=student.id)
                 current_debt = student_locked.previous_debt or Decimal('0.00')
 
@@ -1361,48 +1782,161 @@ def pay_old_debt(request, student_id):
 
                 cat, _ = RevenueCategory.objects.get_or_create(name="مديونية قديمة")
 
-                payment = Payment.objects.create(
+                Payment.objects.create(
                     student=student_locked,
                     academic_year=current_year,
                     revenue_category=cat,
                     amount_paid=amount,
-                    payment_date=timezone.now().date(),
+                    payment_date=timezone.localtime().date(),
                     collected_by=request.user,
                     receipt_number=receipt_no,
-                    notes="سداد مديونية قديمة"
+                    notes=pay_notes,
                 )
 
                 student_locked.previous_debt = max(Decimal('0.00'), current_debt - amount)
-                student_locked.save()
+                student_locked.save(update_fields=['previous_debt'])
 
-            messages.success(request, f"✅ تم تسوية مبلغ {amount} ج.م بنجاح برقم الإيصال الورقي ({receipt_no or 'آلي'}).")
+                if book and receipt_no:
+                    if _close_book_if_finished(book, receipt_no):
+                        messages.warning(request, "تنبيه: تم استخدام آخر إيصال وإغلاق الدفتر بنجاح.")
 
-            # 5. التوجيه الذكي المباشر بحسب المصدر
+            messages.success(request, f"✅ تم تسوية مبلغ {amount} ج.م بنجاح برقم الإيصال ({receipt_no or 'بدون إيصال ورقي - ' + no_receipt_reason}).")
+
             if from_screen == 'counter':
                 return redirect(f"/finance/counter/?student_id={student.id}")
             elif from_screen == 'quick_collection':
                 return redirect(f"/finance/quick-collection/?student_id={student.id}")
-            else:
-                return redirect('student_list')
+            return redirect('student_list')
 
         except IntegrityError:
-            messages.error(
-                request,
-                f"🛑 رقم الإيصال ({receipt_no_raw}) تم حجزه للتو! يرجى إدخال الرقم الشاغر التالي."
-            )
+            messages.error(request, "🛑 رقم الإيصال تم حجزه للتو! يرجى إدخال الرقم الشاغر التالي.")
             return redirect(redirect_on_error)
-
         except Exception as e:
             messages.error(request, f"❌ حدث خطأ أثناء الحفظ: {str(e)}")
             return redirect(redirect_on_error)
 
+    next_receipt_number, has_active_book = get_next_available_receipt(request.user)
     return render(request, 'finance/pay_debt.html', {
         'student': student,
         'old_debt': calculated_old_debt,
         'next_receipt_number': next_receipt_number,
         'has_active_book': has_active_book,
-        'from_screen': from_screen
+        'from_screen': from_screen,
     })
+
+# @user_passes_test(is_manager, login_url='/login/')
+# def pay_old_debt(request, student_id):
+#     student = get_object_or_404(Student, id=student_id)
+#     calculated_old_debt = student.previous_debt or Decimal('0.00')
+
+#     # 1. تحديد الشاشة القادم منها الموظف للحفاظ على تجربة المستخدم
+#     referer = request.META.get('HTTP_REFERER', '')
+#     from_screen = request.GET.get('from') or request.GET.get('next') or request.POST.get('from_screen') or ''
+#     if not from_screen:
+#         if 'counter' in referer:
+#             from_screen = 'counter'
+#         elif 'quick-collection' in referer or 'quick_collection' in referer:
+#             from_screen = 'quick_collection'
+
+#     # 2. حماية فورية: إذا كانت المديونية صفر
+#     if calculated_old_debt <= Decimal('0.00'):
+#         messages.info(request, f"✨ الطالب ({student.get_full_name()}) خالِص المديونية القديمة بالكامل وليس عليه أي مستحقات.")
+#         if from_screen == 'counter' or 'counter' in referer:
+#             return redirect(f"/finance/counter/?student_id={student.id}")
+#         return redirect('student_list')
+
+#     current_year = AcademicYear.objects.filter(is_active=True).first()
+#     next_receipt_number, has_active_book = get_next_available_receipt(request.user)
+
+#     if request.method == 'POST':
+#         # إعداد رابط إعادة التوجيه مع الحفاظ على معلمة from
+#         redirect_on_error = f"{request.path}?from={from_screen}" if from_screen else request.path
+
+#         try:
+#             amount_raw = request.POST.get('amount', '0').strip()
+#             receipt_no_raw = request.POST.get('receipt_number', '').strip()
+
+#             # تحويل آمن للمبلغ
+#             try:
+#                 amount = Decimal(amount_raw)
+#             except (InvalidOperation, TypeError):
+#                 messages.error(request, "⚠️ قيمة المبلغ المدخلة غير صحيحة.")
+#                 return redirect(redirect_on_error)
+
+#             if amount <= Decimal('0.00') or amount > calculated_old_debt:
+#                 messages.error(request, f"⚠️ المبلغ المدخل غير صحيح أو يتجاوز المديونية المستحقة ({calculated_old_debt} ج.م).")
+#                 return redirect(redirect_on_error)
+
+#             receipt_no = int(receipt_no_raw) if (receipt_no_raw and receipt_no_raw.isdigit()) else None
+
+#             # 3. التحقق من التكرار فقط في حال إدخال رقم إيصال فعلي
+#             if receipt_no is not None:
+#                 str_rec = str(receipt_no)
+#                 in_payment = Payment.objects.filter(receipt_number=receipt_no).exists()
+#                 # مطابقة دقيقة بدلاً من icontains لمنع التداخل مع الأرقام المشابهة
+#                 in_ledger = GeneralLedger.objects.filter(receipt_number=str_rec).exists()
+
+#                 if in_payment or in_ledger:
+#                     messages.error(
+#                         request,
+#                         f"🛑 رقم الإيصال ({receipt_no}) مستخدم مسبقاً بالنظام! أول رقم متاح بالدفتر هو ({next_receipt_number or 'غير محدد'})."
+#                     )
+#                     return redirect(redirect_on_error)
+
+#             # 4. المعاملة المالية وقفل السجل لتفادي Race Conditions
+#             with transaction.atomic():
+#                 # جلب سجل الطالب وقفله للتعديل داخل المعاملة
+#                 student_locked = Student.objects.select_for_update().get(id=student.id)
+#                 current_debt = student_locked.previous_debt or Decimal('0.00')
+
+#                 if amount > current_debt:
+#                     messages.error(request, f"⚠️ تم تحديث مديونية الطالب أثناء العملية! المديونية المتبقية حالياً: ({current_debt} ج.م).")
+#                     return redirect(redirect_on_error)
+
+#                 cat, _ = RevenueCategory.objects.get_or_create(name="مديونية قديمة")
+
+#                 payment = Payment.objects.create(
+#                     student=student_locked,
+#                     academic_year=current_year,
+#                     revenue_category=cat,
+#                     amount_paid=amount,
+#                     payment_date=timezone.now().date(),
+#                     collected_by=request.user,
+#                     receipt_number=receipt_no,
+#                     notes="سداد مديونية قديمة"
+#                 )
+
+#                 student_locked.previous_debt = max(Decimal('0.00'), current_debt - amount)
+#                 student_locked.save()
+
+#             messages.success(request, f"✅ تم تسوية مبلغ {amount} ج.م بنجاح برقم الإيصال الورقي ({receipt_no or 'آلي'}).")
+
+#             # 5. التوجيه الذكي المباشر بحسب المصدر
+#             if from_screen == 'counter':
+#                 return redirect(f"/finance/counter/?student_id={student.id}")
+#             elif from_screen == 'quick_collection':
+#                 return redirect(f"/finance/quick-collection/?student_id={student.id}")
+#             else:
+#                 return redirect('student_list')
+
+#         except IntegrityError:
+#             messages.error(
+#                 request,
+#                 f"🛑 رقم الإيصال ({receipt_no_raw}) تم حجزه للتو! يرجى إدخال الرقم الشاغر التالي."
+#             )
+#             return redirect(redirect_on_error)
+
+#         except Exception as e:
+#             messages.error(request, f"❌ حدث خطأ أثناء الحفظ: {str(e)}")
+#             return redirect(redirect_on_error)
+
+#     return render(request, 'finance/pay_debt.html', {
+#         'student': student,
+#         'old_debt': calculated_old_debt,
+#         'next_receipt_number': next_receipt_number,
+#         'has_active_book': has_active_book,
+#         'from_screen': from_screen
+#     })
 
 
 @login_required
@@ -3886,7 +4420,7 @@ def print_debts_report(request):
         discount_display=Coalesce(Subquery(discount_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
     ).annotate(
         net_old_debt=ExpressionWrapper(
-            Coalesce(F('previous_debt'), Value(0, output_field=DecimalField())) - F('old_debt_paid_display'),
+            Coalesce(F('previous_debt'), Value(0, output_field=DecimalField())),
             output_field=DecimalField()
         ),
         calculated_remaining=ExpressionWrapper(

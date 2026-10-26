@@ -191,6 +191,15 @@ def admin_add_restock(request):
                 if stock_txs_to_create:
                     StockTransaction.objects.bulk_create(stock_txs_to_create)
 
+                    # bulk_create لا تستدعي save() فلازم نحدّث الأرصدة يدوياً
+                    deltas = {}
+                    for tx in stock_txs_to_create:
+                        key = (tx.item_id, tx.warehouse_id)
+                        deltas[key] = deltas.get(key, Decimal('0')) + tx.get_signed_quantity()
+
+                    for (item_id, wh_id), delta in deltas.items():
+                        StockBalance.update_balance(item_id, wh_id, delta)
+
                 # تحديث إجمالي الفاتورة
                 invoice.total_amount = total_invoice_amount
                 invoice.net_amount = total_invoice_amount
@@ -224,6 +233,7 @@ def admin_add_restock(request):
     items_json = json.dumps(raw_items)
 
     recent_invoices = PurchaseInvoice.objects.select_related('supplier', 'warehouse').order_by('-date', '-id')[:15]
+    inv_context = build_invoices_context(request)
 
     context = {
         'warehouses': warehouses,
@@ -231,10 +241,11 @@ def admin_add_restock(request):
         'grades': grades,
         'active_year': active_year,
         'items_json': items_json,
-        'recent_invoices': recent_invoices,
         'title': 'تسجيل فواتير المشتريات (ERP)',
+        **inv_context  # يدمج recent_invoices و invoices_data و selected_month و filter_year
     }
     return render(request, 'add_restock.html', context)
+
 
 # @login_required
 # def admin_add_restock(request):
@@ -500,70 +511,70 @@ def material_control_settings(request):
     }
     return render(request, 'core_inventory/mc_settings.html', context)
 
-# @login_required
-# def material_control_settings(request):
-#     """لوحة تحكم الإعدادات التأسيسية للمخازن (MC Settings)"""
-#     warehouses = Warehouse.objects.all()
-#     categories = ItemCategory.objects.all()
-#     units = UnitOfMeasure.objects.all()
-#     items = ItemMaster.objects.select_related('category').all().order_by('-id')
-#     conversions = ItemUnitConversion.objects.select_related('item', 'from_unit', 'to_unit').all()
 
-#     if request.method == 'POST':
-#         action = request.POST.get('action')
-
-#         try:
-#             if action == 'add_warehouse':
-#                 Warehouse.objects.create(
-#                     name=request.POST.get('name'),
-#                     location=request.POST.get('location')
-#                 )
-#                 messages.success(request, "✅ تم إضافة المستودع بنجاح.")
-
-#             elif action == 'add_unit':
-#                 UnitOfMeasure.objects.create(
-#                     name=request.POST.get('name'),
-#                     symbol=request.POST.get('symbol')
-#                 )
-#                 messages.success(request, "✅ تم إضافة وحدة القياس بنجاح.")
-
-#             # 🟢 التحديث الجديد: إضافة تكويد الأصناف
-#             elif action == 'add_item':
-#                 ItemMaster.objects.create(
-#                     sku=request.POST.get('sku'),
-#                     name=request.POST.get('name'),
-#                     category_id=request.POST.get('category_id'),
-#                     item_type=request.POST.get('item_type'),
-#                     unit_of_measure=request.POST.get('unit_of_measure', 'piece')
-#                 )
-#                 messages.success(request, "✅ تم تكويد الصنف بنجاح.")
-
-#             elif action == 'add_conversion':
-#                 ItemUnitConversion.objects.create(
-#                     item_id=request.POST.get('item_id'),
-#                     from_unit_id=request.POST.get('from_unit_id'),
-#                     to_unit_id=request.POST.get('to_unit_id'),
-#                     conversion_rate=Decimal(request.POST.get('conversion_rate'))
-#                 )
-#                 messages.success(request, "✅ تم اعتماد معامل التحويل بنجاح.")
-
-#         except Exception as e:
-#             messages.error(request, f"❌ حدث خطأ: {str(e)}")
-
-#         return redirect('material_control_settings')
-
-#     context = {
-#         'warehouses': warehouses,
-#         'categories': categories,
-#         'units': units,
-#         'items': items,
-#         'conversions': conversions,
-#         'title': 'إعدادات الماتيريال كنترول (MC Settings)'
-#     }
-#     return render(request, 'core_inventory/mc_settings.html', context)
+def _last_purchase_prices():
+    """آخر سعر شراء لكل صنف {item_id: unit_price} باستعلامين فقط (متوافق مع MySQL وPostgres)."""
+    last_ids = PurchaseInvoiceItem.objects.values('item_id').annotate(m=Max('id')).values_list('m', flat=True)
+    return dict(
+        PurchaseInvoiceItem.objects.filter(id__in=list(last_ids)).values_list('item_id', 'unit_price')
+    )
 
 
+def build_invoices_context(request):
+    """
+    ترجع المتغيرات التي يحتاجها القالب:
+      recent_invoices  -> فواتير العام الحالي فقط (ومفلترة بالشهر لو ?month=N)
+      invoices_data    -> تفاصيل الأصناف لعرضها عند الضغط على الفاتورة
+    استخدمها داخل الـ view هكذا:   context.update(build_invoices_context(request))
+    """
+    year = timezone.localdate().year
+    month = (request.GET.get('month') or '').strip()
 
+    qs = (
+        PurchaseInvoice.objects
+        .select_related('supplier', 'warehouse')
+        .prefetch_related('items__item', 'items__grade')
+        .filter(date__year=year)
+        .exclude(status='cancelled')          # الملغاة لا تظهر
+        .order_by('-date', '-id')
+    )
 
+    selected_month = None
+    if month.isdigit() and 1 <= int(month) <= 12:
+        selected_month = int(month)
+        qs = qs.filter(date__month=selected_month)
+
+    invoices = list(qs)
+
+    invoices_data = [
+        {
+            'id': inv.pk,
+            'number': inv.invoice_number,
+            'date': inv.date.strftime('%Y-%m-%d'),
+            'supplier': inv.supplier.name if inv.supplier else 'نقدي / عام',
+            'warehouse': inv.warehouse.name,
+            'net': str(inv.net_amount),
+            'note': inv.notes or '',
+            'items': [
+                {
+                    'name': line.item.name,
+                    'sku': line.item.sku or '',
+                    'grade': line.grade.name if line.grade else '',
+                    'qty': str(line.quantity),
+                    'price': str(line.unit_price),
+                    'total': str(line.total_price),
+                }
+                for line in inv.items.all()
+            ],
+        }
+        for inv in invoices
+    ]
+
+    return {
+        'recent_invoices': invoices,
+        'invoices_data': invoices_data,
+        'selected_month': selected_month,
+        'filter_year': year,
+    }
 
 purchase_invoice_create = admin_add_restock

@@ -513,10 +513,11 @@ class Payment(models.Model):
     class Meta:
         verbose_name = "عملية الدفع"
         verbose_name_plural = "عمليات دفع"
+        ordering = ['-payment_date', '-id']
         indexes = [
             models.Index(fields=['payment_date', 'is_closed', 'is_settlement_only']),
+            models.Index(fields=['student', 'academic_year', 'is_cancelled'], name='pay_stu_year_cancel_idx'),
         ]
-        ordering = ['-payment_date', '-id']
 
     def clean(self):
         if self.pk:

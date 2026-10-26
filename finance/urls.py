@@ -39,6 +39,8 @@ urlpatterns = [
     path('api/student-search/', views.student_search_api, name='student_search_api'),
     path('api/counter-collect/', views.counter_collect_payment_api, name='counter_collect_payment_api'),
 
+    path('api/next-receipt-number/', views.next_receipt_number_api, name='next_receipt_number_api'),
+
     # 🎓 شؤون الطلاب والترقية
     path('students/bulk-promote/', views.bulk_promote_students, name='bulk_promote'),
 

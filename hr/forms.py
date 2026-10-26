@@ -67,12 +67,29 @@ class MissionRequestForm(StyledModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        employee = cleaned_data.get("employee")
         start = cleaned_data.get("start_date")
         end = cleaned_data.get("end_date")
 
         # 🛡️ التحقق من منطقية التواريخ للمأمورية
         if start and end and end < start:
             raise forms.ValidationError("خطأ: تاريخ نهاية المأمورية لا يمكن أن يكون قبل تاريخ بدايتها!")
+
+        if employee and start and end:
+            # 🟢 منع تداخل المأموريات (التحقق من عدم وجود مأمورية أخرى في نفس الفترة)
+            overlapping_missions = MissionRequest.objects.filter(
+                employee=employee,
+                status__in=['pending', 'approved']
+            ).filter(
+                Q(start_date__lte=end) & Q(end_date__gte=start)
+            )
+
+            # استثناء الطلب الحالي في حالة التعديل
+            if self.instance and self.instance.pk:
+                overlapping_missions = overlapping_missions.exclude(pk=self.instance.pk)
+
+            if overlapping_missions.exists():
+                raise forms.ValidationError("عذراً، يوجد طلب مأمورية آخر مسجل لهذا الموظف يتقاطع مع هذه التواريخ.")
 
         return cleaned_data
 
@@ -129,6 +146,7 @@ class EmployeeForm(StyledModelForm):
             'emp_id': 'كود البصمة الرقمي',
             'name': 'اسم الموظف بالكامل',
             'hire_date': 'تاريخ التعيين / المباشرة',  # 🟢 إضافة التسمية هنا
+            'end_date': 'تاريخ انتهاء العمل / الاستقالة',  # 🟢 إضافة التسمية العربية للحقل الجديد
             'department': 'القسم',
             'attendance_rule': 'لائحة العمل المطبقة',
             'is_active': 'على رأس العمل (نشط)',
@@ -148,6 +166,7 @@ class EmployeeForm(StyledModelForm):
         widgets = {
             'hr_managers': forms.SelectMultiple(attrs={'class': 'select2-multiple form-control'}),
             'hire_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+            'end_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),  # 🟢 تفعيل ويدجيت التاريخ لحقل انتهاء العمل
         }
 
 

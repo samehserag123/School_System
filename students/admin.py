@@ -524,6 +524,7 @@ class GradeAdmin(admin.ModelAdmin):
 class ClassroomAdmin(admin.ModelAdmin):
     list_display = ['id', 'name', 'grade']
     list_filter = ['grade']
+    ordering = ('grade', 'name')  # الترتيب حسب الصف ثم الاسم في لوحة التحكم
     search_fields = ['name']
 
 

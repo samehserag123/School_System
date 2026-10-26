@@ -73,7 +73,7 @@ class ShiftRosterInline(admin.TabularInline):
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
     # 🟢 إضافة hire_date للعرض في الجدول
-    list_display = ('emp_id', 'name', 'department', 'hire_date', 'attendance_rule', 'base_salary', 'is_insured', 'colored_status')
+    list_display = ('emp_id', 'name', 'department', 'hire_date', 'end_date', 'attendance_rule', 'base_salary', 'is_insured', 'colored_status')
     list_filter = ('department', 'attendance_rule', 'is_active', 'is_insured')
     search_fields = ('name', 'emp_id')
     list_editable = ('attendance_rule',)
@@ -81,7 +81,7 @@ class EmployeeAdmin(admin.ModelAdmin):
     fieldsets = (
         ('البيانات الأساسية والتعاقدية', {
             # 🟢 تم إضافة hire_date هنا ليظهر في نموذج لوحة الإدارة
-            'fields': ('emp_id', 'name', 'hire_date', 'department', 'attendance_rule', 'is_active', 'base_salary')
+            'fields': ('emp_id', 'name', 'hire_date', 'end_date', 'department', 'attendance_rule', 'is_active', 'base_salary')
         }),
         ('البيانات التأمينية والبدلات 🛡️', {
             'fields': ('is_insured', 'insurance_number', 'insurance_basic_salary', 'insurance_variable_allowance', 'insurance_deduction'),

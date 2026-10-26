@@ -4,116 +4,205 @@
 {% block header_title %}المأموريات الخارجية{% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <!-- نموذج إضافة مأمورية جديدة -->
-    <div class="lg:col-span-1">
-        <div class="bg-slate-900/80 p-6 rounded-2xl shadow-lg border border-slate-700">
-            <h3 class="text-lg font-black text-purple-400 mb-1 flex items-center gap-2">
-                <i data-lucide="map" class="w-5 h-5"></i> تسجيل مأمورية جديدة
-            </h3>
-            <p class="text-xs text-slate-400 mb-6 font-medium">أيام المأمورية تعتبر حضوراً ولا تخضع للخصم.</p>
-            
-            <form method="POST" action="" onsubmit="return validateMissionForm(this)" class="space-y-5">
-                {% csrf_token %}
-                
-                <!-- 🔍 خانة البحث الذكية -->
-                <div class="relative">
-                    <label class="block text-sm font-bold text-slate-300 mb-2">الموظف <span class="text-rose-500">*</span></label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-purple-400">
-                            <i data-lucide="search" class="w-4 h-4"></i>
-                        </div>
-                        <input type="text" id="mission-search-input" placeholder="اضغط هنا للبحث أو اكتب الكود..." class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full pr-10 p-2.5 font-bold transition-all shadow-sm" autocomplete="off">
-                        <input type="hidden" name="employee" id="mission-hidden-emp" required>
-                        
-                        <!-- سحب البيانات من الـ Form الخاص بجانغو مباشرة -->
-                        <ul id="mission-search-results" class="hidden absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-800">
-                            {% for emp in form.employee.field.queryset %}
-                                <li class="cursor-pointer px-3 py-2 text-sm font-bold text-slate-300 transition-colors mission-emp-option hover:bg-slate-700 hover:text-purple-400" data-id="{{ emp.id }}" data-name="{{ emp.name }}">
-                                    {{ emp.name }} <span class="text-purple-400 text-[10px] font-mono mr-1">كود: {{ emp.emp_id }}</span>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
+<div class="space-y-6">
+    <!-- 📅 فلتر فترة الرواتب (من 26 إلى 25) -->
+    <div class="bg-slate-900/80 p-5 rounded-2xl shadow-lg border border-slate-700 backdrop-blur-sm">
+        <form method="GET" action="" class="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <div class="bg-purple-600/20 p-2.5 rounded-xl border border-purple-500/30 text-purple-400">
+                    <i data-lucide="calendar-range" class="w-5 h-5"></i>
                 </div>
-
-                <!-- حقول التاريخ -->
-                <div class="flex gap-4">
-                    <div class="w-1/2">
-                        <label class="block text-sm font-bold text-slate-300 mb-2">من تاريخ <span class="text-rose-500">*</span></label>
-                        <input type="date" name="start_date" id="mission_start_date" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 font-bold" required>
-                    </div>
-                    <div class="w-1/2">
-                        <label class="block text-sm font-bold text-slate-300 mb-2">إلى تاريخ <span class="text-rose-500">*</span></label>
-                        <input type="date" name="end_date" id="mission_end_date" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 font-bold" required>
-                    </div>
-                </div>
-
-                <!-- حقل السبب -->
                 <div>
-                    <label class="block text-sm font-bold text-slate-300 mb-2">السبب والجهة <span class="text-rose-500">*</span></label>
-                    <textarea name="reason" rows="2" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 font-medium" required></textarea>
+                    <h4 class="text-sm font-black text-white">فلتر فترة الرواتب (من 26 إلى 25)</h4>
+                    <p class="text-xs text-slate-400">تصفية المأموريات حسب الشهر المالي (من 26 الشهر السابق إلى 25 الشهر الحالي)</p>
                 </div>
-                
-                <button type="submit" id="mission-submit-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-3 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.3)] transition-all flex justify-center items-center gap-2 mt-4">
-                    <i data-lucide="plus-circle" class="w-5 h-5"></i> اعتماد المأمورية (Enter)
+            </div>
+
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <div class="relative w-full md:w-72">
+                    <select name="salary_period" class="bg-slate-950 border border-slate-700 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full px-4 py-2.5 font-bold outline-none transition-all shadow-sm">
+                        <option value="">-- اختر الشهر المالي --</option>
+                        {% for period in available_periods %}
+                            <option value="{{ period.value }}" {% if selected_period == period.value %}selected{% endif %}>{{ period.label }}</option>
+                        {% empty %}
+                            <option value="2026-01" {% if selected_period == '2026-01' %}selected{% endif %}>يناير 2026</option>
+                            <option value="2026-02" {% if selected_period == '2026-02' %}selected{% endif %}>فبراير 2026</option>
+                            <option value="2026-03" {% if selected_period == '2026-03' %}selected{% endif %}>مارس 2026</option>
+                            <option value="2026-04" {% if selected_period == '2026-04' %}selected{% endif %}>أبريل 2026</option>
+                            <option value="2026-05" {% if selected_period == '2026-05' %}selected{% endif %}>مايو 2026</option>
+                            <option value="2026-06" {% if selected_period == '2026-06' %}selected{% endif %}>يونيو 2026</option>
+                            <option value="2026-07" {% if selected_period == '2026-07' %}selected{% endif %}>يوليو 2026</option>
+                            <option value="2026-08" {% if selected_period == '2026-08' %}selected{% endif %}>أغسطس 2026</option>
+                            <option value="2026-09" {% if selected_period == '2026-09' %}selected{% endif %}>سبتمبر 2026</option>
+                            <option value="2026-10" {% if selected_period == '2026-10' %}selected{% endif %}>أكتوبر 2026</option>
+                            <option value="2026-11" {% if selected_period == '2026-11' %}selected{% endif %}>نوفمبر 2026</option>
+                            <option value="2026-12" {% if selected_period == '2026-12' %}selected{% endif %}>ديسمبر 2026</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl text-sm font-black transition-all shadow-md flex items-center justify-center gap-2 shrink-0">
+                    <i data-lucide="filter" class="w-4 h-4"></i> تصفية
                 </button>
-            </form>
-        </div>
+
+                {% if selected_period %}
+                    <a href="?" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border border-slate-700 shrink-0 flex items-center gap-1">
+                        إعادة ضبط
+                    </a>
+                {% endif %}
+            </div>
+        </form>
     </div>
 
-    <!-- جدول عرض المأموريات -->
-    <div class="lg:col-span-2">
-        <div class="bg-slate-900/60 rounded-2xl shadow-lg border border-slate-700 overflow-hidden backdrop-blur-sm">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-right text-slate-300">
-                    <thead class="text-xs text-slate-400 bg-slate-800/80 border-b border-slate-700">
-                        <tr>
-                            <th class="px-5 py-4 font-black uppercase tracking-wider">الموظف</th>
-                            <th class="px-5 py-4 font-black uppercase tracking-wider">التاريخ (من - إلى)</th>
-                            <th class="px-5 py-4 font-black uppercase tracking-wider">السبب والجهة</th>
-                            <th class="px-5 py-4 font-black uppercase tracking-wider text-center">الحالة</th>
-                            <th class="px-5 py-4 font-black uppercase tracking-wider text-center">الإجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-800/50">
-                        {% for mission in missions %}
-                        <tr class="hover:bg-slate-800/50 transition-colors">
-                            <td class="px-5 py-4 font-bold text-white">{{ mission.employee.name }}</td>
-                            <td class="px-5 py-4 font-mono text-xs">
-                                <span class="block text-primary">{{ mission.start_date|date:"Y-m-d" }}</span>
-                                <span class="block text-slate-500 mt-1">{{ mission.end_date|date:"Y-m-d" }}</span>
-                            </td>
-                            <td class="px-5 py-4 text-xs font-medium text-slate-400">{{ mission.reason|truncatechars:35 }}</td>
-                            <td class="px-5 py-4 text-center">
-                                {% if mission.status == 'approved' %}
-                                    <span class="bg-emerald-950/50 text-emerald-400 px-2 py-1 rounded-md text-xs font-bold border border-emerald-800/50 shadow-sm">مقبولة</span>
-                                {% elif mission.status == 'rejected' %}
-                                    <span class="bg-rose-950/50 text-rose-400 px-2 py-1 rounded-md text-xs font-bold border border-rose-800/50 shadow-sm">مرفوضة</span>
-                                {% else %}
-                                    <span class="bg-amber-950/50 text-amber-400 px-2 py-1 rounded-md text-xs font-bold border border-amber-800/50 shadow-sm">قيد الانتظار</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-5 py-4 text-center">
-                                {% if mission.status == 'pending' %}
-                                <div class="flex items-center justify-center gap-2">
-                                    <a href="{% url 'hr:update_mission_status' mission.id 'approved' %}" class="text-emerald-500 hover:text-emerald-400 bg-emerald-950/30 hover:bg-emerald-900/50 p-2 rounded-lg border border-emerald-900 transition-all shadow-sm" title="موافقة">
-                                        <i data-lucide="check" class="w-4 h-4 font-bold"></i>
-                                    </a>
-                                    <a href="{% url 'hr:update_mission_status' mission.id 'rejected' %}" class="text-rose-500 hover:text-rose-400 bg-rose-950/30 hover:bg-rose-900/50 p-2 rounded-lg border border-rose-900 transition-all shadow-sm" title="رفض">
-                                        <i data-lucide="x" class="w-4 h-4 font-bold"></i>
-                                    </a>
-                                </div>
-                                {% else %}
-                                <span class="text-slate-600 text-xs font-bold bg-slate-800 px-2 py-1 rounded border border-slate-700">- تم اتخاذ إجراء -</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="5" class="px-5 py-12 text-center text-slate-500 font-bold"><i data-lucide="map" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>لا توجد مأموريات مسجلة.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- نموذج إضافة مأمورية جديدة -->
+        <div class="lg:col-span-1">
+            <div class="bg-slate-900/80 p-6 rounded-2xl shadow-lg border border-slate-700">
+                <h3 class="text-lg font-black text-purple-400 mb-1 flex items-center gap-2">
+                    <i data-lucide="map" class="w-5 h-5"></i> تسجيل مأمورية جديدة
+                </h3>
+                <p class="text-xs text-slate-400 mb-6 font-medium">أيام المأمورية تعتبر حضوراً ولا تخضع للخصم.</p>
+
+                <form method="POST" action="" onsubmit="return validateMissionForm(this)" class="space-y-5">
+                    {% csrf_token %}
+
+                    <!-- 🔍 خانة البحث الذكية -->
+                    <div class="relative">
+                        <label class="block text-sm font-bold text-slate-300 mb-2">الموظف <span class="text-rose-500">*</span></label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-purple-400">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                            </div>
+                            <input type="text" id="mission-search-input" placeholder="اضغط هنا للبحث أو اكتب الكود..." class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full pr-10 p-2.5 font-bold transition-all shadow-sm" autocomplete="off">
+                            <input type="hidden" name="employee" id="mission-hidden-emp" required>
+
+                            <!-- سحب البيانات من الـ Form الخاص بجانغو مباشرة -->
+                            <ul id="mission-search-results" class="hidden absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-800">
+                                {% for emp in form.employee.field.queryset %}
+                                    <li class="cursor-pointer px-3 py-2 text-sm font-bold text-slate-300 transition-colors mission-emp-option hover:bg-slate-700 hover:text-purple-400" data-id="{{ emp.id }}" data-name="{{ emp.name }}">
+                                        {{ emp.name }} <span class="text-purple-400 text-[10px] font-mono mr-1">كود: {{ emp.emp_id }}</span>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- حقول التاريخ -->
+                    <div class="flex gap-4">
+                        <div class="w-1/2">
+                            <label class="block text-sm font-bold text-slate-300 mb-2">من تاريخ <span class="text-rose-500">*</span></label>
+                            <input type="date" name="start_date" id="mission_start_date" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 font-bold" required>
+                        </div>
+                        <div class="w-1/2">
+                            <label class="block text-sm font-bold text-slate-300 mb-2">إلى تاريخ <span class="text-rose-500">*</span></label>
+                            <input type="date" name="end_date" id="mission_end_date" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 font-bold" required>
+                        </div>
+                    </div>
+
+                    <!-- السبب والجهة -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-300 mb-2">السبب والجهة <span class="text-rose-500">*</span></label>
+                        <textarea name="reason" id="mission-reason" rows="2" class="bg-slate-950 border border-slate-600 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 font-medium" required></textarea>
+                    </div>
+
+                    <button type="submit" id="mission-submit-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-3 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.3)] transition-all flex justify-center items-center gap-2 mt-4">
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i> حفظ المأمورية
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- جدول عرض المأموريات -->
+        <div class="lg:col-span-2">
+            <div class="bg-slate-900/60 rounded-2xl shadow-lg border border-slate-700 overflow-hidden backdrop-blur-sm flex flex-col justify-between">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-right text-slate-300">
+                        <thead class="text-xs text-slate-400 bg-slate-800/80 border-b border-slate-700">
+                            <tr>
+                                <th class="px-5 py-4 font-black uppercase tracking-wider">الموظف</th>
+                                <th class="px-5 py-4 font-black uppercase tracking-wider">التاريخ (من - إلى)</th>
+                                <th class="px-5 py-4 font-black uppercase tracking-wider">السبب والجهة</th>
+                                <th class="px-5 py-4 font-black uppercase tracking-wider text-center">الحالة</th>
+                                <th class="px-5 py-4 font-black uppercase tracking-wider text-center">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/50">
+                            {% for mission in missions %}
+                            <tr class="hover:bg-slate-800/50 transition-colors">
+                                <td class="px-5 py-4 font-bold text-white">{{ mission.employee.name }}</td>
+                                <td class="px-5 py-4 font-mono text-xs">
+                                    <span class="block text-primary">{{ mission.start_date|date:"Y-m-d" }}</span>
+                                    <span class="block text-slate-500 mt-1">{{ mission.end_date|date:"Y-m-d" }}</span>
+                                </td>
+                                <td class="px-5 py-4 text-xs font-medium text-slate-400">{{ mission.reason|truncatechars:35 }}</td>
+                                <td class="px-5 py-4 text-center">
+                                    {% if mission.status == 'approved' %}
+                                        <span class="bg-emerald-950/50 text-emerald-400 px-2 py-1 rounded-md text-xs font-bold border border-emerald-800/50 shadow-sm">مقبولة</span>
+                                    {% elif mission.status == 'rejected' %}
+                                        <span class="bg-rose-950/50 text-rose-400 px-2 py-1 rounded-md text-xs font-bold border border-rose-800/50 shadow-sm">مرفوضة</span>
+                                    {% else %}
+                                        <span class="bg-amber-950/50 text-amber-400 px-2 py-1 rounded-md text-xs font-bold border border-amber-800/50 shadow-sm">قيد الانتظار</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-5 py-4 text-center">
+                                    {% if mission.status == 'pending' %}
+                                    <div class="flex items-center justify-center gap-2">
+                                        <a href="{% url 'hr:update_mission_status' mission.id 'approved' %}" class="text-emerald-500 hover:text-emerald-400 bg-emerald-950/30 hover:bg-emerald-900/50 p-2 rounded-lg border border-emerald-900 transition-all shadow-sm" title="موافقة">
+                                            <i data-lucide="check" class="w-4 h-4 font-bold"></i>
+                                        </a>
+                                        <a href="{% url 'hr:update_mission_status' mission.id 'rejected' %}" class="text-rose-500 hover:text-rose-400 bg-rose-950/30 hover:bg-rose-900/50 p-2 rounded-lg border border-rose-900 transition-all shadow-sm" title="رفض">
+                                            <i data-lucide="x" class="w-4 h-4 font-bold"></i>
+                                        </a>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-slate-600 text-xs font-bold bg-slate-800 px-2 py-1 rounded border border-slate-700">- تم اتخاذ إجراء -</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="px-5 py-12 text-center text-slate-500 font-bold"><i data-lucide="map" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>لا توجد مأموريات مسجلة.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 📄 باجنيشن احترافي متناسق مع الفلتر -->
+                {% if missions.has_other_pages %}
+                <div class="px-6 py-4 bg-slate-900/80 border-t border-slate-700/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="text-xs font-bold text-slate-400">
+                        عرض الصفحة <span class="text-purple-400 font-mono">{{ missions.number }}</span> من أصل <span class="text-white font-mono">{{ missions.paginator.num_pages }}</span> صفحة
+                    </div>
+                    
+                    <div class="flex items-center gap-1.5">
+                        <!-- زر السابق -->
+                        {% if missions.has_previous %}
+                            <a href="?salary_period={{ selected_period }}&page={{ missions.previous_page_number }}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border border-slate-700 flex items-center gap-1 shadow-sm">
+                                <i data-lucide="chevron-right" class="w-4 h-4"></i> السابق
+                            </a>
+                        {% else %}
+                            <span class="bg-slate-950/50 text-slate-600 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-800 cursor-not-allowed flex items-center gap-1">
+                                <i data-lucide="chevron-right" class="w-4 h-4"></i> السابق
+                            </span>
+                        {% endif %}
+
+                        <!-- رقم الصفحة الحالية -->
+                        <span class="bg-purple-600 text-white px-3.5 py-2 rounded-xl text-xs font-black shadow-sm font-mono">
+                            {{ missions.number }}
+                        </span>
+
+                        <!-- زر التالي -->
+                        {% if missions.has_next %}
+                            <a href="?salary_period={{ selected_period }}&page={{ missions.next_page_number }}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border border-slate-700 flex items-center gap-1 shadow-sm">
+                                التالي <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </a>
+                        {% else %}
+                            <span class="bg-slate-950/50 text-slate-600 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-800 cursor-not-allowed flex items-center gap-1">
+                                التالي <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -187,9 +276,9 @@ document.addEventListener('DOMContentLoaded', function() {
     startInput.addEventListener('keydown', e => {
         if(e.key === 'Enter') { e.preventDefault(); endInput.focus(); endInput.showPicker ? endInput.showPicker() : endInput.select(); }
     });
-    
+
     endInput.addEventListener('keydown', e => {
-        if(e.key === 'Enter') { e.preventDefault(); document.querySelector('textarea[name="reason"]').focus(); }
+        if(e.key === 'Enter') { e.preventDefault(); document.getElementById('mission-reason').focus(); }
     });
 
     // إخفاء القائمة عند النقر خارجها

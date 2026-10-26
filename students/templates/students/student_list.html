@@ -1,4 +1,4 @@
-{% extends "base_finance.html" %}
+{% extends base_template|default:"base_finance.html" %}
 {% load static %}
 
 {% block title %}سجل الطلاب المطور والكنترول العام{% endblock %}
@@ -16,10 +16,7 @@
 {% endblock %}
 
 {% block content %}
-<!-- استيراد مكتبات الأيقونات والأنيميشن الاحترافية -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
+{% if not is_ajax %}
 <style>
     :root {
         --bg-main: #030712;
@@ -58,15 +55,13 @@
 
     .stat-item {
         background: var(--glass-card);
-        backdrop-filter: blur(20px) saturate(190%);
-        -webkit-backdrop-filter: blur(20px) saturate(190%);
         border: 1px solid var(--glass-border);
         border-radius: 18px;
         padding: 16px 20px;
         min-width: 165px;
         flex: 1;
         text-align: center;
-        transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: transform .25s ease, box-shadow .25s ease, background-color .25s ease, border-color .25s ease;
         cursor: pointer;
         position: relative;
         overflow: hidden;
@@ -146,8 +141,6 @@
     /* كروت الفلاتر واللوحات التحكمية */
     .glass-card {
         background: var(--glass-surface) !important;
-        backdrop-filter: blur(20px) saturate(190%);
-        -webkit-backdrop-filter: blur(20px) saturate(190%);
         border: 1px solid var(--glass-border) !important;
         border-radius: 20px !important;
         box-shadow: 0 15px 40px rgba(0, 0, 0, 0.45);
@@ -177,7 +170,6 @@
         border: 1px solid var(--glass-border);
         box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
         background: var(--glass-surface);
-        backdrop-filter: blur(20px);
     }
 
     #studentTable {
@@ -205,12 +197,11 @@
     #studentTable tbody tr {
         background: rgba(15, 23, 42, 0.55);
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        transition: all 0.2s ease-in-out;
+        transition: background-color .15s ease;
     }
 
     #studentTable tbody tr:hover {
         background: rgba(30, 41, 59, 0.95) !important;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5) inset;
     }
 
     #studentTable td {
@@ -349,75 +340,91 @@
 
     .modal-glass {
         background: rgba(15, 23, 42, 0.95) !important;
-        backdrop-filter: blur(25px) saturate(200%);
         border: 2px solid var(--neon-cyan) !important;
         border-radius: 24px !important;
         box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
     }
+
+    /* ===== تحسينات الأداء وتجربة الاستخدام ===== */
+    .stat-item { padding: 0; }
+    .stat-link { display: block; padding: 16px 20px; color: inherit; text-decoration: none; }
+    .stat-link:hover { color: inherit; }
+    .stat-item .print-shortcut-btn { z-index: 3; }
+
+    .modern-table-container.is-loading #tableBody { opacity: .45; pointer-events: none; transition: opacity .15s; }
+    #topLoader { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 2000; opacity: 0; transition: opacity .15s;
+        background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent) no-repeat; background-size: 40% 100%;
+        animation: loaderMove 1s linear infinite; pointer-events: none; }
+    #topLoader.on { opacity: 1; }
+    @keyframes loaderMove { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+
+    .form-select.is-filtered, #searchInput.is-filtered { border-color: var(--neon-cyan) !important; box-shadow: 0 0 10px rgba(56,189,248,.25) !important; }
+
+    .selection-bar { align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px; margin-bottom: 10px;
+        background: rgba(56,189,248,.12); border: 1px solid var(--neon-cyan); border-radius: 12px; font-weight: 800; color: var(--neon-cyan); }
+    .selection-bar:not([hidden]) { display: flex; }
+
+    #toastBox { position: fixed; bottom: 20px; left: 20px; z-index: 3000; display: flex; flex-direction: column; gap: 8px; max-width: min(92vw, 380px); }
+    .toast-pro { padding: 12px 16px; border-radius: 12px; font-weight: 800; font-size: .9rem; color: #fff; background: #0f172a;
+        border: 1px solid var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,.5); animation: toastIn .25s ease; }
+    .toast-pro.out { opacity: 0; transform: translateY(8px); transition: all .3s; }
+    .toast-success { border-color: var(--neon-emerald); } .toast-danger { border-color: var(--neon-rose); } .toast-warning { border-color: var(--neon-amber); }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+    #studentTable td, #studentTable th { background-color: transparent !important; }
+    #studentTable thead { background: #020617 !important; }
+
+    @media (max-width: 768px) { .stat-item { min-width: 140px; } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
+{% endif %}
 
-<!-- 1. شريط العدادات والإحصائيات الفورية العلوية -->
-<div class="stats-bar px-1 animate__animated animate__fadeIn">
-    <a href="?status=all{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.year_id %}&year_id={{ request.GET.year_id }}{% endif %}"
-       class="stat-item {% if not request.GET.status or request.GET.status == 'all' %}active-filter{% endif %}" style="text-decoration: none;">
-        <span class="small-label">إجمالي الطلاب</span>
-        <div class="stat-value text-info" id="stat-total">{{ total_count }}</div>
-        <object>
-            <a href="{% url 'print_debts_report' %}?filter=all{% if request.GET.grade_id %}&grade={{ request.GET.grade_id }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.year_id %}&academic_year={{ request.GET.year_id }}{% endif %}" target="_blank" class="print-shortcut-btn" title="طباعة كشف الطلاب الشامل">
-                <i class="bi bi-printer-fill"></i>
-            </a>
-        </object>
-    </a>
 
-    <a href="?status=unassigned{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.year_id %}&year_id={{ request.GET.year_id }}{% endif %}"
-       class="stat-item {% if request.GET.status == 'unassigned' %}active-filter{% endif %}" style="text-decoration: none;">
-        <span class="small-label">غير مسكنين</span>
-        <div class="stat-value text-secondary" id="stat-unassigned">{{ unassigned_count }}</div>
-        <object>
-            <a href="{% url 'print_debts_report' %}?filter=all{% if request.GET.grade_id %}&grade={{ request.GET.grade_id }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" target="_blank" class="print-shortcut-btn" title="طباعة كشف غير المسكنين">
-                <i class="bi bi-printer-fill"></i>
-            </a>
-        </object>
-    </a>
-
-    <a href="?status=assigned{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.year_id %}&year_id={{ request.GET.year_id }}{% endif %}"
-       class="stat-item {% if request.GET.status == 'assigned' %}active-filter{% endif %}" style="text-decoration: none;">
-        <span class="small-label">المسكنين</span>
-        <div class="stat-value text-primary" id="stat-assigned">{{ assigned_count }}</div>
-        <object>
-            <a href="{% url 'print_debts_report' %}?filter=all{% if request.GET.grade_id %}&grade={{ request.GET.grade_id }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" target="_blank" class="print-shortcut-btn" title="طباعة كشف المسكنين">
-                <i class="bi bi-printer-fill"></i>
-            </a>
-        </object>
-    </a>
-
-    <a href="?status=paid{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.year_id %}&year_id={{ request.GET.year_id }}{% endif %}"
-       class="stat-item {% if request.GET.status == 'paid' %}active-filter{% endif %}" style="text-decoration: none;">
-        <span class="small-label">مسددين (خالص)</span>
-        <div class="stat-value text-success" id="stat-paid">{{ paid_count }}</div>
-        <object>
-            <a href="{% url 'print_debts_report' %}?filter=cleared{% if request.GET.grade_id %}&grade={{ request.GET.grade_id }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" target="_blank" class="print-shortcut-btn" title="طباعة كشف الخالص">
-                <i class="bi bi-printer-fill"></i>
-            </a>
-        </object>
-    </a>
-
-    <a href="?status=debt{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.year_id %}&year_id={{ request.GET.year_id }}{% endif %}"
-       class="stat-item {% if request.GET.status == 'debt' %}active-filter{% endif %}" style="text-decoration: none;">
-        <span class="small-label">مديونين</span>
-        <div class="stat-value text-danger" id="stat-debt">{{ debt_count }}</div>
-        <object>
-            <a href="{% url 'print_debts_report' %}?filter=delayed{% if request.GET.grade_id %}&grade={{ request.GET.grade_id }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" target="_blank" class="print-shortcut-btn" title="طباعة كشف المديونيات">
-                <i class="bi bi-printer-fill"></i>
-            </a>
-        </object>
-    </a>
-
-    <a href="?status=graduated{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.year_id %}&year_id={{ request.GET.year_id }}{% endif %}"
-       class="stat-item {% if request.GET.status == 'graduated' %}active-filter{% endif %}" style="text-decoration: none;">
-        <span class="small-label">إتمام المرحلة 🎓</span>
-        <div class="stat-value text-warning">{{ graduated_count|default:0 }}</div>
-    </a>
+<!-- 1. شريط العدادات (يتحدث بدون ريلود) -->
+<div id="statsBar" class="stats-bar px-1">
+{% with qs=request.GET.urlencode %}
+    <div class="stat-item {% if not request.GET.status or request.GET.status == 'all' %}active-filter{% endif %}">
+        <a class="stat-link" data-status="all" href="?{{ qs }}&status=all&page=1">
+            <span class="small-label">إجمالي الطلاب</span>
+            <div class="stat-value text-info" id="stat-total">{{ total_count }}</div>
+        </a>
+        <a href="{% url 'print_debts_report' %}?filter=all{% if request.GET.grade_id %}&grade={{ request.GET.grade_id|urlencode }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}{% if request.GET.year_id %}&academic_year={{ request.GET.year_id|urlencode }}{% endif %}" target="_blank" rel="noopener" class="print-shortcut-btn" title="طباعة كشف الطلاب الشامل"><i class="bi bi-printer-fill"></i></a>
+    </div>
+    <div class="stat-item {% if request.GET.status == 'unassigned' %}active-filter{% endif %}">
+        <a class="stat-link" data-status="unassigned" href="?{{ qs }}&status=unassigned&page=1">
+            <span class="small-label">غير مسكنين</span>
+            <div class="stat-value text-secondary" id="stat-unassigned">{{ unassigned_count }}</div>
+        </a>
+        <a href="{% url 'print_debts_report' %}?filter=all{% if request.GET.grade_id %}&grade={{ request.GET.grade_id|urlencode }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}{% if request.GET.year_id %}&academic_year={{ request.GET.year_id|urlencode }}{% endif %}" target="_blank" rel="noopener" class="print-shortcut-btn" title="طباعة كشف غير المسكنين"><i class="bi bi-printer-fill"></i></a>
+    </div>
+    <div class="stat-item {% if request.GET.status == 'assigned' %}active-filter{% endif %}">
+        <a class="stat-link" data-status="assigned" href="?{{ qs }}&status=assigned&page=1">
+            <span class="small-label">المسكنين</span>
+            <div class="stat-value text-primary" id="stat-assigned">{{ assigned_count }}</div>
+        </a>
+        <a href="{% url 'print_debts_report' %}?filter=all{% if request.GET.grade_id %}&grade={{ request.GET.grade_id|urlencode }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}{% if request.GET.year_id %}&academic_year={{ request.GET.year_id|urlencode }}{% endif %}" target="_blank" rel="noopener" class="print-shortcut-btn" title="طباعة كشف المسكنين"><i class="bi bi-printer-fill"></i></a>
+    </div>
+    <div class="stat-item {% if request.GET.status == 'paid' %}active-filter{% endif %}">
+        <a class="stat-link" data-status="paid" href="?{{ qs }}&status=paid&page=1">
+            <span class="small-label">مسددين (خالص)</span>
+            <div class="stat-value text-success" id="stat-paid">{{ paid_count }}</div>
+        </a>
+        <a href="{% url 'print_debts_report' %}?filter=cleared{% if request.GET.grade_id %}&grade={{ request.GET.grade_id|urlencode }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}{% if request.GET.year_id %}&academic_year={{ request.GET.year_id|urlencode }}{% endif %}" target="_blank" rel="noopener" class="print-shortcut-btn" title="طباعة كشف الخالص"><i class="bi bi-printer-fill"></i></a>
+    </div>
+    <div class="stat-item {% if request.GET.status == 'debt' %}active-filter{% endif %}">
+        <a class="stat-link" data-status="debt" href="?{{ qs }}&status=debt&page=1">
+            <span class="small-label">مديونين</span>
+            <div class="stat-value text-danger" id="stat-debt">{{ debt_count }}</div>
+        </a>
+        <a href="{% url 'print_debts_report' %}?filter=delayed{% if request.GET.grade_id %}&grade={{ request.GET.grade_id|urlencode }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}{% if request.GET.year_id %}&academic_year={{ request.GET.year_id|urlencode }}{% endif %}" target="_blank" rel="noopener" class="print-shortcut-btn" title="طباعة كشف المديونيات"><i class="bi bi-printer-fill"></i></a>
+    </div>
+    <div class="stat-item {% if request.GET.status == 'graduated' %}active-filter{% endif %}">
+        <a class="stat-link" data-status="graduated" href="?{{ qs }}&status=graduated&page=1">
+            <span class="small-label">إتمام المرحلة 🎓</span>
+            <div class="stat-value text-warning" id="stat-graduated">{{ graduated_count|default:0 }}</div>
+        </a>
+    </div>
+{% endwith %}
 </div>
 
 <form method="POST" action="{% url 'bulk_promote' %}" id="promoteForm">
@@ -425,12 +432,12 @@
     <input type="hidden" name="all_selected_ids" id="allSelectedIds" value="">
 
     <!-- 2. كارت الفلاتر المتقدمة -->
-    <div class="glass-card p-3 mb-3 animate__animated animate__fadeInDown">
+    <div class="glass-card p-3 mb-3">
         <div class="row g-2 align-items-center">
             <div class="col-md-3">
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-dark border-secondary text-info"><i class="bi bi-search"></i></span>
-                    <input type="text" id="searchInput" onkeyup="instantSearch()"
+                    <input type="search" id="searchInput" autocomplete="off"
                         class="form-control bg-dark text-white border-secondary fw-bold"
                         placeholder="بحث باسم الطالب، الكود، أو القومي..."
                         value="{{ search_query|default:'' }}">
@@ -438,7 +445,7 @@
             </div>
 
             <div class="col-md-2">
-                <select class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" onchange="updateUrlParam('grade_id', this.value)">
+                <select class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" data-filter="grade_id">
                     <option value="">الصف الدراسي</option>
                     {% for grade in all_grades %}
                     <option value="{{ grade.id }}" {% if selected_grade == grade.id|stringformat:"i" %}selected{% endif %}>
@@ -449,7 +456,7 @@
             </div>
 
             <div class="col-md-2">
-                <select class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" onchange="updateUrlParam('specialization', this.value)">
+                <select class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" data-filter="specialization">
                     <option value="">التخصص</option>
                     <option value="General" {% if selected_specialization == 'General' %}selected{% endif %}>شعبة عامة</option>
                     <option value="Host" {% if selected_specialization == 'Host' %}selected{% endif %}>فني مضيف</option>
@@ -457,12 +464,12 @@
                     <option value="Internal" {% if selected_specialization == 'Internal' %}selected{% endif %}>مشرف غرف</option>
                     <option value="Kitchen" {% if selected_specialization == 'Kitchen' %}selected{% endif %}>مطبخ</option>
                     <option value="Restaurant" {% if selected_specialization == 'Restaurant' %}selected{% endif %}>مطعم</option>
-                    <option value="Tourism Services" {% if selected_specialization == 'Tourism Services' or selected_specialization == 'Tourism_Services' %}selected{% endif %}>خدمات سياحية</option>
+                    <option value="Tourism_Services" {% if selected_specialization == 'Tourism Services' or selected_specialization == 'Tourism_Services' %}selected{% endif %}>خدمات سياحية</option>
                 </select>
             </div>
 
             <div class="col-md-2">
-                <select class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" onchange="updateUrlParam('classroom_id', this.value)">
+                <select class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" data-filter="classroom_id">
                     <option value="">الفصل</option>
                     {% for classroom in all_classrooms %}
                     <option value="{{ classroom.id }}" {% if selected_classroom == classroom.id|stringformat:"i" %}selected{% endif %}>
@@ -473,7 +480,7 @@
             </div>
 
             <div class="col-md-1">
-                <select class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" onchange="updateUrlParam('gender', this.value)">
+                <select class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" data-filter="gender">
                     <option value="">النوع</option>
                     <option value="Male" {% if selected_gender == 'Male' %}selected{% endif %}>بنين</option>
                     <option value="Female" {% if selected_gender == 'Female' %}selected{% endif %}>بنات</option>
@@ -481,7 +488,7 @@
             </div>
 
             <div class="col-md-1">
-                <select class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" onchange="updateUrlParam('religion', this.value)">
+                <select class="form-select form-select-sm bg-dark text-white border-secondary fw-bold" data-filter="religion">
                     <option value="">الديانة</option>
                     <option value="Muslim" {% if selected_religion == 'Muslim' %}selected{% endif %}>مسلم</option>
                     <option value="Christian" {% if selected_religion == 'Christian' %}selected{% endif %}>مسيحي</option>
@@ -489,9 +496,9 @@
             </div>
 
             <div class="col-md-1">
-                <a href="{{ request.path }}" class="btn btn-danger btn-sm w-100 fw-bold shadow-sm" title="مسح كافة الفلاتر والبحث والعودة للبداية">
+                <button type="button" id="btnReset" class="btn btn-danger btn-sm w-100 fw-bold shadow-sm" title="مسح كافة الفلاتر والبحث والعودة للبداية">
                     <i class="bi bi-eraser-fill me-1"></i> مسح
-                </a>
+                </button>
             </div>
         </div>
     </div>
@@ -500,7 +507,7 @@
     <div class="row g-3 mb-3">
         <div class="col-md-7">
             {% if user.is_superuser %}
-            <div class="glass-card p-2 border-warning animate__animated animate__fadeInRight shadow-lg"
+            <div class="glass-card p-2 border-warning shadow-lg"
                  style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98)) !important; border-right: 5px solid #f59e0b !important;">
                 <div class="row g-2 align-items-center">
                     <div class="col-md-4">
@@ -542,8 +549,13 @@
         </div>
     </div>
 
+    <div id="selectionBar" class="selection-bar" hidden>
+        <span><i class="bi bi-check2-square me-1"></i> المحدد: <b id="selCount">0</b> طالب (عبر كل الصفحات)</span>
+        <button type="button" id="btnClearSel" class="btn btn-sm btn-outline-light fw-bold">إلغاء التحديد</button>
+    </div>
+
     <!-- 4. جدول بيانات الطلاب المطور -->
-    <div class="modern-table-container shadow-lg animate__animated animate__fadeInUp mb-4">
+    <div class="modern-table-container shadow-lg mb-4">
         <div class="table-responsive">
             <table class="table text-center align-middle mb-0" id="studentTable">
                 <thead>
@@ -570,7 +582,7 @@
                         data-academic-status="{{ student.enrollment_status }}">
 
                         <td><input type="checkbox" name="manual_selection_only" value="{{ student.id }}" class="student-checkbox form-check-input"></td>
-                        <td class="fw-bold text-white-50">{{ forloop.counter }}</td>
+                        <td class="fw-bold text-white-50">{{ students.start_index|add:forloop.counter0 }}</td>
 
                         <td class="text-end pe-4">
                             <div class="d-flex flex-column text-end">
@@ -662,7 +674,7 @@
                         <td class="text-center" style="white-space: nowrap;">
                             <div class="d-flex justify-content-center gap-1">
 
-                                <button type="button" class="btn btn-action-icon btn-success text-white shadow-sm border border-success" title="تحصيل إداري / إعادة قيد بالخزينة" onclick="openProCollectionModal('{{ student.id }}', '{{ student.get_full_name|escapejs }}', '{{ student.student_code }}')">
+                                <button type="button" class="btn btn-action-icon btn-success text-white shadow-sm border border-success" title="تحصيل إداري / إعادة قيد بالخزينة" data-pay data-id="{{ student.id }}" data-name="{{ student.get_full_name }}" data-code="{{ student.student_code }}">
                                     <i class="bi bi-cash-coin"></i>
                                 </button>
 
@@ -671,10 +683,19 @@
                                 </a>
 
                                 {% if student.fees_display > 0 %}
-                                    <a href="{% url 'quick_collection' %}?student_id={{ student.id }}&next={{ request.get_full_path|urlencode }}#student-{{ student.id }}"
-                                        class="btn btn-action-icon btn-success" title="تحصيل سريع للأقساط">
-                                         <i class="bi bi-lightning-charge-fill"></i>
-                                    </a>
+                                    {% if student.old_debt_display > 0 %}
+                                        <!-- 🔒 محجوب: يجب سداد المديونية القديمة أولاً من زر "سداد مديونية" -->
+                                        <span class="d-inline-block" tabindex="0" title="🔒 يجب سداد المديونية القديمة ({{ student.old_debt_display|floatformat:0 }} ج.م) أولاً من زر «سداد مديونية»">
+                                            <button type="button" class="btn btn-action-icon btn-secondary" disabled style="opacity:.45; cursor:not-allowed; pointer-events:none;">
+                                                <i class="bi bi-lock-fill"></i>
+                                            </button>
+                                        </span>
+                                    {% else %}
+                                        <a href="{% url 'quick_collection' %}?student_id={{ student.id }}&next={{ request.get_full_path|urlencode }}#student-{{ student.id }}"
+                                            class="btn btn-action-icon btn-success" title="تحصيل سريع للأقساط">
+                                             <i class="bi bi-lightning-charge-fill"></i>
+                                        </a>
+                                    {% endif %}
 
                                     {% if user.is_superuser %}
                                         <a href="{% url 'assign_plan_with_id' student.id %}?from=student_list&next={{ request.get_full_path|urlencode }}#student-{{ student.id }}"
@@ -712,7 +733,7 @@
 <!-- 🟢🟢 تم إغلاق الفورم الرئيسي للترحيل الأكاديمي هنا لفك الاشتباك مع المودالات 🟢🟢 -->
 
 <!-- 5. مودال النجاح بالتعديل والتمركز -->
-<div class="modal fade animate__animated animate__bounceIn" id="editSuccessModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="editSuccessModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content modal-glass">
             <div class="modal-header border-secondary bg-black bg-opacity-40">
@@ -722,7 +743,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-center py-4">
-                <i class="bi bi-person-check-fill text-info animate__animated animate__pulse animate__infinite" style="font-size: 4rem; display: block; margin-bottom: 15px;"></i>
+                <i class="bi bi-person-check-fill text-info" style="font-size: 4rem; display: block; margin-bottom: 15px;"></i>
                 <p class="fs-5 mb-1 text-white fw-bold">تمت عملية التحديث والمزامنة بنجاح للطالب:</p>
                 <h3 id="successModalStudentName" class="fw-black text-warning mb-3"></h3>
                 <p class="text-white-50 small mb-0 fw-semibold" id="successModalStudentInfo"></p>
@@ -738,7 +759,7 @@
 </div>
 
 <!-- 🟢 6. شاشة التحصيل الاحترافية (POS Style) للماليات -->
-<div class="modal fade animate__animated animate__zoomIn" id="proCollectionModal" tabindex="-1">
+<div class="modal fade" id="proCollectionModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-success" style="background: linear-gradient(145deg, #020617, #0f172a); border-width: 2px; box-shadow: 0 20px 50px rgba(16, 185, 129, 0.2);">
 
@@ -749,7 +770,7 @@
                 <button type="button" class="btn-close btn-close-white position-absolute end-0 me-3" data-bs-dismiss="modal"></button>
             </div>
 
-            <form id="proCollectionForm" onsubmit="submitProCollection(event)">
+            <form id="proCollectionForm">
                 {% csrf_token %}
                 <input type="hidden" name="student_id" id="pro_student_id">
 
@@ -790,378 +811,418 @@
     </div>
 </div>
 
-<!-- 7. التنقل بين الصفحات -->
+<!-- 7. التنقل بين الصفحات (يحافظ على كل الفلاتر ولا يعيد تحميل الصفحة) -->
 <div id="paginationContainer">
+{% with qs=request.GET.urlencode %}
+    {% if students.paginator.count %}
+    <p class="text-center text-secondary small fw-bold mt-3 mb-0">
+        عرض {{ students.start_index }} – {{ students.end_index }} من أصل <b id="resultCount" class="text-info">{{ students.paginator.count }}</b> طالب
+    </p>
+    {% endif %}
     {% if students.has_other_pages %}
-    <nav aria-label="Page navigation" class="mt-4 animate__animated animate__fadeInUp">
+    <nav aria-label="التنقل بين الصفحات" class="mt-3 mb-4">
         <ul class="pagination pagination-custom justify-content-center flex-wrap">
-
-            {% if students.number > 3 %}
-            <li class="page-item">
-                <a class="page-link shadow-sm" href="?page=1{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" title="الصفحة الأولى">
-                    <i class="bi bi-chevron-double-right"></i> الأولى
-                </a>
-            </li>
-            {% endif %}
-
             {% if students.has_previous %}
-            <li class="page-item">
-                <a class="page-link shadow-sm" href="?page={{ students.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" title="السابق">
-                    <i class="bi bi-chevron-right"></i>
-                </a>
-            </li>
+            <li class="page-item"><a class="page-link" data-page="1" href="?{{ qs }}&page=1" title="الأولى"><i class="bi bi-chevron-double-right"></i></a></li>
+            <li class="page-item"><a class="page-link" data-page="{{ students.previous_page_number }}" href="?{{ qs }}&page={{ students.previous_page_number }}" title="السابق"><i class="bi bi-chevron-right"></i></a></li>
             {% else %}
+            <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-double-right"></i></span></li>
             <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-right"></i></span></li>
             {% endif %}
 
             {% for i in students.paginator.page_range %}
                 {% if students.number == i %}
-                    <li class="page-item active" aria-current="page"><span class="page-link shadow-sm">{{ i }}</span></li>
+                <li class="page-item active" aria-current="page"><span class="page-link">{{ i }}</span></li>
                 {% elif i > students.number|add:'-3' and i < students.number|add:'3' %}
-                    <li class="page-item">
-                        <a class="page-link shadow-sm" href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ i }}</a>
-                    </li>
+                <li class="page-item"><a class="page-link" data-page="{{ i }}" href="?{{ qs }}&page={{ i }}">{{ i }}</a></li>
                 {% endif %}
             {% endfor %}
 
             {% if students.has_next %}
-            <li class="page-item">
-                <a class="page-link shadow-sm" href="?page={{ students.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" title="التالي">
-                    <i class="bi bi-chevron-left"></i>
-                </a>
-            </li>
+            <li class="page-item"><a class="page-link" data-page="{{ students.next_page_number }}" href="?{{ qs }}&page={{ students.next_page_number }}" title="التالي"><i class="bi bi-chevron-left"></i></a></li>
+            <li class="page-item"><a class="page-link" data-page="{{ students.paginator.num_pages }}" href="?{{ qs }}&page={{ students.paginator.num_pages }}" title="الأخيرة"><i class="bi bi-chevron-double-left"></i></a></li>
             {% else %}
             <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i></span></li>
-            {% endif %}
-
-            {% if students.number < students.paginator.num_pages|add:'-2' %}
-            <li class="page-item">
-                <a class="page-link shadow-sm" href="?page={{ students.paginator.num_pages }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_view_year %}&year_id={{ current_view_year.id }}{% endif %}{% if selected_grade %}&grade_id={{ selected_grade }}{% endif %}{% if selected_classroom %}&classroom_id={{ selected_classroom }}{% endif %}{% if selected_specialization %}&specialization={{ selected_specialization }}{% endif %}{% if selected_gender %}&gender={{ selected_gender }}{% endif %}{% if selected_religion %}&religion={{ selected_religion }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
-                    الأخيرة <i class="bi bi-chevron-double-left"></i>
-                </a>
-            </li>
+            <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-double-left"></i></span></li>
             {% endif %}
         </ul>
     </nav>
     {% endif %}
+{% endwith %}
 </div>
 
+
+{% if not is_ajax %}
 <script>
-function openProCollectionModal(studentId, studentName, studentCode) {
-    document.getElementById('pro_student_id').value = studentId;
-    document.getElementById('pro_student_name').innerText = studentName;
-    document.getElementById('pro_student_code').innerText = "كود: " + studentCode;
-    document.getElementById('pro_amount').value = '';
-    document.getElementById('pro_notes').value = '';
+(() => {
+'use strict';
 
-    let modalEl = document.getElementById('proCollectionModal');
-    let modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-    modal.show();
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
-    setTimeout(() => { document.getElementById('pro_amount').focus(); }, 400);
+const SEL_KEY     = 'student_selection_v2';
+const RET_KEY     = 'student_list_return_v1';   // حالة القائمة قبل الذهاب لشاشة تعديل
+const COLLECT_URL = "{% url 'ajax_collect_reenrollment_fee' %}";
+const CSRF        = "{{ csrf_token }}";
+const OK_STATUS   = ['Promoted', 'passed'];
+const PARTS       = ['tableBody', 'paginationContainer', 'statsBar'];
+
+/* ───────── مساعدات واجهة ───────── */
+function toast(msg, type = 'info') {
+    let box = $('#toastBox');
+    if (!box) { box = document.createElement('div'); box.id = 'toastBox'; document.body.appendChild(box); }
+    const t = document.createElement('div');
+    t.className = 'toast-pro toast-' + type;
+    t.textContent = msg;
+    box.appendChild(t);
+    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 3800);
 }
 
-function submitProCollection(e) {
+const loader = document.createElement('div');
+loader.id = 'topLoader';
+document.body.appendChild(loader);
+const busy = on => {
+    loader.classList.toggle('on', on);
+    const box = $('.modern-table-container');
+    if (box) box.classList.toggle('is-loading', on);
+};
+
+function flash(id, ms = 3500) {
+    const r = document.getElementById('student-' + id);
+    if (!r) return;
+    r.classList.add('highlight-edited-student');
+    setTimeout(() => r.classList.remove('highlight-edited-student'), ms);
+}
+
+/* ───────── التحديد (محفوظ عبر الصفحات، ويُمسح بعد الترحيل) ───────── */
+let selected = (() => {
+    try {
+        const d = JSON.parse(sessionStorage.getItem(SEL_KEY) || '{}');
+        return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {};
+    } catch { return {}; }
+})();
+
+function refreshSelectionUI() {
+    const ids = Object.keys(selected);
+    const hidden = $('#allSelectedIds');
+    if (hidden) hidden.value = ids.join(',');
+    $('#selCount').textContent = ids.length;
+    $('#selectionBar').hidden = !ids.length;
+
+    const boxes = $$('.student-checkbox');
+    const all = $('#selectAll');
+    const n = boxes.filter(b => b.checked).length;
+    if (all) {
+        all.checked = boxes.length > 0 && n === boxes.length;
+        all.indeterminate = n > 0 && n < boxes.length;
+    }
+}
+function persist() {
+    try { sessionStorage.setItem(SEL_KEY, JSON.stringify(selected)); } catch {}
+    refreshSelectionUI();
+}
+function setSel(cb, on) {
+    cb.checked = on;
+    if (on) selected[cb.value] = cb.closest('tr')?.dataset.academicStatus || '';
+    else delete selected[cb.value];
+}
+function syncCheckboxes() {
+    $$('.student-checkbox').forEach(cb => { cb.checked = Object.prototype.hasOwnProperty.call(selected, cb.value); });
+    refreshSelectionUI();
+}
+
+/* ───────── حارس ضد حلقات إعادة التحميل ───────── */
+function fallbackTo(url, err) {
+    console.error('AJAX failed:', err);
+    let last = 0;
+    try { last = +sessionStorage.getItem('ajax_fb') || 0; } catch {}
+    if (Date.now() - last < 15000) {      // سبق وأعدنا التحميل للتو => لا نكرر أبداً
+        toast('تعذر تحديث القائمة من السيرفر. راجع سجل أخطاء السيرفر (Error log).', 'danger');
+        return;
+    }
+    try { sessionStorage.setItem('ajax_fb', Date.now()); } catch {}
+    location.href = url;
+}
+
+/* ───────── محرك التحميل بدون ريلود ───────── */
+// آخر قيمة لكل مفتاح هي المعتمدة (نفس سلوك Django)
+const params = () => {
+    const p = new URLSearchParams();
+    for (const [k, v] of new URLSearchParams(location.search)) p.set(k, v);
+    return p;
+};
+
+let ctrl = null;
+async function load(p, { push = true, scroll = 'none' } = {}) {
+    const qs  = p.toString();
+    const url = location.pathname + (qs ? '?' + qs : '');
+    if (ctrl) ctrl.abort();                       // إلغاء الطلب القديم (يمنع تضارب النتائج)
+    const mine = ctrl = new AbortController();
+    busy(true);
+    try {
+        const res = await fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+            cache: 'no-store',
+            signal: mine.signal,
+        });
+        if (res.redirected && new URL(res.url).pathname !== location.pathname) { fallbackTo(res.url, 'redirected'); return; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+
+        const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+        if (!doc.getElementById('tableBody')) { fallbackTo(url, 'no tableBody'); return; }
+
+        PARTS.forEach(id => {
+            const n = doc.getElementById(id), c = document.getElementById(id);
+            if (n && c) c.innerHTML = n.innerHTML;
+        });
+        history[push ? 'pushState' : 'replaceState'](null, '', url);
+        syncCheckboxes();
+        markFiltered();
+        if (scroll === 'table') $('#studentTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (err) {
+        if (err.name !== 'AbortError') fallbackTo(url, err);
+    } finally {
+        if (mine === ctrl) { busy(false); const gl = document.getElementById('global-loader'); if (gl) gl.classList.remove('active'); }
+    }
+}
+
+function markFiltered() {
+    $$('[data-filter]').forEach(el => el.classList.toggle('is-filtered', !!el.value));
+    const s = $('#searchInput');
+    if (s) s.classList.toggle('is-filtered', !!s.value.trim());
+}
+function syncControlsFromUrl() {
+    const p = params();
+    $$('[data-filter]').forEach(el => { el.value = p.get(el.dataset.filter) || ''; });
+    const s = $('#searchInput');
+    if (s) s.value = p.get('q') || '';
+    markFiltered();
+}
+
+// تغيير فلتر => صفحة 1 (لأن عدد النتائج تغيّر) لكن بدون ريلود ومع بقاء باقي الفلاتر
+function setParam(key, value) {
+    const p = params();
+    value ? p.set(key, value) : p.delete(key);
+    p.set('page', '1');
+    load(p);
+}
+
+/* ───────── البحث الفوري ───────── */
+let timer;
+function runSearch() {
+    const input = $('#searchInput');
+    const q = input.value.trim();
+    const p = params();
+    if ((p.get('q') || '') === q) return;
+    q ? p.set('q', q) : p.delete('q');
+    p.set('page', '1');
+    load(p, { push: false });
+}
+const searchInput = $('#searchInput');
+if (searchInput) {
+    const debounced = e => { if (e.isComposing) return; clearTimeout(timer); timer = setTimeout(runSearch, 300); };
+    searchInput.addEventListener('input', debounced);
+    searchInput.addEventListener('compositionend', debounced);
+    searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); runSearch(); }
+    });
+}
+
+/* ───────── الأحداث العامة ───────── */
+document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.id === 'selectAll') {
+        $$('.student-checkbox').forEach(cb => setSel(cb, t.checked));
+        persist();
+    } else if (t.classList.contains('student-checkbox')) {
+        setSel(t, t.checked);
+        persist();
+    } else if (t.matches('[data-filter]')) {
+        setParam(t.dataset.filter, t.value);
+    }
+});
+
+// مرحلة الالتقاط + stopImmediatePropagation: حتى لا تظهر شاشة "جاري التحميل" الخاصة بالقالب الأساسي دون أن تختفي
+window.addEventListener('click', e => {
+    // رابط إجراء داخل الجدول (تعديل/تحصيل/تسكين...): نتذكر الصفحة والفلاتر لنعود إليها بعد الحفظ
+    const act = e.target.closest('#tableBody a[href]');
+    if (act && act.target !== '_blank' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.button) {
+        try {
+            sessionStorage.setItem(RET_KEY, JSON.stringify({
+                qs: location.search,
+                id: (act.closest('tr')?.id || '').replace('student-', ''),
+                ts: Date.now(),
+            }));
+        } catch {}
+    }
+    const link = e.target.closest('a[data-page], a[data-status]');
+    if (link) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;   // اترك فتح تبويب جديد يعمل
+        e.preventDefault(); e.stopImmediatePropagation();
+        const p = params();
+        if (link.dataset.page) p.set('page', link.dataset.page);
+        else { p.set('status', link.dataset.status); p.set('page', '1'); }
+        load(p, { scroll: link.dataset.page ? 'table' : 'none' });
+        return;
+    }
+    const pay = e.target.closest('[data-pay]');
+    if (pay) { openPay(pay.dataset); return; }
+
+    if (e.target.closest('#btnReset')) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        $$('[data-filter]').forEach(el => { el.value = ''; });
+        if (searchInput) searchInput.value = '';
+        load(new URLSearchParams());
+        return;
+    }
+    if (e.target.closest('#btnClearSel')) {
+        selected = {};
+        persist();
+        syncCheckboxes();
+    }
+}, true);
+
+window.addEventListener('popstate', () => { syncControlsFromUrl(); load(params(), { push: false }); });
+
+// منع Enter داخل الفورم من تنفيذ الترحيل بالخطأ
+const promoteForm = $('#promoteForm');
+if (promoteForm) {
+    promoteForm.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault();
+    });
+
+    promoteForm.addEventListener('submit', e => {
+        const ids = Object.keys(selected);
+        $('#allSelectedIds').value = ids.join(',');
+
+        const grade = $('#targetGradeSelect')?.value;
+        const notApproved = ids.filter(id => !OK_STATUS.includes(selected[id])).length;
+
+        if (notApproved && !confirm(`⚠️ تنبيه أكاديمي من الكنترول: يوجد عدد (${notApproved}) طلاب محددين لم يتم اعتماد "نجاحهم" رسمياً.\n\nهل تريد التجاوز وترحيلهم/تخرجهم أكاديمياً؟`)) {
+            return e.preventDefault();
+        }
+
+        let ok;
+        if (grade === 'graduate_action') {
+            ok = confirm('🎓 تأكيد التخرج الإداري والأكاديمي:\nسيتم تسجيل إتمام المرحلة لجميع الطلاب المحددين وتأرشفتهم.\n\nهل تريد الاعتماد؟');
+        } else if (ids.length) {
+            const action = grade === 'auto' ? 'الترحيل التلقائي الذكي' : 'الترحيل للصف المحدد';
+            ok = confirm(`🚀 سيتم تنفيذ (${action}) لعدد (${ids.length}) طالب تم تحديدهم. هل تريد الاستمرار؟`);
+        } else {
+            const total = $('#resultCount')?.textContent.trim() || $('#stat-total')?.textContent.trim() || '';
+            ok = confirm(`💡 لم تقم بتحديد طلاب يدوياً. سيقوم النظام بترحيل جميع طلاب القائمة المفلترة (${total} طالب). هل تريد الاستمرار؟`);
+        }
+        if (!ok) return e.preventDefault();
+
+        try { sessionStorage.removeItem(SEL_KEY); } catch {}   // لا نترك تحديداً قديماً لعملية لاحقة
+        const btn = e.submitter;
+        if (btn) setTimeout(() => { btn.disabled = true; }, 0);   // منع الضغط المزدوج
+    });
+}
+
+/* ───────── التحصيل الإداري (بدون ريلود) ───────── */
+let payModal = null;
+function openPay(d) {
+    $('#pro_student_id').value = d.id;
+    $('#pro_student_name').textContent = d.name;
+    $('#pro_student_code').textContent = 'كود: ' + d.code;
+    $('#pro_amount').value = '';
+    $('#pro_notes').value = '';
+    payModal = bootstrap.Modal.getOrCreateInstance($('#proCollectionModal'));
+    payModal.show();
+}
+$('#proCollectionModal').addEventListener('shown.bs.modal', () => $('#pro_amount').focus());
+
+$('#proCollectionForm').addEventListener('submit', async e => {
     e.preventDefault();
+    const amount = parseFloat($('#pro_amount').value);
+    const notes  = $('#pro_notes').value.trim();
 
-    let form = document.getElementById('proCollectionForm');
-    let amount = document.getElementById('pro_amount').value;
-    let notes = document.getElementById('pro_notes').value.trim();
+    if (!(amount > 0)) { toast('⚠️ يرجى إدخال مبلغ تحصيل صحيح', 'warning'); $('#pro_amount').focus(); return; }
+    if (!notes)        { toast('⚠️ البيان أو سبب التحصيل مطلوب للتوثيق', 'warning'); $('#pro_notes').focus(); return; }
+    if (!confirm(`هل أنت متأكد من تحصيل مبلغ (${amount} ج.م) بالخزينة وإرسال الإشعار؟`)) return;
 
-    if(!amount || amount <= 0) {
-        alert('⚠️ خطأ: يرجى إدخال مبلغ التحصيل أولاً!');
-        document.getElementById('pro_amount').focus();
-        return;
-    }
-    if(!notes) {
-        alert('⚠️ تنبيه: البيان أو سبب التحصيل مطلوب للتوثيق!');
-        document.getElementById('pro_notes').focus();
-        return;
-    }
-
-    if(!confirm(`هل أنت متأكد من تحصيل مبلغ (${amount} ج.م) بالخزينة وإرسال الإشعار؟`)) return;
-
-    let formData = new FormData(form);
-    let btn = document.getElementById('btnSubmitProCollection');
-    let originalHtml = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري التحصيل...';
+    const btn = $('#btnSubmitProCollection');
+    const html = btn.innerHTML;
     btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري التحصيل...';
 
-    fetch("{% url 'ajax_collect_reenrollment_fee' %}", {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRFToken': '{{ csrf_token }}'
-        }
-    })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success) {
-            alert("💸 " + data.message);
-            window.location.reload();
-        } else {
-            alert('❌ عذراً، خطأ من الخادم: ' + data.error);
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
-        }
-    }).catch(err => {
-        alert('تعذر الاتصال بالسيرفر. يرجى التحقق من الشبكة وسجل الأخطاء.');
-        console.error(err);
-        btn.innerHTML = originalHtml;
+    try {
+        const res  = await fetch(COLLECT_URL, {
+            method: 'POST',
+            body: new FormData(e.target),
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': CSRF },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+
+        const id = $('#pro_student_id').value;
+        payModal && payModal.hide();
+        toast('💸 ' + (data.message || 'تم التحصيل بنجاح'), 'success');
+        await load(params(), { push: false });     // تحديث الصفحة الحالية نفسها مع بقاء الفلاتر ورقم الصفحة
+        flash(id);
+    } catch (err) {
+        toast('❌ ' + err.message, 'danger');
+    } finally {
         btn.disabled = false;
-    });
-}
-
-const STORAGE_KEY = 'selected_student_ids';
-
-function getStoredIds() {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-}
-
-function saveIds(ids) {
-    const cleanIds = ids.filter(id => id && id.toString().trim() !== "");
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanIds));
-    const hiddenInput = document.getElementById("allSelectedIds");
-    if (hiddenInput) {
-        hiddenInput.value = cleanIds.join(',');
-    }
-}
-
-function handleScrollToStudent() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const hId = urlParams.get('highlight') || urlParams.get('success_id');
-    const hash = window.location.hash;
-
-    let targetId = null;
-    if (hId) {
-        targetId = 'student-' + hId;
-    } else if (hash && hash.startsWith('#student-')) {
-        targetId = hash.substring(1);
-    }
-
-    if (targetId) {
-        const targetRow = document.getElementById(targetId);
-        if (targetRow) {
-            setTimeout(() => {
-                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                targetRow.classList.add('highlight-edited-student');
-
-                setTimeout(() => {
-                    targetRow.style.transition = "all 2s ease-in-out";
-                    targetRow.classList.remove('highlight-edited-student');
-                }, 6000);
-            }, 300);
-        }
-    }
-}
-
-function rebindCheckboxes() {
-    const storedIds = getStoredIds();
-    document.querySelectorAll(".student-checkbox").forEach(cb => {
-        cb.checked = storedIds.includes(cb.value);
-        cb.onchange = function() {
-            let currentStored = getStoredIds();
-            if (this.checked) {
-                if (!currentStored.includes(this.value)) currentStored.push(this.value);
-            } else {
-                currentStored = currentStored.filter(id => id !== this.value);
-            }
-            saveIds(currentStored);
-        };
-    });
-}
-
-let debounceTimer;
-function instantSearch() {
-    let query = document.getElementById('searchInput').value.trim();
-    let tableBody = document.getElementById('tableBody');
-
-    clearTimeout(debounceTimer);
-
-    debounceTimer = setTimeout(() => {
-        let url = new URL(window.location.href);
-
-        if (query.length > 0) {
-            url.searchParams.set('q', query);
-        } else {
-            url.searchParams.delete('q');
-        }
-
-        url.searchParams.set('page', '1');
-        if (tableBody) tableBody.style.opacity = '0.35';
-
-        fetch(url.toString(), {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-        .then(response => response.text())
-        .then(data => {
-            let parser = new DOMParser();
-            let doc = parser.parseFromString(data, 'text/html');
-
-            let newTableBody = doc.getElementById('tableBody');
-            let newPaginationContainer = doc.getElementById('paginationContainer');
-
-            if (newTableBody && tableBody) {
-                tableBody.innerHTML = newTableBody.innerHTML;
-            }
-
-            let curPaginationContainer = document.getElementById('paginationContainer');
-            if (newPaginationContainer && curPaginationContainer) {
-                curPaginationContainer.innerHTML = newPaginationContainer.innerHTML;
-            }
-
-            ['stat-total', 'stat-unassigned', 'stat-assigned', 'stat-paid', 'stat-debt'].forEach(id => {
-                let newStat = doc.getElementById(id);
-                let curStat = document.getElementById(id);
-                if (newStat && curStat) {
-                    curStat.innerText = newStat.innerText;
-                }
-            });
-
-            window.history.replaceState({}, '', url.toString());
-            rebindCheckboxes();
-
-            if (tableBody) tableBody.style.opacity = '1';
-        })
-        .catch(err => {
-            console.error('حدث خطأ أثناء تنفيذ البحث الشامل:', err);
-            if (tableBody) tableBody.style.opacity = '1';
-        });
-    }, 350);
-}
-
-function updateUrlParam(key, value) {
-    let url = new URL(window.location.href);
-    if (value) {
-        url.searchParams.set(key, value);
-    } else {
-        url.searchParams.delete(key);
-    }
-    url.searchParams.set('page', '1');
-    window.location.href = url.toString();
-}
-
-document.addEventListener("DOMContentLoaded", function() {
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.focus();
-        const val = searchInput.value;
-        searchInput.value = '';
-        searchInput.value = val;
-    }
-
-    rebindCheckboxes();
-    handleScrollToStudent();
-
-    document.addEventListener("change", function(e) {
-        if (e.target && e.target.id === "selectAll") {
-            const isChecked = e.target.checked;
-            let currentStored = getStoredIds();
-            document.querySelectorAll(".student-checkbox").forEach(cb => {
-                cb.checked = isChecked;
-                if (isChecked) {
-                    if (!currentStored.includes(cb.value)) currentStored.push(cb.value);
-                } else {
-                    currentStored = currentStored.filter(id => id !== cb.value);
-                }
-            });
-            saveIds(currentStored);
-        }
-    });
-
-    const promoteForm = document.getElementById("promoteForm");
-    if (promoteForm) {
-        promoteForm.addEventListener("submit", function(e) {
-            const finalIds = getStoredIds();
-            const hiddenInput = document.getElementById("allSelectedIds");
-            if (hiddenInput) {
-                hiddenInput.value = finalIds.join(',');
-            }
-
-            const targetGradeSelect = document.getElementById("targetGradeSelect");
-            const isGraduation = targetGradeSelect && targetGradeSelect.value === 'graduate_action';
-            const isAuto = targetGradeSelect && targetGradeSelect.value === 'auto';
-
-            let nonPromotedCount = 0;
-            document.querySelectorAll(".student-checkbox:checked").forEach(cb => {
-                let row = closest("tr");
-                if (row) {
-                    let status = row.getAttribute("data-academic-status");
-                    if (status !== "Promoted" && status !== "passed") {
-                        nonPromotedCount++;
-                    }
-                }
-            });
-
-            if (nonPromotedCount > 0) {
-                if (!confirm(`⚠️ تنبيه أكاديمي من الكنترول: يوجد عدد (${nonPromotedCount}) طلاب محددين لم يتم اعتماد "نجاحهم" رسمياً.\n\nهل تريد التجاوز وترحيلهم/تخرجهم أكاديمياً؟`)) {
-                    e.preventDefault();
-                    return;
-                }
-            }
-
-            if (isGraduation) {
-                if (!confirm(`🎓 تأكيد التخرج الإداري والأكاديمي:\nسيتم تسجيل إتمام المرحلة لجميع الطلاب المحددين وتأرشفتهم.\n\nهل تريد الاعتماد؟`)) {
-                    e.preventDefault();
-                }
-            } else if (finalIds.length > 0) {
-                const actionText = isAuto ? 'الترحيل التلقائي الذكي' : 'الترحيل للصف المحدد';
-                if (!confirm(`🚀 سيتم تنفيذ (${actionText}) لعدد (${finalIds.length}) طالب تم تحديدهم. هل تريد الاستمرار؟`)) {
-                    e.preventDefault();
-                }
-            } else {
-                const totalVisibleText = document.getElementById("stat-total") ? document.getElementById("stat-total").innerText : "{{ total_count }}";
-                if (!confirm(`💡 لم تقم بتحديد طلاب يدوياً. سيقوم النظام بترحيل جميع طلاب الصف المفلتر (${totalVisibleText} طالب). هل تريد الاستمرار؟`)) {
-                    e.preventDefault();
-                }
-            }
-        });
+        btn.innerHTML = html;
     }
 });
 
-window.addEventListener("load", function() {
-    const lastEditedId = localStorage.getItem('last_edited_student_id');
-    if (lastEditedId) {
-        const targetRow = document.getElementById('student-' + lastEditedId);
-        if (targetRow) {
-            targetRow.style.setProperty('display', 'table-row', 'important');
-            setTimeout(function() {
-                window.scrollTo({
-                    top: targetRow.getBoundingClientRect().top + window.pageYOffset - 150,
-                    behavior: 'smooth'
-                });
-            }, 100);
+/* ───────── التمرير للطالب بعد العودة من شاشات أخرى ───────── */
+function scrollToTarget() {
+    const q = new URLSearchParams(location.search);
+    const id = q.get('highlight') || q.get('success_id') || (location.hash.startsWith('#student-') ? location.hash.slice(9) : null);
+    if (!id) return;
+    const row = document.getElementById('student-' + id);
+    if (row) setTimeout(() => { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); flash(id, 6000); }, 300);
+}
 
-            const searchData = targetRow.getAttribute('data-search') || "";
-            let studentName = "الطالب المعدل";
-            if (searchData.trim() !== "") {
-                const parts = searchData.split(' ');
-                studentName = parts[0] + " " + (parts[1] || "") + " " + (parts[2] || "");
-            }
+window.addEventListener('load', () => {
+    let lastId = null;
+    try { lastId = localStorage.getItem('last_edited_student_id'); } catch {}
+    if (!lastId) return;
+    const row = document.getElementById('student-' + lastId);
+    if (!row) return;
 
-            document.getElementById('successModalStudentName').innerText = studentName;
-            const successModal = new bootstrap.Modal(document.getElementById('editSuccessModal'));
-            successModal.show();
-
-            targetRow.classList.add('highlight-edited-student');
-
-            setTimeout(() => {
-                targetRow.style.transition = "all 1.5s ease-in-out";
-                targetRow.classList.remove('highlight-edited-student');
-            }, 7000);
-
-            document.getElementById('btnScrollToStudent').onclick = function() {
-                successModal.hide();
-                setTimeout(() => {
-                    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 200);
-            };
-
-            localStorage.removeItem('last_edited_student_id');
-        }
-    }
+    const name = row.querySelector('a.text-info')?.textContent.trim() || 'الطالب المعدل';
+    $('#successModalStudentName').textContent = name;
+    const modal = bootstrap.Modal.getOrCreateInstance($('#editSuccessModal'));
+    modal.show();
+    setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+    flash(lastId, 7000);
+    $('#btnScrollToStudent').onclick = () => {
+        modal.hide();
+        setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+    };
+    try { localStorage.removeItem('last_edited_student_id'); } catch {}
 });
+
+/* ───────── العودة لنفس الصفحة والفلاتر بعد تعديل طالب ───────── */
+(function restoreAfterEdit() {
+    let st = null;
+    try { st = JSON.parse(sessionStorage.getItem(RET_KEY) || 'null'); sessionStorage.removeItem(RET_KEY); } catch {}
+    if (!st || Date.now() - st.ts > 30 * 60 * 1000) return;     // صالحة 30 دقيقة فقط
+    if (location.search || !st.qs) return;                       // جاءت بفلاتر أصلاً، أو كانت الصفحة الأولى بلا فلاتر
+    history.replaceState(null, '', location.pathname + st.qs);
+    syncControlsFromUrl();
+    load(params(), { push: false }).then(() => {
+        const row = st.id && document.getElementById('student-' + st.id);
+        if (row) { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); flash(st.id, 6000); }
+    });
+})();
+
+/* ───────── تشغيل أولي ───────── */
+syncCheckboxes();
+markFiltered();
+scrollToTarget();
+if (searchInput && !matchMedia('(pointer: coarse)').matches) {   // لا نفتح كيبورد الموبايل تلقائياً
+    searchInput.focus();
+    const v = searchInput.value; searchInput.value = ''; searchInput.value = v;
+}
+})();
 </script>
+{% endif %}
+
 {% endblock %}

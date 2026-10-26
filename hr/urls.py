@@ -58,4 +58,6 @@ urlpatterns = [
 
     # مسار العطلات الرسمية
     path('holidays/', views.public_holiday_list, name='public_holiday_list'),
+
+    path('reports/monthly-excel/<int:year>/<int:month>/', views.export_monthly_report_excel, name='export_monthly_report'),
 ]

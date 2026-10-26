@@ -264,6 +264,7 @@ class Classroom(models.Model):
     grade = models.ForeignKey("students.Grade", on_delete=models.CASCADE)
 
     class Meta:
+        ordering = ['grade', 'name']  # الترتيب حسب الصف ثم اسم الفصل
         verbose_name = "فصل"
         verbose_name_plural = "الفصول"
 
@@ -382,6 +383,9 @@ class Student(models.Model):
         verbose_name_plural = "الطلاب"
         indexes = [
             models.Index(fields=['first_name', 'id']),
+            models.Index(fields=['academic_year', 'is_active', 'first_name'], name='stu_year_active_name_idx'),
+            models.Index(fields=['academic_year', 'enrollment_status'], name='stu_year_status_idx'),
+            models.Index(fields=['academic_year', 'grade', 'classroom'], name='stu_year_grade_class_idx'),
         ]
 
     # ----------------------------------------------------------------

@@ -109,7 +109,9 @@
         window.addEventListener("beforeunload", () => loader.classList.add("active"));
         document.addEventListener("click", e => {
             const link = e.target.closest("a");
-            if (!link || e.ctrlKey || !link.href || link.href.startsWith("#") || link.href.startsWith("javascript")) return;
+            if (e.defaultPrevented) return;   // الصفحة تعالج النقر بنفسها (AJAX) فلا داعي للودر
+            const raw = link ? (link.getAttribute("href") || "") : "";
+            if (!link || e.ctrlKey || e.metaKey || e.shiftKey || e.button || !raw || raw.startsWith("#") || raw.startsWith("javascript") || link.hasAttribute("download")) return;
             
             // 🟢 التعديل الجذري: منع تشغيل اللودر إذا كان الرابط سيفتح في نافذة جديدة (target="_blank")
             if (link.getAttribute("target") === "_blank") return;

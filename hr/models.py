@@ -116,12 +116,40 @@ def calculate_monthly_leave_rate(hire_date, reference_date=None):
     return 2.5 if tenure_years >= 10 else 1.75
 
 
+# def calculate_accrued_annual_leave(employee, reference_date=None):
+#     """
+#     الرصيد المتراكم فعلياً لحد أي تاريخ (افتراضياً: النهاردة)،
+#     بناءً على أقرب نقطة بين بداية سنة الإجازات وتاريخ تعيين الموظف.
+#     """
+#     ref = reference_date or date.today()
+#     year_start = get_leave_year_start(ref)
+
+#     if employee.hire_date and employee.hire_date > year_start:
+#         accrual_start = employee.hire_date
+#     else:
+#         accrual_start = year_start
+
+#     if accrual_start > ref:
+#         return 0.0
+
+#     months = full_months_between(accrual_start, ref)
+#     monthly_rate = calculate_monthly_leave_rate(employee.hire_date, ref)
+
+#     return round(months * monthly_rate, 2)
+
+
 def calculate_accrued_annual_leave(employee, reference_date=None):
     """
     الرصيد المتراكم فعلياً لحد أي تاريخ (افتراضياً: النهاردة)،
     بناءً على أقرب نقطة بين بداية سنة الإجازات وتاريخ تعيين الموظف.
+    ولا يتجاوز تاريخ انتهاء العمل إن وُجد.
     """
     ref = reference_date or date.today()
+
+    # 🟢 الموظف المستقيل لا يتراكم له رصيد بعد انتهاء عمله
+    if employee.end_date and employee.end_date < ref:
+        ref = employee.end_date
+
     year_start = get_leave_year_start(ref)
 
     if employee.hire_date and employee.hire_date > year_start:
@@ -138,18 +166,27 @@ def calculate_accrued_annual_leave(employee, reference_date=None):
     return round(months * monthly_rate, 2)
 
 
-
+# ============================================================
+# 2) استبدل كلاس Employee بالكامل بهذا
+# ============================================================
 class Employee(models.Model):
     emp_id = models.CharField(max_length=50, unique=True, verbose_name="كود البصمة الرقمي")
     name = models.CharField(max_length=100, verbose_name="اسم الموظف بالكامل")
 
-    # 🟢 إضافة القيمة الافتراضية 1/1/2026
     hire_date = models.DateField(
         "تاريخ التعيين / المباشرة",
         default=date(2026, 1, 1),
         null=True,
         blank=True
     )
+
+    end_date = models.DateField(
+        "تاريخ انتهاء العمل / الاستقالة",
+        null=True,
+        blank=True,
+        help_text="يترك فارغاً إذا كان الموظف على رأس العمل"
+    )
+
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, verbose_name="القسم التابع له")
     attendance_rule = models.ForeignKey('AttendanceRule', on_delete=models.PROTECT, verbose_name="لائحة العمل المطبقة")
 
@@ -176,58 +213,117 @@ class Employee(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [
+            # 🟢 حماية على مستوى قاعدة البيانات (تعمل حتى مع الاستيراد والـ ORM)
+            # ملاحظة: في Django 5.1+ استبدل check= بـ condition=
+            models.CheckConstraint(
+                check=Q(end_date__isnull=True)
+                      | Q(hire_date__isnull=True)
+                      | Q(end_date__gte=F('hire_date')),
+                name='employee_end_date_after_hire_date',
+            ),
+        ]
+
     def __str__(self):
         return f"[{self.emp_id}] {self.name}"
 
-    @property
-    def remaining_annual_balance(self):
+    # --------------------------------------------------------
+    # التحقق
+    # --------------------------------------------------------
+    def clean(self):
+        super().clean()
+        if self.hire_date and self.end_date and self.end_date < self.hire_date:
+            raise ValidationError({'end_date': "تاريخ انتهاء العمل لا يمكن أن يكون قبل تاريخ التعيين."})
+
+    # --------------------------------------------------------
+    # فترة التوظيف
+    # --------------------------------------------------------
+    def is_employed_on(self, target_date):
         """
-        الرصيد المتبقي الفعلي = (المتراكم شهرياً تلقائياً + أي تعديل يدوي إضافي)
-                                  - (أيام الإجازات السنوية المعتمدة/المعلّقة)
-
-        ملحوظة: initial_annual_balance بقى حقل "تعديل يدوي اختياري" فقط
-        (مثلاً لترحيل رصيد قديم من نظام سابق أو تصحيح استثنائي)،
-        مش المصدر الأساسي للرصيد بعد دلوقتي.
+        هل الموظف على قوة العمل في هذا اليوم؟ (شاملاً يوم التعيين ويوم انتهاء العمل)
+        يجب أن تستخدمها دوال رفع البصمة وتوليد الحضور والعطلات والمأموريات
+        قبل إنشاء أي سجل DailyAttendance.
         """
-        from django.db.models import Sum
-
-        accrued = calculate_accrued_annual_leave(self)
-        manual_adjustment = float(self.initial_annual_balance or 0)
-
-        used_days = self.leaverequest_set.filter(
-            leave_type='annual',
-            status__in=['approved', 'pending']
-        ).aggregate(total=Sum('duration_days'))['total'] or 0
-
-        return round(accrued + manual_adjustment - used_days, 2)
-
-    @property
-    def daily_wage(self):
-        """قاعدة الـ 30 يوم الثابتة لحساب الأجر اليومي"""
-        if self.base_salary:
-            return Decimal(str(self.base_salary)) / Decimal('30.0')
-        return Decimal('0.00')
+        if self.hire_date and target_date < self.hire_date:
+            return False
+        if self.end_date and target_date > self.end_date:
+            return False
+        return True
 
     def get_active_days_in_month(self, target_year, target_month):
-        """حساب أيام العمل الفعلية في شهر محدد (للموظف الجديد والقديم)"""
+        """
+        عدد الأيام الفعلية (بالتقويم) التي كان فيها الموظف على قوة العمل داخل الشهر.
+        - شهر كامل: 28/29/30/31 (= عدد أيام الشهر)
+        - بدأ يوم 2: يخصم يوم واحد أياً كان طول الشهر.
+        - يوم التعيين ويوم انتهاء العمل محسوبان.
+        """
         _, last_day = calendar.monthrange(target_year, target_month)
         month_start = date(target_year, target_month, 1)
         month_end = date(target_year, target_month, last_day)
 
         if self.hire_date and self.hire_date > month_end:
             return 0
+        if self.end_date and self.end_date < month_start:
+            return 0
 
-        if not self.hire_date or self.hire_date <= month_start:
-            return 30
+        calc_start = max(self.hire_date, month_start) if self.hire_date else month_start
+        calc_end = min(self.end_date, month_end) if self.end_date else month_end
 
-        actual_worked_days = (month_end - self.hire_date).days + 1
-        return min(actual_worked_days, 30)
+        if calc_end < calc_start:
+            return 0
+
+        return (calc_end - calc_start).days + 1
+
+    # --------------------------------------------------------
+    # الأجور
+    # --------------------------------------------------------
+    @property
+    def daily_wage(self):
+        """
+        الأجر اليومي القياسي = الراتب ÷ 30 (نفس standard_day_rate المستخدم في كشف المرتبات).
+        الراتب المستحق للخدمة الجزئية (تعيين / استقالة) يحسبه الكشف نفسه في
+        compute_salary_components على دورة 26→25، فلا تستخدم هذه الخاصية لحساب الراتب الأساسي.
+        """
+        if self.base_salary:
+            return Decimal(str(self.base_salary)) / Decimal('30.0')
+        return Decimal('0.00')
+
+    # --------------------------------------------------------
+    # الإجازات
+    # --------------------------------------------------------
+    @property
+    def remaining_annual_balance(self):
+        """
+        الرصيد المتبقي الفعلي = (المتراكم شهرياً تلقائياً + أي تعديل يدوي إضافي)
+                                  - (أيام الإجازات السنوية المعتمدة/المعلّقة)
+
+        initial_annual_balance حقل "تعديل يدوي اختياري" فقط
+        (لترحيل رصيد قديم من نظام سابق أو تصحيح استثنائي).
+        """
+        accrued = calculate_accrued_annual_leave(self)
+        manual_adjustment = float(self.initial_annual_balance or 0)
+
+        # 🔧 تصحيح: related_name الفعلي هو leave_requests (وليس leaverequest_set)،
+        # و duration_days property وليست حقل قاعدة بيانات فلا يصلح معها Sum().
+        used_days = sum(
+            leave.duration_days
+            for leave in self.leave_requests.filter(
+                leave_type='annual',
+                status__in=['approved', 'pending']
+            )
+        )
+
+        return round(accrued + manual_adjustment - used_days, 2)
 
     def check_is_working_day(self, target_date):
         """
-        دالة تفحص ما إذا كان اليوم يوم عمل.
-        الأولوية لجدول الورديات (ShiftRoster). إذا لم يوجد، يتم الرجوع للائحة الافتراضية.
+        هل اليوم يوم عمل؟ (مع مراعاة فترة التوظيف)
+        الأولوية: فترة التوظيف ← جدول الورديات (ShiftRoster) ← لائحة الدوام.
         """
+        if not self.is_employed_on(target_date):
+            return False
+
         roster = self.rosters.filter(date=target_date).first()
         if roster:
             return roster.is_working
@@ -265,6 +361,177 @@ class Employee(models.Model):
             status='approved'
         )
         return sum(leave.duration_days for leave in leaves)
+
+
+
+
+# class Employee(models.Model):
+#     emp_id = models.CharField(max_length=50, unique=True, verbose_name="كود البصمة الرقمي")
+#     name = models.CharField(max_length=100, verbose_name="اسم الموظف بالكامل")
+
+#     # 🟢 إضافة القيمة الافتراضية 1/1/2026
+#     hire_date = models.DateField(
+#         "تاريخ التعيين / المباشرة",
+#         default=date(2026, 1, 1),
+#         null=True,
+#         blank=True
+#     )
+
+#     # 🟢 إضافة حقل تاريخ انتهاء العمل / الاستقالة الجديد
+#     end_date = models.DateField(
+#         "تاريخ انتهاء العمل / الاستقالة",
+#         null=True,
+#         blank=True,
+#         help_text="يترك فارغاً إذا كان الموظف على رأس العمل"
+#     )
+
+#     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, verbose_name="القسم التابع له")
+#     attendance_rule = models.ForeignKey('AttendanceRule', on_delete=models.PROTECT, verbose_name="لائحة العمل المطبقة")
+
+#     is_active = models.BooleanField(default=True, verbose_name="على رأس العمل حالياً")
+#     base_salary = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="الراتب الأساسي التعاقدي")
+
+#     is_insured = models.BooleanField(default=False, verbose_name="خاضع للتأمينات الاجتماعية؟")
+#     insurance_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="الرقم التأميني")
+#     insurance_basic_salary = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="الأجر الأساسي التأميني")
+#     insurance_variable_allowance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="البدلات التأمينية / الأجر المتغير")
+#     insurance_deduction = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="قيمة الاستقطاع التأميني (حصة الموظف)")
+#     initial_annual_balance = models.DecimalField(max_digits=5, decimal_places=2, default=0, blank=True, verbose_name="رصيد الإجازات المبدئي")
+#     annual_balance = models.FloatField(default=15.0, verbose_name="رصيد الاعتيادية")
+#     casual_balance = models.FloatField(default=6.0, verbose_name="رصيد الإجازات العارضة")
+#     sick_balance = models.FloatField(default=30.0, verbose_name="رصيد الإجازات المرضية المتاحة")
+
+#     hr_managers = models.ManyToManyField(
+#         User,
+#         blank=True,
+#         related_name='assigned_employees',
+#         verbose_name="مسؤولي الـ HR المخصصين لهذا الموظف"
+#     )
+
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     def __str__(self):
+#         return f"[{self.emp_id}] {self.name}"
+
+#     @property
+#     def remaining_annual_balance(self):
+#         """
+#         الرصيد المتبقي الفعلي = (المتراكم شهرياً تلقائياً + أي تعديل يدوي إضافي)
+#                                   - (أيام الإجازات السنوية المعتمدة/المعلّقة)
+
+#         ملحوظة: initial_annual_balance بقى حقل "تعديل يدوي اختياري" فقط
+#         (مثلاً لترحيل رصيد قديم من نظام سابق أو تصحيح استثنائي)،
+#         مش المصدر الأساسي للرصيد بعد دلوقتي.
+#         """
+#         from django.db.models import Sum
+
+#         accrued = calculate_accrued_annual_leave(self)
+#         manual_adjustment = float(self.initial_annual_balance or 0)
+
+#         used_days = self.leaverequest_set.filter(
+#             leave_type='annual',
+#             status__in=['approved', 'pending']
+#         ).aggregate(total=Sum('duration_days'))['total'] or 0
+
+#         return round(accrued + manual_adjustment - used_days, 2)
+
+#     @property
+#     def daily_wage(self):
+#         """قاعدة الـ 30 يوم الثابتة لحساب الأجر اليومي"""
+#         if self.base_salary:
+#             return Decimal(str(self.base_salary)) / Decimal('30.0')
+#         return Decimal('0.00')
+
+#     # def get_active_days_in_month(self, target_year, target_month):
+#     #     """حساب أيام العمل الفعلية في شهر محدد (للموظف الجديد والقديم)"""
+#     #     _, last_day = calendar.monthrange(target_year, target_month)
+#     #     month_start = date(target_year, target_month, 1)
+#     #     month_end = date(target_year, target_month, last_day)
+
+#     #     if self.hire_date and self.hire_date > month_end:
+#     #         return 0
+
+#     #     if not self.hire_date or self.hire_date <= month_start:
+#     #         return 30
+
+#     #     actual_worked_days = (month_end - self.hire_date).days + 1
+#     #     return min(actual_worked_days, 30)
+
+#     def clean(self):
+#         super().clean()
+#         # 🟢 التحقق من منطقية التواريخ
+#         if self.hire_date and self.end_date and self.end_date < self.hire_date:
+#             raise ValidationError({'end_date': "تاريخ انتهاء العمل لا يمكن أن يكون قبل تاريخ التعيين."})
+
+#     def get_active_days_in_month(self, target_year, target_month):
+#         """حساب أيام العمل الفعلية في شهر محدد (للموظف الجديد، المستقيل، أو المستمر)"""
+#         _, last_day = calendar.monthrange(target_year, target_month)
+#         month_start = date(target_year, target_month, 1)
+#         month_end = date(target_year, target_month, last_day)
+
+#         # 1. إذا كان الموظف لم يتم تعيينه بعد في هذا الشهر
+#         if self.hire_date and self.hire_date > month_end:
+#             return 0
+
+#         # 2. إذا كان الموظف قد انتهى عمله وتاريخ استقالته قبل بداية هذا الشهر تماماً
+#         if self.end_date and self.end_date < month_start:
+#             return 0
+
+#         # 3. تحديد نقطة البداية الفعلية داخل الشهر (إما تاريخ التعيين أو أول يوم في الشهر أيهما أبعد)
+#         calc_start = max(self.hire_date, month_start) if self.hire_date else month_start
+
+#         # 4. تحديد نقطة النهاية الفعلية داخل الشهر (إما تاريخ انتهاء العمل أو آخر يوم في الشهر أيهما أقرب)
+#         calc_end = min(self.end_date, month_end) if self.end_date else month_end
+
+#         # 5. احتساب الأيام الفعلية بدقة (مع تضمين يوم البدء ويوم النهاية بإضافة +1)
+#         actual_worked_days = (calc_end - calc_start).days + 1
+
+#         # سقف احتساب الشهر بحد أقصى 30 يوم حسب قاعدة الأجور المعمول بها
+#         return max(0, min(actual_worked_days, 30))
+
+#     def check_is_working_day(self, target_date):
+#         """
+#         دالة تفحص ما إذا كان اليوم يوم عمل.
+#         الأولوية لجدول الورديات (ShiftRoster). إذا لم يوجد، يتم الرجوع للائحة الافتراضية.
+#         """
+#         roster = self.rosters.filter(date=target_date).first()
+#         if roster:
+#             return roster.is_working
+
+#         if self.attendance_rule:
+#             return self.attendance_rule.is_working_day(target_date)
+#         return False
+
+#     @property
+#     def casual_taken_this_month(self):
+#         """إجمالي أيام العارضة المستهلكة في الشهر الحالي"""
+#         if hasattr(self, 'annotated_casual_taken'):
+#             return getattr(self, 'annotated_casual_taken') or 0.0
+
+#         now = timezone.now()
+#         leaves = self.leave_requests.filter(
+#             leave_type='casual',
+#             start_date__year=now.year,
+#             start_date__month=now.month,
+#             status='approved'
+#         )
+#         return sum(leave.duration_days for leave in leaves)
+
+#     @property
+#     def annual_taken_this_month(self):
+#         """إجمالي أيام السنوية المستهلكة في الشهر الحالي"""
+#         if hasattr(self, 'annotated_annual_taken'):
+#             return getattr(self, 'annotated_annual_taken') or 0.0
+
+#         now = timezone.now()
+#         leaves = self.leave_requests.filter(
+#             leave_type='annual',
+#             start_date__year=now.year,
+#             start_date__month=now.month,
+#             status='approved'
+#         )
+#         return sum(leave.duration_days for leave in leaves)
 
 
 # 4. سجل البصمة الخام

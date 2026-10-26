@@ -1,143 +1,199 @@
-<!DOCTYPE html>
+{% load l10n %}<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تسوية مديونية الطالب - {{ student.get_full_name }}</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
-        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card-custom { border-radius: 18px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        .card-header-custom { background: linear-gradient(135deg, #0d6efd, #0a58ca); border-top-left-radius: 18px !important; border-top-right-radius: 18px !important; }
-        .form-control:focus { border-color: #0d6efd; box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15); }
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            margin: 0; background: #f4f6f9; color: #212529;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.5;
+        }
+        .wrap { max-width: 520px; margin: 40px auto; padding: 0 14px; }
+        .card { background: #fff; border-radius: 18px; box-shadow: 0 10px 25px rgba(0,0,0,.1); overflow: hidden; }
+        .card-head {
+            background: linear-gradient(135deg, #0d6efd, #0a58ca);
+            color: #fff; text-align: center; padding: 16px;
+        }
+        .card-head h1 { margin: 0; font-size: 1.3rem; }
+        .card-body { padding: 24px; }
+
+        .alert { padding: 12px 14px; border-radius: 8px; margin-bottom: 14px; font-weight: bold;
+                 display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .alert button { background: none; border: 0; font-size: 1.3rem; cursor: pointer; color: inherit; line-height: 1; }
+        .alert-danger  { background: #f8d7da; color: #842029; }
+        .alert-success { background: #d1e7dd; color: #0f5132; }
+        .alert-info    { background: #cff4fc; color: #055160; }
+        .alert-warning { background: #fff3cd; color: #664d03; }
+
+        .info-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 14px; margin-bottom: 22px; }
+        .info-box p { margin: 0 0 8px; }
+        .info-box p:last-child { margin: 0; }
+        .muted { color: #6c757d; }
+        .name { color: #0d6efd; font-weight: bold; }
+        .debt-badge { display: inline-block; background: #ffc107; color: #212529; padding: 4px 12px;
+                      border-radius: 6px; font-weight: bold; font-size: 1.1rem; }
+
+        .field { margin-bottom: 22px; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; }
+        input[type=number], input[type=text] {
+            width: 100%; padding: 12px; font-size: 1.2rem; font-weight: bold; text-align: center;
+            border: 1px solid #ced4da; border-radius: 8px; font-family: inherit;
+        }
+        input[type=number]:focus, input[type=text]:focus { outline: 0; border-color: #0d6efd; box-shadow: 0 0 0 .2rem rgba(13,110,253,.15); }
+        #amount { color: #198754; border-color: #198754; }
+
+
+        .btn { display: inline-block; padding: 12px 28px; font-size: 1.05rem; font-weight: bold; border: 0;
+               border-radius: 8px; cursor: pointer; text-decoration: none; font-family: inherit; }
+        .btn-success { background: #198754; color: #fff; }
+        .btn-success:disabled { opacity: .7; cursor: not-allowed; }
+        .btn-secondary { background: #6c757d; color: #fff; }
+
+        .exception-box { border: 1px dashed #ffc107; background: #fffbea; border-radius: 10px; padding: 12px 14px; }
+        .exception-box label.chk { display: flex; align-items: center; gap: 8px; font-weight: bold; cursor: pointer; margin: 0; color: #664d03; }
+        .exception-box input[type=checkbox] { width: 18px; height: 18px; }
+        #noReceiptReasonWrap { display: none; margin-top: 10px; }
+        #noReceiptReason { width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #ced4da; border-radius: 8px; font-family: inherit; }
+        #noReceiptReason:focus { outline: 0; border-color: #ffc107; box-shadow: 0 0 0 .2rem rgba(255,193,7,.25); }
+        .help { display: block; margin-top: 8px; font-size: .9rem; font-weight: bold; }
+        .help.ok { color: #198754; }
+        .help.bad { color: #dc3545; }
+        .help.gray { color: #6c757d; }
+
+        .actions { text-align: center; margin-top: 10px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent;
+                   border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-left: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
+<div class="wrap">
+    <div class="card">
+        <div class="card-head"><h1>💰 تسوية مديونية الطالب</h1></div>
+        <div class="card-body">
 
-<div class="container my-5">
-    <div class="row justify-content-center">
-        <div class="col-md-7 col-lg-6">
-            <div class="card card-custom">
-                <div class="card-header card-header-custom text-white py-3">
-                    <h4 class="mb-0 text-center font-weight-bold">
-                        <i class="bi bi-cash-coin me-2"></i> تسوية مديونية الطالب
-                    </h4>
-                </div>
-                <div class="card-body p-4">
-
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show text-right font-weight-bold shadow-sm" role="alert">
-                                {{ message }}
-                                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                    <span aria-hidden="true">&times;</span>
-                                </button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-
-                    <div class="bg-light p-3 rounded-lg mb-4 text-right border">
-                        <p class="mb-2 fs-5">
-                            <strong class="text-secondary"><i class="bi bi-person-fill"></i> اسم الطالب:</strong> 
-                            <span class="text-primary font-weight-bold ms-1">{{ student.get_full_name }}</span>
-                        </p>
-                        <p class="mb-0">
-                            <strong class="text-secondary"><i class="bi bi-receipt"></i> المديونية القديمة المتبقية:</strong> 
-                            <span class="badge badge-warning text-dark p-2 font-weight-bold ms-1" style="font-size: 1.1rem;">
-                                {{ old_debt }} ج.م
-                            </span>
-                        </p>
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">
+                        <span>{{ message }}</span>
+                        <button type="button" onclick="this.parentNode.remove()" aria-label="إغلاق">&times;</button>
                     </div>
+                {% endfor %}
+            {% endif %}
 
-                    <form method="POST" action="" id="settleDebtForm" onsubmit="preventDoubleSubmit(event)">
-                        {% csrf_token %}
-                        
-                        <!-- 🟢 حقل مخفي لنقل اسم الشاشة المرجعية -->
-                        <input type="hidden" name="from_screen" value="{{ from_screen }}">
-
-                        <div class="form-group text-right mb-4">
-                            <label for="amount" class="font-weight-bold text-dark">
-                                <i class="bi bi-currency-pound text-success"></i> المبلغ المراد سداده:
-                            </label>
-                            <input type="number" id="amount" name="amount" step="1" 
-                                   max="{{ old_debt }}" min="1"
-                                   class="form-control form-control-lg text-center font-weight-bold text-success border-success" 
-                                   placeholder="أدخل المبلغ..." required autofocus>
-                        </div>
-
-                        <div class="form-group text-right mb-4">
-                            <label for="receiptNumberInput" class="font-weight-bold text-dark">
-                                <i class="bi bi-journal-check text-primary"></i> رقم الإيصال الورقي المرجعي:
-                            </label>
-                            <div class="input-group">
-                                <input type="number" name="receipt_number" id="receiptNumberInput"
-                                       class="form-control form-control-lg text-center font-weight-bold text-dark"
-                                       value="{{ next_receipt_number|default:'' }}"
-                                       placeholder="أدخل رقم الإيصال المرجعي...">
-                                <div class="input-group-append">
-                                    <button type="button" class="btn btn-outline-danger font-weight-bold" onclick="clearSerialInput()" title="إلغاء السيريال المكتوب">
-                                        <i class="bi bi-trash3-fill"></i> إلغاء السيريال
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            {% if has_active_book %}
-                                <small class="text-success font-weight-bold d-block mt-2" id="serialHelpText">
-                                    <i class="bi bi-check-circle-fill"></i> السيريال المتاح التالي بالدفتر النشط.
-                                </small>
-                            {% else %}
-                                <small class="text-danger font-weight-bold d-block mt-2">
-                                    ⚠️ لا يوجد دفتر إيصالات نشط حالياً للمحصل. يمكنك الإدخال يدوياً.
-                                </small>
-                            {% endif %}
-                        </div>
-
-                        <div class="text-center mt-4 pt-2">
-                            <button type="submit" id="submitBtn" class="btn btn-success btn-lg px-5 font-weight-bold shadow-sm">
-                                <i class="bi bi-check2-circle"></i> <span id="btnText">تأكيد عملية السداد</span>
-                            </button>
-                            <!-- 🟢 تحويل زر الإلغاء للعودة الذكية للكاونتر -->
-                            <a href="{% if from_screen == 'counter' %}/finance/counter/?student_id={{ student.id }}{% elif from_screen == 'quick_collection' %}/finance/quick-collection/?student_id={{ student.id }}{% else %}{% url 'student_list' %}{% endif %}" class="btn btn-secondary btn-lg px-4 mr-2">
-                                إلغاء
-                            </a>
-                        </div>
-                    </form>
-
-                </div>
+            <div class="info-box">
+                <p><strong class="muted">👤 اسم الطالب:</strong> <span class="name">{{ student.get_full_name }}</span></p>
+                <p><strong class="muted">🧾 المديونية القديمة المتبقية:</strong>
+                   <span class="debt-badge">{{ old_debt }} ج.م</span></p>
             </div>
+
+            <form method="POST" action="" id="settleDebtForm">
+                {% csrf_token %}
+                <input type="hidden" name="from_screen" value="{{ from_screen }}">
+
+                <div class="field">
+                    <label for="amount">💵 المبلغ المراد سداده:</label>
+                    <input type="number" id="amount" name="amount" step="0.01" min="0.01"
+                           max="{{ old_debt|unlocalize }}" placeholder="أدخل المبلغ..."
+                           inputmode="decimal" required autofocus>
+                </div>
+
+                <div class="field">
+                    <label for="receiptNumberInput">📒 رقم الإيصال الورقي المرجعي:</label>
+                    <input type="text" name="receipt_number" id="receiptNumberInput"
+                           value="{{ next_receipt_number|default_if_none:'' }}"
+                           dir="ltr" autocomplete="off" spellcheck="false"
+                           {% if has_active_book %}required{% endif %}
+                           placeholder="{% if has_active_book %}رقم الإيصال مطلوب{% else %}أدخل رقم الإيصال المرجعي...{% endif %}">
+
+                    {% if has_active_book and next_receipt_number %}
+                        <small class="help ok" id="serialHelpText">✔ السيريال المتاح التالي بالدفتر النشط (الرقم مطلوب).</small>
+                    {% elif has_active_book %}
+                        <small class="help bad" id="serialHelpText">⚠️ لا يوجد رقم متاح في الدفتر النشط. فعّل دفتراً جديداً قبل السداد.</small>
+                    {% else %}
+                        <small class="help bad" id="serialHelpText">⚠️ لا يوجد دفتر إيصالات نشط حالياً للمحصل. يمكنك الإدخال يدوياً.</small>
+                    {% endif %}
+                </div>
+
+                <div class="field exception-box">
+                    <label class="chk" for="noReceiptChk">
+                        <input type="checkbox" id="noReceiptChk" name="no_receipt" value="1">
+                        استثناء إداري: سداد بدون إيصال ورقي (تحويل بنكي / ظرف خاص)
+                    </label>
+                    <div id="noReceiptReasonWrap">
+                        <label for="noReceiptReason" style="margin-bottom:4px;">رقم التحويل / سبب الاستثناء (مطلوب):</label>
+                        <input type="text" id="noReceiptReason" name="no_receipt_reason" maxlength="150" autocomplete="off"
+                               placeholder="مثال: تحويل بنكي رقم 123456 - بنك مصر">
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button type="submit" id="submitBtn" class="btn btn-success">✔ <span id="btnText">تأكيد عملية السداد</span></button>
+                    <a class="btn btn-secondary"
+                       href="{% if from_screen == 'counter' %}/finance/counter/?student_id={{ student.id }}{% elif from_screen == 'quick_collection' %}/finance/quick-collection/?student_id={{ student.id }}{% else %}{% url 'student_list' %}{% endif %}">إلغاء</a>
+                </div>
+            </form>
+
         </div>
     </div>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
-function clearSerialInput() {
-    const input = document.getElementById('receiptNumberInput');
-    const helpText = document.getElementById('serialHelpText');
-    if (input) {
-        input.value = '';
-        input.focus();
-    }
-    if (helpText) {
-        helpText.className = 'text-muted font-weight-bold d-block mt-2';
-        helpText.innerHTML = '<i class="bi bi-info-circle"></i> تم إفراغ السيريال - سيتم الحفظ برقم آلي حر.';
-    }
-}
+(function () {
+    var form = document.getElementById('settleDebtForm');
+    var hasBook = {% if has_active_book %}true{% else %}false{% endif %};
+    var chk = document.getElementById('noReceiptChk');
+    var reasonWrap = document.getElementById('noReceiptReasonWrap');
+    var reason = document.getElementById('noReceiptReason');
+    var receiptInput = document.getElementById('receiptNumberInput');
+    var help = document.getElementById('serialHelpText');
+    var helpOriginal = help ? help.textContent : '';
+    var helpOriginalClass = help ? help.className : '';
 
-function preventDoubleSubmit(event) {
-    const btn = document.getElementById('submitBtn');
-    const btnText = document.getElementById('btnText');
-    
-    if (btn) {
-        btn.disabled = true;
-        btnText.innerHTML = 'جاري الحفظ والترحيل...';
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> ' + btnText.innerHTML;
+    // الاستثناء: يعطّل رقم الإيصال ويطلب سبباً موثقاً بدلاً منه
+    function syncException() {
+        var on = chk.checked;
+        reasonWrap.style.display = on ? 'block' : 'none';
+        reason.required = on;
+        receiptInput.disabled = on;                 // الحقل المعطّل لا يُرسل مع النموذج
+        receiptInput.required = hasBook && !on;
+        if (on) {
+            receiptInput.dataset.keep = receiptInput.value;
+            receiptInput.value = '';
+            if (help) { help.className = 'help gray'; help.textContent = 'ℹ️ سيُحفظ السداد بدون رقم إيصال، ويُسجَّل السبب في ملاحظات الدفعة.'; }
+            reason.focus();
+        } else {
+            if (receiptInput.dataset.keep) receiptInput.value = receiptInput.dataset.keep;
+            if (help) { help.className = helpOriginalClass; help.textContent = helpOriginal; }
+        }
     }
-}
+    chk.addEventListener('change', syncException);
+    syncException();
+
+    var btn = document.getElementById('submitBtn');
+    var btnText = document.getElementById('btnText');
+
+    form.addEventListener('submit', function () {
+        if (!btn) return;
+        // التعطيل بعد إرسال النموذج مباشرة حتى لا يُلغى الإرسال
+        setTimeout(function () {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> جاري الحفظ والترحيل...';
+        }, 0);
+    });
+
+    // لو رجع المستخدم بزر "السابق" يعاد تفعيل الزر
+    window.addEventListener('pageshow', function () {
+        syncException();
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '✔ <span id="btnText">تأكيد عملية السداد</span>';
+        }
+    });
+})();
 </script>
-
 </body>
 </html>

@@ -22,10 +22,12 @@ from django.db.models import (
     CharField, Q, F, Value, Sum, Count, DecimalField, Max,
     ExpressionWrapper, Exists, Subquery, OuterRef, Case, When, IntegerField
 )
-from django.db.models.functions import Coalesce, Concat
+from django.db.models.functions import Coalesce, Concat, Greatest
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.cache import never_cache
+from django.views.decorators.vary import vary_on_headers
 
 # =========================================================
 # 🟢 Django REST Framework
@@ -4751,6 +4753,48 @@ def save_admin_decision(request):
 
 
 
+# =========================================================
+# ⚡ أدوات البحث السريع في سجل الطلاب (نفس فلسفة شاشة الكاونتر)
+# =========================================================
+_AR_DIGITS = str.maketrans('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹', '0123456789' * 2)
+_TASHKEEL_RE = re.compile(r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]')
+
+
+def _registry_clean_query(query):
+    """أرقام هندية -> لاتينية، حذف التشكيل والتطويل، وضبط المسافات."""
+    q = (query or '').translate(_AR_DIGITS)
+    q = _TASHKEEL_RE.sub('', q)
+    return ' '.join(q.split())
+
+
+def _registry_norm(text):
+    """توحيد الحروف المتشابهة (مطابق لما يُخزَّن في search_name)."""
+    return (text.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ٱ', 'ا')
+                .replace('ة', 'ه').replace('ى', 'ي'))
+
+
+def _registry_word_q(word):
+    """شرط كلمة واحدة: اسم (مفهرس) أو كود أو رقم قومي، مع دعم عبدالله <-> عبد الله."""
+    norm_word = _registry_norm(word)
+    cond = (Q(search_name__icontains=norm_word) |
+            Q(student_code__icontains=word) |
+            Q(national_id__icontains=word))
+    if norm_word.startswith('عبد') and len(norm_word) > 5:
+        cond |= Q(search_name__icontains='عبد ' + norm_word[3:])
+    return cond
+
+
+class _PrecountedPaginator(Paginator):
+    """Paginator لا ينفذ COUNT إضافياً (العدد محسوب مسبقاً في استعلام الإحصائيات)."""
+    def __init__(self, object_list, per_page, total, **kwargs):
+        super().__init__(object_list, per_page, **kwargs)
+        self._precount = total
+
+    @property
+    def count(self):
+        return self._precount
+
+
 @login_required
 def student_registry_view(request):
     # ========================================================
@@ -4815,6 +4859,9 @@ def student_registry_view(request):
     # ========================================================
     # 🟢 2. المعالجة الأساسية للوحة السجل المدني والفلترة
     # ========================================================
+    is_ajax = request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
+    light = is_ajax and request.GET.get('light') == '1'     # طلب بحث أثناء الكتابة: بدون عدادات الفلاتر السريعة
+
     year_id = request.GET.get('year_id')
     if year_id:
         target_year = get_object_or_404(AcademicYear, id=year_id)
@@ -4822,13 +4869,13 @@ def student_registry_view(request):
     else:
         active_year = AcademicYear.objects.filter(is_active=True).first()
         target_year = active_year
-        # 🟢 التعديل: إظهار الطلاب النشطين أو من عليهم مديونية سابقة
+        # 🟢 إظهار الطلاب النشطين أو من عليهم مديونية سابقة
         base_query = Student.objects.filter(
             Q(is_active=True) | Q(previous_debt__gt=0),
             academic_year=active_year
         )
 
-    query = request.GET.get('q', '').strip()
+    query = _registry_clean_query(request.GET.get('q', ''))
     grade_id = request.GET.get('grade_id', '')
     classroom_id = request.GET.get('classroom_id', '')
     spec = request.GET.get('specialization', '')
@@ -4837,18 +4884,10 @@ def student_registry_view(request):
     is_disability = request.GET.get('is_disability', '')
     quick_filter = request.GET.get('quick_filter', '')
 
-    # 🚀 التحديث الجوهري 1: خوارزمية البحث الذكية والمفهرسة (تلغي بطء الـ Annotate وتحل مشكلة منة/منه)
-    if query:
-        words = query.split()
-        for word in words:
-            norm_word = word.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ة', 'ه').replace('ى', 'ي')
-            base_query = base_query.filter(
-                Q(search_name__icontains=norm_word) |
-                Q(student_code__icontains=word) |
-                Q(national_id__icontains=word)
-            )
+    # 🚀 البحث: كل كلمة لازم تتطابق (اسم مفهرس / كود / رقم قومي)
+    for word in query.split():
+        base_query = base_query.filter(_registry_word_q(word))
 
-    # تطبيق باقي الفلاتر
     if grade_id: base_query = base_query.filter(grade_id=grade_id)
     if classroom_id: base_query = base_query.filter(classroom_id=classroom_id)
     if spec: base_query = base_query.filter(specialization=spec)
@@ -4857,37 +4896,23 @@ def student_registry_view(request):
     if is_disability:
         base_query = base_query.filter(integration_status=(is_disability == 'true'))
 
-    # ========================================================
-    # 🟢 3. العمود الذكي: الاستعلامات الفرعية العميقة وتطبيق الفلاتر السريعة المحدثة (تعتمد على enrollment_status لدقة 100%)
-    # ========================================================
-    latest_reenrollment = ReEnrollmentRecord.objects.filter(
-        student=OuterRef('pk'), academic_year=target_year
-    ).order_by('-id')
+    # الطلاب المتخلفون عن امتحانات السنة (استعلام فرعي IN بدل JOIN + GROUP BY على كل الطلاب)
+    missed_student_ids = ExamResult.objects.filter(
+        is_absent=True, academic_year=target_year
+    ).values('student_id')
 
-    base_query = base_query.annotate(
-        last_dismissal_date=Subquery(latest_reenrollment.values('dismissal_date')[:1]),
-        last_reenrollment_date=Subquery(latest_reenrollment.values('reenrollment_date')[:1]),
-        reenroll_status_db=Subquery(latest_reenrollment.values('status')[:1]),
-        missed_exams_count=Count('exam_results', filter=Q(exam_results__is_absent=True, exam_results__academic_year=target_year), distinct=True)
-    )
-
-    if quick_filter == 'dismissed':
-        base_query = base_query.filter(enrollment_status='Dismissed')
-    elif quick_filter == 'reenrolled':
-        base_query = base_query.filter(enrollment_status='Re_enrolled')
-    elif quick_filter == 'retained':
-        base_query = base_query.filter(enrollment_status='Retained')
-    elif quick_filter == 'promoted':
-        base_query = base_query.filter(enrollment_status='Promoted')
-    elif quick_filter == 'did_not_attend':
-        base_query = base_query.filter(enrollment_status='Did_Not_Attend')
+    status_by_quick = {
+        'dismissed': 'Dismissed', 'reenrolled': 'Re_enrolled', 'retained': 'Retained',
+        'promoted': 'Promoted', 'did_not_attend': 'Did_Not_Attend',
+    }
+    if quick_filter in status_by_quick:
+        base_query = base_query.filter(enrollment_status=status_by_quick[quick_filter])
     elif quick_filter == 'missed_exams':
-        base_query = base_query.filter(missed_exams_count__gt=0)
+        base_query = base_query.filter(pk__in=missed_student_ids)
 
     # ========================================================
-    # 🚀 التحديث الجوهري 2: حساب الإحصائيات باستعلام واحد فقط (Aggregation)
+    # 🚀 3. الإحصائيات باستعلام واحد خفيف (بدون JOIN) + نفسه يُستخدم كعدد للـ Paginator
     # ========================================================
-    # بدلاً من تنفيذ 6 استعلامات .count() تبطئ السيرفر، نقوم بجمعها في استعلام قاعدة بيانات واحد
     agg_stats = base_query.aggregate(
         total_count=Count('id'),
         male_count=Count('id', filter=Q(gender='Male')),
@@ -4897,13 +4922,6 @@ def student_registry_view(request):
         integration_count=Count('id', filter=Q(integration_status=True))
     )
 
-    # حساب العدادات الخاصة بالفلاتر السريعة (على مستوى السنة كلها لتظل ظاهرة للرقم الكلي)
-    # 🟢 التعديل: تجميع الطلاب النشطين + أصحاب المديونيات لتبقى العدادات مطابقة
-    all_active_students = Student.objects.filter(
-        Q(is_active=True) | Q(previous_debt__gt=0),
-        academic_year=target_year
-    )
-
     stats = {
         'total': agg_stats['total_count'],
         'male': agg_stats['male_count'],
@@ -4911,29 +4929,80 @@ def student_registry_view(request):
         'muslim': agg_stats['muslim_count'],
         'christian': agg_stats['christian_count'],
         'integration': agg_stats['integration_count'],
-
-        # 🟢 عدادات الفلاتر السريعة المحدثة:
-        'dismissed_count': all_active_students.filter(enrollment_status='Dismissed').count(),
-        'reenrolled_count': all_active_students.filter(enrollment_status='Re_enrolled').count(),
-        'retained_count': all_active_students.filter(enrollment_status='Retained').count(),
-        'promoted_count': all_active_students.filter(enrollment_status='Promoted').count(),
-        'did_not_attend_count': all_active_students.filter(enrollment_status='Did_Not_Attend').count(),
-        'missed_exams_count': all_active_students.filter(exam_results__is_absent=True, exam_results__academic_year=target_year).distinct().count()
+        'dismissed_count': 0, 'reenrolled_count': 0, 'retained_count': 0,
+        'promoted_count': 0, 'did_not_attend_count': 0, 'missed_exams_count': 0,
     }
 
+    # عدادات الفلاتر السريعة (على مستوى السنة كلها) — استعلام واحد بدل 6،
+    # وتُتخطى أثناء الكتابة في البحث لأنها لا تتأثر به.
+    if not light:
+        all_active_students = Student.objects.filter(
+            Q(is_active=True) | Q(previous_debt__gt=0),
+            academic_year=target_year
+        )
+        qc = all_active_students.aggregate(
+            dismissed=Count('id', filter=Q(enrollment_status='Dismissed')),
+            reenrolled=Count('id', filter=Q(enrollment_status='Re_enrolled')),
+            retained=Count('id', filter=Q(enrollment_status='Retained')),
+            promoted=Count('id', filter=Q(enrollment_status='Promoted')),
+            did_not_attend=Count('id', filter=Q(enrollment_status='Did_Not_Attend')),
+            missed=Count('id', filter=Q(pk__in=missed_student_ids)),
+        )
+        stats.update({
+            'dismissed_count': qc['dismissed'], 'reenrolled_count': qc['reenrolled'],
+            'retained_count': qc['retained'], 'promoted_count': qc['promoted'],
+            'did_not_attend_count': qc['did_not_attend'], 'missed_exams_count': qc['missed'],
+        })
+
     # ========================================================
-    # 🟢 4. الترتيب والتقسيم (Pagination)
+    # 🟢 4. الترتيب والتقسيم: نرقّم "المعرفات" فقط (خفيف)، ثم نجلب صفوف الصفحة (20) بالتفاصيل
     # ========================================================
-    student_list = base_query.order_by('first_name', 'id')
-    paginator = Paginator(student_list, 20)
-    page_number = request.GET.get('page')
-    students_page = paginator.get_page(page_number)
+    if query:
+        norm_q = _registry_norm(query)
+        ordered = base_query.annotate(
+            is_prefix_match=Case(
+                When(
+                    Q(search_name__istartswith=norm_q) |
+                    Q(first_name__istartswith=query) |
+                    Q(student_code__istartswith=query),
+                    then=Value(0)
+                ),
+                default=Value(1),
+                output_field=IntegerField()
+            )
+        ).order_by('is_prefix_match', 'first_name', 'id')      # الأقرب للنص المكتوب أولاً
+    else:
+        ordered = base_query.order_by('first_name', 'id')
+
+    paginator = _PrecountedPaginator(ordered.values_list('pk', flat=True), 20, agg_stats['total_count'])
+    students_page = paginator.get_page(request.GET.get('page'))
+    page_ids = list(students_page.object_list)
+
+    latest_reenrollment = ReEnrollmentRecord.objects.filter(
+        student=OuterRef('pk'), academic_year=target_year
+    ).order_by('-id')
+    missed_count_sq = ExamResult.objects.filter(
+        student=OuterRef('pk'), is_absent=True, academic_year=target_year
+    ).order_by().values('student').annotate(c=Count('pk')).values('c')[:1]
+
+    rows = Student.objects.filter(pk__in=page_ids).select_related('grade', 'classroom').annotate(
+        last_dismissal_date=Subquery(latest_reenrollment.values('dismissal_date')[:1]),
+        last_reenrollment_date=Subquery(latest_reenrollment.values('reenrollment_date')[:1]),
+        reenroll_status_db=Subquery(latest_reenrollment.values('status')[:1]),
+        missed_exams_count=Coalesce(
+            Subquery(missed_count_sq, output_field=IntegerField()),
+            Value(0), output_field=IntegerField()
+        ),
+    )
+    rows_by_id = {s.pk: s for s in rows}
+    students_page.object_list = [rows_by_id[i] for i in page_ids if i in rows_by_id]
 
     context = {
         'students': students_page,
         'stats': stats,
-        'all_grades': Grade.objects.all(),
-        'all_classrooms': Classroom.objects.all(),
+        # القوائم المنسدلة لا تتغير أثناء الـ AJAX، فلا داعي لاستعلامها في كل مرة
+        'all_grades': [] if is_ajax else Grade.objects.all(),
+        'all_classrooms': [] if is_ajax else Classroom.objects.all(),
         'all_specs': Student.SPECIALIZATION_CHOICES if hasattr(Student, 'SPECIALIZATION_CHOICES') else [],
 
         'selected_grade': grade_id,
@@ -4945,7 +5014,7 @@ def student_registry_view(request):
         'search_query': query,
         'quick_filter': quick_filter,
 
-        'current_year': target_year if year_id else active_year,
+        'current_year': target_year,
         'is_archive': bool(year_id),
     }
 
@@ -5045,153 +5114,238 @@ def admin_add_restock(request):
     }
     return render(request, 'students/admin_restock.html', context)
 
+
+# =====================================================================
+# استبدل بهذا الملف الدالتين القديمتين في students/views.py:
+#   1) get_item_history
+#   2) inventory_category_report
+# كلتاهما تعتمدان الآن على المخزن الجديد (core_inventory) فقط.
+# لا حاجة لأي import جديد: كل ما يلزم مستورد أصلاً في أعلى views.py
+# =====================================================================
+
+_IN_OPENING = ['IN_OPENING']
+_IN_OTHER = ['IN_PURCHASE', 'IN_RETURN', 'ADJUST']
+_OUT_TYPES = ['OUT_STUDENT', 'OUT_DEPT', 'OUT_WASTE', 'TRANSFER']
+
+
+def _is_book_item(item):
+    """الكتاب = صنف مربوط بمادة دراسية، أو تصنيفه/اسمه يدل على الكتب.
+    أي صنف بيع آخر يُعامل كزي مدرسي. عدّل الكلمات حسب تسمية تصنيفاتك."""
+    if item.linked_subject_id:
+        return True
+    text = f"{item.category.name if item.category_id else ''} {item.name}"
+    return any(k in text for k in ('كتاب', 'كتب', 'مقرر', 'منهج'))
+
+
+@login_required
 def get_item_history(request, item_id):
-    try:
-        item = InventoryItem.objects.get(id=item_id)
-        history_list = []
+    """سجل حركة صنف واحد (وارد ومنصرف) من جدول StockTransaction."""
+    from core_inventory.models import StockTransaction
 
-        restocks = InventoryRestock.objects.filter(item_id=item_id).order_by('-restock_date')
+    labels = dict(StockTransaction.MOVEMENT_TYPES)
+    txs = (
+        StockTransaction.objects
+        .filter(item_id=item_id)
+        .select_related('student', 'warehouse')
+        .order_by('-date')[:500]
+    )
 
-        for stock in restocks:
-            history_list.append({
-                'date': stock.restock_date.strftime('%Y-%m-%d') if stock.restock_date else "---",
-                'type': 'وارد (توريد)',
-                'color': 'success',
-                'qty': stock.quantity,
-                'note': stock.note or "إضافة كمية للمخزن"
-            })
+    history = []
+    for t in txs:
+        is_out = t.movement_type in _OUT_TYPES
+        note = t.notes or ''
+        if t.student_id:
+            try:
+                student_name = t.student.get_full_name()
+            except Exception:
+                student_name = str(t.student)
+            note = f"طالب: {student_name}" + (f" — {note}" if note else '')
+        elif t.department:
+            note = f"قسم: {t.department}" + (f" — {note}" if note else '')
 
-        if not restocks.exists():
-            history_list.append({
-                'date': "---",
-                'type': 'وارد (رصيد أول)',
-                'color': 'success',
-                'qty': item.stock_quantity,
-                'note': "الكمية الأساسية عند تعريف الصنف"
-            })
+        history.append({
+            'date': timezone.localtime(t.date).strftime('%Y-%m-%d') if t.date else '---',
+            'type': labels.get(t.movement_type, t.movement_type),
+            'color': 'danger' if is_out else 'success',
+            'qty': float(t.quantity),
+            'note': note or '---',
+        })
 
-        sales = BookSale.objects.filter(item_id=item_id).order_by('-sale_date')
-
-        for sale in sales:
-            student_name = f"{sale.student.first_name} {sale.student.last_name}" if sale.student else "---"
-
-            history_list.append({
-                'date': sale.sale_date.strftime('%Y-%m-%d') if sale.sale_date else "---",
-                'type': 'منصرف',
-                'color': 'danger',
-                'qty': sale.quantity,
-                'note': f"طالب: {student_name}"
-            })
-
-        return JsonResponse({'history': history_list})
-
-    except InventoryItem.DoesNotExist:
-        return JsonResponse({'history': [], 'error': 'Item not found'})
+    return JsonResponse({'history': history})
 
 
 @login_required
 def inventory_category_report(request):
-    """
-    منظومة الجرد الفعلي الموحد للمخزن:
-    1. تفصل بين الكتب الدراسية والزي المدرسي بتبويبات مستقلة.
-    2. تصفى الأصناف الصورية لمنع التدبيل وتجمع الأصناف الحقيقية حسب الصفوف.
-    3. تعرض أول المدة، الشراء والتوريد الإضافي، إجمالي الوارد، المنصرف، والرصيد المتبقي.
-    """
-    # معالجة الخطأ المحتمل إذا لم تكن الدالة موجودة
-    active_year = get_active_year() if 'get_active_year' in globals() else "2025/2026"
+    """تقرير الجرد الموحد: كتب / زي، مقسّم بالصفوف، من حركات المخزن الفعلية."""
+    from core_inventory.models import ItemMaster, StockTransaction
 
-    # 🟢 1. التصحيح الجذري: إزالة .values() لجلب "كائنات" حقيقية (Objects)
-    raw_items = ItemMaster.objects.all().order_by('name')
+    active_year = get_active_year()
+    zero = Value(Decimal('0.00'), output_field=DecimalField())
 
-    physical_items = []
-    for item in raw_items:
-        # 🟢 2. استخدام hasattr و getattr لحماية السيرفر من التعطل إذا اختلف اسم الحقل
-        has_subject = getattr(item, 'subject_id', None)
-        has_uniform = getattr(item, 'uniform_id', None)
-
-        # التأكد من وجود العلاقات بأمان قبل استخدام .exists()
-        has_restocks = hasattr(item, 'restocks') and item.restocks.exists()
-        has_sales = hasattr(item, 'booksale_set') and item.booksale_set.exists()
-
-        if has_subject or has_uniform or has_restocks or has_sales or getattr(item, 'item_type', None) in ['book', 'uniform']:
-            physical_items.append(item)
-
-    books_by_grade = {}
-    uniform_by_grade = {}
-
-    total_books_incoming = 0
-    total_books_sold = 0
-    total_books_remaining = 0
-
-    total_uniform_incoming = 0
-    total_uniform_sold = 0
-    total_uniform_remaining = 0
-
-    for item in physical_items:
-        # جلب البيانات بأمان تام (Fallback values) لتجنب أي أخطاء في العرض
-        grade = getattr(item, 'grade', None)
-        grade_name = getattr(grade, 'name', "عام / بدون صف") if grade else "عام / بدون صف"
-
-        opening_stock = getattr(item, 'stock_quantity', 0)
-
-        # جلب الكميات الموردة
-        restocks_qty = sum(r.quantity for r in item.restocks.all()) if hasattr(item, 'restocks') else 0
-
-        total_incoming = getattr(item, 'total_incoming', opening_stock + restocks_qty)
-        total_sold = getattr(item, 'total_sold_count', 0)
-        remaining = getattr(item, 'remaining_qty', total_incoming - total_sold)
-
-        display_name = getattr(item, 'display_name', getattr(item, 'name', 'صنف غير محدد'))
-        item_type = getattr(item, 'item_type', 'book')
-
-        item_data = {
-            'id': item.id,
-            'name': display_name,
-            'grade_name': grade_name,
-            'opening_stock': opening_stock,
-            'restocks_qty': restocks_qty,
-            'total_incoming': total_incoming,
-            'total_sold': total_sold,
-            'remaining': remaining,
-            'item_type': item_type,
-        }
-
-        if item_type == 'book':
-            if grade_name not in books_by_grade:
-                books_by_grade[grade_name] = []
-            books_by_grade[grade_name].append(item_data)
-
-            total_books_incoming += total_incoming
-            total_books_sold += total_sold
-            total_books_remaining += remaining
-
-        elif item_type == 'uniform':
-            if grade_name not in uniform_by_grade:
-                uniform_by_grade[grade_name] = []
-            uniform_by_grade[grade_name].append(item_data)
-
-            total_uniform_incoming += total_incoming
-            total_uniform_sold += total_sold
-            total_uniform_remaining += remaining
-
-    context = {
-        'books_by_grade': books_by_grade,
-        'uniform_by_grade': uniform_by_grade,
-        'stats': {
-            'total_items': len(physical_items),
-            'books_incoming': total_books_incoming,
-            'books_sold': total_books_sold,
-            'books_remaining': total_books_remaining,
-            'uniform_incoming': total_uniform_incoming,
-            'uniform_sold': total_uniform_sold,
-            'uniform_remaining': total_uniform_remaining,
-            'grand_remaining': total_books_remaining + total_uniform_remaining,
-        },
-        'active_year': active_year,
-        'title': 'تقرير الجرد والرقابة المخزنية الموحدة'
+    # تجميع كل الحركات في استعلام واحد لكل الأصناف
+    totals = {
+        r['item_id']: r
+        for r in StockTransaction.objects.values('item_id').annotate(
+            opening=Coalesce(Sum('quantity', filter=Q(movement_type__in=_IN_OPENING)), zero),
+            restocks=Coalesce(Sum('quantity', filter=Q(movement_type__in=_IN_OTHER)), zero),
+            sold=Coalesce(Sum('quantity', filter=Q(movement_type__in=_OUT_TYPES)), zero),
+        )
     }
 
-    return render(request, 'students/books/inventory_report.html', context)
+    items = (
+        ItemMaster.objects
+        .filter(item_type='saleable')
+        .select_related('linked_grade', 'linked_subject', 'category')
+        .order_by('linked_grade_id', 'name')
+    )
+
+    books_by_grade, uniform_by_grade = {}, {}
+    st = dict(books_remaining=0, books_sold=0, books_incoming=0,
+              uniform_remaining=0, uniform_sold=0, uniform_incoming=0)
+
+    for item in items:
+        t = totals.get(item.id)
+        opening = t['opening'] if t else Decimal('0')
+        restocks = t['restocks'] if t else Decimal('0')
+        sold = t['sold'] if t else Decimal('0')
+        incoming = opening + restocks
+        remaining = incoming - sold
+
+        grade_name = item.linked_grade.name if item.linked_grade_id else 'عام / بدون صف'
+        row = {
+            'id': item.id,
+            'name': item.name,
+            'opening_stock': opening,
+            'restocks_qty': restocks,
+            'total_incoming': incoming,
+            'total_sold': sold,
+            'remaining': remaining,
+        }
+
+        if _is_book_item(item):
+            books_by_grade.setdefault(grade_name, []).append(row)
+            st['books_incoming'] += incoming
+            st['books_sold'] += sold
+            st['books_remaining'] += remaining
+        else:
+            uniform_by_grade.setdefault(grade_name, []).append(row)
+            st['uniform_incoming'] += incoming
+            st['uniform_sold'] += sold
+            st['uniform_remaining'] += remaining
+
+    st['grand_remaining'] = st['books_remaining'] + st['uniform_remaining']
+
+    return render(request, 'students/books/inventory_report.html', {
+        'books_by_grade': books_by_grade,      # dict عادي (مش defaultdict) عشان {% .items %}
+        'uniform_by_grade': uniform_by_grade,
+        'stats': st,
+        'active_year': active_year,
+        'title': 'تقرير الجرد والرقابة المخزنية الموحدة',
+    })
+
+# @login_required
+# def inventory_category_report(request):
+#     """
+#     منظومة الجرد الفعلي الموحد للمخزن:
+#     1. تفصل بين الكتب الدراسية والزي المدرسي بتبويبات مستقلة.
+#     2. تصفى الأصناف الصورية لمنع التدبيل وتجمع الأصناف الحقيقية حسب الصفوف.
+#     3. تعرض أول المدة، الشراء والتوريد الإضافي، إجمالي الوارد، المنصرف، والرصيد المتبقي.
+#     """
+#     # معالجة الخطأ المحتمل إذا لم تكن الدالة موجودة
+#     active_year = get_active_year() if 'get_active_year' in globals() else "2025/2026"
+
+#     # 🟢 1. التصحيح الجذري: إزالة .values() لجلب "كائنات" حقيقية (Objects)
+#     raw_items = ItemMaster.objects.all().order_by('name')
+
+#     physical_items = []
+#     for item in raw_items:
+#         # 🟢 2. استخدام hasattr و getattr لحماية السيرفر من التعطل إذا اختلف اسم الحقل
+#         has_subject = getattr(item, 'subject_id', None)
+#         has_uniform = getattr(item, 'uniform_id', None)
+
+#         # التأكد من وجود العلاقات بأمان قبل استخدام .exists()
+#         has_restocks = hasattr(item, 'restocks') and item.restocks.exists()
+#         has_sales = hasattr(item, 'booksale_set') and item.booksale_set.exists()
+
+#         if has_subject or has_uniform or has_restocks or has_sales or getattr(item, 'item_type', None) in ['book', 'uniform']:
+#             physical_items.append(item)
+
+#     books_by_grade = {}
+#     uniform_by_grade = {}
+
+#     total_books_incoming = 0
+#     total_books_sold = 0
+#     total_books_remaining = 0
+
+#     total_uniform_incoming = 0
+#     total_uniform_sold = 0
+#     total_uniform_remaining = 0
+
+#     for item in physical_items:
+#         # جلب البيانات بأمان تام (Fallback values) لتجنب أي أخطاء في العرض
+#         grade = getattr(item, 'grade', None)
+#         grade_name = getattr(grade, 'name', "عام / بدون صف") if grade else "عام / بدون صف"
+
+#         opening_stock = getattr(item, 'stock_quantity', 0)
+
+#         # جلب الكميات الموردة
+#         restocks_qty = sum(r.quantity for r in item.restocks.all()) if hasattr(item, 'restocks') else 0
+
+#         total_incoming = getattr(item, 'total_incoming', opening_stock + restocks_qty)
+#         total_sold = getattr(item, 'total_sold_count', 0)
+#         remaining = getattr(item, 'remaining_qty', total_incoming - total_sold)
+
+#         display_name = getattr(item, 'display_name', getattr(item, 'name', 'صنف غير محدد'))
+#         item_type = getattr(item, 'item_type', 'book')
+
+#         item_data = {
+#             'id': item.id,
+#             'name': display_name,
+#             'grade_name': grade_name,
+#             'opening_stock': opening_stock,
+#             'restocks_qty': restocks_qty,
+#             'total_incoming': total_incoming,
+#             'total_sold': total_sold,
+#             'remaining': remaining,
+#             'item_type': item_type,
+#         }
+
+#         if item_type == 'book':
+#             if grade_name not in books_by_grade:
+#                 books_by_grade[grade_name] = []
+#             books_by_grade[grade_name].append(item_data)
+
+#             total_books_incoming += total_incoming
+#             total_books_sold += total_sold
+#             total_books_remaining += remaining
+
+#         elif item_type == 'uniform':
+#             if grade_name not in uniform_by_grade:
+#                 uniform_by_grade[grade_name] = []
+#             uniform_by_grade[grade_name].append(item_data)
+
+#             total_uniform_incoming += total_incoming
+#             total_uniform_sold += total_sold
+#             total_uniform_remaining += remaining
+
+#     context = {
+#         'books_by_grade': books_by_grade,
+#         'uniform_by_grade': uniform_by_grade,
+#         'stats': {
+#             'total_items': len(physical_items),
+#             'books_incoming': total_books_incoming,
+#             'books_sold': total_books_sold,
+#             'books_remaining': total_books_remaining,
+#             'uniform_incoming': total_uniform_incoming,
+#             'uniform_sold': total_uniform_sold,
+#             'uniform_remaining': total_uniform_remaining,
+#             'grand_remaining': total_books_remaining + total_uniform_remaining,
+#         },
+#         'active_year': active_year,
+#         'title': 'تقرير الجرد والرقابة المخزنية الموحدة'
+#     }
+
+#     return render(request, 'students/books/inventory_report.html', context)
 
 
 
@@ -5677,215 +5831,188 @@ def student_dashboard(request, student_id=None):
 def is_manager(user):
     return user.is_authenticated and (user.is_superuser or user.is_staff)
 
+
+# =========================================================
+# ⚡ سجل الطلاب المالي (student_list) — نسخة سريعة
+# =========================================================
+STUDENT_LIST_PER_PAGE = 20
+
+
+def _student_stats_version():
+    """رقم نسخة للكاش: يتغير عند أي تعديل مالي فتتجدد العدادات فوراً بدل انتظار انتهاء الكاش."""
+    v = cache.get('student_stats_ver')
+    if v is None:
+        v = int(time.time() * 1000)
+        cache.set('student_stats_ver', v, None)
+    return v
+
+
+def _bump_student_stats_version(*args, **kwargs):
+    cache.set('student_stats_ver', int(time.time() * 1000), None)
+
+
+def _student_fin_annotations(year):
+    """التجميعات المالية للطالب في سنة معينة (Subqueries بدون JOIN)."""
+    dec = lambda: DecimalField()
+    zero = lambda: Value(0, output_field=DecimalField())
+
+    def agg(qs, field):
+        return Coalesce(Subquery(
+            qs.order_by().values('student').annotate(t=Sum(field)).values('t')[:1],
+            output_field=dec()), zero())
+
+    inst = StudentInstallment.objects.filter(student=OuterRef('pk'), academic_year=year)
+    pays = Payment.objects.filter(student=OuterRef('pk'), academic_year=year, is_cancelled=False)
+    return {
+        'is_assigned': Exists(inst),
+        'fees_display': agg(inst, 'amount_due'),
+        'late_fees_display': agg(inst, 'late_fee'),
+        'total_paid_display': agg(pays.exclude(revenue_category__name__icontains="مديوني"), 'amount_paid'),
+        'discount_display': agg(StudentAccount.objects.filter(student=OuterRef('pk'), academic_year=year), 'discount'),
+    }
+
+
+def _student_with_remaining(qs, year):
+    """يضيف calc_rem (المتبقي) بنفس معادلة العرض في الجدول (المديونية القديمة لا تقل عن صفر)."""
+    z = Value(0, output_field=DecimalField())
+    return qs.annotate(**_student_fin_annotations(year)).annotate(
+        calc_rem=ExpressionWrapper(
+            Greatest(Coalesce(F('previous_debt'), z), z)
+            + F('fees_display') + F('late_fees_display')
+            - F('total_paid_display') - F('discount_display'),
+            output_field=DecimalField()))
+
+
+def _student_list_base_template(is_ajax):
+    """قالب خفيف لطلبات AJAX؛ ولو الملف غير موجود نرجع للقالب العادي بدل خطأ 500."""
+    if is_ajax:
+        try:
+            from django.template.loader import get_template
+            get_template("students/_ajax_base.html")
+            return "students/_ajax_base.html"
+        except Exception:
+            pass
+    return "base_finance.html"
+
+
 @login_required
+@never_cache
+@vary_on_headers('X-Requested-With')
 def student_list(request):
-    all_years = AcademicYear.objects.all().order_by('-name')
-    all_grades = Grade.objects.all().order_by('id')
-    all_classrooms = Classroom.objects.select_related('grade').all()
+    is_ajax = request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
+    g = request.GET
 
-    selected_year_id = request.GET.get('year_id')
-    grade_id = request.GET.get('grade_id')
-    classroom_id = request.GET.get('classroom_id')
-    specialization = request.GET.get('specialization')
-    gender = request.GET.get('gender')
-    religion = request.GET.get('religion')
-    is_disability = request.GET.get('is_disability')
-    search_query = request.GET.get('q', '').strip()
-    status_filter = request.GET.get('status')
+    selected_year_id = g.get('year_id', '').strip()
+    grade_id = g.get('grade_id', '')
+    classroom_id = g.get('classroom_id', '')
+    specialization = g.get('specialization', '')
+    gender = g.get('gender', '')
+    religion = g.get('religion', '')
+    is_disability = g.get('is_disability', '')
+    search_query = _registry_clean_query(g.get('q', ''))
+    status_filter = g.get('status', '')
 
-    if selected_year_id:
+    # القوائم المنسدلة لا تتغير أثناء الـ AJAX فلا داعي لاستعلامها
+    all_years = [] if is_ajax else AcademicYear.objects.all().order_by('-name')
+    all_grades = [] if is_ajax else Grade.objects.all().order_by('id')
+    all_classrooms = [] if is_ajax else Classroom.objects.select_related('grade').all()
+
+    is_archive = False
+    if selected_year_id.isdigit():
         current_view_year = get_object_or_404(AcademicYear, id=selected_year_id)
         is_archive = not current_view_year.is_active
     else:
-        current_view_year = AcademicYear.objects.filter(is_active=True).first() or all_years.first()
-        is_archive = False
+        current_view_year = (AcademicYear.objects.filter(is_active=True).first()
+                             or AcademicYear.objects.order_by('-name').first())
+
+    stats = {'total': 0, 'assigned': 0, 'unassigned': 0, 'paid': 0, 'debt': 0}
+    graduated_count = 0
+    students_page = Paginator([], STUDENT_LIST_PER_PAGE).get_page(1)
 
     if current_view_year:
+        # ───────── 1) نطاق الطلاب (قبل فلتر الحالة المالية) ─────────
         if status_filter == 'graduated':
-            base_query = Student.objects.filter(academic_year=current_view_year, enrollment_status='Graduated').select_related("grade", "classroom")
+            scope = Student.objects.filter(academic_year=current_view_year, enrollment_status='Graduated')
         else:
-            # 🟢 التعديل: إظهار الطلاب النشطين أو من عليهم مديونية قديمة
-            base_query = Student.objects.filter(
-                Q(is_active=True) | Q(previous_debt__gt=0),
-                academic_year=current_view_year
-            ).select_related("grade", "classroom")
+            scope = Student.objects.filter(Q(is_active=True) | Q(previous_debt__gt=0),
+                                           academic_year=current_view_year)
+        if grade_id: scope = scope.filter(grade_id=grade_id)
+        if classroom_id: scope = scope.filter(classroom_id=classroom_id)
+        if specialization: scope = scope.filter(specialization=specialization)
+        if gender: scope = scope.filter(gender=gender)
+        if religion: scope = scope.filter(religion=religion)
+        if is_disability: scope = scope.filter(integration_status=(is_disability == 'true'))
+        for word in search_query.split():
+            scope = scope.filter(_registry_word_q(word))
 
-        graduated_count = Student.objects.filter(academic_year=current_view_year, enrollment_status='Graduated').count()
+        # ───────── 2) العدادات: استعلام واحد + كاش مشترك بين كل الحالات ─────────
+        ver = _student_stats_version()
+        raw = '|'.join([str(ver), str(current_view_year.id), 'G' if status_filter == 'graduated' else 'A',
+                        grade_id, classroom_id, specialization, gender, religion, is_disability, search_query])
+        stats_key = 'student_stats_v6_' + hashlib.md5(raw.encode('utf-8')).hexdigest()
+        if g.get('refresh') == '1':
+            cache.delete(stats_key)
+        cached = cache.get(stats_key)
+        if cached is None:
+            agg = _student_with_remaining(scope, current_view_year).aggregate(
+                total=Count('id'),
+                assigned=Count('id', filter=Q(is_assigned=True)),
+                debt=Count('id', filter=Q(calc_rem__gt=0.01)),
+                paid=Count('id', filter=Q(is_assigned=True, calc_rem__lte=0.01)),
+            )
+            cached = {'total': agg['total'], 'assigned': agg['assigned'], 'debt': agg['debt'],
+                      'paid': agg['paid'], 'unassigned': agg['total'] - agg['assigned']}
+            cache.set(stats_key, cached, 120)
+        stats = cached
 
-        if grade_id:
-            base_query = base_query.filter(grade_id=grade_id)
-        if classroom_id:
-            base_query = base_query.filter(classroom_id=classroom_id)
-        if specialization:
-            base_query = base_query.filter(specialization=specialization)
-        if gender:
-            base_query = base_query.filter(gender=gender)
-        if religion:
-            base_query = base_query.filter(religion=religion)
-        if is_disability:
-            base_query = base_query.filter(integration_status=(is_disability == 'true'))
+        grad_key = f'student_grad_count_{ver}_{current_view_year.id}'
+        graduated_count = cache.get(grad_key)
+        if graduated_count is None:
+            graduated_count = Student.objects.filter(academic_year=current_view_year,
+                                                     enrollment_status='Graduated').count()
+            cache.set(grad_key, graduated_count, 120)
+
+        # ───────── 3) قائمة الصفحة: نرقّم المعرفات فقط ثم نجلب 20 صفاً بالتفاصيل ─────────
+        if status_filter in ('assigned', 'unassigned'):
+            lst = scope.annotate(is_assigned=_student_fin_annotations(current_view_year)['is_assigned']) \
+                       .filter(is_assigned=(status_filter == 'assigned'))
+        elif status_filter == 'debt':
+            lst = _student_with_remaining(scope, current_view_year).filter(calc_rem__gt=0.01)
+        elif status_filter == 'paid':
+            lst = _student_with_remaining(scope, current_view_year).filter(is_assigned=True, calc_rem__lte=0.01)
+        else:
+            lst = scope
+
+        # العدد معروف مسبقاً من العدادات (نفس التعريفات) فلا COUNT إضافي
+        list_total = {'assigned': stats['assigned'], 'unassigned': stats['unassigned'],
+                      'debt': stats['debt'], 'paid': stats['paid']}.get(status_filter, stats['total'])
 
         if search_query:
-            words = search_query.split()
-            for word in words:
-                # توحيد الحروف العربية للبحث المرن
-                norm_word = word.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ة', 'ه').replace('ى', 'ي')
-                base_query = base_query.filter(
-                    Q(search_name__icontains=norm_word) |
-                    Q(student_code__icontains=word) |
-                    Q(national_id__icontains=word)
-                )
+            norm_q = _registry_norm(search_query)
+            lst = lst.annotate(is_prefix_match=Case(
+                When(Q(search_name__istartswith=norm_q) | Q(first_name__istartswith=search_query)
+                     | Q(student_code__istartswith=search_query), then=Value(0)),
+                default=Value(1), output_field=IntegerField())).order_by('is_prefix_match', 'first_name', 'id')
+        else:
+            lst = lst.order_by('first_name', 'id')
 
-        installments_exists_subquery = StudentInstallment.objects.filter(student=OuterRef('pk'), academic_year=current_view_year)
+        paginator = _PrecountedPaginator(lst.values_list('pk', flat=True), STUDENT_LIST_PER_PAGE, list_total)
+        students_page = paginator.get_page(g.get('page'))
+        page_ids = list(students_page.object_list)
 
-        # 🟢 المسدد من المصاريف الحالية (شامل التسويات القديمة ليظهر المحصل كاملاً)
-        receipts_subquery = Payment.objects.filter(
-            student=OuterRef('pk'),
-            academic_year=current_view_year,
-            is_cancelled=False
-        ).exclude(revenue_category__name__icontains="مديوني").values('student').annotate(t=Sum('amount_paid')).values('t')
+        rows = (Student.objects.filter(pk__in=page_ids).select_related('grade', 'classroom')
+                .annotate(**_student_fin_annotations(current_view_year)))
+        by_id = {s.pk: s for s in rows}
+        page_rows = [by_id[i] for i in page_ids if i in by_id]
 
-        # 🟢 المسدد من المديونية القديمة (شامل التسويات القديمة)
-        old_debt_receipts_subquery = Payment.objects.filter(
-            student=OuterRef('pk'),
-            academic_year=current_view_year,
-            is_cancelled=False,
-            revenue_category__name__icontains="مديوني"
-        ).values('student').annotate(t=Sum('amount_paid')).values('t')
-
-        discount_subquery = StudentAccount.objects.filter(student=OuterRef('pk'), academic_year=current_view_year).values('student').annotate(t=Sum('discount')).values('t')
-        installments_subquery = StudentInstallment.objects.filter(student=OuterRef('pk'), academic_year=current_view_year).values('student').annotate(t=Sum('amount_due')).values('t')
-        late_fees_subquery = StudentInstallment.objects.filter(student=OuterRef('pk'), academic_year=current_view_year).values('student').annotate(t=Sum('late_fee')).values('t')
-
-        financial_annotations = {
-            'is_assigned': Exists(installments_exists_subquery),
-            'fees_display': Coalesce(Subquery(installments_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
-            'late_fees_display': Coalesce(Subquery(late_fees_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
-            'total_paid_display': Coalesce(Subquery(receipts_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
-            'old_debt_paid_display': Coalesce(Subquery(old_debt_receipts_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
-            'discount_display': Coalesce(Subquery(discount_subquery, output_field=DecimalField()), Value(0, output_field=DecimalField())),
-        }
-
-        if status_filter == 'assigned':
-            base_query = base_query.filter(installments__academic_year=current_view_year).distinct()
-        elif status_filter == 'unassigned':
-            base_query = base_query.exclude(installments__academic_year=current_view_year)
-        elif status_filter in ['debt', 'paid']:
-            base_query = base_query.annotate(**financial_annotations).annotate(
-                net_old_debt=ExpressionWrapper(
-                    Coalesce(F('previous_debt'), Value(0, output_field=DecimalField())) - F('old_debt_paid_display'),
-                    output_field=DecimalField()
-                ),
-                calculated_remaining_approx=ExpressionWrapper(
-                    (F('net_old_debt') + F('fees_display') + F('late_fees_display')) -
-                    (F('total_paid_display') + F('discount_display')), output_field=DecimalField()
-                )
-            )
-            if status_filter == 'debt':
-                base_query = base_query.filter(calculated_remaining_approx__gt=0.01)
-            elif status_filter == 'paid':
-                base_query = base_query.filter(is_assigned=True, calculated_remaining_approx__lte=0.01)
-
-        base_query = base_query.order_by('first_name', 'id')
-        paginator = Paginator(base_query, 20)
-        current_page_number = request.GET.get('page', 1)
-        students_page = paginator.get_page(current_page_number)
-
-        page_student_ids = [student.id for student in students_page.object_list]
-
-        annotated_20_students = Student.objects.filter(id__in=page_student_ids).annotate(**financial_annotations)
-        financial_map = {s.id: s for s in annotated_20_students}
-
-        for student in students_page.object_list:
-            fin_data = financial_map.get(student.id)
-            student.is_assigned = fin_data.is_assigned if fin_data else False
-            student.fees_display = fin_data.fees_display if fin_data else Decimal('0.00')
-            student.late_fees_display = fin_data.late_fees_display if fin_data else Decimal('0.00')
-            student.total_paid_display = fin_data.total_paid_display if fin_data else Decimal('0.00')
-            student.old_debt_paid_display = getattr(fin_data, 'old_debt_paid_display', Decimal('0.00')) if fin_data else Decimal('0.00')
-            student.discount_display = fin_data.discount_display if fin_data else Decimal('0.00')
-
-            # 🟢 المديونية القديمة الصافية
-            old_d = student.previous_debt or Decimal('0.00')
-            student.net_old_debt_display = max(Decimal('0.00'), old_d - student.old_debt_paid_display)
-            student.old_debt_display = student.net_old_debt_display
-
-            raw_remaining = (
-                student.net_old_debt_display + student.fees_display + student.late_fees_display
-            ) - (student.total_paid_display + student.discount_display)
-
-            student.calculated_remaining = max(Decimal('0.00'), raw_remaining)
-
-        force_refresh = request.GET.get('refresh') == '1'
-        filter_raw_str = f"y_{selected_year_id}_g_{grade_id}_c_{classroom_id}_sp_{specialization}_gen_{gender}_rel_{religion}_dis_{is_disability}_q_{search_query}_st_{status_filter}"
-        cache_hash = hashlib.md5(filter_raw_str.encode('utf-8')).hexdigest()
-        cache_key = f"student_stats_v4_{cache_hash}"
-
-        if force_refresh:
-            cache.delete(cache_key)
-
-        stats = cache.get(cache_key)
-
-        if not stats:
-            stats_base_qs = Student.objects.filter(academic_year=current_view_year)
-            if status_filter == 'graduated':
-                stats_base_qs = stats_base_qs.filter(enrollment_status='Graduated')
-            else:
-                stats_base_qs = stats_base_qs.filter(is_active=True)
-
-            if grade_id: stats_base_qs = stats_base_qs.filter(grade_id=grade_id)
-            if classroom_id: stats_base_qs = stats_base_qs.filter(classroom_id=classroom_id)
-            if specialization: stats_base_qs = stats_base_qs.filter(specialization=specialization)
-            if gender: stats_base_qs = stats_base_qs.filter(gender=gender)
-            if religion: stats_base_qs = stats_base_qs.filter(religion=religion)
-            if is_disability: stats_base_qs = stats_base_qs.filter(integration_status=(is_disability == 'true'))
-
-            if search_query:
-                words = search_query.split()
-                for word in words:
-                    norm_word = word.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ة', 'ه').replace('ى', 'ي')
-                    stats_base_qs = stats_base_qs.filter(
-                        Q(search_name__icontains=norm_word) |
-                        Q(student_code__icontains=word) |
-                        Q(national_id__icontains=word)
-                    )
-
-            total_st_count = stats_base_qs.count()
-            assigned_st_count = stats_base_qs.filter(installments__academic_year=current_view_year).distinct().count()
-            unassigned_st_count = total_st_count - assigned_st_count
-
-            annotated_stats_qs = stats_base_qs.annotate(**financial_annotations).annotate(
-                calc_net_old=ExpressionWrapper(
-                    Coalesce(F('previous_debt'), Value(0, output_field=DecimalField())) - F('old_debt_paid_display'),
-                    output_field=DecimalField()
-                ),
-                calc_rem=ExpressionWrapper(
-                    (F('calc_net_old') + F('fees_display') + F('late_fees_display')) -
-                    (F('total_paid_display') + F('discount_display')), output_field=DecimalField()
-                )
-            )
-
-            debt_st_count = annotated_stats_qs.filter(calc_rem__gt=0.01).count()
-            paid_st_count = annotated_stats_qs.filter(is_assigned=True, calc_rem__lte=0.01).count()
-
-            stats = {
-                'total': total_st_count,
-                'assigned': assigned_st_count,
-                'unassigned': unassigned_st_count,
-                'paid': paid_st_count,
-                'debt': debt_st_count,
-            }
-            cache.set(cache_key, stats, 300)
-
-        total_count = stats.get('total', 0)
-        assigned_count = stats.get('assigned', 0)
-        unassigned_count = stats.get('unassigned', 0)
-        paid_count = stats.get('paid', 0)
-        debt_count = stats.get('debt', 0)
-
-    else:
-        students_page = []
-        total_count = assigned_count = unassigned_count = paid_count = debt_count = graduated_count = 0
+        zero = Decimal('0.00')
+        for s in page_rows:
+            net_old = max(zero, s.previous_debt or zero)
+            s.net_old_debt_display = net_old
+            s.old_debt_display = net_old
+            s.calculated_remaining = max(
+                zero, net_old + s.fees_display + s.late_fees_display - s.total_paid_display - s.discount_display)
+        students_page.object_list = page_rows
 
     context = {
         "students": students_page,
@@ -5900,16 +6027,26 @@ def student_list(request):
         "selected_religion": religion,
         "selected_is_disability": is_disability,
         "is_archive": is_archive,
-        "total_count": total_count,
-        "assigned_count": assigned_count,
-        "unassigned_count": unassigned_count,
-        "paid_count": paid_count,
-        "debt_count": debt_count,
+        "total_count": stats['total'],
+        "assigned_count": stats['assigned'],
+        "unassigned_count": stats['unassigned'],
+        "paid_count": stats['paid'],
+        "debt_count": stats['debt'],
         "graduated_count": graduated_count,
         "search_query": search_query,
         "status_filter": status_filter,
+        "is_ajax": is_ajax,
+        # في طلبات الـ AJAX نتجنب رسم الهيكل الكامل (القوائم/الإشعارات...) فيقل الزمن كثيراً
+        "base_template": _student_list_base_template(is_ajax),
     }
     return render(request, "students/student_list.html", context)
+
+
+# أي تعديل مالي/طلابي يُجدّد عدادات سجل الطلاب فوراً
+from django.db.models.signals import post_save as _ps, post_delete as _pd
+for _m in (Student, Payment, StudentInstallment, StudentAccount):
+    _ps.connect(_bump_student_stats_version, sender=_m, weak=False, dispatch_uid=f'stu_stats_save_{_m.__name__}')
+    _pd.connect(_bump_student_stats_version, sender=_m, weak=False, dispatch_uid=f'stu_stats_del_{_m.__name__}')
 
 
 
