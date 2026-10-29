@@ -6,8 +6,9 @@ from .models import (
     Department, AttendanceRule, Employee,
     FingerprintLog, DailyAttendance, LeaveRequest,
     ShiftRoster,
-    MissionRequest, PermissionRequest,  # 🟢 تم استيراد موديلات المأموريات والأذونات
-    PenaltyRecord  # 🛡️ موديل الجزاء الإداري
+    MissionRequest, PermissionRequest,
+    PenaltyRecord,
+    PublicHoliday
 )
 
 # 1. تنسيق عرض الإدارات

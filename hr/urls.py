@@ -14,7 +14,7 @@ urlpatterns = [
     path('attendance/upload/', views.upload_and_process_attendance, name='upload_attendance'),
     # 🆕 المسار الجديد لتسجيل الانصراف اليدوي في حالات عطل البصمة
     path('attendance/manual-checkout/<int:record_id>/', views.manual_checkout, name='manual_checkout'),
-
+    path('attendance/manual-entry/', views.manual_attendance_entry, name='manual_attendance_entry'),
     path('attendance/export-excel/', views.export_attendance_excel, name='export_attendance_excel'),
 
     path('leaves/', views.leave_list, name='leave_list'),

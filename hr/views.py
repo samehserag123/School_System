@@ -55,6 +55,17 @@ from itertools import groupby
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
+
+
+def filter_by_employment_period(qs):
+    """يستبعد أي سجل حضور قبل تاريخ التعيين أو بعد تاريخ انتهاء العمل."""
+    return qs.filter(
+        Q(employee__hire_date__isnull=True) | Q(date__gte=F('employee__hire_date'))
+    ).filter(
+        Q(employee__end_date__isnull=True) | Q(date__lte=F('employee__end_date'))
+    )
+
+
 def export_attendance_excel(request):
     search_query = request.GET.get('q', '').strip()
     month = request.GET.get('month', '')
@@ -84,6 +95,9 @@ def export_attendance_excel(request):
             queryset = queryset.filter(date__gte=start_date, date__lte=end_date)
         except ValueError:
             pass
+
+    # 🟢 استبعاد الأيام قبل التعيين أو بعد انتهاء العمل (يُطبَّق دائماً)
+    queryset = filter_by_employment_period(queryset)
 
     # 3. إنشاء ملف Excel
     wb = openpyxl.Workbook()
@@ -125,6 +139,10 @@ def export_attendance_excel(request):
         emp_records = list(group)
         emp_name = employee.name if employee else "غير محدد"
         emp_code = employee.emp_id if employee else "-"
+
+        # اسم لائحة العمل (الشفت) للموظف
+        rule = getattr(employee, 'attendance_rule', None) if employee else None
+        shift_label = rule.name if rule else 'تابع السجل'
 
         # شريط بيانات الموظف
         ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=len(headers))
@@ -170,7 +188,7 @@ def export_attendance_excel(request):
 
             row_data = [
                 record.date.strftime('%Y-%m-%d') if record.date else '-',
-                getattr(record, 'shift_name', 'تابع السجل'),
+                shift_label,
                 record.check_in.strftime('%H:%M') if record.check_in else '-',
                 record.check_out.strftime('%H:%M') if record.check_out else '-',
                 late_display,
@@ -206,6 +224,82 @@ def export_attendance_excel(request):
     wb.save(response)
 
     return response
+
+
+def attendance_list(request):
+    today = timezone.localdate()
+
+    target_month = int(request.GET.get('month', today.month))
+    target_year = int(request.GET.get('year', today.year))
+    search_query = request.GET.get('q', '').strip()
+
+    prev_month = target_month - 1 if target_month > 1 else 12
+    prev_year = target_year if target_month > 1 else target_year - 1
+
+    cycle_start = date(prev_year, prev_month, 26)
+    cycle_end = date(target_year, target_month, 25)
+
+    attendance_query = DailyAttendance.objects.select_related('employee').filter(
+        date__gte=cycle_start,
+        date__lte=cycle_end
+    )
+    # 🟢 استبعاد الأيام قبل التعيين أو بعد انتهاء العمل
+    attendance_query = filter_by_employment_period(attendance_query)
+
+    if search_query:
+        if search_query.isdigit():
+            attendance_query = attendance_query.filter(employee__emp_id=search_query)
+        else:
+            pattern = search_query
+            pattern = re.sub(r'[اأإآ]', r'[اأإآ]', pattern)
+            pattern = re.sub(r'[هة]', r'[هة]', pattern)
+            pattern = re.sub(r'[يى]', r'[يى]', pattern)
+            attendance_query = attendance_query.filter(Q(employee__name__iregex=pattern))
+
+    attendance_query = attendance_query.order_by('employee__name', 'date')
+
+    paginator = Paginator(attendance_query, 50)
+    page_number = request.GET.get('page')
+    attendance = paginator.get_page(page_number)
+
+    # 🟢 جلب وقرن الجزاءات الإدارية المباشرة (PenaltyRecord) لكل يوم
+    page_records = list(attendance.object_list)
+    if page_records:
+        emp_ids = {r.employee_id for r in page_records}
+        penalties = PenaltyRecord.objects.filter(
+            employee_id__in=emp_ids,
+            date__gte=cycle_start,
+            date__lte=cycle_end
+        )
+
+        # خريطة للجزاءات الإدارية بحسب الموظف والتاريخ
+        penalties_map = {}
+        for p in penalties:
+            key = (p.employee_id, p.date)
+            penalties_map[key] = penalties_map.get(key, 0.0) + float(p.deduction_days)
+
+        # دمج الجزاء الإداري مع جزاء التحايل ليظهرا معاً
+        # (يُعرض فقط على سجلات الصفحة، وهي مفلترة مسبقاً بفترة التوظيف)
+        for r in page_records:
+            admin_p = penalties_map.get((r.employee_id, r.date), 0.0)
+            r.direct_admin_penalty = admin_p
+            r.total_day_penalty = float(r.administrative_penalty_days) + admin_p
+
+    context = {
+        'attendance': attendance,
+        'month': target_month,
+        'year': target_year,
+        'cycle_start': cycle_start,
+        'cycle_end': cycle_end,
+        'search_query': search_query,
+        'months_range': range(1, 13),
+        'years_range': range(today.year - 2, today.year + 3),
+        'all_employees': Employee.objects.filter(is_active=True).order_by('name'),
+        'today': today,
+    }
+
+    return render(request, 'hr/attendance_list.html', context)
+
 
 @require_POST
 @login_required
@@ -557,13 +651,12 @@ def leave_cancel(request, leave_id):
         if leave.status == 'approved':
             emp = leave.employee
 
-            # 🛑 إلغاء التعديل اليدوي للرصيد من هنا لمنع التكرار
-            # دالة leave.save() أدناه ستشعر بتغير الحالة من approved إلى rejected
-            # وتستدعي _update_employee_balance(operation='refund') تلقائياً.
+            # 🟢 الحل القاطع: استرداد الرصيد صراحةً فوراً قبل تغيير الحالة
+            leave._update_employee_balance(leave.duration_days, operation='refund')
 
-            # 1. تغيير حالة الطلب (سيقوم الموديل باسترداد الرصيد تلقائياً)
+            # 1. تغيير حالة الطلب إلى مرفوض/ملغي
             leave.status = 'rejected'
-            leave.save()
+            leave.save(update_fields=['status'])  # تحديث حقل الحالة فقط لتجنب أي تداخل
 
             # 2. تعديل سجل الحضور وتطبيق جزاء الغياب الصارم (3 أيام)
             DailyAttendance.objects.filter(
@@ -814,7 +907,8 @@ def get_payroll_data(year, month):
         admin_penalties = PenaltyRecord.objects.filter(
             employee=emp,
             date__gte=emp_effective_start,
-            date__lte=cycle_end
+            date__lte=emp_effective_end      # كانت cycle_end
+
         ).aggregate(
             total=Coalesce(Sum('deduction_days'), Value(0.0), output_field=FloatField())
         )['total']
@@ -1793,7 +1887,7 @@ def calculate_monthly_salary(request, employee_id, year, month):
 
     # 🟢 إضافة أيام خصم الجزاءات الإدارية الموقّعة (PenaltyRecord) لنفس الشهر
     penalty_records_this_month = PenaltyRecord.objects.filter(
-        employee=employee, date__gte=emp_effective_start, date__lte=cycle_end
+        employee=employee, date__gte=emp_effective_start, date__lte=emp_effective_end
     )
     total_penalty_record_days = penalty_records_this_month.aggregate(
         Sum('deduction_days')
@@ -1939,158 +2033,7 @@ def employee_list(request):
     return render(request, 'hr/employee_list.html', context)
 
 
-def attendance_list(request):
-    today = timezone.localdate()
 
-    target_month = int(request.GET.get('month', today.month))
-    target_year = int(request.GET.get('year', today.year))
-    search_query = request.GET.get('q', '').strip()
-
-    prev_month = target_month - 1 if target_month > 1 else 12
-    prev_year = target_year if target_month > 1 else target_year - 1
-
-    cycle_start = date(prev_year, prev_month, 26)
-    cycle_end = date(target_year, target_month, 25)
-
-    attendance_query = DailyAttendance.objects.select_related('employee').filter(
-        date__gte=cycle_start,
-        date__lte=cycle_end
-    )
-
-    if search_query:
-        if search_query.isdigit():
-            attendance_query = attendance_query.filter(employee__emp_id=search_query)
-        else:
-            pattern = search_query
-            pattern = re.sub(r'[اأإآ]', r'[اأإآ]', pattern)
-            pattern = re.sub(r'[هة]', r'[هة]', pattern)
-            pattern = re.sub(r'[يى]', r'[يى]', pattern)
-            attendance_query = attendance_query.filter(Q(employee__name__iregex=pattern))
-
-    attendance_query = attendance_query.order_by('employee__name', 'date')
-
-    paginator = Paginator(attendance_query, 50)
-    page_number = request.GET.get('page')
-    attendance = paginator.get_page(page_number)
-
-    # 🟢 جلب وقرن الجزاءات الإدارية المباشرة (PenaltyRecord) لكل يوم
-    page_records = list(attendance.object_list)
-    if page_records:
-        emp_ids = {r.employee_id for r in page_records}
-        penalties = PenaltyRecord.objects.filter(
-            employee_id__in=emp_ids,
-            date__gte=cycle_start,
-            date__lte=cycle_end
-        )
-
-        # خريطة للجزاءات الإدارية بحسب الموظف والتاريخ
-        penalties_map = {}
-        for p in penalties:
-            key = (p.employee_id, p.date)
-            penalties_map[key] = penalties_map.get(key, 0.0) + float(p.deduction_days)
-
-        # دمج الجزاء الإداري مع جزاء التحايل ليظهرا معاً
-        for r in page_records:
-            admin_p = penalties_map.get((r.employee_id, r.date), 0.0)
-            r.direct_admin_penalty = admin_p
-            r.total_day_penalty = float(r.administrative_penalty_days) + admin_p
-
-    context = {
-        'attendance': attendance,
-        'month': target_month,
-        'year': target_year,
-        'cycle_start': cycle_start,
-        'cycle_end': cycle_end,
-        'search_query': search_query,
-        'months_range': range(1, 13),
-        'years_range': range(today.year - 2, today.year + 3),
-        'all_employees': Employee.objects.filter(is_active=True).order_by('name'),
-        'today': today,
-    }
-
-    return render(request, 'hr/attendance_list.html', context)
-
-
-# def attendance_list(request):
-#     """
-#     سجل الحضور مع الدورة المحاسبية (26 إلى 25) والبحث العربي الذكي
-#     """
-#     today = timezone.localdate()
-
-#     # 1. جلب الشهر والسنة المستهدفين
-#     target_month = int(request.GET.get('month', today.month))
-#     target_year = int(request.GET.get('year', today.year))
-#     search_query = request.GET.get('q', '').strip()
-
-#     # 2. 🟢 حساب الدورة المحاسبية (من يوم 26 الشهر السابق إلى 25 الشهر الحالي)
-#     prev_month = target_month - 1 if target_month > 1 else 12
-#     prev_year = target_year if target_month > 1 else target_year - 1
-
-#     cycle_start = date(prev_year, prev_month, 26)
-#     cycle_end = date(target_year, target_month, 25)
-
-#     # تطبيق فلتر الدورة المحاسبية
-#     attendance_query = DailyAttendance.objects.select_related('employee').filter(
-#         date__gte=cycle_start,
-#         date__lte=cycle_end
-#     )
-
-#     # 3. محرك البحث الذكي (معدل)
-#     if search_query:
-#         if search_query.isdigit():
-#             # إذا كان الإدخال رقماً، نستخدم المطابقة التامة exact match مع كود البصمة
-#             attendance_query = attendance_query.filter(employee__emp_id=search_query)
-#         else:
-#             # إذا كان الإدخال نصاً، نطبق البحث المرن على اسم الموظف بحالات الهمزات والألف اللينة
-#             pattern = search_query
-#             pattern = re.sub(r'[اأإآ]', r'[اأإآ]', pattern)
-#             pattern = re.sub(r'[هة]', r'[هة]', pattern)
-#             pattern = re.sub(r'[يى]', r'[يى]', pattern)
-
-#             attendance_query = attendance_query.filter(
-#                 Q(employee__name__iregex=pattern)
-#             )
-
-#     # الترتيب: الموظف أولاً، ثم تسلسل الأيام
-#     attendance_query = attendance_query.order_by('employee__name', 'date')
-
-#     # الترقيم
-#     paginator = Paginator(attendance_query, 50)
-#     page_number = request.GET.get('page')
-#     attendance = paginator.get_page(page_number)
-
-#     # 🟢 إثراء سجلات هذه الصفحة (50 سجل بحد أقصى) بنوع الإجازة الفعلي
-#     # (سنوية/عارضة/مرضية) بدل عرض كلمة "إجازة" العامة فقط - مفيد خصوصاً
-#     # لتوضيح الإجازة المرضية بشكل منفصل في سجل الحضور
-#     leave_days = [r for r in attendance if r.status == 'leave']
-#     if leave_days:
-#         employee_ids = {r.employee_id for r in leave_days}
-#         relevant_leaves = list(LeaveRequest.objects.filter(
-#             employee_id__in=employee_ids,
-#             status='approved',
-#             start_date__lte=cycle_end,
-#             end_date__gte=cycle_start,
-#         ).values('employee_id', 'start_date', 'end_date', 'leave_type'))
-
-#         for r in leave_days:
-#             r.leave_type_code = None
-#             for lv in relevant_leaves:
-#                 if lv['employee_id'] == r.employee_id and lv['start_date'] <= r.date <= lv['end_date']:
-#                     r.leave_type_code = lv['leave_type']
-#                     break
-
-#     context = {
-#         'attendance': attendance,
-#         'month': target_month,
-#         'year': target_year,
-#         'cycle_start': cycle_start,
-#         'cycle_end': cycle_end,
-#         'search_query': search_query,
-#         'months_range': range(1, 13),
-#         'years_range': range(today.year - 2, today.year + 3),
-#     }
-
-#     return render(request, 'hr/attendance_list.html', context)
 
 
 def leave_list(request):
@@ -2258,7 +2201,8 @@ def leave_request_view(request):
         annual_taken = sum((l.end_date - l.start_date).days + 1 for l in emp_leaves if l.leave_type == 'annual')
 
         emp_balances[str(emp.id)] = {
-            'annual_balance': float(getattr(emp, 'annual_balance', 0) or 0),
+            'annual_balance': float(emp.remaining_annual_balance),  # 👈 استخدام الرصيد الديناميكي الفعلي
+
             'casual_balance': float(getattr(emp, 'casual_balance', 0) or 0),
             'taken_casual_month': float(casual_taken),
             'taken_annual_month': float(annual_taken),

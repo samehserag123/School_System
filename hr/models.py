@@ -314,7 +314,7 @@ class Employee(models.Model):
             )
         )
 
-        return round(accrued + manual_adjustment - used_days, 2)
+        return float(self.annual_balance or 0)
 
     def check_is_working_day(self, target_date):
         """
@@ -583,6 +583,47 @@ class DailyAttendance(models.Model):
         verbose_name = "سجل حضور يومي معالج"
         verbose_name_plural = "سجلات الحضور اليومية المعالجة"
 
+    def clean(self):
+        super().clean()
+        # منع إنشاء أو حفظ أي سجل حضور/غياب بعد تاريخ انتهاء التعاقد للموظف
+        if self.employee and self.employee.end_date and self.date > self.employee.end_date:
+            raise ValidationError("لا يمكن تسجيل حضور أو غياب لهذا الموظف بعد تاريخ انتهاء تعاقده.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def approved_leave(self):
+        """البحث الذكي عن أي إجازة معتمدة تغطي هذا اليوم للموظف"""
+        return self.employee.leave_requests.filter(
+            start_date__lte=self.date,
+            end_date__gte=self.date,
+            status='approved'
+        ).first()
+
+    @property
+    def leave_type_code(self):
+        """إرجاع كود نوع الإجازة (sick, casual, annual) إذا وجدت"""
+        leave = self.approved_leave
+        return leave.leave_type if leave else None
+
+    @property
+    def leave_type_name(self):
+        """إرجاع اسم نوع الإجازة بالعربية (مرضية، عارضة، اعتيادية)"""
+        leave = self.approved_leave
+        if leave:
+            types_dict = dict(LeaveRequest.TYPES)
+            return types_dict.get(leave.leave_type, leave.leave_type)
+        return None
+
+    @property
+    def is_permission(self):
+        """التحقق مما إذا كان هناك إذن خروج معتمد في هذا اليوم"""
+        return self.employee.permissions.filter(
+            date=self.date,
+            status='approved'
+        ).exists()
     def __str__(self):
         return f"{self.employee.name} | {self.date} | {self.get_status_display()}"
 
@@ -993,11 +1034,33 @@ class LeaveRequest(models.Model):
 
             super().save(*args, **kwargs)
 
+    @transaction.atomic
+    def delete(self, *args, **kwargs):
+        """
+        تجاوز دالة الحذف لضمان استرداد رصيد الموظف تلقائياً
+        إذا تم مسح إجازة كانت معتمدة (approved) بالفعل.
+        """
+        if self.status == 'approved':
+            # استرداد الأيام لرصيد الموظف قبل الحذف
+            self._update_employee_balance(self.duration_days, operation='refund')
+
+            # (اختياري واحترافي): إعادة ضبط سجلات الحضور المرتبطة لتصبح غياب أو طبيعية
+            DailyAttendance.objects.filter(
+                employee=self.employee,
+                date__range=[self.start_date, self.end_date],
+                status='leave'
+            ).update(
+                status='absent',
+                administrative_penalty_days=3.0
+            )
+
+        super().delete(*args, **kwargs)
+
     def _update_employee_balance(self, days, operation='deduct'):
         multiplier = -1 if operation == 'deduct' else 1
         days_to_apply = days * multiplier
 
-        # تحديث ذرّي (Atomic Update) في قاعدة البيانات
+        # 🟢 تحديث مباشر وثابت لأرصدة الاعتيادي، العارضة، والمرضية في قاعدة البيانات
         if self.leave_type == 'annual':
             Employee.objects.filter(pk=self.employee_id).update(
                 annual_balance=F('annual_balance') + days_to_apply
@@ -1325,3 +1388,38 @@ class PenaltyRecord(models.Model):
 
     def __str__(self):
         return f"{self.employee.name} - {self.get_penalty_type_display()} - خصم {self.deduction_days} يوم"
+
+
+
+
+from django.db.models.signals import pre_save, post_delete
+from django.dispatch import receiver
+
+# 1. التقاط عملية الحذف نهائياً (حتى من الـ Admin) واسترداد الرصيد
+@receiver(post_delete, sender=LeaveRequest)
+def restore_balance_on_delete(sender, instance, **kwargs):
+    if instance.status == 'approved':
+        instance._update_employee_balance(instance.duration_days, operation='refund')
+
+        # إعادة ضبط سجلات الحضور المرتبطة
+        DailyAttendance.objects.filter(
+            employee=instance.employee,
+            date__range=[instance.start_date, instance.end_date],
+            status='leave'
+        ).update(
+            status='absent',
+            administrative_penalty_days=3.0
+        )
+
+# 2. التقاط تغيير الحالة إلى مرفوض أو ملغي (سواء من الـ Admin أو النظام)
+@receiver(pre_save, sender=LeaveRequest)
+def restore_balance_on_status_change(sender, instance, **kwargs):
+    if instance.pk:
+        try:
+            old_instance = LeaveRequest.objects.get(pk=instance.pk)
+            # إذا كانت معتمدة وتم تغييرها لأي حالة أخرى (مثل rejected)
+            if old_instance.status == 'approved' and instance.status != 'approved':
+                instance._update_employee_balance(instance.duration_days, operation='refund')
+        except LeaveRequest.DoesNotExist:
+            pass
+
